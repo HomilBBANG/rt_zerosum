@@ -99,8 +99,12 @@ func _ready() -> void:
 	var s := _big_button("바로 전투 시작", Color(1.0, 0.5, 0.3))
 	s.pressed.connect(func(): Game.restart_count = 0; Game.start_battle())
 	btn_row.add_child(s)
+	var bb := _big_button("리그 벤치", Color(0.9, 0.8, 0.3))
+	bb.pressed.connect(func(): get_tree().change_scene_to_file(Game.SCENE_BENCH))
+	btn_row.add_child(bb)
 	box.add_child(_label("전투 중: 1~4 조명 프리셋 전환 · Tab 2D/3D 즉시 전환 · F1 디버그 패널 · R 재시작 · Space 턴 종료", 13, Color(0.8, 0.9, 0.9)))
-	Game.maybe_cli_capture()
+	if Game.cli.get("scene", "menu") == "menu":
+		Game.maybe_cli_capture()
 
 
 func _sync_mode() -> void:

@@ -451,13 +451,7 @@ func _refresh_panel() -> void:
 	stat_label.text = "HP %d/%d    AP %d/%d (+%d/턴)    속도 %d" % [u.hp, u.data.max_hp, u.ap, u.data.max_ap, u.data.ap_recovery, u.data.speed]
 	var w := u.current_weapon()
 	weapon_label.text = "무기: %s (%s, 위력 %+d)   위치: %s %d" % [w.name, "원거리" if w.range_type == "ranged" else "근접", int(w.power_bonus), SlotManager.ROW_NAMES[u.row], u.index + 1]
-	var meta: Dictionary = manifest.units.get(u.data.sprite_id, {})
-	var tex: Texture2D = load("res://assets/sprites/%s.png" % u.data.sprite_id)
-	var at := AtlasTexture.new()
-	at.atlas = tex
-	var hr: Array = meta.get("head_rect", [64, 36, 128, 128])
-	at.region = Rect2(hr[0], hr[1], hr[2], hr[3])
-	portrait.texture = at
+	portrait.texture = UnitArt.portrait(u.data.sprite_id, manifest)
 	portrait.flip_h = u.team == "enemy"
 	var is_player := controller.is_player_turn() and not view.busy
 	for o in controller.get_command_options():

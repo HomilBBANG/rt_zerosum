@@ -6,7 +6,7 @@ const SCENE_FORMATION := "res://scenes/formation.tscn"
 const SCENE_BATTLE_2D := "res://scenes/battle_2d.tscn"
 const SCENE_BATTLE_3D := "res://scenes/battle_3d.tscn"
 const SCENE_RESULT := "res://scenes/result.tscn"
-const SCENE_LAB := "res://scenes/lighting_lab.tscn"
+const SCENE_BENCH := "res://scenes/rig_bench.tscn"
 
 var mode: String = "2d"            # "2d" | "3d"
 var preset: String = "g1"          # LightingPresets 키
@@ -57,8 +57,8 @@ func _cli_jump() -> void:
 			get_tree().change_scene_to_file(SCENE_FORMATION)
 		"menu":
 			pass
-		"lab":
-			get_tree().change_scene_to_file(SCENE_LAB)
+		"bench":
+			get_tree().change_scene_to_file(SCENE_BENCH)
 		"result":
 			last_result = {"winner": cli.get("winner", "ally"), "rounds": 4, "mode": mode,
 				"log": PackedStringArray(["(CLI 미리보기) 전투 로그 예시", "라운드 4 시작: 라온 → 저격수 → ...", "라온 → 지휘관: 필살기 21 피해 (전투 불능)", "전투 종료: 아군 승리"])}

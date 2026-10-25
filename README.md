@@ -11,6 +11,12 @@
 
 렌더러는 `gl_compatibility` 로 두었습니다(저사양/소프트웨어 렌더 검증 포함). Forward+ 로 바꿔도 셰이더는 그대로 동작합니다.
 
+## Skeleton2D 리그 (2D 확정 후 비용 테스트)
+사용자 제공 원화 1장을 `tools/rig_cutter.py` 로 17개 파츠 + 16개 본 + 파츠별 구역 마스크로 잘라 `assets/sprites/rig_hero/` 에 두고,
+`RiggedUnit2D` 가 rig.json 으로 Bone2D 트리와 애니메이션(idle/attack/hit/heal/death)을 만든다. 아군 '라온' 슬롯이 이 캐릭터다.
+비용 측정 결과와 파이프라인은 `docs/skeleton2d_cost.md`, 벤치는 메뉴의 "리그 벤치" 또는
+`++ --scene=bench --count=48 --rig=1` (B 본 표시, Tab 평면↔리그, +/- 인원).
+
 ## 규칙 테스트 (헤드리스)
 ```
 godot --headless --path . --import          # 최초 1회 (클래스 캐시 생성)
@@ -30,14 +36,14 @@ CLI 인자(`++` 뒤): `--scene=battle|formation|result|menu --mode=2d|3d --prese
 scenes/            main_menu, formation, battle_2d, battle_3d, battle_hud, result
 scripts/battle/    규칙 계층 (표현 비의존): unit_data, action_data, unit_runtime, slot_manager,
                    turn_scheduler, ap_component, target_validator, action_resolver, enemy_ai, battle_controller
-scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d + unit_sprite_2d + slot_marker_2d,
+scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d + unit_sprite_2d + rigged_unit_2d + slot_marker_2d,
                    battle_view_3d + unit_model_3d, lighting_presets
 scripts/ui/        battle_hud, main_menu, formation, result
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_zoned_lighting (2D, v0.3), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/sprites/    생성된 캐릭터/무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + manifest.json
 assets/textures/   배경 플레이트 + 마스크, 3D 얼굴 데칼
-tools/             gen_sprites.py (원화·마스크 생성기), render_shots.sh
+tools/             gen_sprites.py (원화·마스크 생성기), rig_cutter.py (원화→리그 파츠), render_shots.sh
 tests/             run_tests.gd
 docs/              design/ (기획서 사본), screenshots/, 2D_vs_3D_comparison.md
 ```

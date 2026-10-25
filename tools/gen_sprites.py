@@ -284,19 +284,34 @@ def draw_character(spec):
     return img1, mask, mask_l, meta
 
 
-def build_zone_mask(img1, unlit_marks, light_from="right", rim=5):
-    """per-row silhouette split: key side (toward light) / ambient band / shadow side, rim accent on shadow edge."""
+def build_zone_mask(img1, unlit_marks, light_from="right", rim=5, smooth=0):
+    """per-row silhouette split: key side (toward light) / ambient band / shadow side, rim accent on shadow edge.
+    smooth>0: 행별 실루엣 좌/우 경계를 세로 이동평균으로 부드럽게 해 터미네이터의 계단을 줄인다."""
     w, h = img1.size
     a = img1.split()[3]
     px = a.load()
     mask = Image.new("L", (w, h), Z_AMBIENT)
     mp = mask.load()
+    rows = []
     for y in range(h):
         xs = [x for x in range(w) if px[x, y] > 40]
-        if not xs:
+        rows.append((xs[0], xs[-1], xs) if xs else None)
+    edges = {}
+    for y in range(h):
+        if rows[y] is None:
             continue
-        x0, x1 = xs[0], xs[-1]
-        width = max(1, x1 - x0)
+        if smooth > 0:
+            lo = max(0, y - smooth); hi = min(h, y + smooth + 1)
+            ys = [rows[k] for k in range(lo, hi) if rows[k] is not None]
+            edges[y] = (sum(r[0] for r in ys) / len(ys), sum(r[1] for r in ys) / len(ys))
+        else:
+            edges[y] = (rows[y][0], rows[y][1])
+    for y in range(h):
+        if rows[y] is None:
+            continue
+        xs = rows[y][2]
+        x0, x1 = edges[y]
+        width = max(1.0, x1 - x0)
         # slight diagonal: terminator shifts with height
         yn = y / h
         # 빛 받는 면을 60% 안팎으로: 얼굴이 절반으로 갈리지 않고 '큰 덩어리 그림자' 가 반대쪽에 남도록
@@ -312,8 +327,8 @@ def build_zone_mask(img1, unlit_marks, light_from="right", rim=5):
                 v = Z_AMBIENT
             else:
                 v = Z_SHADOW
-            # rim on the shadow-side silhouette edge
-            d_edge = (x - x0) if light_from == "right" else (x1 - x)
+            # rim on the shadow-side silhouette edge (실제 경계 기준)
+            d_edge = (x - rows[y][0]) if light_from == "right" else (rows[y][1] - x)
             if d_edge < rim:
                 v = Z_ACCENT
             mp[x, y] = v

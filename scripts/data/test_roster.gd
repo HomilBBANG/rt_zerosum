@@ -54,7 +54,7 @@ static func _unit(id: String, name: String, team: String, role: String, lvl: int
 	for x in weapons:
 		w.append(x)
 	u.weapons = w
-	u.sprite_id = id
+	u.sprite_id = palette.get("sprite_id", id)
 	u.default_row = row
 	u.default_index = idx
 	u.palette = palette
@@ -86,7 +86,7 @@ static func build_allies() -> Array[UnitData]:
 		_unit("a_raon", "라온", "ally", "저격수", 6, 11, "ranged", 24, 5, 2, 0,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("sniper", "저격총", "ranged", 3), W("knife", "단검", "melee", 0)], 2, 0,
-			{"skin": "#f1c7ad", "hair": "#6e5cc9", "jacket": "#2e3d5c", "pants": "#1e222c", "accent": "#b8ff5e", "eyes": "#e0b84a", "hair_style": "long"}),
+			{"skin": "#f4cdb6", "hair": "#8a3a2a", "jacket": "#1a1a1e", "pants": "#17171a", "accent": "#d9d9e0", "eyes": "#6a6f78", "hair_style": "long", "sprite_id": "hero"}),
 		_unit("a_doyun", "도윤", "ally", "통신병", 5, 9, "ranged", 26, 8, 3, 0,
 			["basic_attack", "rally", "heal", "ultimate"],
 			[W("smg", "기관단총", "ranged", 0), W("club", "곤봉", "melee", 1)], 2, 1,

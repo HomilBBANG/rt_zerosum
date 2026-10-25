@@ -5,7 +5,9 @@ extends Node2D
 signal clicked(unit: UnitRuntime)
 
 const SHADER := preload("res://shaders/cel_zoned_lighting.gdshader")
+const RIG_SCRIPT := preload("res://scripts/presentation/rigged_unit_2d.gd")
 const BASE_SCALE := 0.5
+const WEAPON_RIG_SCALE := 3.2  # 무기 원화(캐릭터 460px 기준) → 리그 원화(1475px) 비율
 
 var unit: UnitRuntime
 var manifest: Dictionary
@@ -21,6 +23,12 @@ var _bob_t: float = 0.0
 var _flash: float = 0.0
 var _dead_alpha: float = 1.0
 var ui_accent: Color = Color(1, 0.9, 0.4)
+var rig: RiggedUnit2D = null
+var rig_height: float = 232.0
+
+
+func is_rigged() -> bool:
+	return rig != null
 
 
 func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
@@ -33,6 +41,9 @@ func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
 	if unit.team == "enemy":
 		flip.scale.x = -1.0
 	flip.scale *= BASE_SCALE
+	if UnitArt.has_rig(unit.data.sprite_id):
+		_build_rigged(meta)
+		return
 	body = Sprite2D.new()
 	body.name = "Body"
 	body.centered = false
@@ -70,6 +81,47 @@ func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
 	_update_light_masks()
 	z_index = 10
 
+## Skeleton2D 리그 경로: 파츠별 셰이더/마스크, 무기는 손 본에 부착
+func _build_rigged(_meta: Dictionary) -> void:
+	rig = RIG_SCRIPT.new()
+	rig.name = "Rig"
+	flip.add_child(rig)
+	rig.scale = Vector2.ONE / BASE_SCALE
+	rig.build(UnitArt.rig_dir(unit.data.sprite_id), false)
+	rig_height = -rig.head_top_local().y + 6.0
+	mat = rig.mats[0]
+	weapon = Sprite2D.new()
+	weapon.name = "Weapon"
+	weapon.centered = false
+	wmat = ShaderMaterial.new()
+	wmat.shader = SHADER
+	weapon.material = wmat
+	weapon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	rig.attach_weapon(weapon)
+	weapon.scale = Vector2.ONE * WEAPON_RIG_SCALE
+	weapon.z_index = 9
+	refresh_weapon()
+	area = Area2D.new()
+	area.input_pickable = true
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(110.0, rig_height)
+	shape.shape = rect
+	shape.position = Vector2(0, -rig_height * 0.5)
+	area.add_child(shape)
+	area.input_event.connect(_on_area_input)
+	add_child(area)
+	_update_light_masks()
+	z_index = 10
+
+
+func _all_mats() -> Array:
+	if rig != null:
+		var arr: Array = rig.mats.duplicate()
+		arr.append(wmat)
+		return arr
+	return [mat, wmat]
+
 
 func refresh_weapon() -> void:
 	var w := unit.current_weapon()
@@ -96,7 +148,10 @@ func _update_light_masks() -> void:
 	if unit.team == "enemy":
 		tex_from_right = not tex_from_right
 	var suffix := "_mask_r" if tex_from_right else "_mask_l"
-	mat.set_shader_parameter("zone_mask", load("res://assets/sprites/%s%s.png" % [unit.data.sprite_id, suffix]))
+	if rig != null:
+		rig.set_light_direction(light_from_right)
+	else:
+		mat.set_shader_parameter("zone_mask", load("res://assets/sprites/%s%s.png" % [unit.data.sprite_id, suffix]))
 	if weapon.visible:
 		var wid: String = unit.current_weapon().get("id", "")
 		wmat.set_shader_parameter("zone_mask", load("res://assets/sprites/w_%s%s.png" % [wid, suffix]))
@@ -107,7 +162,7 @@ func apply_lighting(p: Dictionary, zone: String) -> void:
 	ui_accent = p.get("ui_accent", ui_accent)
 	# 캐릭터는 의상 고유색 식별을 위해 그림자 색을 배경보다 약간 밝게 (§3.1 '피부·의상 식별 유지')
 	var char_shadow := Color(minf(1.0, p.shadow.r * 1.9), minf(1.0, p.shadow.g * 1.9), minf(1.0, p.shadow.b * 1.9))
-	for m in [mat, wmat]:
+	for m in _all_mats():
 		m.set_shader_parameter("shadow_tint", char_shadow)
 		m.set_shader_parameter("ambient_tint", p.ambient)
 		match zone:
@@ -173,14 +228,17 @@ func _process(delta: float) -> void:
 		return
 	_bob_t += delta * (2.2 if highlight_kind == "current" else 1.4)
 	var amp := 2.5 if highlight_kind == "current" else 1.5
-	flip.position.y = sin(_bob_t + float(unit.instance_id)) * amp
+	if rig == null:
+		flip.position.y = sin(_bob_t + float(unit.instance_id)) * amp
 	if _flash > 0.0:
 		_flash = maxf(0.0, _flash - delta * 4.0)
-		for m in [mat, wmat]:
+		for m in _all_mats():
 			m.set_shader_parameter("flash_color", Color(1, 1, 1, _flash))
 
 
 func head_screen_offset() -> Vector2:
+	if rig != null:
+		return Vector2(0, -rig_height - 6)
 	var meta: Dictionary = manifest.units.get(unit.data.sprite_id, {})
 	var h: float = float(meta.get("height", 460)) * BASE_SCALE
 	return Vector2(0, -h - 6)
@@ -194,6 +252,8 @@ func _on_area_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void
 
 # ---------------------------------------------------------------- 연출
 func play_attack(toward_right: bool, ranged: bool) -> Tween:
+	if rig != null:
+		rig.play("attack")
 	var tw := create_tween()
 	var dir := 1.0 if toward_right else -1.0
 	if ranged:
@@ -207,18 +267,31 @@ func play_attack(toward_right: bool, ranged: bool) -> Tween:
 
 func play_hit() -> void:
 	_flash = 1.0
+	if rig != null:
+		rig.play("hit")
+		return
 	var tw := create_tween()
 	tw.tween_property(flip, "rotation", -0.12 if unit.team == "ally" else 0.12, 0.06)
 	tw.tween_property(flip, "rotation", 0.0, 0.16)
 
 
 func play_heal() -> void:
+	if rig != null:
+		rig.play("heal")
+		return
 	var tw := create_tween()
 	tw.tween_property(flip, "scale", flip.scale * 1.06, 0.12)
 	tw.tween_property(flip, "scale", flip.scale, 0.18)
 
 
 func play_death() -> void:
+	if rig != null:
+		rig.play("death")
+		var tw2 := create_tween()
+		tw2.tween_property(flip, "modulate", Color(0.45, 0.45, 0.5, 0.65), 0.8)
+		z_index = 5
+		set_highlight("none")
+		return
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(flip, "rotation", (-1.35 if unit.team == "ally" else 1.35), 0.45).set_trans(Tween.TRANS_BOUNCE)

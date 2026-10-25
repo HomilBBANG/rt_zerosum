@@ -88,11 +88,7 @@ func _ready() -> void:
 
 
 func _portrait(u: UnitData) -> Texture2D:
-	var at := AtlasTexture.new()
-	at.atlas = load("res://assets/sprites/%s.png" % u.sprite_id)
-	var hr: Array = manifest.units.get(u.sprite_id, {}).get("head_rect", [64, 36, 128, 128])
-	at.region = Rect2(hr[0], hr[1], hr[2], hr[3])
-	return at
+	return UnitArt.portrait(u.sprite_id, manifest)
 
 
 func _select(uid: String) -> void:

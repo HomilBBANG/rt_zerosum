@@ -175,7 +175,10 @@ func build(p_unit: UnitRuntime) -> void:
 	face.size = Vector2(0.4, 0.2)
 	var fm := ShaderMaterial.new()
 	fm.shader = UNLIT
-	fm.set_shader_parameter("tex", load("res://assets/textures/face_%s.png" % unit.data.sprite_id))
+	var face_path := "res://assets/textures/face_%s.png" % unit.data.sprite_id
+	if not ResourceLoader.exists(face_path):
+		face_path = "res://assets/textures/face_a_raon.png"
+	fm.set_shader_parameter("tex", load(face_path))
 	var fmi := _mesh(face, fm, Vector3(0, head_y - 0.01, head_r * 0.96))
 	fmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# 무기
