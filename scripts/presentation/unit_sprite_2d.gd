@@ -27,11 +27,6 @@ var _dead_alpha: float = 1.0
 var ui_accent: Color = Color(1, 0.9, 0.4)
 var rig: RiggedUnit2D = null
 var rig_height: float = 232.0
-const PX_PER_M := 230.0 / 1.75   # 리그 키 230px = 1.75m (스프라이트 로컬 픽셀)
-var _lm_tex: ImageTexture = null
-var _lm_local := Rect2()
-var _lm_xf := Transform2D()
-var _face_band := Vector2(-1, -1)
 
 
 func is_rigged() -> bool:
@@ -181,89 +176,75 @@ func _update_light_masks() -> void:
 		wmat.set_shader_parameter("near_rim_mask", load("res://assets/sprites/w_%s%s.png" % [wid, opposite]))
 
 
-## 장면 팔레트 공통 값 (셰이더 v7): 빛 없는 면은 주변광 색상으로, 형태 그림자면은 그림자 색상으로 물든다
-func _apply_palette(m: ShaderMaterial, p: Dictionary) -> void:
-	m.set_shader_parameter("shadow_tint", p.shadow)
-	m.set_shader_parameter("ambient_tint", p.ambient)
-	m.set_shader_parameter("palette_mix", float(p.get("char_palette_mix", 0.65)))
-	m.set_shader_parameter("shadow_hue", 0.70)
-	m.set_shader_parameter("shadow_depth", 0.80)
-	m.set_shader_parameter("key_mix", float(p.get("char_light_mix", 0.85)))
-	m.set_shader_parameter("use_rim", Game.rim_enabled)
-	m.set_shader_parameter("debug_view", int(Game.cli.get("charview", "0")))
-	# 얼굴은 원화색을 더 남겨 입술·피부·눈썹이 팔레트에 묻히지 않게
-	# (빛 지도 모드는 몸 높이 띠로 이어지게 적용, 2D 배경 모드는 head 파츠만)
-	m.set_shader_parameter("face_keep", 0.5 if (_lm_tex != null or _is_head_mat(m)) else 0.0)
-	m.set_shader_parameter("face_band", _face_band)
-	_apply_eye_paint(m)
-
-
-func _is_head_mat(m: ShaderMaterial) -> bool:
-	if rig == null:
-		return false
-	var i: int = rig.mats.find(m)
-	return i >= 0 and rig.part_names[i] == "head"
-
-
-## 2D 배경 모드 프리셋 적용. zone: "key" | "accent" | "ambient" — 유닛이 서 있는 빛 영역 (빛 지도 없음)
+## 프리셋 적용. zone: "key" | "accent" | "ambient" — 유닛이 서 있는 빛 영역
 func apply_lighting(p: Dictionary, zone: String) -> void:
 	ui_accent = p.get("ui_accent", ui_accent)
 	for m in _all_mats():
-		_apply_palette(m, p)
-		m.set_shader_parameter("use_light_map", false)
+		m.set_shader_parameter("shadow_tint", p.shadow)
+		m.set_shader_parameter("ambient_tint", p.ambient)
 		match zone:
 			"accent":
+				# 보조광(창문) 영역: 주조명 = 보조광색, 림 = 주조명색
 				m.set_shader_parameter("key_color", p.accent)
 				m.set_shader_parameter("accent_color", p.key)
+				m.set_shader_parameter("key_mix", 0.62)
 			"ambient":
-				m.set_shader_parameter("key_color", Color.BLACK)
+				# 두 빛 사이: 고유색이 가장 잘 보이는 구역. 약한 주변광, 선명한 주조명 림
+				m.set_shader_parameter("key_color", p.ambient.lightened(0.5))
 				m.set_shader_parameter("accent_color", p.key)
+				m.set_shader_parameter("key_mix", 0.3)
 			_:
 				m.set_shader_parameter("key_color", p.key)
 				m.set_shader_parameter("accent_color", p.accent)
+				m.set_shader_parameter("key_mix", 0.62)
+		m.set_shader_parameter("accent_mix", 0.85)
+		m.set_shader_parameter("shadow_depth", 0.78)
+		m.set_shader_parameter("shadow_hue", 0.40)
+		m.set_shader_parameter("use_near_rim", false)
+		m.set_shader_parameter("use_rim", Game.rim_enabled)
+		m.set_shader_parameter("debug_view", int(Game.cli.get("charview", "0")))
+		_apply_eye_paint(m)
 
 
-## 3D 배경 모드: 3D 광원이 캐릭터 몸 위 어디에 닿는지 계산한 빛 지도로 명암을 정한다.
-## 빛 지도는 발 기준 폭 lm_w × 높이 lm_h (m) 영역. from_right: 가장 센 빛이 오는 쪽 (형태 그림자 방향).
-func apply_light_map(p: Dictionary, img: Image, from_right: bool, lm_w: float, lm_h: float) -> void:
+## 3D 배경 모드: 캐릭터 위치에 실제로 닿는 빛으로 명암을 정한다.
+## - 닿는 빛이 있으면: 빛 쪽 얼굴·몸을 그 광원색으로 밝힘(키), 반대편은 셀 그림자.
+##   빛이 뒤(벽의 창·문)에서 오면 빛 쪽 가장자리에 같은 색 림을 더함(역광이 몸을 감싸는 느낌).
+##   반대편 가장자리 림은 그쪽에서 실제로 오는 두 번째 빛이 있을 때만.
+## - 닿는 빛이 없으면: 주변광만, 림 없음
+func apply_light_probe(p: Dictionary, key: Dictionary, rim: Dictionary) -> void:
 	ui_accent = p.get("ui_accent", ui_accent)
-	if _lm_tex == null or Vector2i(_lm_tex.get_size()) != img.get_size():
-		_lm_tex = ImageTexture.create_from_image(img)
-	else:
-		_lm_tex.update(img)
-	_lm_local = Rect2(-lm_w * 0.5 * PX_PER_M, -lm_h * PX_PER_M, lm_w * PX_PER_M, lm_h * PX_PER_M)
-	_face_band = _face_band_for(lm_h)
+	var from_right := true
+	var ambient: Color = p.ambient
 	for m in _all_mats():
-		_apply_palette(m, p)
-		m.set_shader_parameter("use_light_map", true)
-		m.set_shader_parameter("light_map", _lm_tex)
-	_lm_xf = Transform2D(0.0, Vector2(-INF, -INF))
-	_update_lm_rect()
+		m.set_shader_parameter("shadow_tint", p.shadow)
+		m.set_shader_parameter("ambient_tint", ambient)
+		var far_rim := false
+		var near_rim := false
+		if key.is_empty():
+			m.set_shader_parameter("key_color", ambient.lightened(0.5))
+			m.set_shader_parameter("key_mix", 0.25)
+			m.set_shader_parameter("shadow_depth", 0.86)
+			m.set_shader_parameter("shadow_hue", 0.30)
+		else:
+			var k := clampf(float(key.intensity) / 3.0, 0.0, 1.0)
+			from_right = key.from_right
+			m.set_shader_parameter("key_color", key.color)
+			m.set_shader_parameter("key_mix", lerpf(0.45, 0.70, k))
+			m.set_shader_parameter("shadow_depth", 0.80)
+			m.set_shader_parameter("shadow_hue", 0.35)
+			if key.get("behind", false) and Game.rim_enabled:
+				near_rim = true
+				m.set_shader_parameter("near_rim_color", key.color)
+				m.set_shader_parameter("near_rim_mix", lerpf(0.7, 0.92, k))
+			if not rim.is_empty() and Game.rim_enabled:
+				far_rim = true
+				m.set_shader_parameter("accent_color", rim.color)
+				m.set_shader_parameter("accent_mix", clampf(0.45 + float(rim.intensity) / 4.0, 0.45, 0.85))
+		m.set_shader_parameter("use_rim", far_rim)
+		m.set_shader_parameter("use_near_rim", near_rim)
+		m.set_shader_parameter("debug_view", int(Game.cli.get("charview", "0")))
+		_apply_eye_paint(m)
 	set_light_direction(from_right)
-
-
-## 얼굴 보존 띠 (빛 지도 v 좌표): 턱 높이 위는 얼굴, 목까지 서서히 풀림. 리그의 head_rect 아래쪽 = 턱.
-func _face_band_for(lm_h: float) -> Vector2:
-	if rig == null or not rig.rig.has("head_rect") or not rig.rig.has("figure_px"):
-		return Vector2(-1, -1)
-	var hr: Array = rig.rig.head_rect
-	var chin_up: float = (float(rig.rig.ground[1]) - (float(hr[1]) + float(hr[3]))) / float(rig.rig.figure_px)   # 키 대비 턱 높이
-	var h_m := 1.75 * unit.data.height_cm / 175.0
-	var v := 1.0 - chin_up * h_m / lm_h
-	return Vector2(v - 0.01, v + 0.06)
-
-
-## 빛 지도 영역을 캔버스 좌표로 (이동 트윈 중에도 따라가도록 매 프레임 확인)
-func _update_lm_rect() -> void:
-	var gt := get_global_transform()
-	if gt.is_equal_approx(_lm_xf):
-		return
-	_lm_xf = gt
-	var tl: Vector2 = gt * _lm_local.position
-	var br: Vector2 = gt * _lm_local.end
-	var r := Vector4(tl.x, tl.y, br.x - tl.x, br.y - tl.y)
-	for m in _all_mats():
-		m.set_shader_parameter("lm_rect", r)
 
 
 ## 로스터 eye_paint 가 있으면 눈동자를 그 색으로 진하게 칠하고, 없으면 원화 눈 색 그대로 둔다.
@@ -312,8 +293,6 @@ func draw_ellipse_poly(center: Vector2, radii: Vector2, color: Color, filled: bo
 
 
 func _process(delta: float) -> void:
-	if _lm_tex != null:
-		_update_lm_rect()
 	if not unit.alive:
 		return
 	_bob_t += delta * (2.2 if highlight_kind == "current" else 1.4)

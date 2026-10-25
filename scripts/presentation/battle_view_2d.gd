@@ -287,25 +287,21 @@ func _process(_delta: float) -> void:
 func relight() -> void:
 	if bg3d == null:
 		return
-	var bodies: Dictionary = {}
-	for id in sprites:
-		var u: UnitRuntime = sprites[id].unit
-		bodies[id] = {"pos": slot_world(u.team, u.row, u.index), "height": 1.75 * (u.data.height_cm / 175.0), "alive": u.alive}
 	for id in sprites:
 		var s: UnitSprite2D = sprites[id]
 		var u: UnitRuntime = s.unit
-		var w: Vector3 = bodies[id].pos
-		var h: float = bodies[id].height
+		var w := slot_world(u.team, u.row, u.index)
+		var h := 1.75 * (u.data.height_cm / 175.0)
 		bg3d.set_shadow_proxy(id, w, h, u.alive, u.data.sprite_id, u.team == "enemy")
-		# 다른 (살아 있는) 캐릭터가 빛을 가리면 그 그림자 속
-		var blockers: Array = []
-		for oid in bodies:
-			if oid != id and bodies[oid].alive:
-				blockers.append(bodies[oid])
-		var img: Image = bg3d.light_map(w, h, blockers)
 		var probes: Array = bg3d.light_probe(w, h)
-		var from_right: bool = probes[0].from_right if not probes.is_empty() else true
-		s.apply_light_map(preset, img, from_right, BG3D_SCRIPT.LM_W, h * BG3D_SCRIPT.LM_H_K)
+		var key: Dictionary = probes[0] if not probes.is_empty() and probes[0].intensity > 0.3 else {}
+		var rim: Dictionary = {}
+		if not key.is_empty():
+			for pr in probes.slice(1):
+				if pr.from_right != key.from_right and pr.intensity > 0.3:
+					rim = pr
+					break
+		s.apply_light_probe(preset, key, rim)
 	_rerender_bg()
 
 
