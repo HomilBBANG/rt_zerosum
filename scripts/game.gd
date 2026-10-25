@@ -17,7 +17,7 @@ var allies: Array[UnitData] = []
 var enemies: Array[UnitData] = []
 var actions: Dictionary = {}
 var restart_count: int = 0
-var rim_enabled: bool = true      # 캐릭터 림 라인 (F3 토글, CLI --rim=0)
+var rim_enabled: bool = true      # 캐릭터 림 라인: 사용 확정(2026-10-25). F3 토글·CLI --rim=0 은 비교·디버그용
 var last_result: Dictionary = {}
 var cli: Dictionary = {}
 
