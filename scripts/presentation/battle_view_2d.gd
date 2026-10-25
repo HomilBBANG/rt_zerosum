@@ -8,7 +8,7 @@ const UNIT_SCRIPT := preload("res://scripts/presentation/unit_sprite_2d.gd")
 @onready var world: Node2D = $World
 @onready var bg: Sprite2D = $World/Background
 @onready var units_root: Node2D = $World/Units
-var back_bars: Node2D   # 발밑 체력 바 층: 캐릭터(z 10~)와 쓰러진 캐릭터(z 5)보다 아래
+var back_bars: Node2D   # 발밑 체력 칸 층: 캐릭터·하이라이트 링보다 위 (월드 안 제일 위)
 @onready var markers_root: Node2D = $World/Markers
 @onready var clear_rect: ColorRect = $Clear
 
@@ -115,7 +115,7 @@ func _ready() -> void:
 	_make_camera()
 	back_bars = Node2D.new()
 	back_bars.name = "BackBars"
-	back_bars.z_index = 2
+	back_bars.z_index = 100   # 캐릭터·하이라이트 링보다 위 (제일 위)
 	world.add_child(back_bars)
 	back_bars.draw.connect(_draw_back_bars)
 
@@ -295,7 +295,7 @@ func get_unit_screen_pos(unit: UnitRuntime) -> Vector2:
 	return world.get_global_transform_with_canvas() * (s.position + s.head_screen_offset() * s.scale.y)
 
 
-## 발밑 체력 칸: 월드 안에서 모든 캐릭터보다 아래 층(z)에 그려 캐릭터를 가리지 않는다.
+## 발밑 체력 칸: 월드 안에서 제일 위 층에 그려 하이라이트 링·캐릭터에 가리지 않는다.
 func draws_back_bars() -> bool:
 	return true
 
