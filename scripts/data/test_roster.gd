@@ -133,7 +133,7 @@ static func build_provided_allies() -> Array[UnitData]:
 		_unit("a_kira", "키라", "ally", "돌격병", 5, 10, "melee", 40, 6, 2, 1,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("knife", "전투단검", "melee", 2), W("pistol", "권총", "ranged", 0)], 0, 1,
-			{"skin": "#f2b8a2", "hair": "#4a2c24", "jacket": "#4f4240", "pants": "#4a3f3c", "accent": "#e8e4e0", "eyes": "#6e6e74", "eye_paint": "#c8d4ff", "hair_style": "ponytail", "sprite_id": "kira", "height_cm": 165.0}),
+			{"skin": "#f2b8a2", "hair": "#4a2c24", "jacket": "#4f4240", "pants": "#4a3f3c", "accent": "#e8e4e0", "eyes": "#6e6e74", "eye_paint": "#c8d4ff", "hair_style": "ponytail", "sprite_id": "kira", "height_cm": 175.0}),
 		_unit("a_nikita", "니키타", "ally", "저격수", 6, 11, "ranged", 24, 5, 2, 0,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("sniper", "저격총", "ranged", 3), W("knife", "단검", "melee", 0)], 2, 1,
@@ -148,18 +148,18 @@ static func build_provided_allies() -> Array[UnitData]:
 
 static func build_provided_enemies() -> Array[UnitData]:
 	var out: Array[UnitData] = [
-		_unit("e_kira", "적 돌격병", "enemy", "돌격병", 5, 10, "melee", 40, 6, 2, 1,
-			["basic_attack", "heavy_attack"],
-			[W("knife", "전투단검", "melee", 2)], 0, 1,
-			{"skin": "#f2b8a2", "hair": "#4a2c24", "jacket": "#4f4240", "pants": "#4a3f3c", "accent": "#ff5c5c", "eyes": "#6e6e74", "eye_paint": "#c8d4ff", "hair_style": "ponytail", "sprite_id": "kira", "height_cm": 165.0}),
-		_unit("e_hana", "적 돌격소총수", "enemy", "돌격소총수", 5, 10, "ranged", 34, 6, 2, 1,
+		_unit("e_dan", "단", "enemy", "돌격병", 5, 8, "melee", 46, 6, 2, 2,
+			["basic_attack", "heavy_attack", "ultimate"],
+			[W("axe", "전투도끼", "melee", 2)], 0, 1,
+			{"skin": "#c77e60", "hair": "#c77e60", "jacket": "#564946", "pants": "#544744", "accent": "#ff5c5c", "eyes": "#5a6a80", "eye_paint": "#7fb2ff", "hair_style": "bald", "sprite_id": "dan", "height_cm": 185.0}),
+		_unit("e_ethan", "이선", "enemy", "소총수", 5, 9, "ranged", 30, 6, 2, 0,
 			["basic_attack", "heavy_attack"],
 			[W("rifle", "소총", "ranged", 1)], 1, 1,
-			{"skin": "#c98a62", "hair": "#7a6455", "jacket": "#4a4342", "pants": "#463f3e", "accent": "#ff5c5c", "eyes": "#c99a3a", "eye_paint": "#ffb020", "hair_style": "ponytail", "sprite_id": "hero2", "height_cm": 176.8}),
-		_unit("e_nikita", "적 저격수", "enemy", "저격수", 6, 12, "ranged", 24, 5, 2, 0,
-			["basic_attack", "heavy_attack", "ultimate"],
-			[W("sniper", "저격총", "ranged", 3)], 2, 1,
-			{"skin": "#f4cdb6", "hair": "#8a2f22", "jacket": "#c4bcba", "pants": "#4a4240", "accent": "#ff2e7a", "eyes": "#6a6f78", "eye_paint": "#4f9cff", "hair_style": "long", "sprite_id": "nikita_army", "height_cm": 168.0}),
+			{"skin": "#f09f80", "hair": "#4e3229", "jacket": "#524540", "pants": "#3e312e", "accent": "#ff5c5c", "eyes": "#1e1a1a", "eye_paint": "#9a7cff", "hair_style": "short", "sprite_id": "ethan", "height_cm": 178.0}),
+		_unit("e_alma", "앨마", "enemy", "의무병", 4, 7, "ranged", 28, 7, 3, 0,
+			["basic_attack", "heal", "rally"],
+			[W("pistol", "권총", "ranged", 0)], 2, 1,
+			{"skin": "#e9ab92", "hair": "#a87a5c", "jacket": "#cab6b1", "pants": "#4a3f3e", "accent": "#ff5c5c", "eyes": "#5f7a70", "eye_paint": "#43d6a0", "hair_style": "bun", "sprite_id": "alma", "height_cm": 166.0}),
 	]
 	return out
 

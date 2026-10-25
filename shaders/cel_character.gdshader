@@ -1,8 +1,9 @@
-// 캐릭터 셀 라이팅 v5 — "원화 색 또렷 + 불투명한 빛 + 선화 보존".
+// 캐릭터 셀 라이팅 v6 — "원화 색 또렷 + 타지 않는 빛 + 선화·검정 보존".
 // 원화의 밝기(명암)는 픽셀마다 그대로 두고 '색상'만 조명 쪽으로 옮긴다.
 // (곱하기는 보색 조명에서 원화를 어둡게 죽이고, 스크린은 어두운 의상에 회색 막을 씌워 둘 다 쓰지 않음)
-//   빛 받는 면 : 광원색으로 '칠한' 면. 원화 밝기를 끌어올린 뒤 광원 색상으로 key_mix 만큼 덮는다(반투명 막이 아니라 셀 칠).
-//               선화(윤곽선·주름선처럼 아주 어두운 픽셀)는 빛을 받지 않고 원화 그대로 남아 그림이 뭉개지지 않는다.
+//   빛 받는 면 : 원화 밝기를 살짝(어두운 색일수록 더) 올리고 광원 색상으로 key_mix 만큼 옮긴다.
+//               밝은 색이 하얗게 날아가지 않게 채널이 1 을 넘으면 색상을 유지한 채 전체를 낮춘다(클리핑·채도 과장 없음).
+//               빛은 '검정이 아닌 색'에만: 선화(주변보다 확 어두운 선)와 검정(부츠·검정 티 등)은 원화 그대로.
 //   주변광     : 원화 그대로
 //   그림자     : 원화 밝기의 82% + 그림자 색상 쪽으로 약간(18%) — 그림자 속에서도 고유색이 보이게
 //   림         : 조명색 선 (선화 제외)
@@ -26,11 +27,11 @@ uniform float accent_mix : hint_range(0.0, 1.0) = 0.85;   // 림 세기
 uniform float shadow_depth : hint_range(0.3, 1.0) = 0.82; // 그림자 밝기 (원화 대비)
 uniform float shadow_hue : hint_range(0.0, 1.0) = 0.18;   // 그림자를 그림자 색상으로 옮기는 정도
 uniform float ambient_mix : hint_range(0.0, 1.0) = 0.0;  // 주변광 구역의 색 물듦
-uniform float lit_gain : hint_range(0.8, 1.6) = 1.18;     // 빛 받는 면 밝기
-uniform float light_lift : hint_range(0.0, 0.5) = 0.10;   // 빛 받는 면 밝기 바닥값 (검정 의상도 빛이 '맺히게')
+uniform float light_lift : hint_range(0.0, 0.5) = 0.12;   // 빛 받는 면을 밝히는 양 (남은 밝기 여유의 비율: 어두운 색일수록 많이)
+uniform vec2 black_range = vec2(0.09, 0.20);   // 이 밝기 아래는 '검정'으로 보고 빛을 입히지 않음 (사이 구간은 서서히)
 uniform vec2 line_ratio = vec2(0.55, 0.80);   // 주변 평균 밝기 대비 이 비율보다 어두운 픽셀 = 선화 → 빛을 입히지 않음
 uniform float line_radius = 2.5;               // 주변 평균을 볼 거리 (텍셀)
-uniform float saturation : hint_range(0.0, 2.0) = 1.18;
+uniform float saturation : hint_range(0.0, 2.0) = 1.0;
 uniform bool use_rim = true;
 uniform vec4 eye_color : source_color = vec4(0.3, 0.6, 1.0, 1.0);
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
@@ -48,6 +49,11 @@ vec3 hue_of(vec3 c) {   // 밝기를 1 로 맞춘 색상 (어두운 그림자색
 vec3 tint_keep_L(vec3 c, float L) {
 	vec3 h = hue_of(c);
 	return h * (L / max(lum(h), 0.001));
+}
+
+// 채널이 1 을 넘으면 잘라내지 않고(=색이 하얗게 타고 색상이 틀어짐) 색상 비율을 유지한 채 낮춘다
+vec3 no_burn(vec3 c) {
+	return c / max(1.0, max(c.r, max(c.g, c.b)));
 }
 
 // 선화 가중치: 1 = 칠한 면, 0 = 선화. 절대 밝기가 아니라 '주변보다 확 어두운가'로 판단해서
@@ -77,9 +83,9 @@ vec3 shade(vec3 base, float zone, float lw) {
 		e = mix(e, e * mix(vec3(1.0), key_color.rgb, 0.5), 0.12);
 		return clamp(e, 0.0, 1.0);
 	} else if (zone < 0.83) {
-		float Ll = min(L * lit_gain + light_lift * (1.0 - L), 0.97);
-		vec3 lit = mix(base * (Ll / max(L, 0.001)), tint_keep_L(key_color.rgb, Ll), key_mix);
-		return mix(base, clamp(lit, 0.0, 1.0), lw);
+		float Ll = L + (1.0 - L) * light_lift;
+		vec3 lit = mix(no_burn(base * (Ll / max(L, 0.001))), no_burn(tint_keep_L(key_color.rgb, Ll)), key_mix);
+		return mix(base, lit, lw);
 	}
 	return mix(base, accent_color.rgb, accent_mix * lw);
 }
@@ -95,7 +101,8 @@ vec3 shade2(vec3 base, vec2 uv, float lw) {
 void fragment() {
 	// Godot 4: fragment 의 COLOR 는 이미 텍스처색 × 정점색(모듈레이트). 다시 텍스처를 곱하면 색이 제곱돼 어두워진다.
 	vec4 base = COLOR;
-	float lw = line_weight(TEXTURE, UV, TEXTURE_PIXEL_SIZE, lum(base.rgb));
+	// 빛·림을 입힐 가중치: 선화가 아니고(주변 대비) 검정도 아닌(절대 밝기) 픽셀만
+	float lw = line_weight(TEXTURE, UV, TEXTURE_PIXEL_SIZE, lum(base.rgb)) * smoothstep(black_range.x, black_range.y, lum(base.rgb));
 	vec2 d = fwidth(UV) * 0.25;
 	vec3 o = shade2(base.rgb, UV + vec2(-d.x, -d.y), lw)
 		+ shade2(base.rgb, UV + vec2(d.x, -d.y), lw)
