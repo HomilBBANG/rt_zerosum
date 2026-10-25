@@ -7,7 +7,7 @@
 //   주변광     : 원화 그대로
 //   그림자     : 원화 밝기의 82% + 그림자 색상 쪽으로 약간(18%) — 그림자 속에서도 고유색이 보이게
 //   림         : 조명색 선 (선화 제외)
-//   눈동자     : eye_color 로 진하게
+//   눈동자     : eye_color 로 진하게 (paint_eyes=false 면 원화 눈 색 그대로)
 // zone_mask: 0 그림자 / 85 주변광 / 128 눈동자 / 170 주조명 / 255 림
 shader_type canvas_item;
 render_mode unshaded;
@@ -34,6 +34,7 @@ uniform float line_radius = 2.5;               // 주변 평균을 볼 거리 (�
 uniform float saturation : hint_range(0.0, 2.0) = 1.0;
 uniform bool use_rim = true;
 uniform vec4 eye_color : source_color = vec4(0.3, 0.6, 1.0, 1.0);
+uniform bool paint_eyes = true;
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
 uniform int debug_view = 0;   // 1: 원화 그대로 출력 (디버그)
 
@@ -79,6 +80,9 @@ vec3 shade(vec3 base, float zone, float lw) {
 	} else if (zone < 0.45) {
 		return clamp(mix(base, tint_keep_L(ambient_tint.rgb, L), ambient_mix), 0.0, 1.0);
 	} else if (zone < 0.55) {
+		if (!paint_eyes) {
+			return base;
+		}
 		vec3 e = eye_color.rgb * (L / max(lum(eye_color.rgb), 0.05)) * 1.35;
 		e = mix(e, e * mix(vec3(1.0), key_color.rgb, 0.5), 0.12);
 		return clamp(e, 0.0, 1.0);

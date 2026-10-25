@@ -155,7 +155,7 @@ static func build_provided_enemies() -> Array[UnitData]:
 		_unit("e_ethan", "이선", "enemy", "소총수", 5, 9, "ranged", 30, 6, 2, 0,
 			["basic_attack", "heavy_attack"],
 			[W("rifle", "소총", "ranged", 1)], 1, 1,
-			{"skin": "#f09f80", "hair": "#4e3229", "jacket": "#524540", "pants": "#3e312e", "accent": "#ff5c5c", "eyes": "#1e1a1a", "eye_paint": "#9a7cff", "hair_style": "short", "sprite_id": "ethan", "height_cm": 178.0}),
+			{"skin": "#f09f80", "hair": "#4e3229", "jacket": "#524540", "pants": "#3e312e", "accent": "#ff5c5c", "eyes": "#1e1a1a", "hair_style": "short", "sprite_id": "ethan", "height_cm": 178.0}),
 		_unit("e_alma", "앨마", "enemy", "의무병", 4, 7, "ranged", 28, 7, 3, 0,
 			["basic_attack", "heal", "rally"],
 			[W("pistol", "권총", "ranged", 0)], 2, 1,

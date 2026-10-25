@@ -203,7 +203,7 @@ func apply_lighting(p: Dictionary, zone: String) -> void:
 		m.set_shader_parameter("use_near_rim", false)
 		m.set_shader_parameter("use_rim", Game.rim_enabled)
 		m.set_shader_parameter("debug_view", int(Game.cli.get("charview", "0")))
-		m.set_shader_parameter("eye_color", Color(unit.data.palette.get("eye_paint", unit.data.palette.get("eyes", "#4f9cff"))))
+		_apply_eye_paint(m)
 
 
 ## 3D 배경 모드: 캐릭터 위치에 실제로 닿는 빛으로 명암을 정한다.
@@ -243,8 +243,15 @@ func apply_light_probe(p: Dictionary, key: Dictionary, rim: Dictionary) -> void:
 		m.set_shader_parameter("use_rim", far_rim)
 		m.set_shader_parameter("use_near_rim", near_rim)
 		m.set_shader_parameter("debug_view", int(Game.cli.get("charview", "0")))
-		m.set_shader_parameter("eye_color", Color(unit.data.palette.get("eye_paint", unit.data.palette.get("eyes", "#4f9cff"))))
+		_apply_eye_paint(m)
 	set_light_direction(from_right)
+
+
+## 로스터 eye_paint 가 있으면 눈동자를 그 색으로 진하게 칠하고, 없으면 원화 눈 색 그대로 둔다.
+func _apply_eye_paint(m: ShaderMaterial) -> void:
+	var pal: Dictionary = unit.data.palette
+	m.set_shader_parameter("paint_eyes", pal.has("eye_paint"))
+	m.set_shader_parameter("eye_color", Color(pal.get("eye_paint", pal.get("eyes", "#4f9cff"))))
 
 
 func set_highlight(kind: String) -> void:
