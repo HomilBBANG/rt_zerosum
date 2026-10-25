@@ -9,8 +9,8 @@ uniform vec4 accent_color : source_color = vec4(0.22, 1.0, 0.73, 1.0);
 uniform float key_mix : hint_range(0.0, 1.0) = 0.7;
 uniform float accent_mix : hint_range(0.0, 1.0) = 0.8;
 void fragment() {
-	// Godot 4: fragment 의 COLOR 는 이미 텍스처색 × 정점색(모듈레이트) → 한 번만 곱한 원화색
-	vec4 base = COLOR;
+	// 텍스처색 × COLOR(이미 텍스처색 × 모듈레이트) = 원화색을 두 번 곱한 진한 톤 (확정된 룩)
+	vec4 base = texture(TEXTURE, UV) * COLOR;
 	vec3 o = base.rgb;
 	if (zone == 0) { o = base.rgb * shadow_tint.rgb; }
 	else if (zone == 1) { o = base.rgb * ambient_tint.rgb; }

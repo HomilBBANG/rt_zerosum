@@ -77,8 +77,8 @@ vec3 shade2(vec3 base, vec2 uv) {
 }
 
 void fragment() {
-	// Godot 4: fragment 의 COLOR 는 이미 텍스처색 × 정점색(모듈레이트) → 한 번만 곱한 원화색
-	vec4 base = COLOR;
+	// 텍스처색 × COLOR(이미 텍스처색 × 모듈레이트) = 원화색을 두 번 곱한 진한 톤 (확정된 룩)
+	vec4 base = texture(TEXTURE, UV) * COLOR;
 	vec2 d = fwidth(UV) * 0.25;
 	vec3 o = shade2(base.rgb, UV + vec2(-d.x, -d.y))
 		+ shade2(base.rgb, UV + vec2(d.x, -d.y))
