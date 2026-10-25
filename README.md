@@ -5,24 +5,25 @@
 그래픽 방향(2D vs 3D)을 비교·결정할 수 있게 했습니다. 비교 결과는 `docs/2D_vs_3D_comparison.md` 참조.
 
 ## 설치 (노트북·데스크톱 공통, 명령 한 줄)
-각 기기의 사용자 폴더 아래 `game` 폴더(예: `C:\Users\eunjikim\game`, `/Users/eunjikim/game`)에 프로젝트를 받고,
+각 기기의 `/Users/eunjikim/Game` (= `~/Game`, Windows 는 `C:\Users\<이름>\Game`)에 프로젝트를 받고,
 Godot 4.7 을 `game/_engine/` 에 자동으로 내려받아 바로 실행합니다. 저장소가 공개라 GitHub 로그인은 필요 없습니다.
 
 **Windows** — 시작 메뉴에서 PowerShell 을 열고 붙여넣기:
 ```powershell
 irm https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/claude/clever-keller-maq0u6/setup/install_windows.ps1 | iex
 ```
-설치가 끝나면 바탕화면에 **RT Zerosum** 바로가기가 생깁니다. 이후 실행은 바로가기 또는 `game\play.bat`.
+설치가 끝나면 바탕화면에 **RT Zerosum** 바로가기가 생깁니다. 이후 실행은 바로가기 또는 `Game\play.bat`.
 
-**macOS / Linux** — 터미널에 붙여넣기:
+**macOS (노트북·컴퓨터 공통)** — 터미널에 붙여넣기:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/claude/clever-keller-maq0u6/setup/install.sh | bash
 ```
-이후 실행은 `~/game/play.sh` (macOS 는 Finder 에서 `play.command` 더블클릭).
+이후 실행은 Finder 에서 `Game/play.command` 더블클릭, 또는 `~/Game/play.sh`.
+`~/Game` 폴더가 이미 있고 다른 파일이 들어 있어도 지우지 않고 그 자리에 연결합니다(이름이 겹치는 파일이 있으면 멈추고 알려줌).
 
 **업데이트**: 같은 설치 명령을 다시 실행하면 최신 커밋을 받아옵니다(git 이 있으면 pull, 없으면 zip 재다운로드).
 **에디터로 열기**: `play.bat edit` / `./play.sh edit`.
-**다른 폴더에 설치**: Windows `$env:GAME_DIR="D:\game"`, macOS/Linux `GAME_DIR=~/work/game` 를 앞에 지정.
+**다른 폴더에 설치**: macOS `curl ... | GAME_DIR=/경로 bash`, Windows `$env:GAME_DIR="D:\Game"` 를 먼저 지정.
 
 > git 이 설치돼 있으면 두 기기 모두 `git pull` 로 같은 코드를 맞출 수 있습니다. 한쪽에서 수정한 뒤 다른 쪽에서 받으려면
 > 수정한 기기에서 `git push` 할 권한(HomilBBANG/rt_zerosum 저장소 협업자)이 필요합니다.

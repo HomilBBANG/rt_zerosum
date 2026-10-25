@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# RT Zerosum 설치 (macOS / Linux): ~/game 에 프로젝트를 받고 Godot 4.7 을 _engine/ 에 내려받은 뒤 실행.
+# RT Zerosum 설치 (macOS / Linux): ~/Game (/Users/<이름>/Game) 에 프로젝트를 받고 Godot 4.7 을 _engine/ 에 내려받은 뒤 실행.
 # 사용:  curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/claude/clever-keller-maq0u6/setup/install.sh | bash
 # 옵션(환경변수): GAME_DIR=설치폴더  GAME_BRANCH=브랜치  NO_RUN=1(설치만)
 set -euo pipefail
 REPO="https://github.com/HomilBBANG/rt_zerosum.git"
 BRANCH="${GAME_BRANCH:-claude/clever-keller-maq0u6}"
-DIR="${GAME_DIR:-$HOME/game}"
+DIR="${GAME_DIR:-$HOME/Game}"
 GODOT_VER="4.7-stable"
 BASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VER}"
 
@@ -15,13 +15,21 @@ if [ -d "$DIR/.git" ]; then
   git -C "$DIR" fetch origin "$BRANCH"
   git -C "$DIR" checkout -q "$BRANCH"
   git -C "$DIR" pull --ff-only origin "$BRANCH"
-elif command -v git >/dev/null 2>&1; then
-  if [ -e "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null)" ]; then
-    echo "!! $DIR 에 다른 파일이 있습니다. 비우거나 GAME_DIR 로 다른 폴더를 지정하세요." >&2; exit 1
+elif git --version >/dev/null 2>&1; then   # macOS 의 /usr/bin/git 껍데기(개발도구 미설치)는 여기서 걸러짐
+  if [ -d "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null)" ]; then
+    # 이미 파일이 있는 폴더: 그 자리에서 git 을 연결. 같은 이름의 기존 파일이 있으면 덮어쓰지 않고 멈춘다.
+    echo "-- $DIR 에 기존 파일이 있어 그 자리에 연결합니다 (기존 파일은 지우지 않음)"
+    git -C "$DIR" init -q
+    git -C "$DIR" remote add origin "$REPO" 2>/dev/null || git -C "$DIR" remote set-url origin "$REPO"
+    git -C "$DIR" fetch -q origin "$BRANCH"
+    if ! git -C "$DIR" checkout -q -b "$BRANCH" --track "origin/$BRANCH"; then
+      echo "!! 기존 파일 중 저장소 파일과 이름이 같은 것이 있어 멈췄습니다. 위 목록의 파일을 옮긴 뒤 다시 실행하세요." >&2; exit 1
+    fi
+  else
+    git clone -b "$BRANCH" "$REPO" "$DIR"
   fi
-  git clone -b "$BRANCH" "$REPO" "$DIR"
 else
-  echo "-- git 이 없어 zip 으로 받습니다 (업데이트하려면 다시 실행)"
+  echo "-- git 이 없어 zip 으로 받습니다 (업데이트하려면 다시 실행. xcode-select --install 로 git 을 설치하면 pull 로 업데이트됩니다)"
   tmp="$(mktemp -d)"
   curl -fL -o "$tmp/src.zip" "https://codeload.github.com/HomilBBANG/rt_zerosum/zip/refs/heads/${BRANCH}"
   unzip -q "$tmp/src.zip" -d "$tmp"
