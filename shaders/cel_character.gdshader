@@ -1,6 +1,6 @@
 // 캐릭터 전용 셀 라이팅 (배경은 cel_zoned_lighting).
 // 고유색 × 광원색(곱하기) + 약한 광원색 가산 + 채도 보정으로 색을 '입힌다' (덮어 섞으면 반투명 막처럼 보임).
-// zone_mask: 0 그림자 / 85 주변광 / 170 주조명 / 255 림(보조광)  (128 은 배경 전용, 캐릭터에서는 주조명 취급)
+// zone_mask: 0 그림자 / 85 주변광 / 128 눈동자(eye_color 로 칠함) / 170 주조명 / 255 림(보조광)
 // 마스크는 구역 코드라 보간할 수 없으므로(최근접), 화면 픽셀 안에서 4번 샘플해 결과 색을 평균 → 명암 경계 계단 제거.
 shader_type canvas_item;
 render_mode unshaded;
@@ -15,6 +15,7 @@ uniform float accent_mix : hint_range(0.0, 1.0) = 0.85;
 uniform float shadow_lift : hint_range(0.0, 1.0) = 0.22;
 uniform float saturation : hint_range(0.0, 2.0) = 1.3;
 uniform bool use_rim = true;   // false: 림 구역을 그림자로 (림 라인 없음)
+uniform vec4 eye_color : source_color = vec4(0.3, 0.6, 1.0, 1.0);   // 눈동자에 일부러 칠하는 색 (조명에 묻히지 않게)
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
 
 float lum(vec3 c) {
@@ -37,8 +38,12 @@ vec3 shade(vec3 base, float zone) {
 		return tinted(base, shadow_tint.rgb * 2.5 + vec3(0.1), 0.85, L * 0.42 + shadow_lift * 0.12, 0.0);
 	} else if (zone < 0.45) {
 		return tinted(base, ambient_tint.rgb, 0.55, L * 0.95, 0.02);
+	} else if (zone < 0.55) {
+		// 눈동자: 원화 명암(동공 어둡게)은 살리고 색은 eye_color 로 진하게. 조명은 아주 약하게만
+		vec3 e = eye_color.rgb * (L / max(lum(eye_color.rgb), 0.05)) * 1.35;
+		e = mix(e, e * mix(vec3(1.0), key_color.rgb, 0.5), 0.12);
+		return clamp(e, 0.0, 1.0);
 	} else if (zone < 0.83) {
-		// 주조명 (0.45~0.55 의 '고유색 유지' 구역도 주조명으로 처리: 눈만 따로 튀지 않게)
 		return tinted(base, key_color.rgb, key_mix, L * 1.08 + 0.04, 0.06);
 	}
 	return mix(base, accent_color.rgb, accent_mix);

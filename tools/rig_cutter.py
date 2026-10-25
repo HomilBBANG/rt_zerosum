@@ -69,6 +69,7 @@ HEAD_RECT = (360, 20, 380, 340)
 # ---- hero2 (하나): 갈색 곱슬 포니테일, 밝은 회색 후드 + 검정 탱크톱·와이드 팬츠, 흰 운동화 (원화 1024x1536)
 HERO2 = {
     "src": "char_ref2.png", "classify": "neutral", "head_rect": (400, 0, 310, 290),
+    "irises": [(539, 155, 15), (600, 180, 11)], "iris_rule": "amber",   # 호박색 홍채 → 파랑 성분이 적은 픽셀
     "eyes": [(545, 160), (635, 170)], "ground": (580, 1515),
     "bones": [
         ("hip", "", (575, 640)), ("spine", "hip", (575, 540)), ("chest", "spine", (565, 420)),
@@ -101,7 +102,9 @@ HERO2 = {
 
 def _hero_def():
     return {"src": "char_ref.png", "classify": "warm", "head_rect": HEAD_RECT, "eyes": EYES, "ground": GROUND,
-            "bones": BONES, "parts": PARTS}
+            "bones": BONES, "parts": PARTS,
+            # 홍채 원(원본 px): 회색 홍채 → 무채색 픽셀을 홍채로
+            "irises": [(497, 192, 18), (585, 210, 16)], "iris_rule": "neutral"}
 
 
 CHARACTERS = {"hero": _hero_def, "hero2": lambda: HERO2}
@@ -171,7 +174,43 @@ def build(cid):
     cls = classify(im, d["classify"])
     mask_r = build_zone_mask(im, [], "right", rim=max(2, round(11 * K)), smooth=round(90 * K))
     mask_l = build_zone_mask(im, [], "left", rim=max(2, round(11 * K)), smooth=round(90 * K))
-    # (예전: 눈 주변 '조명 무시' 타원 → 얼굴에서 눈 주변만 원래 색으로 튀어 제거. 셰이더가 원화 명암을 유지하므로 불필요)
+    # 눈동자 구역(Z_UNLIT=128): 홍채 원 안에서 흰자·피부를 뺀 홍채·동공 픽셀만. 셰이더가 캐릭터 눈 색을 칠한다.
+    # (예전의 눈 주변 큰 타원은 피부까지 덮어 얼굴에서 튀었으므로 쓰지 않음)
+    px = im.load()
+    for (ix, iy, ir) in d.get("irises", []):
+        cx, cy, rr = ix * K, iy * K, ir * K + 0.5
+        for y in range(int(cy - rr) - 1, int(cy + rr) + 2):
+            for x in range(int(cx - rr) - 1, int(cx + rr) + 2):
+                if not (0 <= x < w and 0 <= y < h) or (x - cx) ** 2 + (y - cy) ** 2 > rr * rr:
+                    continue
+                r, g, b, a = px[x, y]
+                if a < 100 or min(r, g, b) > 185:          # 흰자·하이라이트 제외
+                    continue
+                dark = max(r, g, b) < 75                    # 동공·속눈썹
+                if d.get("iris_rule") == "amber":
+                    iris = (b < 0.47 * r and r > 60) or (g - b) > 42   # 호박색: 파랑이 적거나(어두운 쪽) 초록-파랑 차이 큼(밝은 쪽). 피부는 b≈0.58r, g-b≈31
+                else:
+                    iris = abs(r - b) < 40
+                if dark or iris:
+                    mask_r.putpixel((x, y), Z_UNLIT)
+                    mask_l.putpixel((x, y), Z_UNLIT)
+        # 한 겹 넓히기: 원 안에서 이미 잡힌 픽셀과 맞닿은 '흰자 아닌' 픽셀도 홍채로 (축소 원화의 경계 빈틈 메움)
+        for _ in range(2):
+            add = []
+            for y in range(int(cy - rr) - 1, int(cy + rr) + 2):
+                for x in range(int(cx - rr) - 1, int(cx + rr) + 2):
+                    if not (1 <= x < w - 1 and 1 <= y < h - 1) or (x - cx) ** 2 + (y - cy) ** 2 > rr * rr:
+                        continue
+                    if mask_r.getpixel((x, y)) == Z_UNLIT:
+                        continue
+                    r, g, b, a = px[x, y]
+                    if a < 100 or min(r, g, b) > 170:
+                        continue
+                    if any(mask_r.getpixel((x + dx, y + dy)) == Z_UNLIT for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                        add.append((x, y))
+            for q in add:
+                mask_r.putpixel(q, Z_UNLIT)
+                mask_l.putpixel(q, Z_UNLIT)
     # 정수리(알파 기준)~발바닥 픽셀 높이: 게임이 캐릭터 키(cm)에 맞춰 배율을 정하는 기준
     abox = im.split()[3].point(lambda v: 255 if v > 40 else 0).getbbox()
     figure_px = GROUND[1] - abox[1]

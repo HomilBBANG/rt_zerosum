@@ -192,6 +192,7 @@ func apply_lighting(p: Dictionary, zone: String) -> void:
 				m.set_shader_parameter("key_mix", 0.62)
 		m.set_shader_parameter("accent_mix", 0.85)
 		m.set_shader_parameter("use_rim", Game.rim_enabled)
+		m.set_shader_parameter("eye_color", Color(unit.data.palette.get("eye_paint", unit.data.palette.get("eyes", "#4f9cff"))))
 
 
 func set_highlight(kind: String) -> void:
