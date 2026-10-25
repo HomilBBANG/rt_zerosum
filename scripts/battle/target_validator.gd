@@ -2,6 +2,7 @@ class_name TargetValidator
 extends RefCounted
 ## 대상 유효성 (GDD 3절 위치 제한 첫 버전).
 ## 근접: 상대 전방 우선, 전방이 비면 다음 열. 원거리: 어느 열이나. 지원: 아군 전 열.
+## 두 칸(전방+중앙) 큰 몸집은 두 열 모두에 있는 것으로 본다 → 살아 있는 동안 전방을 막는다.
 
 
 static func enemy_team_of(team: String) -> String:
@@ -57,7 +58,7 @@ static func block_reason(action: ActionData, actor: UnitRuntime, target: UnitRun
 			if target.team != enemy:
 				return "적만 공격할 수 있습니다."
 			var r := melee_reachable_row(actor, slots)
-			if target.row != r:
+			if not target.occupies_row(r):
 				return "근접 무기는 %s열 적만 공격할 수 있습니다. (앞열 먼저)" % SlotManager.ROW_NAMES[r]
 		"enemy_any":
 			if target.team != enemy:

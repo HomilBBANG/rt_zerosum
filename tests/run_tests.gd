@@ -51,6 +51,7 @@ func _init() -> void:
 	_test_melee_row_rule()
 	_test_restart_resets()
 	_test_coin_is_seeded()
+	_test_large_units()
 	print("== %d passed, %d failed ==" % [_passes, _fails])
 	quit(1 if _fails > 0 else 0)
 
@@ -303,3 +304,33 @@ func _test_coin_is_seeded() -> void:
 	_check(seen.size() == 2, "시드에 따라 앞/뒤 모두 등장")
 	a.queue_free()
 	b.queue_free()
+
+
+func _test_large_units() -> void:
+	print("[11] 두 칸 차지하는 큰 몸집 (괴물: 전방+중앙)")
+	var bc := BattleController.new()
+	bc.enemy_delay = 0.0
+	bc.setup(TestRoster.build_actions(), TestRoster.default_roster(TestRoster.build_provided_allies(), TestRoster.build_provided_enemies()), 7, "ally")
+	root.add_child(bc)
+	bc.start_battle()
+	var ghoul := _unit(bc, "구울")
+	var slime := _unit(bc, "슬라임")
+	_check(ghoul != null and slime != null, "괴물 2마리 배치")
+	_check(bc.slots.unit_at("enemy:0:1") == ghoul and bc.slots.unit_at("enemy:1:1") == ghoul, "구울이 전방·중앙 두 칸 차지")
+	_check(bc.slots.unit_at("enemy:0:0") == slime and bc.slots.unit_at("enemy:1:0") == slime, "슬라임이 전방·중앙 두 칸 차지")
+	_check(bc.slots.living_units("enemy").size() == 2, "적 유닛 수는 2 (칸 수 아님)")
+	_check(bc.slots.living_units("ally").size() == 6, "아군 6인")
+	var kira := _unit(bc, "키라")
+	var basic: ActionData = bc.actions["basic_attack"]
+	var melee_targets := TargetValidator.valid_targets(basic, kira, bc.slots)
+	_check(melee_targets.size() == 2 and melee_targets.has(ghoul) and melee_targets.has(slime), "근접: 전방의 두 괴물 모두 공격 가능")
+	_check(TargetValidator.block_reason(basic, kira, ghoul, bc.slots) == "", "근접: 구울 공격 가능")
+	# 큰 몸집은 이동·교환 불가, 다른 유닛도 큰 몸집과 교환 불가
+	var res := bc.slots.move_or_swap(ghoul, "enemy:2:1")
+	_check(not res.ok, "큰 몸집 이동 거부")
+	_check(bc.slots.unit_at("enemy:0:1") == ghoul, "거부 후 자리 유지")
+	# 구울 사망 → 두 칸 모두 비움
+	ghoul.alive = false
+	bc.slots.remove_dead_from_slots()
+	_check(bc.slots.unit_at("enemy:0:1") == null and bc.slots.unit_at("enemy:1:1") == null, "사망 시 두 칸 모두 비움")
+	bc.queue_free()

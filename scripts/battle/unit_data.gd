@@ -18,6 +18,8 @@ extends Resource
 @export var sprite_id: String = ""
 @export var role: String = ""              # 표시용 병과명
 @export var height_cm: float = 175.0       # 키: 화면 크기에 반영 (230px = 175cm)
+## 차지하는 열 수: 1 = 한 칸, 2 = default_row 부터 뒤로 두 칸 (예: 전방+중앙). 큰 몸집 괴물용, 이동·교환 불가.
+@export var row_span: int = 1
 ## 기본 배치 (row 0=전방,1=중앙,2=후방 / index 0,1)
 @export var default_row: int = 0
 @export var default_index: int = 0

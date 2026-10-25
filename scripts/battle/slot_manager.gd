@@ -25,11 +25,15 @@ func clear() -> void:
 
 
 func add_unit(unit: UnitRuntime) -> bool:
-	var key := unit.slot_key()
-	if _slots.has(key):
-		push_error("Slot occupied: %s" % key)
+	if unit.row + unit.data.row_span > ROWS:
+		push_error("Slot out of range: %s span %d" % [unit.slot_key(), unit.data.row_span])
 		return false
-	_slots[key] = unit
+	for key in unit.slot_keys():
+		if _slots.has(key):
+			push_error("Slot occupied: %s" % key)
+			return false
+	for key in unit.slot_keys():
+		_slots[key] = unit   # 큰 몸집은 차지한 칸 모두 같은 유닛을 가리킴
 	_units.append(unit)
 	return true
 
@@ -75,6 +79,8 @@ func move_or_swap(unit: UnitRuntime, target_key: String) -> Dictionary:
 	if target_key == unit.slot_key():
 		return {"ok": false, "reason": "현재 위치입니다."}
 	var other: UnitRuntime = _slots.get(target_key, null)
+	if unit.is_large() or (other != null and other.is_large()):
+		return {"ok": false, "reason": "큰 몸집은 자리를 옮기거나 바꿀 수 없습니다."}
 	var from_key := unit.slot_key()
 	if other == null:
 		_slots.erase(from_key)

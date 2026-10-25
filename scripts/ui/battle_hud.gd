@@ -408,7 +408,7 @@ func _on_unit_clicked(unit: UnitRuntime) -> void:
 		return
 	if pending_action == "":
 		# 대상 지정 중이 아니면 유닛 정보 툴팁
-		show_toast("%s  Lv%d  속도 %d  HP %d/%d  AP %d/%d  %s" % [unit.display_name(), unit.data.level, unit.data.speed, unit.hp, unit.data.max_hp, unit.ap, unit.data.max_ap, SlotManager.ROW_NAMES[unit.row]])
+		show_toast("%s  Lv%d  속도 %d  HP %d/%d  AP %d/%d  %s" % [unit.display_name(), unit.data.level, unit.data.speed, unit.hp, unit.data.max_hp, unit.ap, unit.data.max_ap, _row_text(unit)])
 		return
 	var reason := controller.get_target_block_reason(pending_action, unit)
 	if reason != "":
@@ -450,7 +450,7 @@ func _refresh_panel() -> void:
 	name_label.text = "%s  ·  %s  Lv%d" % [u.display_name(), u.data.role, u.data.level]
 	stat_label.text = "HP %d/%d    AP %d/%d (+%d/턴)    속도 %d" % [u.hp, u.data.max_hp, u.ap, u.data.max_ap, u.data.ap_recovery, u.data.speed]
 	var w := u.current_weapon()
-	weapon_label.text = "무기: %s (%s, 위력 %+d)   위치: %s %d" % [w.name, "원거리" if w.range_type == "ranged" else "근접", int(w.power_bonus), SlotManager.ROW_NAMES[u.row], u.index + 1]
+	weapon_label.text = "무기: %s (%s, 위력 %+d)   위치: %s %d" % [w.name, "원거리" if w.range_type == "ranged" else "근접", int(w.power_bonus), _row_text(u), u.index + 1]
 	portrait.texture = UnitArt.portrait(u.data.sprite_id, manifest)
 	portrait.flip_h = u.team == "enemy"
 	var is_player := controller.is_player_turn() and not view.busy
@@ -571,3 +571,11 @@ func _process(delta: float) -> void:
 				b.disabled = true
 		if not lock and buttons_box.get_child_count() > 0 and buttons_box.get_child(0).disabled and controller.current.ap > 0:
 			_refresh_panel()
+
+
+## 위치 표시: 두 칸 큰 몸집은 "전방·중앙"
+func _row_text(u: UnitRuntime) -> String:
+	var names: PackedStringArray = []
+	for r in range(u.row, u.row + u.data.row_span):
+		names.append(SlotManager.ROW_NAMES[r])
+	return "·".join(names)

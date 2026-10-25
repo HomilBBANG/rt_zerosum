@@ -25,6 +25,14 @@ var exterior_accent: ShaderMaterial
 var _markers: Array[Node3D] = []
 
 
+## 유닛 위치: 두 칸 큰 몸집은 차지한 칸들의 가운데
+static func unit_position(u: UnitRuntime) -> Vector3:
+	var w := Vector3.ZERO
+	for r in range(u.row, u.row + u.data.row_span):
+		w += slot_position(u.team, r, u.index)
+	return w / float(u.data.row_span)
+
+
 static func slot_position(team: String, row: int, index: int) -> Vector3:
 	var x: float
 	if team == "ally":
@@ -229,7 +237,7 @@ func _spawn_units() -> void:
 		var m: UnitModel3D = MODEL.new()
 		units_root.add_child(m)
 		m.build(u)
-		m.position = slot_position(u.team, u.row, u.index)
+		m.position = unit_position(u)
 		m.scale = Vector3.ONE * (u.data.height_cm / 175.0)   # 캐릭터 키 반영
 		models[u.instance_id] = m
 	apply_preset(preset)
@@ -362,7 +370,7 @@ func _on_unit_moved(unit: UnitRuntime, _f: String, _t: String) -> void:
 	var m := model_of(unit)
 	_begin_busy()
 	var tw := create_tween()
-	tw.tween_property(m, "position", slot_position(unit.team, unit.row, unit.index), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(m, "position", unit_position(unit), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	await tw.finished
 	_end_busy()
 
@@ -373,8 +381,8 @@ func _on_units_swapped(a: UnitRuntime, b: UnitRuntime) -> void:
 	_begin_busy()
 	var tw := create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(ma, "position", slot_position(a.team, a.row, a.index), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(mb, "position", slot_position(b.team, b.row, b.index), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(ma, "position", unit_position(a), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(mb, "position", unit_position(b), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	await tw.finished
 	_end_busy()
 

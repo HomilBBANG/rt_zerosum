@@ -289,12 +289,14 @@ func get_target_block_reason(action_id: String, target: UnitRuntime) -> String:
 ## 이동 가능한 슬롯 목록 [{key, kind: "move"|"swap", other}]
 func get_move_options() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	if current == null:
+	if current == null or current.is_large():
 		return out
 	for key in slots.team_slot_keys(current.team):
 		if key == current.slot_key():
 			continue
 		var other := slots.unit_at(key)
+		if other != null and other.is_large():
+			continue
 		out.append({"key": key, "kind": "move" if other == null else "swap", "other": other})
 	return out
 

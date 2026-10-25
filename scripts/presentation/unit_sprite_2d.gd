@@ -33,6 +33,11 @@ func is_rigged() -> bool:
 	return rig != null
 
 
+## 좌우 반전 여부: 적은 왼쪽(아군)을 보게 뒤집는다. 원화가 이미 왼쪽을 보면(art_faces_left, 예: 구울) 반대로.
+func is_mirrored() -> bool:
+	return (unit.team == "enemy") != bool(unit.data.palette.get("art_faces_left", false))
+
+
 func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
 	unit = p_unit
 	manifest = p_manifest
@@ -53,7 +58,7 @@ func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
 	else:
 		add_child(group)
 		group.add_child(flip)
-	if unit.team == "enemy":
+	if is_mirrored():
 		flip.scale.x = -1.0
 	flip.scale *= BASE_SCALE
 	if UnitArt.has_rig(unit.data.sprite_id):
@@ -159,9 +164,9 @@ func set_light_direction(from_right: bool) -> void:
 
 
 func _update_light_masks() -> void:
-	# 텍스처 공간에서의 빛 방향: 적은 좌우 반전되므로 뒤집는다.
+	# 텍스처 공간에서의 빛 방향: 좌우 반전된 유닛은 뒤집는다.
 	var tex_from_right := light_from_right
-	if unit.team == "enemy":
+	if is_mirrored():
 		tex_from_right = not tex_from_right
 	var suffix := "_mask_r" if tex_from_right else "_mask_l"
 	var opposite := "_mask_l" if tex_from_right else "_mask_r"

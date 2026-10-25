@@ -126,7 +126,7 @@ static func build_enemies() -> Array[UnitData]:
 	return out
 
 
-## 사용자 제공 원화 캐릭터만으로 구성한 전투 (게임 기본). 같은 두 캐릭터를 적으로도 세운다.
+## 사용자 제공 원화로 구성한 전투 (게임 기본): 사람 캐릭터 6인은 아군, 괴물(구울·슬라임)은 적.
 ## 생성 원화 12인(build_allies/build_enemies)은 규칙 테스트·벤치용으로만 유지.
 static func build_provided_allies() -> Array[UnitData]:
 	var out: Array[UnitData] = [
@@ -142,25 +142,36 @@ static func build_provided_allies() -> Array[UnitData]:
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("rifle", "소총", "ranged", 1), W("bayonet", "대검", "melee", 2)], 1, 1,
 			{"skin": "#c98a62", "hair": "#7a6455", "jacket": "#4a4342", "pants": "#463f3e", "accent": "#e8e4e0", "eyes": "#c99a3a", "eye_paint": "#ffb020", "hair_style": "ponytail", "sprite_id": "hero2", "height_cm": 176.8}),
+		_unit("a_dan", "단", "ally", "돌격병", 5, 8, "melee", 46, 6, 2, 2,
+			["basic_attack", "heavy_attack", "ultimate"],
+			[W("axe", "전투도끼", "melee", 2), W("pistol", "권총", "ranged", 0)], 0, 0,
+			{"skin": "#c77e60", "hair": "#c77e60", "jacket": "#564946", "pants": "#544744", "accent": "#e8e4e0", "eyes": "#5a6a80", "eye_paint": "#7fb2ff", "hair_style": "bald", "sprite_id": "dan", "height_cm": 185.0}),
+		_unit("a_ethan", "이선", "ally", "소총수", 5, 9, "ranged", 30, 6, 2, 0,
+			["basic_attack", "heavy_attack", "ultimate"],
+			[W("rifle", "소총", "ranged", 1), W("bayonet", "대검", "melee", 2)], 1, 0,
+			{"skin": "#f09f80", "hair": "#4e3229", "jacket": "#524540", "pants": "#3e312e", "accent": "#e8e4e0", "eyes": "#1e1a1a", "hair_style": "short", "sprite_id": "ethan", "height_cm": 178.0}),
+		_unit("a_alma", "앨마", "ally", "의무병", 4, 7, "ranged", 28, 7, 3, 0,
+			["basic_attack", "heal", "rally", "ultimate"],
+			[W("pistol", "권총", "ranged", 0), W("syringe", "전투 주사기", "melee", 1)], 2, 0,
+			{"skin": "#e9ab92", "hair": "#a87a5c", "jacket": "#cab6b1", "pants": "#4a3f3e", "accent": "#e8e4e0", "eyes": "#5f7a70", "eye_paint": "#43d6a0", "hair_style": "bun", "sprite_id": "alma", "height_cm": 166.0}),
 	]
 	return out
 
 
 static func build_provided_enemies() -> Array[UnitData]:
-	var out: Array[UnitData] = [
-		_unit("e_dan", "단", "enemy", "돌격병", 5, 8, "melee", 46, 6, 2, 2,
+	# 괴물은 적으로만 등장. 둘 다 키 2m, 전방+중앙 두 칸 차지(row_span 2) — 구울은 앞줄(index 1), 슬라임은 뒷줄(index 0)
+	# 아군 6인을 상대하므로 체력이 크다 (임시 밸런스)
+	var ghoul := _unit("e_ghoul", "구울", "enemy", "괴물", 6, 10, "melee", 110, 6, 2, 2,
 			["basic_attack", "heavy_attack", "ultimate"],
-			[W("axe", "전투도끼", "melee", 2)], 0, 1,
-			{"skin": "#c77e60", "hair": "#c77e60", "jacket": "#564946", "pants": "#544744", "accent": "#ff5c5c", "eyes": "#5a6a80", "eye_paint": "#7fb2ff", "hair_style": "bald", "sprite_id": "dan", "height_cm": 185.0}),
-		_unit("e_ethan", "이선", "enemy", "소총수", 5, 9, "ranged", 30, 6, 2, 0,
+			[W("claw", "발톱", "melee", 3)], 0, 1,
+			{"skin": "#e7a58f", "hair": "#8e1c22", "jacket": "#4b403c", "pants": "#4b403c", "accent": "#ff3b3b", "eyes": "#1a0d0d", "hair_style": "bald", "sprite_id": "ghoul", "height_cm": 200.0, "art_faces_left": true})
+	ghoul.row_span = 2
+	var slime := _unit("e_slime", "슬라임", "enemy", "괴물", 4, 5, "melee", 130, 5, 2, 3,
 			["basic_attack", "heavy_attack"],
-			[W("rifle", "소총", "ranged", 1)], 1, 1,
-			{"skin": "#f09f80", "hair": "#4e3229", "jacket": "#524540", "pants": "#3e312e", "accent": "#ff5c5c", "eyes": "#1e1a1a", "hair_style": "short", "sprite_id": "ethan", "height_cm": 178.0}),
-		_unit("e_alma", "앨마", "enemy", "의무병", 4, 7, "ranged", 28, 7, 3, 0,
-			["basic_attack", "heal", "rally"],
-			[W("pistol", "권총", "ranged", 0)], 2, 1,
-			{"skin": "#e9ab92", "hair": "#a87a5c", "jacket": "#cab6b1", "pants": "#4a3f3e", "accent": "#ff5c5c", "eyes": "#5f7a70", "eye_paint": "#43d6a0", "hair_style": "bun", "sprite_id": "alma", "height_cm": 166.0}),
-	]
+			[W("slam", "덮치기", "melee", 2)], 0, 0,
+			{"skin": "#2c4a6e", "hair": "#2c4a6e", "jacket": "#1e3350", "pants": "#1e3350", "accent": "#6fd0ff", "eyes": "#9fe8ff", "hair_style": "bald", "sprite_id": "slime", "height_cm": 200.0})
+	slime.row_span = 2
+	var out: Array[UnitData] = [ghoul, slime]
 	return out
 
 

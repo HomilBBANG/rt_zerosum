@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bcppslojwigda"
-path="res://.godot/imported/hybrid_zoom.png-eb48c28856c1313fb66fa9a2fc5f29d5.ctex"
+uid="uid://c4r6qcffm0bw7"
+path="res://.godot/imported/head_mask_l.png-c33f0158f8d53f12fe90a8401c3a38bb.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://docs/screenshots/hybrid_zoom.png"
-dest_files=["res://.godot/imported/hybrid_zoom.png-eb48c28856c1313fb66fa9a2fc5f29d5.ctex"]
+source_file="res://assets/sprites/rig_ghoul/head_mask_l.png"
+dest_files=["res://.godot/imported/head_mask_l.png-c33f0158f8d53f12fe90a8401c3a38bb.ctex"]
 
 [params]
 

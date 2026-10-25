@@ -62,9 +62,29 @@ static func slot_position(team: String, row: int, index: int) -> Vector2:
 
 ## 슬롯에 선 캐릭터의 화면 배율 (스프라이트 기준 키 sprite_px 가 원근 키가 되도록)
 static func slot_scale(team: String, row: int, index: int) -> float:
-	var v := slot_world(team, row, index) - _C
+	return _scale_at(slot_world(team, row, index))
+
+
+static func _scale_at(w: Vector3) -> float:
+	var v := w - _C
 	var px := _focal * float(cam.get("unit_height_m", 1.75)) / v.dot(_F)
 	return px / float(cam.get("sprite_px", 230.0))
+
+
+## 유닛이 서는 월드 위치: 두 칸(전방+중앙) 큰 몸집은 차지한 칸들의 가운데
+static func unit_world(u: UnitRuntime) -> Vector3:
+	var w := Vector3.ZERO
+	for r in range(u.row, u.row + u.data.row_span):
+		w += slot_world(u.team, r, u.index)
+	return w / float(u.data.row_span)
+
+
+static func unit_position(u: UnitRuntime) -> Vector2:
+	return project(unit_world(u))
+
+
+static func unit_scale(u: UnitRuntime) -> float:
+	return _scale_at(unit_world(u))
 
 
 static func zone_for_slot(team: String, row: int) -> String:
@@ -98,7 +118,6 @@ func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
 	super.setup(p_controller, p_preset)
 	controller.battle_started.connect(_spawn_units)
 	controller.battle_started.connect(_play_intro)
-	controller.actor_started.connect(func(u, _r): focus_unit(u, CAM_MOVE_TIME))
 	controller.unit_died.connect(func(_u): relight())   # 쓰러진 캐릭터의 바닥 그림자 제거
 	if not controller.slots.all_units().is_empty():
 		_spawn_units()
@@ -110,18 +129,11 @@ func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
 
 
 # ---------------------------------------------------------------- 전투 카메라
-## 전투 시작 시 전체 구도(배치 확인) → 잠시 뒤 줌인 → 차례가 온 캐릭터를 화면 중심으로 따라감.
-## 배경(1280×720) 밖이 보이지 않도록 중심을 제한. HUD 는 CanvasLayer 라 카메라 영향 없음.
-const CAM_INTRO_HOLD := 1.1     # 전체 구도 유지 시간(초)
-const CAM_INTRO_TIME := 0.9     # 줌인 시간
-const CAM_MOVE_TIME := 0.55     # 캐릭터 간 이동 시간
-const CAM_BATTLE_ZOOM := 2.0    # 전투 중 줌 배율: 차례 캐릭터 중심으로 크게 (배경 노출 최소화)
+## 전투 내내 전체 구도 고정 (차례 캐릭터 줌인은 적 선택을 가려서 제거, 2026-10-25).
+## Camera2D 는 3D 배경이 2D 카메라를 따라 그리도록 남겨 둔다 (_process → set_view).
 const CAM_SCREEN := Vector2(1280, 720)
-const CAM_VIEW_CENTER_Y := 336.0  # 상단 바(~92)와 하단 명령 패널(~580) 사이 영역의 중앙: 차례 캐릭터 몸 중심이 여기 오도록
 
 var bcam: Camera2D
-var cam_ready := false
-var _cam_tween: Tween
 
 
 func _make_camera() -> void:
@@ -132,56 +144,9 @@ func _make_camera() -> void:
 	bcam.make_current()
 
 
-func _cam_center_for(point: Vector2, zoom: float) -> Vector2:
-	if bg3d != null:
-		return point   # 3D 배경은 카메라를 따라 다시 그리므로 경계 제한 없음 → 캐릭터를 정확히 중앙에
-	var half := CAM_SCREEN * 0.5 / zoom
-	return Vector2(clampf(point.x, half.x, CAM_SCREEN.x - half.x), clampf(point.y, half.y, CAM_SCREEN.y - half.y))
-
-
-func _cam_to(center: Vector2, zoom: float, dur: float) -> void:
-	if _cam_tween and _cam_tween.is_valid():
-		_cam_tween.kill()
-	var target := _cam_center_for(center, zoom)
-	if dur <= 0.0:
-		bcam.zoom = Vector2.ONE * zoom
-		bcam.position = target
-		return
-	_cam_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	_cam_tween.tween_property(bcam, "zoom", Vector2.ONE * zoom, dur)
-	_cam_tween.tween_property(bcam, "position", target, dur)
-
-
-## 차례 캐릭터의 몸 중심이 화면 가운데(가로 중앙, 세로는 상단 바와 하단 패널 사이 중앙)에 오도록 하는 카메라 중심
-## Camera2D: 화면 y = (월드 y - 중심 y) × zoom + 360
-func _focus_point(unit: UnitRuntime, zoom: float) -> Vector2:
-	var s := sprite_of(unit)
-	var feet := slot_position(unit.team, unit.row, unit.index) if s == null else s.position
-	var body_h := 150.0 if s == null else (-s.head_screen_offset().y) * s.scale.y
-	var body_mid := feet - Vector2(0, body_h * 0.5)
-	return Vector2(body_mid.x, body_mid.y - (CAM_VIEW_CENTER_Y - CAM_SCREEN.y * 0.5) / zoom)
-
-
-func focus_unit(unit: UnitRuntime, dur: float) -> void:
-	if not cam_ready or unit == null:
-		return
-	_cam_to(_focus_point(unit, CAM_BATTLE_ZOOM), CAM_BATTLE_ZOOM, dur)
-
-
 func _play_intro() -> void:
-	cam_ready = false
-	_cam_to(CAM_SCREEN * 0.5, 1.0, 0.0)
-	# 스크린샷 자동화는 기본적으로 인트로를 건너뜀 (--intro=1 이면 재생, --intro=hold 면 전체 구도에서 멈춤)
-	var mode: String = Game.cli.get("intro", "0" if Game.cli.has("shot") else "1")
-	if mode == "hold":
-		return
-	if mode == "1":
-		await get_tree().create_timer(CAM_INTRO_HOLD).timeout
-		cam_ready = true
-		focus_unit(controller.current, CAM_INTRO_TIME)
-	else:
-		cam_ready = true
-		focus_unit(controller.current, 0.0)
+	bcam.zoom = Vector2.ONE
+	bcam.position = CAM_SCREEN * 0.5
 
 
 ## 전투 (재)시작 시 슬롯의 유닛으로 스프라이트 재생성
@@ -193,8 +158,8 @@ func _spawn_units() -> void:
 		var s: UnitSprite2D = UNIT_SCRIPT.new()
 		units_root.add_child(s)
 		s.build(u, manifest)
-		s.position = slot_position(u.team, u.row, u.index)
-		s.scale = Vector2.ONE * slot_scale(u.team, u.row, u.index)
+		s.position = unit_position(u)
+		s.scale = Vector2.ONE * unit_scale(u)
 		s.clicked.connect(func(unit): unit_clicked.emit(unit))
 		sprites[u.instance_id] = s
 	_sort_units()
@@ -290,9 +255,9 @@ func relight() -> void:
 	for id in sprites:
 		var s: UnitSprite2D = sprites[id]
 		var u: UnitRuntime = s.unit
-		var w := slot_world(u.team, u.row, u.index)
+		var w := unit_world(u)
 		var h := 1.75 * (u.data.height_cm / 175.0)
-		bg3d.set_shadow_proxy(id, w, h, u.alive, u.data.sprite_id, u.team == "enemy")
+		bg3d.set_shadow_proxy(id, w, h, u.alive, u.data.sprite_id, s.is_mirrored())
 		var probes: Array = bg3d.light_probe(w, h)
 		var key: Dictionary = probes[0] if not probes.is_empty() and probes[0].intensity > 0.3 else {}
 		var rim: Dictionary = {}
@@ -386,8 +351,8 @@ func _on_unit_moved(unit: UnitRuntime, _from_key: String, _to_key: String) -> vo
 	_begin_busy()
 	var tw := create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(s, "position", slot_position(unit.team, unit.row, unit.index), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(s, "scale", Vector2.ONE * slot_scale(unit.team, unit.row, unit.index), 0.35)
+	tw.tween_property(s, "position", unit_position(unit), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(s, "scale", Vector2.ONE * unit_scale(unit), 0.35)
 	await tw.finished
 	_sort_units()
 	apply_preset(preset)
@@ -401,10 +366,10 @@ func _on_units_swapped(a: UnitRuntime, b: UnitRuntime) -> void:
 	_begin_busy()
 	var tw := create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(sa, "position", slot_position(a.team, a.row, a.index), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(sb, "position", slot_position(b.team, b.row, b.index), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(sa, "scale", Vector2.ONE * slot_scale(a.team, a.row, a.index), 0.35)
-	tw.tween_property(sb, "scale", Vector2.ONE * slot_scale(b.team, b.row, b.index), 0.35)
+	tw.tween_property(sa, "position", unit_position(a), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(sb, "position", unit_position(b), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(sa, "scale", Vector2.ONE * unit_scale(a), 0.35)
+	tw.tween_property(sb, "scale", Vector2.ONE * unit_scale(b), 0.35)
 	await tw.finished
 	_sort_units()
 	apply_preset(preset)

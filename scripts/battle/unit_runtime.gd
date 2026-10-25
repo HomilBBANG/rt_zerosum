@@ -38,6 +38,22 @@ func slot_key() -> String:
 	return SlotManager.make_key(team, row, index)
 
 
+## 차지한 모든 슬롯 (큰 몸집은 row 부터 row_span 칸)
+func slot_keys() -> Array[String]:
+	var out: Array[String] = []
+	for r in range(row, row + data.row_span):
+		out.append(SlotManager.make_key(team, r, index))
+	return out
+
+
+func occupies_row(r: int) -> bool:
+	return r >= row and r < row + data.row_span
+
+
+func is_large() -> bool:
+	return data.row_span > 1
+
+
 func current_weapon() -> Dictionary:
 	if data.weapons.is_empty():
 		return {"id": "none", "name": "맨손", "range_type": data.range_type, "power_bonus": 0}

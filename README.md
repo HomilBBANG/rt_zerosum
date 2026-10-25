@@ -55,10 +55,10 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 3D 뷰도 같은 각도(40°)로 맞춰 두었습니다.
 
 ## 전투 편성 (게임 기본)
-게임은 **사용자 제공 원화 캐릭터만** 배치합니다 (3대3, `TestRoster.build_provided_*`):
-- 아군: 키라(돌격병, 175cm, 전열, `rig_kira`)·하나(돌격소총수, 176.8cm, 중열, `rig_hero2`)·니키타(저격수, 168cm, 후열, `rig_nikita_army`)
-- 적군: 단(돌격병, 185cm, 전열, `rig_dan`)·이선(소총수, 178cm, 중열, `rig_ethan`)·앨마(의무병, 166cm, 후열, `rig_alma`) — 좌우 반전
-바닥 그림자는 리그의 `silhouette.png`(원화 실루엣)를 3D 배경 안에 판으로 세워 실제 광원으로 드리운 캐릭터 모양 그림자입니다.
+게임은 **사용자 제공 원화 캐릭터만** 배치합니다 (6대2, `TestRoster.build_provided_*`):
+- 아군(사람 6인): 단(돌격병 185cm, 전방)·키라(돌격병 175cm, 전방)·이선(소총수 178cm, 중앙)·하나(돌격소총수 176.8cm, 중앙)·앨마(의무병 166cm, 후방)·니키타(저격수 168cm, 후방)
+- 적(괴물, 적으로만 등장): 구울·슬라임 — 둘 다 키 2m, **전방+중앙 두 칸 차지** (`UnitData.row_span = 2`)
+  두 칸 괴물은 살아 있는 동안 전방을 막고(근접은 괴물부터), 자리 이동·교환을 하지 않으며, 두 칸의 가운데에 선다.
 도형으로 생성한 12인(`build_allies/build_enemies`)은 규칙 테스트와 리그 벤치에서만 씁니다.
 새 캐릭터 추가: 원화를 `assets/source/` 에 두고(검정 배경 원화는 먼저 `python3 tools/remove_black_bg.py 입력 출력` 으로 투명화) `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
 `python3 tools/rig_cutter.py <id>` → 임포트 후 `tools/set_mipmaps.py` → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.
