@@ -110,13 +110,9 @@ def main():
     _scale_defs(K)
     w, h = im.size
     cls = classify(im)
-    mask_r = build_zone_mask(im, EYES, "right", rim=max(3, round(22 * K)), smooth=round(90 * K))
-    mask_l = build_zone_mask(im, EYES, "left", rim=max(3, round(22 * K)), smooth=round(90 * K))
-    # 눈 unlit 반경 확대 (원화 해상도)
-    for m in (mask_r, mask_l):
-        d = ImageDraw.Draw(m)
-        for (ex, ey) in EYES:
-            d.ellipse([ex - 42 * K, ey - 28 * K, ex + 42 * K, ey + 28 * K], fill=Z_UNLIT)
+    mask_r = build_zone_mask(im, [], "right", rim=max(3, round(22 * K)), smooth=round(90 * K))
+    mask_l = build_zone_mask(im, [], "left", rim=max(3, round(22 * K)), smooth=round(90 * K))
+    # (예전: 눈 주변 '조명 무시' 타원 → 얼굴에서 눈 주변만 원래 색으로 튀어 제거. 셰이더가 원화 명암을 유지하므로 불필요)
     rig = {"image_size": [w, h], "ground": list(GROUND), "scale": round(0.156 / K, 4),
            "bones": [{"name": n, "parent": p, "pos": list(pos)} for n, p, pos in BONES],
            "parts": [], "weapon_bone": "wrist_r", "head_bone": "head",
