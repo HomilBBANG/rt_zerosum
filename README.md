@@ -6,7 +6,7 @@
 
 ## 설치 (노트북·데스크톱 공통, 명령 한 줄)
 각 기기의 `/Users/eunjikim/Game` (= `~/Game`, Windows 는 `C:\Users\<이름>\Game`)에 프로젝트를 받고,
-Godot 4.7 을 `game/_engine/` 에 자동으로 내려받아 바로 실행합니다. 저장소가 공개라 GitHub 로그인은 필요 없습니다.
+Godot 4.7 이 없을 때만 macOS 는 `/Applications/Godot.app` 하나에 설치해 바로 실행합니다(이미 있으면 재사용). 저장소가 공개라 GitHub 로그인은 필요 없습니다.
 
 **Windows** — 시작 메뉴에서 PowerShell 을 열고 붙여넣기:
 ```powershell
@@ -20,6 +20,12 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/in
 ```
 이후 실행은 Finder 에서 `Game/play.command` 더블클릭, 또는 `~/Game/play.sh`.
 `~/Game` 폴더가 이미 있고 다른 파일이 들어 있어도 지우지 않고 그 자리에 연결합니다(이름이 겹치는 파일이 있으면 멈추고 알려줌).
+
+**Godot 가 여러 개 깔렸을 때**: 아래 명령이 Mac 의 Godot 를 모두 찾아 목록을 보여주고, y 를 입력하면 4.7 하나만
+`/Applications/Godot.app` 에 남기고 나머지는 휴지통으로 옮깁니다(Finder 휴지통에서 복구 가능).
+```bash
+curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cleanup_godot.sh | bash
+```
 
 **업데이트**: 같은 설치 명령을 다시 실행하면 최신 커밋을 받아옵니다(git 이 있으면 pull, 없으면 zip 재다운로드).
 **에디터로 열기**: `play.bat edit` / `./play.sh edit`.

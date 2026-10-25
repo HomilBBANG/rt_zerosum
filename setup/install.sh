@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# RT Zerosum 설치 (macOS / Linux): ~/Game (/Users/<이름>/Game) 에 프로젝트를 받고 Godot 4.7 을 _engine/ 에 내려받은 뒤 실행.
+# RT Zerosum 설치 (macOS / Linux): ~/Game (/Users/<이름>/Game) 에 프로젝트를 받고, Godot 4.7 이 없을 때만
+# /Applications/Godot.app 에 하나 설치한 뒤 실행. 이미 있는 Godot 4.7 은 그대로 재사용한다.
 # 사용:  curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/install.sh | bash
 # 옵션(환경변수): GAME_DIR=설치폴더  GAME_BRANCH=브랜치  NO_RUN=1(설치만)
 set -euo pipefail
@@ -38,26 +39,35 @@ else
   rm -rf "$tmp"
 fi
 
-mkdir -p "$DIR/_engine"
-case "$(uname -s)" in
-  Darwin)
-    BIN="$DIR/_engine/Godot.app/Contents/MacOS/Godot"
-    if [ ! -x "$BIN" ]; then
-      echo "-- Godot ${GODOT_VER} (macOS) 다운로드"
-      curl -fL -o "$DIR/_engine/godot.zip" "$BASE/Godot_v${GODOT_VER}_macos.universal.zip"
-      unzip -q -o "$DIR/_engine/godot.zip" -d "$DIR/_engine" && rm "$DIR/_engine/godot.zip"
-      xattr -dr com.apple.quarantine "$DIR/_engine/Godot.app" 2>/dev/null || true
-    fi ;;
-  Linux)
-    BIN="$DIR/_engine/Godot_v${GODOT_VER}_linux.x86_64"
-    if [ ! -x "$BIN" ]; then
+. "$DIR/setup/godot_find.sh"
+if BIN="$(find_godot47 "$DIR")"; then
+  echo "-- 이미 설치된 Godot 4.7 사용: $BIN (새로 받지 않음)"
+else
+  case "$(uname -s)" in
+    Darwin)
+      echo "-- Godot ${GODOT_VER} (macOS) 다운로드 → /Applications/Godot.app"
+      tmpz="$(mktemp -d)"
+      curl -fL -o "$tmpz/godot.zip" "$BASE/Godot_v${GODOT_VER}_macos.universal.zip"
+      unzip -q -o "$tmpz/godot.zip" -d "$tmpz"
+      if [ -e /Applications/Godot.app ]; then mv /Applications/Godot.app "$HOME/.Trash/Godot (old $(date +%H%M%S)).app"; fi
+      if mv "$tmpz/Godot.app" /Applications/Godot.app 2>/dev/null; then
+        BIN="/Applications/Godot.app/Contents/MacOS/Godot"
+      else
+        mkdir -p "$HOME/Applications" && mv "$tmpz/Godot.app" "$HOME/Applications/Godot.app"
+        BIN="$HOME/Applications/Godot.app/Contents/MacOS/Godot"
+      fi
+      xattr -dr com.apple.quarantine "$(dirname "$(dirname "$(dirname "$BIN")")")" 2>/dev/null || true
+      rm -rf "$tmpz" ;;
+    Linux)
+      mkdir -p "$DIR/_engine"
+      BIN="$DIR/_engine/Godot_v${GODOT_VER}_linux.x86_64"
       echo "-- Godot ${GODOT_VER} (Linux) 다운로드"
       curl -fL -o "$DIR/_engine/godot.zip" "$BASE/Godot_v${GODOT_VER}_linux.x86_64.zip"
       unzip -q -o "$DIR/_engine/godot.zip" -d "$DIR/_engine" && rm "$DIR/_engine/godot.zip"
-      chmod +x "$BIN"
-    fi ;;
-  *) echo "!! 지원하지 않는 OS: $(uname -s). Windows 는 setup/install_windows.ps1 을 쓰세요." >&2; exit 1 ;;
-esac
+      chmod +x "$BIN" ;;
+    *) echo "!! 지원하지 않는 OS: $(uname -s). Windows 는 setup/install_windows.ps1 을 쓰세요." >&2; exit 1 ;;
+  esac
+fi
 
 chmod +x "$DIR/play.sh" "$DIR/play.command" 2>/dev/null || true
 echo "-- 첫 리소스 임포트 (1~2분)"
