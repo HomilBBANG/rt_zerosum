@@ -27,7 +27,12 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/in
 curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cleanup_godot.sh | bash
 ```
 
-**업데이트**: 같은 설치 명령을 다시 실행하면 최신 커밋을 받아옵니다(git 이 있으면 pull, 없으면 zip 재다운로드).
+**업데이트**: 프로젝트 폴더에서 `git pull` 만 하면 됩니다 → 그다음 평소처럼 `play.command` / `play.sh` / `play.bat` 실행.
+새 원화·리그가 들어온 커밋이면 실행 스크립트가 알아서 리소스를 다시 임포트합니다(커밋이 바뀐 첫 실행에만, 최대 1~2분).
+```bash
+cd ~/Game/zerosum && git pull
+```
+git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신으로 받아옵니다.
 **에디터로 열기**: `play.bat edit` / `./play.sh edit`.
 **다른 폴더에 설치**: macOS `curl ... | GAME_DIR=/경로 bash`, Windows `$env:GAME_DIR="D:\Game"` 를 먼저 지정.
 
