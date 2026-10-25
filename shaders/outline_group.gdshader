@@ -4,7 +4,7 @@ shader_type canvas_item;
 render_mode unshaded;
 
 uniform sampler2D screen_texture : hint_screen_texture, repeat_disable, filter_linear;
-uniform float thickness : hint_range(0.0, 6.0) = 1.2;
+uniform float thickness : hint_range(0.0, 6.0) = 0.7;
 uniform vec4 line_color : source_color = vec4(0.06, 0.04, 0.07, 1.0);
 
 void fragment() {
@@ -20,7 +20,7 @@ void fragment() {
 		a = max(a, textureLod(screen_texture, SCREEN_UV + vec2(cos(ang), sin(ang)) * px, 0.0).a);
 	}
 	// 머리카락처럼 가장자리가 반투명한 원화도 외곽선이 흐려지지 않게 커버리지를 끌어올림
-	a = smoothstep(0.04, 0.35, a);
+	a = smoothstep(0.06, 0.5, a);
 	vec4 outline = vec4(line_color.rgb, a * line_color.a);
 	COLOR = mix(outline, vec4(c.rgb, 1.0), c.a);
 	COLOR.a = max(c.a, outline.a);

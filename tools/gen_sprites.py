@@ -279,8 +279,8 @@ def draw_character(spec):
     c.multiply_region(selfshadow, 0.8)
 
     img1 = c.down()
-    mask = build_zone_mask(img1, [], light_from="right")      # 눈 '조명 무시' 구역 없음 (셰이더가 명암 유지)
-    mask_l = build_zone_mask(img1, [], light_from="left")
+    mask = build_zone_mask(img1, [], light_from="right", rim=3)      # 눈 '조명 무시' 구역 없음 (셰이더가 명암 유지), 림 얇게
+    mask_l = build_zone_mask(img1, [], light_from="left", rim=3)
     meta = {"hand": [hand[0], hand[1]], "head_rect": [cx - 72, head_top - 26, 144, 152], "ground": ground, "height": ground - (head_top - 30)}
     return img1, mask, mask_l, meta
 
