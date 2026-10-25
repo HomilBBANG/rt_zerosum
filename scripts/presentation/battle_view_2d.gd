@@ -234,6 +234,9 @@ func _make_3d_background() -> void:
 	bg_vp.own_world_3d = true
 	bg_vp.msaa_3d = Viewport.MSAA_4X
 	bg_vp.positional_shadow_atlas_size = 4096
+	# 그림자 드리우는 스폿은 2개(문·창)뿐 → 사분면 하나씩 통째로 (광원당 2048², 발밑 그림자 계단 줄임)
+	bg_vp.positional_shadow_atlas_quad_0 = Viewport.SHADOW_ATLAS_QUADRANT_SUBDIV_1
+	bg_vp.positional_shadow_atlas_quad_1 = Viewport.SHADOW_ATLAS_QUADRANT_SUBDIV_1
 	bg_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(bg_vp)
 	bg3d = Node3D.new()
@@ -284,21 +287,25 @@ func _process(_delta: float) -> void:
 func relight() -> void:
 	if bg3d == null:
 		return
+	var bodies: Dictionary = {}
+	for id in sprites:
+		var u: UnitRuntime = sprites[id].unit
+		bodies[id] = {"pos": slot_world(u.team, u.row, u.index), "height": 1.75 * (u.data.height_cm / 175.0), "alive": u.alive}
 	for id in sprites:
 		var s: UnitSprite2D = sprites[id]
 		var u: UnitRuntime = s.unit
-		var w := slot_world(u.team, u.row, u.index)
-		var h := 1.75 * (u.data.height_cm / 175.0)
+		var w: Vector3 = bodies[id].pos
+		var h: float = bodies[id].height
 		bg3d.set_shadow_proxy(id, w, h, u.alive, u.data.sprite_id, u.team == "enemy")
+		# 다른 (살아 있는) 캐릭터가 빛을 가리면 그 그림자 속
+		var blockers: Array = []
+		for oid in bodies:
+			if oid != id and bodies[oid].alive:
+				blockers.append(bodies[oid])
+		var img: Image = bg3d.light_map(w, h, blockers)
 		var probes: Array = bg3d.light_probe(w, h)
-		var key: Dictionary = probes[0] if not probes.is_empty() and probes[0].intensity > 0.3 else {}
-		var rim: Dictionary = {}
-		if not key.is_empty():
-			for pr in probes.slice(1):
-				if pr.from_right != key.from_right and pr.intensity > 0.3:
-					rim = pr
-					break
-		s.apply_light_probe(preset, key, rim)
+		var from_right: bool = probes[0].from_right if not probes.is_empty() else true
+		s.apply_light_map(preset, img, from_right, BG3D_SCRIPT.LM_W, h * BG3D_SCRIPT.LM_H_K)
 	_rerender_bg()
 
 

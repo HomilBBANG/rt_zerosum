@@ -70,6 +70,7 @@ func _room_mat(color: Color, outline_mode: int = 1, outline_w: float = 0.02) -> 
 	var m := ShaderMaterial.new()
 	m.shader = CEL
 	m.set_shader_parameter("albedo", color)
+	m.set_shader_parameter("palette_paint", true)   # 배경은 장면 팔레트 색상으로 확실하게
 	if outline_w > 0.0:
 		var o := ShaderMaterial.new()
 		o.shader = OUTLINE
@@ -244,6 +245,7 @@ func apply_preset(p: Dictionary) -> void:
 	fill_light.light_color = p.ambient
 	exterior_key.set_shader_parameter("tint", p.key)
 	exterior_accent.set_shader_parameter("tint", p.accent)
+	_apply_spot_regions()
 	for m in room_mats:
 		m.set_shader_parameter("shadow_tint", p.shadow)
 		m.set_shader_parameter("ambient_tint", p.ambient)
@@ -460,6 +462,20 @@ func _debug_markers() -> void:
 				add_child(mi)
 
 
+## 배경 재질에 스폿 2개(문 키 / 창 보조)의 해석적 영역 전달 (cel_3d palette_paint 참고)
+func _apply_spot_regions() -> void:
+	var lights := [key_light, accent_light]
+	for m in room_mats:
+		for i in 2:
+			var l: SpotLight3D = lights[i]
+			var r := _opening_for(l)
+			m.set_shader_parameter("spot_pos_%d" % i, l.position)   # 이 노드 = 월드 원점
+			m.set_shader_parameter("spot_dir_%d" % i, -l.transform.basis.z)
+			m.set_shader_parameter("spot_cos_%d" % i, cos(deg_to_rad(l.spot_angle)) if l.visible else 2.0)
+			m.set_shader_parameter("spot_rect_%d" % i, Vector4(r.position.x, r.position.y, r.size.x, r.size.y))
+		m.set_shader_parameter("wall_z", WALL_Z)
+
+
 func _opening_for(light: Light3D) -> Rect2:
 	if light == key_light:
 		return OPENING_DOOR
@@ -486,6 +502,51 @@ func light_probe(p: Vector3, height: float = 1.7) -> Array:
 			out.append({"color": lc, "intensity": acc, "from_right": light.global_position.x > p.x, "behind": lv.z < -0.2, "dir": lv, "light": light})
 	out.sort_custom(func(a, b): return a.intensity > b.intensity)
 	return out
+
+
+## 캐릭터 몸 위 빛 지도: 캐릭터가 선 평면(z = p.z)에 cols×rows 격자를 세우고 점마다 실제 광원이 닿는지 계산.
+## 픽셀 = 닿는 빛 색 × 세기(0~1). 열 0 = 월드 x 작은 쪽(화면 왼쪽), 행 0 = 위.
+## blockers: 다른 캐릭터 [{pos, height}] — 광원과 점 사이를 막으면 그 캐릭터의 그림자 속.
+const LM_W := 1.6   # 빛 지도 폭(m)
+const LM_H_K := 1.15   # 키 대비 높이
+func light_map(p: Vector3, height: float, blockers: Array, cols: int = 16, rows: int = 44) -> Image:
+	var img := Image.create(cols, rows, false, Image.FORMAT_RGBA8)
+	var top := height * LM_H_K
+	for r in rows:
+		var y := top * (1.0 - (float(r) + 0.5) / float(rows))
+		for c in cols:
+			var x := p.x + LM_W * ((float(c) + 0.5) / float(cols) - 0.5)
+			var q := Vector3(x, y, p.z)
+			var col := Color(0, 0, 0, 1)
+			for light in [key_light, accent_light]:
+				if not light.visible:
+					continue
+				var e := _spot_at(light, q)
+				if e <= 0.0 or _blocked_by_units(light.global_position, q, blockers):
+					continue
+				var k := clampf(e, 0.0, 1.0)
+				var lc: Color = light.light_color
+				col.r = maxf(col.r, lc.r * k)
+				col.g = maxf(col.g, lc.g * k)
+				col.b = maxf(col.b, lc.b * k)
+			img.set_pixel(c, r, col)
+	return img
+
+
+## 광원 a → 점 b 사이를 다른 캐릭터(세로 원기둥 근사, 반지름 0.2m)가 가리는지
+func _blocked_by_units(a: Vector3, b: Vector3, blockers: Array) -> bool:
+	var a2 := Vector2(a.x, a.z)
+	var b2 := Vector2(b.x, b.z)
+	for bl in blockers:
+		var c: Vector3 = bl.pos
+		var c2 := Vector2(c.x, c.z)
+		var near := Geometry2D.get_closest_point_to_segment(c2, a2, b2)
+		if near.distance_to(c2) > 0.2 or near.distance_to(b2) < 0.3:
+			continue
+		var t := a2.distance_to(near) / maxf(a2.distance_to(b2), 0.001)
+		if lerpf(a.y, b.y, t) < float(bl.height):
+			return true
+	return false
 
 
 func _spot_at(light: SpotLight3D, q: Vector3) -> float:
