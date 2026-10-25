@@ -1,4 +1,4 @@
-# RT Zerosum installer (Windows): clones the project into %USERPROFILE%\Game, downloads Godot 4.7 into _engine\, then runs it.
+# RT Zerosum installer (Windows): clones the project into %USERPROFILE%\Game\zerosum, downloads Godot 4.7 into _engine\, then runs it.
 # Usage (paste into PowerShell):
 #   irm https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/install_windows.ps1 | iex
 # Options (env vars): $env:GAME_DIR=<folder>  $env:GAME_BRANCH=<branch>  $env:NO_RUN="1" (install only)
@@ -8,7 +8,7 @@ $ProgressPreference = "SilentlyContinue"   # much faster Invoke-WebRequest
 
 $Repo    = "https://github.com/HomilBBANG/rt_zerosum.git"
 $Branch  = if ($env:GAME_BRANCH) { $env:GAME_BRANCH } else { "main" }
-$Dir     = if ($env:GAME_DIR) { $env:GAME_DIR } else { Join-Path $env:USERPROFILE "Game" }
+$Dir     = if ($env:GAME_DIR) { $env:GAME_DIR } else { Join-Path (Join-Path $env:USERPROFILE "Game") "zerosum" }
 $GodotVer = "4.7-stable"
 $Base    = "https://github.com/godotengine/godot-builds/releases/download/$GodotVer"
 
@@ -23,6 +23,7 @@ if (Test-Path (Join-Path $Dir ".git")) {
     if ((Test-Path $Dir) -and (Get-ChildItem $Dir -Force | Select-Object -First 1)) {
         throw "$Dir already contains other files. Empty it or set `$env:GAME_DIR to another folder."
     }
+    New-Item -ItemType Directory -Force -Path (Split-Path $Dir -Parent) | Out-Null
     git clone -b $Branch $Repo $Dir
 } else {
     Write-Host "-- git not found: downloading a zip instead (run again to update)"

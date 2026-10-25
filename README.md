@@ -5,21 +5,21 @@
 그래픽 방향(2D vs 3D)을 비교·결정할 수 있게 했습니다. 비교 결과는 `docs/2D_vs_3D_comparison.md` 참조.
 
 ## 설치 (노트북·데스크톱 공통, 명령 한 줄)
-각 기기의 `/Users/eunjikim/Game` (= `~/Game`, Windows 는 `C:\Users\<이름>\Game`)에 프로젝트를 받고,
+각 기기의 `/Users/eunjikim/Game/zerosum` (= `~/Game/zerosum`, Windows 는 `C:\Users\<이름>\Game\zerosum`)에 프로젝트를 받고,
 Godot 4.7 이 없을 때만 macOS 는 `/Applications/Godot.app` 하나에 설치해 바로 실행합니다(이미 있으면 재사용). 저장소가 공개라 GitHub 로그인은 필요 없습니다.
 
 **Windows** — 시작 메뉴에서 PowerShell 을 열고 붙여넣기:
 ```powershell
 irm https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/install_windows.ps1 | iex
 ```
-설치가 끝나면 바탕화면에 **RT Zerosum** 바로가기가 생깁니다. 이후 실행은 바로가기 또는 `Game\play.bat`.
+설치가 끝나면 바탕화면에 **RT Zerosum** 바로가기가 생깁니다. 이후 실행은 바로가기 또는 `Game\zerosum\play.bat`.
 
 **macOS (노트북·컴퓨터 공통)** — 터미널에 붙여넣기:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/install.sh | bash
 ```
-이후 실행은 Finder 에서 `Game/play.command` 더블클릭, 또는 `~/Game/play.sh`.
-`~/Game` 폴더가 이미 있고 다른 파일이 들어 있어도 지우지 않고 그 자리에 연결합니다(이름이 겹치는 파일이 있으면 멈추고 알려줌).
+이후 실행은 Finder 에서 `Game/zerosum/play.command` 더블클릭, 또는 `~/Game/zerosum/play.sh`.
+`~/Game/zerosum` 폴더가 이미 있고 다른 파일이 들어 있어도 지우지 않고 그 자리에 연결합니다(이름이 겹치는 파일이 있으면 멈추고 알려줌).
 
 **Godot 가 여러 개 깔렸을 때**: 아래 명령이 Mac 의 Godot 를 모두 찾아 목록을 보여주고, y 를 입력하면 4.7 하나만
 `/Applications/Godot.app` 에 남기고 나머지는 휴지통으로 옮깁니다(Finder 휴지통에서 복구 가능).

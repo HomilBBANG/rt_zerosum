@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
-# RT Zerosum 설치 (macOS / Linux): ~/Game (/Users/<이름>/Game) 에 프로젝트를 받고, Godot 4.7 이 없을 때만
+# RT Zerosum 설치 (macOS / Linux): ~/Game/zerosum (/Users/<이름>/Game/zerosum) 에 프로젝트를 받고, Godot 4.7 이 없을 때만
 # /Applications/Godot.app 에 하나 설치한 뒤 실행. 이미 있는 Godot 4.7 은 그대로 재사용한다.
 # 사용:  curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/install.sh | bash
 # 옵션(환경변수): GAME_DIR=설치폴더  GAME_BRANCH=브랜치  NO_RUN=1(설치만)
 set -euo pipefail
 REPO="https://github.com/HomilBBANG/rt_zerosum.git"
 BRANCH="${GAME_BRANCH:-main}"
-DIR="${GAME_DIR:-$HOME/Game}"
+DIR="${GAME_DIR:-$HOME/Game/zerosum}"
 GODOT_VER="4.7-stable"
 BASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VER}"
 
 echo "== RT Zerosum 설치: $DIR (브랜치 $BRANCH)"
+# 예전 기본 위치(~/Game 바로 아래)에 받아 둔 적이 있으면 알려준다 (자동으로 지우지 않음)
+PARENT="$(dirname "$DIR")"
+if [ "$PARENT" != "$DIR" ] && [ -d "$PARENT/.git" ] && git -C "$PARENT" remote get-url origin 2>/dev/null | grep -q "rt_zerosum"; then
+  echo "!! $PARENT 에도 예전에 받은 같은 프로젝트가 있습니다. 새 위치는 $DIR 입니다."
+  echo "   필요 없으면 $PARENT 안의 프로젝트 파일(.git, assets, scenes, scripts 등)을 정리하세요. 이 스크립트는 지우지 않습니다."
+fi
 if [ -d "$DIR/.git" ]; then
   echo "-- 이미 있음: 최신으로 업데이트"
   git -C "$DIR" fetch origin "$BRANCH"
@@ -27,6 +33,7 @@ elif git --version >/dev/null 2>&1; then   # macOS 의 /usr/bin/git 껍데기(�
       echo "!! 기존 파일 중 저장소 파일과 이름이 같은 것이 있어 멈췄습니다. 위 목록의 파일을 옮긴 뒤 다시 실행하세요." >&2; exit 1
     fi
   else
+    mkdir -p "$(dirname "$DIR")"
     git clone -b "$BRANCH" "$REPO" "$DIR"
   fi
 else

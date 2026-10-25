@@ -6,7 +6,7 @@
 #  - Godot 의 에디터 설정/프로젝트 목록(~/Library/Application Support/Godot)은 건드리지 않음
 # 사용: curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cleanup_godot.sh | bash
 set -uo pipefail
-GAME_DIR="${GAME_DIR:-$HOME/Game}"
+GAME_DIR="${GAME_DIR:-$HOME/Game/zerosum}"
 KEEP_TARGET="${KEEP_TARGET:-/Applications/Godot.app}"
 here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
 if [ -n "$here" ] && [ -f "$here/godot_find.sh" ]; then
@@ -20,7 +20,7 @@ list="$(mktemp)"
 if command -v mdfind >/dev/null 2>&1; then
   mdfind "kMDItemCFBundleIdentifier == 'org.godotengine.godot'" 2>/dev/null >> "$list"
 fi
-for d in /Applications "$HOME/Applications" "$HOME/Downloads" "$HOME/Desktop" "$HOME/Documents" "$GAME_DIR/_engine" ${GODOT_SEARCH_DIRS:-}; do
+for d in /Applications "$HOME/Applications" "$HOME/Downloads" "$HOME/Desktop" "$HOME/Documents" "$GAME_DIR/_engine" "$HOME/Game/_engine" ${GODOT_SEARCH_DIRS:-}; do
   [ -d "$d" ] || continue
   find "$d" -maxdepth 3 \( -iname "Godot*.app" -o -iname "Godot_v*" \) -not -path "*/Contents/*" -not -iname "*.zip" 2>/dev/null >> "$list"
 done
@@ -34,7 +34,7 @@ done < <(sort -u "$list")
 rm -f "$list"
 
 if [ ${#apps[@]} -eq 0 ]; then
-  echo "Godot 를 찾지 못했습니다. ~/Game 에서 setup/install.sh 를 실행하면 /Applications/Godot.app 에 하나 설치합니다."; exit 0
+  echo "Godot 를 찾지 못했습니다. ~/Game/zerosum 에서 setup/install.sh 를 실행하면 /Applications/Godot.app 에 하나 설치합니다."; exit 0
 fi
 
 # 2) 남길 것 고르기: /Applications/Godot.app 이 4.7 이면 그것, 아니면 4.7 중 첫 번째
@@ -53,7 +53,7 @@ for a in "${apps[@]}"; do
   i=$((i+1))
 done
 if [ -z "$keep" ]; then
-  echo "!! 4.7 버전이 없어 아무것도 지우지 않습니다. ~/Game 에서 setup/install.sh 를 먼저 실행하세요." >&2; exit 1
+  echo "!! 4.7 버전이 없어 아무것도 지우지 않습니다. ~/Game/zerosum 에서 setup/install.sh 를 먼저 실행하세요." >&2; exit 1
 fi
 [ "$keep" != "$KEEP_TARGET" ] && echo "  → 남길 것을 $KEEP_TARGET 로 옮깁니다."
 if [ ${#apps[@]} -eq 1 ] && [ "$keep" = "$KEEP_TARGET" ]; then echo "이미 하나만 있습니다."; exit 0; fi
@@ -88,4 +88,4 @@ done
 # 빈 _engine 폴더 정리
 rmdir "$GAME_DIR/_engine" 2>/dev/null || true
 echo "완료. 남은 Godot: $keep"
-echo "게임 실행: Finder 에서 ~/Game/play.command 더블클릭 (자동으로 이 Godot 를 씁니다)"
+echo "게임 실행: Finder 에서 ~/Game/zerosum/play.command 더블클릭 (자동으로 이 Godot 를 씁니다)"
