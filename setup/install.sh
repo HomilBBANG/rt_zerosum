@@ -17,21 +17,48 @@ if [ "$PARENT" != "$DIR" ] && [ -d "$PARENT/.git" ] && git -C "$PARENT" remote g
   echo "!! $PARENT 에도 예전에 받은 같은 프로젝트가 있습니다. 새 위치는 $DIR 입니다."
   echo "   필요 없으면 $PARENT 안의 프로젝트 파일(.git, assets, scenes, scripts 등)을 정리하세요. 이 스크립트는 지우지 않습니다."
 fi
-if [ -d "$DIR/.git" ]; then
-  echo "-- 이미 있음: 최신으로 업데이트"
-  git -C "$DIR" fetch origin "$BRANCH"
-  git -C "$DIR" checkout -q "$BRANCH"
-  git -C "$DIR" pull --ff-only origin "$BRANCH"
-elif git --version >/dev/null 2>&1; then   # macOS 의 /usr/bin/git 껍데기(개발도구 미설치)는 여기서 걸러짐
-  if [ -d "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null)" ]; then
-    # 이미 파일이 있는 폴더: 그 자리에서 git 을 연결. 같은 이름의 기존 파일이 있으면 덮어쓰지 않고 멈춘다.
-    echo "-- $DIR 에 기존 파일이 있어 그 자리에 연결합니다 (기존 파일은 지우지 않음)"
-    git -C "$DIR" init -q
-    git -C "$DIR" remote add origin "$REPO" 2>/dev/null || git -C "$DIR" remote set-url origin "$REPO"
-    git -C "$DIR" fetch -q origin "$BRANCH"
-    if ! git -C "$DIR" checkout -q -b "$BRANCH" --track "origin/$BRANCH"; then
-      echo "!! 기존 파일 중 저장소 파일과 이름이 같은 것이 있어 멈췄습니다. 위 목록의 파일을 옮긴 뒤 다시 실행하세요." >&2; exit 1
+# 저장소 파일과 이름이 겹치는 '추적되지 않은 기존 파일'을 백업 폴더로 옮긴다 (지우지 않음)
+backup_conflicts() {
+  local ref="$1" bdir="" f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if [ -e "$DIR/$f" ] && ! git -C "$DIR" ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+      [ -z "$bdir" ] && bdir="$DIR/_backup_before_install_$(date +%Y%m%d_%H%M%S)"
+      mkdir -p "$bdir/$(dirname "$f")"
+      mv "$DIR/$f" "$bdir/$f"
+      echo "   백업: $f → $(basename "$bdir")/$f"
     fi
+  done < <(git -C "$DIR" ls-tree -r --name-only "$ref")
+  [ -n "$bdir" ] && echo "-- 이름이 겹치는 기존 파일을 $bdir 로 옮겼습니다."
+  return 0
+}
+
+connect_in_place() {
+  echo "-- $DIR 에 기존 파일이 있어 그 자리에 연결합니다 (겹치는 파일만 백업 폴더로 이동)"
+  [ -d "$DIR/.git" ] || git -C "$DIR" init -q
+  git -C "$DIR" remote add origin "$REPO" 2>/dev/null || git -C "$DIR" remote set-url origin "$REPO"
+  git -C "$DIR" fetch -q origin "$BRANCH"
+  backup_conflicts "origin/$BRANCH"
+  git -C "$DIR" checkout -q -B "$BRANCH" --track "origin/$BRANCH"
+}
+
+HAS_GIT=0; git --version >/dev/null 2>&1 && HAS_GIT=1   # macOS 의 /usr/bin/git 껍데기(개발도구 미설치)는 여기서 걸러짐
+if [ -d "$DIR/.git" ] && [ $HAS_GIT = 1 ] && git -C "$DIR" rev-parse --verify -q HEAD >/dev/null; then
+  echo "-- 이미 있음: 최신으로 업데이트"
+  git -C "$DIR" remote set-url origin "$REPO" 2>/dev/null || git -C "$DIR" remote add origin "$REPO"
+  git -C "$DIR" fetch -q origin "$BRANCH"
+  if [ "$(git -C "$DIR" rev-parse --abbrev-ref HEAD)" != "$BRANCH" ]; then
+    backup_conflicts "origin/$BRANCH"
+    git -C "$DIR" checkout -q -B "$BRANCH" --track "origin/$BRANCH"
+  else
+    git -C "$DIR" pull -q --ff-only origin "$BRANCH"
+  fi
+elif [ -d "$DIR/.git" ] && [ $HAS_GIT = 1 ]; then
+  # 이전 실행이 중간에 멈춰 커밋 없는 .git 만 남은 경우
+  connect_in_place
+elif [ $HAS_GIT = 1 ]; then
+  if [ -d "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null)" ]; then
+    connect_in_place
   else
     mkdir -p "$(dirname "$DIR")"
     git clone -b "$BRANCH" "$REPO" "$DIR"
