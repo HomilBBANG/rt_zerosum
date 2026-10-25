@@ -115,9 +115,9 @@ func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
 const CAM_INTRO_HOLD := 1.1     # 전체 구도 유지 시간(초)
 const CAM_INTRO_TIME := 0.9     # 줌인 시간
 const CAM_MOVE_TIME := 0.55     # 캐릭터 간 이동 시간
-const CAM_BATTLE_ZOOM := 1.2    # 전투 중 줌 배율 (20%)
+const CAM_BATTLE_ZOOM := 2.0    # 전투 중 줌 배율: 차례 캐릭터 중심으로 크게 (배경 노출 최소화)
 const CAM_SCREEN := Vector2(1280, 720)
-const CAM_FEET_SCREEN_Y := 556.0   # 줌인 시 차례 캐릭터의 발이 오는 화면 높이 (하단 명령 패널 바로 위) → 앞쪽 바닥이 덜 보임
+const CAM_VIEW_CENTER_Y := 336.0  # 상단 바(~92)와 하단 명령 패널(~580) 사이 영역의 중앙: 차례 캐릭터 몸 중심이 여기 오도록
 
 var bcam: Camera2D
 var cam_ready := false
@@ -133,6 +133,8 @@ func _make_camera() -> void:
 
 
 func _cam_center_for(point: Vector2, zoom: float) -> Vector2:
+	if bg3d != null:
+		return point   # 3D 배경은 카메라를 따라 다시 그리므로 경계 제한 없음 → 캐릭터를 정확히 중앙에
 	var half := CAM_SCREEN * 0.5 / zoom
 	return Vector2(clampf(point.x, half.x, CAM_SCREEN.x - half.x), clampf(point.y, half.y, CAM_SCREEN.y - half.y))
 
@@ -150,12 +152,14 @@ func _cam_to(center: Vector2, zoom: float, dur: float) -> void:
 	_cam_tween.tween_property(bcam, "position", target, dur)
 
 
-## 차례 캐릭터의 발이 화면 CAM_FEET_SCREEN_Y 에 오도록 하는 카메라 중심 (월드 좌표)
+## 차례 캐릭터의 몸 중심이 화면 가운데(가로 중앙, 세로는 상단 바와 하단 패널 사이 중앙)에 오도록 하는 카메라 중심
 ## Camera2D: 화면 y = (월드 y - 중심 y) × zoom + 360
 func _focus_point(unit: UnitRuntime, zoom: float) -> Vector2:
 	var s := sprite_of(unit)
 	var feet := slot_position(unit.team, unit.row, unit.index) if s == null else s.position
-	return Vector2(feet.x, feet.y - (CAM_FEET_SCREEN_Y - CAM_SCREEN.y * 0.5) / zoom)
+	var body_h := 150.0 if s == null else (-s.head_screen_offset().y) * s.scale.y
+	var body_mid := feet - Vector2(0, body_h * 0.5)
+	return Vector2(body_mid.x, body_mid.y - (CAM_VIEW_CENTER_Y - CAM_SCREEN.y * 0.5) / zoom)
 
 
 func focus_unit(unit: UnitRuntime, dur: float) -> void:
@@ -217,7 +221,7 @@ func apply_preset(p: Dictionary) -> void:
 ## 배경은 3D 방(실제 스폿라이트·하드 섀도우)을 2D 가상 카메라와 같은 투영으로 렌더해 텍스처로 깔고,
 ## 2D 캐릭터는 자기 위치에 실제로 닿는 빛(원뿔·개구부 통과)으로 명암·림 색과 방향을 정한다.
 const BG3D_SCRIPT := preload("res://scripts/presentation/battle_view_3d.gd")
-const BG_RENDER_SIZE := Vector2i(3584, 2016)   # QHD × 전투 줌 1.4 → 줌인해도 배경이 흐려지지 않게
+const BG_RENDER_SIZE := Vector2i(2560, 1440)   # QHD. 카메라를 따라 다시 그리므로 줌해도 흐려지지 않음
 
 var bg_vp: SubViewport
 var bg3d: Node   # BattleView3D (배경 모드)
@@ -236,14 +240,44 @@ func _make_3d_background() -> void:
 	bg3d.set_script(BG3D_SCRIPT)
 	bg_vp.add_child(bg3d)
 	bg3d.configure_as_background(cam)
-	bg.texture = bg_vp.get_texture()
-	bg.material = null
-	bg.scale = Vector2.ONE * (1280.0 / float(BG_RENDER_SIZE.x))
+	# 배경은 화면 공간(카메라 영향 없음)에 화면 크기로 깔고, 3D 카메라가 2D 카메라의 위치·줌을 그대로 따라가 다시 그린다
+	bg.visible = false
+	clear_rect.visible = false   # 화면 공간 3D 배경(레이어 -1)을 덮지 않게
+	var layer := CanvasLayer.new()
+	layer.name = "BackgroundLayer"
+	layer.layer = -1
+	add_child(layer)
+	var tr := TextureRect.new()
+	# 확장 모드를 먼저 지정해야 텍스처(2560×1440) 크기로 커지지 않고 화면(1280×720 논리)에 맞춰 늘어남
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_SCALE
+	tr.texture = bg_vp.get_texture()
+	tr.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	tr.position = Vector2.ZERO
+	tr.size = CAM_SCREEN
+	tr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(tr)
 
 
 func _rerender_bg() -> void:
 	if bg_vp != null:
 		bg_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+var _last_view := Vector3(-1, -1, -1)
+
+
+func _process(_delta: float) -> void:
+	# 2D 카메라가 움직이거나 줌이 바뀌면 3D 배경 카메라를 맞추고 다시 렌더
+	if bg3d == null or bcam == null:
+		return
+	var v := Vector3(bcam.position.x, bcam.position.y, bcam.zoom.x)
+	if v.is_equal_approx(_last_view):
+		return
+	_last_view = v
+	bg3d.set_view(cam, bcam.position, bcam.zoom.x)
+	_rerender_bg()
 
 
 ## 모든 유닛의 조명을 3D 광원 기준으로 다시 계산 + 그림자 대리 물체 갱신 + 배경 재렌더

@@ -420,13 +420,25 @@ func configure_as_background(c: Dictionary) -> void:
 	var H := float(scr[1])
 	camera.position = target + Vector3(0.0, sin(p), cos(p)) * d
 	camera.look_at(target, Vector3.UP)
-	var near := 0.3
-	var size := 2.0 * near * tan(deg_to_rad(float(c.get("vfov_deg", 32.0))) * 0.5)
-	# 2D 투영의 주점(cx, cy)이 화면 중앙이 아니므로 프러스텀을 그만큼 옮긴다 (off-axis)
-	var off := Vector2(-(float(c.get("cx", W * 0.5)) - W * 0.5) / H * size, (float(c.get("cy", H * 0.5)) - H * 0.5) / H * size)
-	camera.set_frustum(size, off, near, 120.0)
+	set_view(c, Vector2(W * 0.5, H * 0.5), 1.0)
 	if Game.cli.get("bgdebug", "0") == "1":
 		_debug_markers()
+
+
+## 2D 카메라(화면 중심 cam_center, 줌 zoom — 2D 월드 좌표)가 보는 영역과 똑같이 보이도록 프러스텀 설정.
+## 2D 투영: 화면 = (월드 - cam_center) × zoom + 화면중앙, 월드는 주점(cx, cy)·초점거리 f 의 투영 → 3D 는 같은 카메라 위치에서
+## 화각을 1/zoom 로, 주점을 (cx - cam_center) × zoom 만큼 옮긴 off-axis 프러스텀.
+func set_view(c: Dictionary, cam_center: Vector2, zoom: float) -> void:
+	var scr: Array = c.get("screen", [1280, 720])
+	var W := float(scr[0])
+	var H := float(scr[1])
+	var near := 0.3
+	var size := 2.0 * near * tan(deg_to_rad(float(c.get("vfov_deg", 32.0))) * 0.5) / zoom
+	var dx := (float(c.get("cx", W * 0.5)) - cam_center.x) * zoom
+	var dy := (float(c.get("cy", H * 0.5)) - cam_center.y) * zoom
+	camera.set_frustum(size, Vector2(-dx / H * size, dy / H * size), near, 120.0)
+	if Game.cli.get("camlog", "0") == "1":
+		print("[set_view] center=", cam_center, " zoom=", zoom, " size=", size, " dx=", dx, " dy=", dy)
 
 
 func _debug_markers() -> void:
