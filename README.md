@@ -49,11 +49,12 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cl
 3D 뷰도 같은 각도(40°)로 맞춰 두었습니다.
 
 ## 전투 편성 (게임 기본)
-게임은 **사용자 제공 원화 캐릭터만** 배치합니다: 아군 라온(저격수, `rig_hero`)·세린(돌격소총수, `rig_hero2`),
+게임은 **사용자 제공 원화 캐릭터만** 배치합니다: 아군 니키타(저격수, 168cm, `rig_hero`)·하나(돌격소총수, 176.8cm, `rig_hero2`),
 적은 같은 두 캐릭터를 좌우 반전해 세운 2대2 전투입니다(`TestRoster.build_provided_*`).
 도형으로 생성한 12인(`build_allies/build_enemies`)은 규칙 테스트와 리그 벤치에서만 씁니다.
 새 캐릭터 추가: 원화를 `assets/source/` 에 두고 `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
-`python3 tools/rig_cutter.py <id>` → 임포트 후 `tools/set_mipmaps.py` → 로스터에 `sprite_id: "<id>"` 로 등록.
+`python3 tools/rig_cutter.py <id>` → 임포트 후 `tools/set_mipmaps.py` → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.
+캐릭터 키는 `rig.json` 의 `figure_px`(원화 정수리~발 픽셀)를 화면 230px = 175cm 기준으로 환산해 2D·3D 모두에 반영됩니다.
 
 ## Skeleton2D 리그 (2D 확정 후 비용 테스트)
 사용자 제공 원화 1장을 `tools/rig_cutter.py` 로 17개 파츠 + 16개 본 + 파츠별 구역 마스크로 잘라 `assets/sprites/rig_hero/` 에 두고,

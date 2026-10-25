@@ -224,6 +224,7 @@ func _spawn_units() -> void:
 		units_root.add_child(m)
 		m.build(u)
 		m.position = slot_position(u.team, u.row, u.index)
+		m.scale = Vector3.ONE * (u.data.height_cm / 175.0)   # 캐릭터 키 반영
 		models[u.instance_id] = m
 	apply_preset(preset)
 

@@ -21,12 +21,15 @@ var mirrored := false
 var px_k: float = 1.0   # 원본(1475px 키) 기준으로 작성한 이동량을 축소 원화 픽셀로 환산
 
 
-func build(p_rig_dir: String, p_mirrored: bool = false) -> void:
+## height_cm: 캐릭터 키. rig.json 의 figure_px(정수리~발 픽셀)를 230px = 175cm 기준 화면 키로 맞춘다.
+func build(p_rig_dir: String, p_mirrored: bool = false, height_cm: float = 175.0) -> void:
 	rig_dir = p_rig_dir
 	mirrored = p_mirrored
 	var f := FileAccess.open(rig_dir.path_join("rig.json"), FileAccess.READ)
 	rig = JSON.parse_string(f.get_as_text())
 	scale_factor = float(rig.get("scale", 0.156))
+	if rig.has("figure_px"):
+		scale_factor = 230.0 * (height_cm / 175.0) / float(rig.figure_px)
 	px_k = 0.156 / scale_factor
 	var ground: Array = rig.ground
 	# 이미지 픽셀 좌표계를 그대로 쓰고 컨테이너에서 축소. 발 접지점이 (0,0).

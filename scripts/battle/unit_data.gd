@@ -17,6 +17,7 @@ extends Resource
 @export var weapons: Array[Dictionary] = []
 @export var sprite_id: String = ""
 @export var role: String = ""              # 표시용 병과명
+@export var height_cm: float = 175.0       # 키: 화면 크기에 반영 (230px = 175cm)
 ## 기본 배치 (row 0=전방,1=중앙,2=후방 / index 0,1)
 @export var default_row: int = 0
 @export var default_index: int = 0

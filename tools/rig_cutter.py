@@ -66,7 +66,7 @@ EYES = [(492, 206), (596, 206)]
 GROUND = (585, 1505)
 HEAD_RECT = (360, 20, 380, 340)
 
-# ---- hero2: 갈색 곱슬 포니테일, 회흑색 전투복, 부츠 (원화 1024x1536)
+# ---- hero2 (하나): 갈색 곱슬 포니테일, 회색 전투복(소매 걷음), 부츠 (원화 1024x1536)
 HERO2 = {
     "src": "char_ref2.png", "classify": "neutral", "head_rect": (430, 0, 280, 260),
     "eyes": [(540, 150), (630, 160)], "ground": (590, 1505),
@@ -123,7 +123,7 @@ def classify(im, mode="warm"):
             ap[x, y] = 255
             if mode == "neutral":
                 rb = r - b
-                if rb < 14 and max(r, g, b) < 150:
+                if rb < 20 and (g - b) < 7 and max(r, g, b) < 175:   # 무채색 회색 의상(밝은 소매 포함)
                     dp[x, y] = 255
                 elif rb >= 52:
                     sp[x, y] = 255
@@ -172,7 +172,10 @@ def build(cid):
     mask_r = build_zone_mask(im, [], "right", rim=max(2, round(11 * K)), smooth=round(90 * K))
     mask_l = build_zone_mask(im, [], "left", rim=max(2, round(11 * K)), smooth=round(90 * K))
     # (예전: 눈 주변 '조명 무시' 타원 → 얼굴에서 눈 주변만 원래 색으로 튀어 제거. 셰이더가 원화 명암을 유지하므로 불필요)
-    rig = {"image_size": [w, h], "ground": list(GROUND), "scale": round(0.156 / K, 4),
+    # 정수리(알파 기준)~발바닥 픽셀 높이: 게임이 캐릭터 키(cm)에 맞춰 배율을 정하는 기준
+    abox = im.split()[3].point(lambda v: 255 if v > 40 else 0).getbbox()
+    figure_px = GROUND[1] - abox[1]
+    rig = {"image_size": [w, h], "ground": list(GROUND), "scale": round(0.156 / K, 4), "figure_px": figure_px,
            "bones": [{"name": n, "parent": p, "pos": list(pos)} for n, p, pos in BONES],
            "parts": [], "weapon_bone": "wrist_r", "head_bone": "head",
            "eyes": EYES, "head_rect": [round(v * K) for v in d["head_rect"]]}

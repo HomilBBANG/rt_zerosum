@@ -98,7 +98,7 @@ func _build_rigged(_meta: Dictionary) -> void:
 	rig.name = "Rig"
 	flip.add_child(rig)
 	rig.scale = Vector2.ONE / BASE_SCALE
-	rig.build(UnitArt.rig_dir(unit.data.sprite_id), false)
+	rig.build(UnitArt.rig_dir(unit.data.sprite_id), false, unit.data.height_cm)
 	rig_height = -rig.head_top_local().y + 6.0
 	mat = rig.mats[0]
 	weapon = Sprite2D.new()
