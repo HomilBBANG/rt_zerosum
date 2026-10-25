@@ -91,21 +91,36 @@ def classify(im):
             "skindark": ImageChops.lighter(skin, dark)}
 
 
+# 원화를 화면 표시 크기의 약 2배(레티나 대응)로 미리 줄여 쓴다. 1475px 키를 그대로 쓰면 10배 축소로 계단 현상이 난다.
+K = 0.36
+
+
+def _scale_defs(k):
+    global BONES, PARTS, EYES, GROUND
+    sp = lambda pt: (round(pt[0] * k), round(pt[1] * k))
+    BONES = [(n, p, sp(pos)) for n, p, pos in BONES]
+    PARTS = [(n, b, kind, [sp(q) for q in poly], z) for n, b, kind, poly, z in PARTS]
+    EYES = [sp(e) for e in EYES]
+    GROUND = sp(GROUND)
+
+
 def main():
     im = Image.open(SRC).convert("RGBA")
+    im = im.resize((round(im.width * K), round(im.height * K)), Image.LANCZOS)
+    _scale_defs(K)
     w, h = im.size
     cls = classify(im)
-    mask_r = build_zone_mask(im, EYES, "right", rim=22, smooth=90)
-    mask_l = build_zone_mask(im, EYES, "left", rim=22, smooth=90)
+    mask_r = build_zone_mask(im, EYES, "right", rim=max(3, round(22 * K)), smooth=round(90 * K))
+    mask_l = build_zone_mask(im, EYES, "left", rim=max(3, round(22 * K)), smooth=round(90 * K))
     # 눈 unlit 반경 확대 (원화 해상도)
     for m in (mask_r, mask_l):
         d = ImageDraw.Draw(m)
         for (ex, ey) in EYES:
-            d.ellipse([ex - 42, ey - 28, ex + 42, ey + 28], fill=Z_UNLIT)
-    rig = {"image_size": [w, h], "ground": list(GROUND), "scale": 0.156,
+            d.ellipse([ex - 42 * K, ey - 28 * K, ex + 42 * K, ey + 28 * K], fill=Z_UNLIT)
+    rig = {"image_size": [w, h], "ground": list(GROUND), "scale": round(0.156 / K, 4),
            "bones": [{"name": n, "parent": p, "pos": list(pos)} for n, p, pos in BONES],
            "parts": [], "weapon_bone": "wrist_r", "head_bone": "head",
-           "eyes": EYES, "head_rect": [360, 20, 380, 340]}
+           "eyes": EYES, "head_rect": [round(v * K) for v in (360, 20, 380, 340)]}
     debug = Image.new("RGBA", (w * 2, h), (60, 60, 70, 255))
     debug.alpha_composite(im, (0, 0))
     dd = ImageDraw.Draw(debug)
@@ -114,7 +129,7 @@ def main():
         pm = Image.new("L", (w, h), 0)
         ImageDraw.Draw(pm).polygon(poly, fill=255)
         pm = ImageChops.multiply(pm, cls[kind])
-        pm = pm.filter(ImageFilter.MaxFilter(3))          # 이음새 1px 팽창
+        pm = pm.filter(ImageFilter.MaxFilter(3))          # 이음새 1px 팽창 (축소 원화 기준)
         pm = ImageChops.multiply(pm, cls["any"])
         part = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         part.paste(im, (0, 0), pm)

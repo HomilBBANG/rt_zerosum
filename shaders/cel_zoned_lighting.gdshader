@@ -14,21 +14,28 @@ uniform float accent_mix : hint_range(0.0, 1.0) = 0.8;
 uniform float unlit_dim : hint_range(0.0, 1.0) = 0.9;
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0); // 피격 플래시 (a = 강도)
 
+vec3 zone_color(vec3 base, float zone) {
+	if (zone < 0.17) {
+		return base * shadow_tint.rgb;
+	} else if (zone < 0.45) {
+		return base * ambient_tint.rgb;
+	} else if (zone < 0.55) {
+		return base * unlit_dim;
+	} else if (zone < 0.83) {
+		return mix(base, key_color.rgb, key_mix);
+	}
+	return mix(base, accent_color.rgb, accent_mix);
+}
+
 void fragment() {
 	vec4 base = texture(TEXTURE, UV) * COLOR;
-	float zone = texture(zone_mask, UV).r;
-	vec3 out_rgb;
-	if (zone < 0.17) {
-		out_rgb = base.rgb * shadow_tint.rgb;
-	} else if (zone < 0.45) {
-		out_rgb = base.rgb * ambient_tint.rgb;
-	} else if (zone < 0.55) {
-		out_rgb = base.rgb * unlit_dim;
-	} else if (zone < 0.83) {
-		out_rgb = mix(base.rgb, key_color.rgb, key_mix);
-	} else {
-		out_rgb = mix(base.rgb, accent_color.rgb, accent_mix);
-	}
+	// 구역 코드는 보간 불가(최근접) → 화면 픽셀 안 4점의 결과 색을 평균해 경계 계단 제거 (v0.4)
+	vec2 d = fwidth(UV) * 0.25;
+	vec3 out_rgb = zone_color(base.rgb, texture(zone_mask, UV + vec2(-d.x, -d.y)).r)
+		+ zone_color(base.rgb, texture(zone_mask, UV + vec2(d.x, -d.y)).r)
+		+ zone_color(base.rgb, texture(zone_mask, UV + vec2(-d.x, d.y)).r)
+		+ zone_color(base.rgb, texture(zone_mask, UV + vec2(d.x, d.y)).r);
+	out_rgb *= 0.25;
 	out_rgb = mix(out_rgb, flash_color.rgb, flash_color.a);
 	COLOR = vec4(out_rgb, base.a);
 }

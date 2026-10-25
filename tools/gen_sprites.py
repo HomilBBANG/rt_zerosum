@@ -18,6 +18,7 @@ os.makedirs(OUT_SPR, exist_ok=True)
 os.makedirs(OUT_TEX, exist_ok=True)
 
 S = 4                     # supersample
+PX = 1                    # 선 굵기 배율 (배경을 2배 해상도로 그릴 때 2)
 W, H = 256, 512           # 1x canvas
 LINE = (24, 18, 26, 255)  # outline color
 LW = 3                    # outline width at 1x
@@ -48,18 +49,18 @@ class Canvas:
         self.body_alpha = None  # body-only silhouette for mask splitting
 
     def poly(self, pts, fill, outline=LINE, lw=LW):
-        self.d.polygon(sc(pts), fill=fill, outline=outline if lw > 0 else None, width=int(lw * S) if lw > 0 else 0)
+        self.d.polygon(sc(pts), fill=fill, outline=outline if lw > 0 else None, width=int(lw * S * PX) if lw > 0 else 0)
 
     def ellipse(self, box, fill, outline=LINE, lw=LW):
         x0, y0, x1, y1 = box
-        self.d.ellipse([x0 * S, y0 * S, x1 * S, y1 * S], fill=fill, outline=outline if lw > 0 else None, width=int(lw * S) if lw > 0 else 0)
+        self.d.ellipse([x0 * S, y0 * S, x1 * S, y1 * S], fill=fill, outline=outline if lw > 0 else None, width=int(lw * S * PX) if lw > 0 else 0)
 
     def rrect(self, box, r, fill, outline=LINE, lw=LW):
         x0, y0, x1, y1 = box
-        self.d.rounded_rectangle([x0 * S, y0 * S, x1 * S, y1 * S], radius=r * S, fill=fill, outline=outline if lw > 0 else None, width=int(lw * S) if lw > 0 else 0)
+        self.d.rounded_rectangle([x0 * S, y0 * S, x1 * S, y1 * S], radius=r * S, fill=fill, outline=outline if lw > 0 else None, width=int(lw * S * PX) if lw > 0 else 0)
 
     def line(self, pts, fill, w):
-        self.d.line(sc(pts), fill=fill, width=int(w * S), joint="curve")
+        self.d.line(sc(pts), fill=fill, width=int(w * S * PX), joint="curve")
 
     def thick_limb(self, pts, w, fill, outline=LINE, lw=LW):
         """rounded polyline with outline: draw outline pass then fill pass with round caps"""
@@ -478,12 +479,15 @@ class Cam:
         return [self.p(*q) for q in pts3]
 
 
+BG_RES = 2   # 배경은 1280×720 의 2배로 생성 (레티나·전체화면에서 흐려지지 않게). Godot 에서 0.5배로 표시
+
+
 def draw_background():
-    BW, BH = 1280, 720
-    global S
-    S_prev = S
-    S = 2
-    cam = Cam(CAMERA)
+    BW, BH = 1280 * BG_RES, 720 * BG_RES
+    global S, PX
+    S_prev, PX_prev = S, PX
+    S, PX = 2, BG_RES
+    cam = Cam(dict(CAMERA, screen=[BW, BH], cx=CAMERA["cx"] * BG_RES, cy=CAMERA["cy"] * BG_RES))
     c = Canvas(BW, BH)
     m = Image.new("L", (BW * S, BH * S), Z_AMBIENT)   # 마스크도 같은 배율로 그린 뒤 축소
     md = ImageDraw.Draw(m)
@@ -582,7 +586,7 @@ def draw_background():
     mpoly([(1.5, 1.06, WALL_Z + 0.8), (2.1, 1.06, WALL_Z + 0.8), (2.1, 0.9, WALL_Z + 0.8), (1.5, 0.9, WALL_Z + 0.8)], Z_UNLIT)
     img = c.down()
     mask = m.resize((BW, BH), Image.NEAREST)
-    S = S_prev
+    S, PX = S_prev, PX_prev
     return img, mask
 
 

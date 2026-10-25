@@ -82,6 +82,9 @@ func _ready() -> void:
 	var f := FileAccess.open("res://assets/sprites/manifest.json", FileAccess.READ)
 	manifest = JSON.parse_string(f.get_as_text())
 	set_camera(manifest.get("camera", {}))
+	# 배경은 2배 해상도(레티나 대응)로 생성되어 있으므로 화면 크기에 맞춰 축소
+	bg.scale = Vector2.ONE * (1280.0 / float(bg.texture.get_width()))
+	bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	bg_mat = ShaderMaterial.new()
 	bg_mat.shader = ZONE_SHADER
 	bg_mat.set_shader_parameter("zone_mask", load("res://assets/textures/bg_barracks_mask.png"))

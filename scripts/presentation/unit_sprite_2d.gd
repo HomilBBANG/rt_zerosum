@@ -8,7 +8,7 @@ const SHADER := preload("res://shaders/cel_character.gdshader")
 const OUTLINE_SHADER := preload("res://shaders/outline_group.gdshader")
 const RIG_SCRIPT := preload("res://scripts/presentation/rigged_unit_2d.gd")
 const BASE_SCALE := 0.5
-const WEAPON_RIG_SCALE := 3.2  # 무기 원화(캐릭터 460px 기준) → 리그 원화(1475px) 비율
+
 
 var unit: UnitRuntime
 var manifest: Dictionary
@@ -109,7 +109,8 @@ func _build_rigged(_meta: Dictionary) -> void:
 	weapon.material = wmat
 	weapon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	rig.attach_weapon(weapon)
-	weapon.scale = Vector2.ONE * WEAPON_RIG_SCALE
+	# 무기 원화는 캐릭터 키 460px 기준 → 리그 원화 픽셀계로 (키 230px 화면 = 리그 scale)
+	weapon.scale = Vector2.ONE * (0.5 / rig.scale_factor)
 	weapon.z_index = 9
 	refresh_weapon()
 	area = Area2D.new()

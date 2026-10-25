@@ -18,6 +18,7 @@ var scale_factor: float = 0.156
 var weapon_bone: Bone2D
 var light_from_right := true
 var mirrored := false
+var px_k: float = 1.0   # 원본(1475px 키) 기준으로 작성한 이동량을 축소 원화 픽셀로 환산
 
 
 func build(p_rig_dir: String, p_mirrored: bool = false) -> void:
@@ -26,6 +27,7 @@ func build(p_rig_dir: String, p_mirrored: bool = false) -> void:
 	var f := FileAccess.open(rig_dir.path_join("rig.json"), FileAccess.READ)
 	rig = JSON.parse_string(f.get_as_text())
 	scale_factor = float(rig.get("scale", 0.156))
+	px_k = 0.156 / scale_factor
 	var ground: Array = rig.ground
 	# 이미지 픽셀 좌표계를 그대로 쓰고 컨테이너에서 축소. 발 접지점이 (0,0).
 	skeleton = Skeleton2D.new()
@@ -108,9 +110,8 @@ func attach_weapon(node: Node2D) -> void:
 		add_child(node)
 		return
 	weapon_bone.add_child(node)
-	node.position = Vector2(10, 10)
+	node.position = Vector2(10, 10) * px_k
 	node.rotation = deg_to_rad(70.0)
-	node.scale = Vector2.ONE * (1.0 / scale_factor) * 0.5 * 0.9  # 무기 원화(1x) 를 리그 픽셀계로
 
 
 # ---------------------------------------------------------------- 애니메이션
@@ -143,7 +144,7 @@ func _build_animations() -> void:
 	_track(idle, "shoulder_r", [[0.0, deg_to_rad(1.5)], [1.3, deg_to_rad(-1.5)], [2.6, deg_to_rad(1.5)]])
 	_track(idle, "elbow_l", [[0.0, 0.0], [1.3, deg_to_rad(2.0)], [2.6, 0.0]])
 	_track(idle, "elbow_r", [[0.0, 0.0], [1.3, deg_to_rad(-2.0)], [2.6, 0.0]])
-	_track(idle, "hip", [[0.0, Vector2(bones.hip.position)], [1.3, bones.hip.position + Vector2(0, 6)], [2.6, Vector2(bones.hip.position)]], "position")
+	_track(idle, "hip", [[0.0, Vector2(bones.hip.position)], [1.3, bones.hip.position + Vector2(0, 6) * px_k], [2.6, Vector2(bones.hip.position)]], "position")
 	lib.add_animation("idle", idle)
 	# attack: 오른팔 들어 올려 조준/휘두르기 + 상체 전진
 	var atk := Animation.new()
@@ -173,7 +174,7 @@ func _build_animations() -> void:
 	# death: 무릎 꿇고 쓰러짐
 	var die := Animation.new()
 	die.length = 0.8
-	_track(die, "hip", [[0.0, Vector2(bones.hip.position)], [0.8, bones.hip.position + Vector2(0, 260)]], "position")
+	_track(die, "hip", [[0.0, Vector2(bones.hip.position)], [0.8, bones.hip.position + Vector2(0, 260) * px_k]], "position")
 	_track(die, "hip_l", [[0.0, 0.0], [0.8, deg_to_rad(-35)]])
 	_track(die, "hip_r", [[0.0, 0.0], [0.8, deg_to_rad(35)]])
 	_track(die, "knee_l", [[0.0, 0.0], [0.8, deg_to_rad(70)]])
