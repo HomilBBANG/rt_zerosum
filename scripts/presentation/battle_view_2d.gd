@@ -115,9 +115,9 @@ func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
 const CAM_INTRO_HOLD := 1.1     # 전체 구도 유지 시간(초)
 const CAM_INTRO_TIME := 0.9     # 줌인 시간
 const CAM_MOVE_TIME := 0.55     # 캐릭터 간 이동 시간
-const CAM_BATTLE_ZOOM := 1.4    # 전투 중 줌 배율
+const CAM_BATTLE_ZOOM := 1.2    # 전투 중 줌 배율 (20%)
 const CAM_SCREEN := Vector2(1280, 720)
-const CAM_HUD_BOTTOM := 140.0   # 하단 명령 패널 높이: 그만큼 위쪽 영역의 중심에 캐릭터를 둔다
+const CAM_FEET_SCREEN_Y := 556.0   # 줌인 시 차례 캐릭터의 발이 오는 화면 높이 (하단 명령 패널 바로 위) → 앞쪽 바닥이 덜 보임
 
 var bcam: Camera2D
 var cam_ready := false
@@ -150,13 +150,12 @@ func _cam_to(center: Vector2, zoom: float, dur: float) -> void:
 	_cam_tween.tween_property(bcam, "position", target, dur)
 
 
-## 캐릭터 몸 중앙이 HUD 위쪽 영역의 가운데에 오도록 하는 카메라 중심 (월드 좌표)
+## 차례 캐릭터의 발이 화면 CAM_FEET_SCREEN_Y 에 오도록 하는 카메라 중심 (월드 좌표)
+## Camera2D: 화면 y = (월드 y - 중심 y) × zoom + 360
 func _focus_point(unit: UnitRuntime, zoom: float) -> Vector2:
 	var s := sprite_of(unit)
 	var feet := slot_position(unit.team, unit.row, unit.index) if s == null else s.position
-	var body_h := 150.0 if s == null else (-s.head_screen_offset().y) * s.scale.y
-	var body_mid := feet - Vector2(0, body_h * 0.5)
-	return body_mid + Vector2(0, CAM_HUD_BOTTOM * 0.5 / zoom)
+	return Vector2(feet.x, feet.y - (CAM_FEET_SCREEN_Y - CAM_SCREEN.y * 0.5) / zoom)
 
 
 func focus_unit(unit: UnitRuntime, dur: float) -> void:
