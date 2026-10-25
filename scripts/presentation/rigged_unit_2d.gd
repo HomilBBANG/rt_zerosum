@@ -4,7 +4,7 @@ extends Node2D
 ## 파츠 Sprite2D 를 본 아래에 붙인다. 모든 파츠는 cel_zoned_lighting 셰이더 + 구역 마스크를 쓴다.
 ## 애니메이션(idle/attack/hit/heal/death)은 코드로 만든 Animation 리소스 (본 회전 키).
 
-const SHADER := preload("res://shaders/cel_zoned_lighting.gdshader")
+const SHADER := preload("res://shaders/cel_character.gdshader")
 
 var rig: Dictionary
 var rig_dir: String

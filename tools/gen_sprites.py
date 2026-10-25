@@ -315,8 +315,8 @@ def build_zone_mask(img1, unlit_marks, light_from="right", rim=5, smooth=0):
         # slight diagonal: terminator shifts with height
         yn = y / h
         # 빛 받는 면을 60% 안팎으로: 얼굴이 절반으로 갈리지 않고 '큰 덩어리 그림자' 가 반대쪽에 남도록
-        key_t = 0.40 - 0.12 * (yn - 0.5)
-        amb_t = key_t - 0.15
+        key_t = 0.38 - 0.12 * (yn - 0.5)
+        amb_t = key_t - 0.17
         for x in xs:
             t = (x - x0) / width
             if light_from == "left":

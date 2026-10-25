@@ -4,7 +4,8 @@ extends Node2D
 
 signal clicked(unit: UnitRuntime)
 
-const SHADER := preload("res://shaders/cel_zoned_lighting.gdshader")
+const SHADER := preload("res://shaders/cel_character.gdshader")
+const OUTLINE_SHADER := preload("res://shaders/outline_group.gdshader")
 const RIG_SCRIPT := preload("res://scripts/presentation/rigged_unit_2d.gd")
 const BASE_SCALE := 0.5
 const WEAPON_RIG_SCALE := 3.2  # 무기 원화(캐릭터 460px 기준) → 리그 원화(1475px) 비율
@@ -14,6 +15,7 @@ var manifest: Dictionary
 var body: Sprite2D
 var weapon: Sprite2D
 var flip: Node2D
+var group: CanvasGroup
 var area: Area2D
 var mat: ShaderMaterial
 var wmat: ShaderMaterial
@@ -35,9 +37,18 @@ func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
 	unit = p_unit
 	manifest = p_manifest
 	var meta: Dictionary = manifest.units.get(unit.data.sprite_id, {})
+	# 파츠·무기를 하나의 CanvasGroup 으로 그려 합쳐진 실루엣에 외곽선을 준다
+	group = CanvasGroup.new()
+	group.name = "Group"
+	group.fit_margin = 8.0
+	group.clear_margin = 8.0
+	var om := ShaderMaterial.new()
+	om.shader = OUTLINE_SHADER
+	group.material = om
+	add_child(group)
 	flip = Node2D.new()
 	flip.name = "Flip"
-	add_child(flip)
+	group.add_child(flip)
 	if unit.team == "enemy":
 		flip.scale.x = -1.0
 	flip.scale *= BASE_SCALE
@@ -160,29 +171,25 @@ func _update_light_masks() -> void:
 ## 프리셋 적용. zone: "key" | "accent" | "ambient" — 유닛이 서 있는 빛 영역
 func apply_lighting(p: Dictionary, zone: String) -> void:
 	ui_accent = p.get("ui_accent", ui_accent)
-	# 캐릭터는 의상 고유색 식별을 위해 그림자 색을 배경보다 약간 밝게 (§3.1 '피부·의상 식별 유지')
-	var char_shadow := Color(minf(1.0, p.shadow.r * 1.9), minf(1.0, p.shadow.g * 1.9), minf(1.0, p.shadow.b * 1.9))
 	for m in _all_mats():
-		m.set_shader_parameter("shadow_tint", char_shadow)
+		m.set_shader_parameter("shadow_tint", p.shadow)
 		m.set_shader_parameter("ambient_tint", p.ambient)
 		match zone:
 			"accent":
-				# 보조광(창문) 영역: 키=보조광색, 림=주조명색
+				# 보조광(창문) 영역: 주조명 = 보조광색, 림 = 주조명색
 				m.set_shader_parameter("key_color", p.accent)
 				m.set_shader_parameter("accent_color", p.key)
-				m.set_shader_parameter("key_mix", p.char_accent_mix)
-				m.set_shader_parameter("accent_mix", p.char_key_mix)
+				m.set_shader_parameter("key_mix", 0.62)
 			"ambient":
-				# 두 빛 사이: 고유색이 가장 잘 보이는 구역. 약한 주변광 키, 선명한 주조명 림
-				m.set_shader_parameter("key_color", p.ambient.lightened(0.45))
+				# 두 빛 사이: 고유색이 가장 잘 보이는 구역. 약한 주변광, 선명한 주조명 림
+				m.set_shader_parameter("key_color", p.ambient.lightened(0.5))
 				m.set_shader_parameter("accent_color", p.key)
-				m.set_shader_parameter("key_mix", 0.22)
-				m.set_shader_parameter("accent_mix", p.char_key_mix)
+				m.set_shader_parameter("key_mix", 0.3)
 			_:
 				m.set_shader_parameter("key_color", p.key)
 				m.set_shader_parameter("accent_color", p.accent)
-				m.set_shader_parameter("key_mix", p.char_key_mix)
-				m.set_shader_parameter("accent_mix", p.char_accent_mix)
+				m.set_shader_parameter("key_mix", 0.62)
+		m.set_shader_parameter("accent_mix", 0.85)
 
 
 func set_highlight(kind: String) -> void:

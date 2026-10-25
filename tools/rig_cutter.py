@@ -95,8 +95,8 @@ def main():
     im = Image.open(SRC).convert("RGBA")
     w, h = im.size
     cls = classify(im)
-    mask_r = build_zone_mask(im, EYES, "right", rim=7, smooth=90)
-    mask_l = build_zone_mask(im, EYES, "left", rim=7, smooth=90)
+    mask_r = build_zone_mask(im, EYES, "right", rim=22, smooth=90)
+    mask_l = build_zone_mask(im, EYES, "left", rim=22, smooth=90)
     # 눈 unlit 반경 확대 (원화 해상도)
     for m in (mask_r, mask_l):
         d = ImageDraw.Draw(m)

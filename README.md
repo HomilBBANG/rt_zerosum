@@ -77,7 +77,7 @@ scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d
                    battle_view_3d + unit_model_3d, lighting_presets
 scripts/ui/        battle_hud, main_menu, formation, result
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
-shaders/           cel_zoned_lighting (2D, v0.3), flat_zone_fill, cel_3d, outline_3d, unlit_3d
+shaders/           cel_zoned_lighting (2D 배경, v0.3), cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/sprites/    생성된 캐릭터/무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + manifest.json
 assets/textures/   배경 플레이트 + 마스크, 3D 얼굴 데칼
 setup/             install_windows.ps1, install.sh (기기 설치), play.bat / play.sh / play.command (루트, 실행)
