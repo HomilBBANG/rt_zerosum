@@ -1,3 +1,7 @@
 .godot/
 *.import.tmp
 /screenshots_tmp/
+__pycache__/
+*.pyc
+# 설치 스크립트가 받아 두는 Godot 실행 파일 (기기마다 다름)
+/_engine/

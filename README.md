@@ -4,8 +4,31 @@
 **같은 전투 규칙 위에 2D 표현(원화 + 구역 마스크 셰이더)과 3D 표현(셀 셰이더 + 실광원) 두 가지 뷰**를 올려
 그래픽 방향(2D vs 3D)을 비교·결정할 수 있게 했습니다. 비교 결과는 `docs/2D_vs_3D_comparison.md` 참조.
 
+## 설치 (노트북·데스크톱 공통, 명령 한 줄)
+각 기기의 사용자 폴더 아래 `game` 폴더(예: `C:\Users\eunjikim\game`, `/Users/eunjikim/game`)에 프로젝트를 받고,
+Godot 4.7 을 `game/_engine/` 에 자동으로 내려받아 바로 실행합니다. 저장소가 공개라 GitHub 로그인은 필요 없습니다.
+
+**Windows** — 시작 메뉴에서 PowerShell 을 열고 붙여넣기:
+```powershell
+irm https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/claude/clever-keller-maq0u6/setup/install_windows.ps1 | iex
+```
+설치가 끝나면 바탕화면에 **RT Zerosum** 바로가기가 생깁니다. 이후 실행은 바로가기 또는 `game\play.bat`.
+
+**macOS / Linux** — 터미널에 붙여넣기:
+```bash
+curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/claude/clever-keller-maq0u6/setup/install.sh | bash
+```
+이후 실행은 `~/game/play.sh` (macOS 는 Finder 에서 `play.command` 더블클릭).
+
+**업데이트**: 같은 설치 명령을 다시 실행하면 최신 커밋을 받아옵니다(git 이 있으면 pull, 없으면 zip 재다운로드).
+**에디터로 열기**: `play.bat edit` / `./play.sh edit`.
+**다른 폴더에 설치**: Windows `$env:GAME_DIR="D:\game"`, macOS/Linux `GAME_DIR=~/work/game` 를 앞에 지정.
+
+> git 이 설치돼 있으면 두 기기 모두 `git pull` 로 같은 코드를 맞출 수 있습니다. 한쪽에서 수정한 뒤 다른 쪽에서 받으려면
+> 수정한 기기에서 `git push` 할 권한(HomilBBANG/rt_zerosum 저장소 협업자)이 필요합니다.
+
 ## 실행
-1. Godot 4.7 (stable) 로 이 폴더를 열고 F5. 메인 씬 `scenes/main_menu.tscn`.
+1. 위 설치 스크립트를 썼다면 `play.bat` / `play.sh`. 직접 설치한 Godot 4.7 (stable) 로 이 폴더를 열어 F5 해도 됩니다. 메인 씬 `scenes/main_menu.tscn`.
 2. 메뉴에서 **표현 모드(2D/3D)**, 조명 프리셋(G1~G4), 선공(동전/아군 기습/적 매복), 시드를 고른 뒤 편성 → 전투.
 3. 전투 중 단축키: `1~4` 조명 프리셋 즉시 교체 · `Tab` 2D↔3D 즉시 전환 · `F1` 디버그 패널 · `F2` HUD 숨김 · `R` 재시작 · `Space` 턴 종료 · 우클릭 취소.
 
@@ -43,6 +66,7 @@ scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_zoned_lighting (2D, v0.3), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/sprites/    생성된 캐릭터/무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + manifest.json
 assets/textures/   배경 플레이트 + 마스크, 3D 얼굴 데칼
+setup/             install_windows.ps1, install.sh (기기 설치), play.bat / play.sh / play.command (루트, 실행)
 tools/             gen_sprites.py (원화·마스크 생성기), rig_cutter.py (원화→리그 파츠), render_shots.sh
 tests/             run_tests.gd
 docs/              design/ (기획서 사본), screenshots/, 2D_vs_3D_comparison.md
