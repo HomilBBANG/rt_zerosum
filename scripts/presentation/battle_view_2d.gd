@@ -89,11 +89,14 @@ func _ready() -> void:
 	bg_mat.shader = ZONE_SHADER
 	bg_mat.set_shader_parameter("zone_mask", load("res://assets/textures/bg_barracks_mask.png"))
 	bg.material = bg_mat
+	_make_camera()
 
 
 func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
 	super.setup(p_controller, p_preset)
 	controller.battle_started.connect(_spawn_units)
+	controller.battle_started.connect(_play_intro)
+	controller.actor_started.connect(func(u, _r): focus_unit(u, CAM_MOVE_TIME))
 	if not controller.slots.all_units().is_empty():
 		_spawn_units()
 	controller.action_resolved.connect(_on_action_resolved)
@@ -101,6 +104,78 @@ func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
 	controller.units_swapped.connect(_on_units_swapped)
 	controller.weapon_changed.connect(_on_weapon_changed)
 	controller.unit_died.connect(_on_unit_died)
+
+
+# ---------------------------------------------------------------- 전투 카메라
+## 전투 시작 시 전체 구도(배치 확인) → 잠시 뒤 줌인 → 차례가 온 캐릭터를 화면 중심으로 따라감.
+## 배경(1280×720) 밖이 보이지 않도록 중심을 제한. HUD 는 CanvasLayer 라 카메라 영향 없음.
+const CAM_INTRO_HOLD := 1.1     # 전체 구도 유지 시간(초)
+const CAM_INTRO_TIME := 0.9     # 줌인 시간
+const CAM_MOVE_TIME := 0.55     # 캐릭터 간 이동 시간
+const CAM_BATTLE_ZOOM := 1.4    # 전투 중 줌 배율
+const CAM_SCREEN := Vector2(1280, 720)
+const CAM_HUD_BOTTOM := 140.0   # 하단 명령 패널 높이: 그만큼 위쪽 영역의 중심에 캐릭터를 둔다
+
+var bcam: Camera2D
+var cam_ready := false
+var _cam_tween: Tween
+
+
+func _make_camera() -> void:
+	bcam = Camera2D.new()
+	bcam.name = "BattleCamera"
+	bcam.position = CAM_SCREEN * 0.5
+	world.add_child(bcam)
+	bcam.make_current()
+
+
+func _cam_center_for(point: Vector2, zoom: float) -> Vector2:
+	var half := CAM_SCREEN * 0.5 / zoom
+	return Vector2(clampf(point.x, half.x, CAM_SCREEN.x - half.x), clampf(point.y, half.y, CAM_SCREEN.y - half.y))
+
+
+func _cam_to(center: Vector2, zoom: float, dur: float) -> void:
+	if _cam_tween and _cam_tween.is_valid():
+		_cam_tween.kill()
+	var target := _cam_center_for(center, zoom)
+	if dur <= 0.0:
+		bcam.zoom = Vector2.ONE * zoom
+		bcam.position = target
+		return
+	_cam_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_cam_tween.tween_property(bcam, "zoom", Vector2.ONE * zoom, dur)
+	_cam_tween.tween_property(bcam, "position", target, dur)
+
+
+## 캐릭터 몸 중앙이 HUD 위쪽 영역의 가운데에 오도록 하는 카메라 중심 (월드 좌표)
+func _focus_point(unit: UnitRuntime, zoom: float) -> Vector2:
+	var s := sprite_of(unit)
+	var feet := slot_position(unit.team, unit.row, unit.index) if s == null else s.position
+	var body_h := 150.0 if s == null else (-s.head_screen_offset().y) * s.scale.y
+	var body_mid := feet - Vector2(0, body_h * 0.5)
+	return body_mid + Vector2(0, CAM_HUD_BOTTOM * 0.5 / zoom)
+
+
+func focus_unit(unit: UnitRuntime, dur: float) -> void:
+	if not cam_ready or unit == null:
+		return
+	_cam_to(_focus_point(unit, CAM_BATTLE_ZOOM), CAM_BATTLE_ZOOM, dur)
+
+
+func _play_intro() -> void:
+	cam_ready = false
+	_cam_to(CAM_SCREEN * 0.5, 1.0, 0.0)
+	# 스크린샷 자동화는 기본적으로 인트로를 건너뜀 (--intro=1 이면 재생, --intro=hold 면 전체 구도에서 멈춤)
+	var mode: String = Game.cli.get("intro", "0" if Game.cli.has("shot") else "1")
+	if mode == "hold":
+		return
+	if mode == "1":
+		await get_tree().create_timer(CAM_INTRO_HOLD).timeout
+		cam_ready = true
+		focus_unit(controller.current, CAM_INTRO_TIME)
+	else:
+		cam_ready = true
+		focus_unit(controller.current, 0.0)
 
 
 ## 전투 (재)시작 시 슬롯의 유닛으로 스프라이트 재생성
