@@ -1,0 +1,439 @@
+{
+ "units": {
+  "a_jiho": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#f4c9a4",
+    "hair": "#2b1d16",
+    "jacket": "#3b5d4a",
+    "pants": "#2a3340",
+    "accent": "#ffb347",
+    "eyes": "#4a86c8"
+   },
+   "hair_style": "spiky"
+  },
+  "a_sera": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#f8d6c2",
+    "hair": "#e8c178",
+    "jacket": "#4e6b8a",
+    "pants": "#2d2f3a",
+    "accent": "#ff5e8a",
+    "eyes": "#3aa66e"
+   },
+   "hair_style": "bob"
+  },
+  "a_minu": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#e9b68f",
+    "hair": "#141414",
+    "jacket": "#5b6652",
+    "pants": "#30353a",
+    "accent": "#62d3ff",
+    "eyes": "#7a4b2a"
+   },
+   "hair_style": "short"
+  },
+  "a_haneul": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#fbe3d0",
+    "hair": "#c4553a",
+    "jacket": "#e9e4d6",
+    "pants": "#3a4652",
+    "accent": "#ff3b5c",
+    "eyes": "#2f7fd3"
+   },
+   "hair_style": "ponytail"
+  },
+  "a_raon": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#f1c7ad",
+    "hair": "#6e5cc9",
+    "jacket": "#2e3d5c",
+    "pants": "#1e222c",
+    "accent": "#b8ff5e",
+    "eyes": "#e0b84a"
+   },
+   "hair_style": "long"
+  },
+  "a_doyun": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#f3cdb3",
+    "hair": "#8a5a2b",
+    "jacket": "#6b5f8e",
+    "pants": "#2c2a3a",
+    "accent": "#ffe45e",
+    "eyes": "#4c4c4c"
+   },
+   "hair_style": "curly"
+  },
+  "e_captain": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#d9b08c",
+    "hair": "#111111",
+    "jacket": "#7a1f2b",
+    "pants": "#1f1f24",
+    "accent": "#ffd23f",
+    "eyes": "#d8463c"
+   },
+   "hair_style": "short"
+  },
+  "e_grenadier": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#c99a76",
+    "hair": "#4a2d1b",
+    "jacket": "#6a2230",
+    "pants": "#26242b",
+    "accent": "#ff8c42",
+    "eyes": "#5a3b2e"
+   },
+   "hair_style": "bald"
+  },
+  "e_rifle": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#e4b393",
+    "hair": "#2a1a12",
+    "jacket": "#8a2634",
+    "pants": "#2b2630",
+    "accent": "#ff5c5c",
+    "eyes": "#3b2f2f"
+   },
+   "hair_style": "short"
+  },
+  "e_gunner": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#bf8e6e",
+    "hair": "#1a1a1a",
+    "jacket": "#5e1e2a",
+    "pants": "#22212a",
+    "accent": "#ffb86b",
+    "eyes": "#2a2a2a"
+   },
+   "hair_style": "spiky"
+  },
+  "e_sniper": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#f0cdb4",
+    "hair": "#d6d6e0",
+    "jacket": "#4a1b2c",
+    "pants": "#1d1c26",
+    "accent": "#ff2e7a",
+    "eyes": "#b23a9e"
+   },
+   "hair_style": "long"
+  },
+  "e_commander": {
+   "hand": [
+    172,
+    298
+   ],
+   "head_rect": [
+    56,
+    40,
+    144,
+    152
+   ],
+   "ground": 492,
+   "height": 456,
+   "palette": {
+    "skin": "#e8c4a8",
+    "hair": "#6b4a2b",
+    "jacket": "#9a2b3f",
+    "pants": "#2b2230",
+    "accent": "#ffd700",
+    "eyes": "#2f4f8f"
+   },
+   "hair_style": "bob"
+  }
+ },
+ "weapons": {
+  "rifle": {
+   "pivot": [
+    56.0,
+    43.0
+   ],
+   "size": [
+    129,
+    86
+   ]
+  },
+  "sniper": {
+   "pivot": [
+    58.0,
+    51.0
+   ],
+   "size": [
+    162,
+    91
+   ]
+  },
+  "smg": {
+   "pivot": [
+    55.0,
+    31.0
+   ],
+   "size": [
+    102,
+    76
+   ]
+  },
+  "shotgun": {
+   "pivot": [
+    56.0,
+    45.0
+   ],
+   "size": [
+    132,
+    88
+   ]
+  },
+  "mg": {
+   "pivot": [
+    59.0,
+    44.0
+   ],
+   "size": [
+    146,
+    82
+   ]
+  },
+  "launcher": {
+   "pivot": [
+    60.0,
+    35.0
+   ],
+   "size": [
+    125,
+    71
+   ]
+  },
+  "pistol": {
+   "pivot": [
+    15.0,
+    26.0
+   ],
+   "size": [
+    46,
+    55
+   ]
+  },
+  "axe": {
+   "pivot": [
+    31.0,
+    102.0
+   ],
+   "size": [
+    102,
+    129
+   ]
+  },
+  "mace": {
+   "pivot": [
+    18.0,
+    122.0
+   ],
+   "size": [
+    72,
+    149
+   ]
+  },
+  "club": {
+   "pivot": [
+    15.0,
+    105.0
+   ],
+   "size": [
+    57,
+    132
+   ]
+  },
+  "baton": {
+   "pivot": [
+    16.0,
+    80.0
+   ],
+   "size": [
+    49,
+    107
+   ]
+  },
+  "blade": {
+   "pivot": [
+    26.0,
+    66.0
+   ],
+   "size": [
+    104,
+    90
+   ]
+  },
+  "bayonet": {
+   "pivot": [
+    27.0,
+    35.0
+   ],
+   "size": [
+    74,
+    58
+   ]
+  },
+  "knife": {
+   "pivot": [
+    27.0,
+    27.0
+   ],
+   "size": [
+    62,
+    50
+   ]
+  },
+  "syringe": {
+   "pivot": [
+    30.0,
+    39.0
+   ],
+   "size": [
+    75,
+    67
+   ]
+  }
+ },
+ "zones": {
+  "shadow": 0,
+  "ambient": 85,
+  "unlit": 128,
+  "key": 170,
+  "accent": 255
+ }
+}

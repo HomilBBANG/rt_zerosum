@@ -1,0 +1,13 @@
+[gd_scene load_steps=4 format=3 uid="uid://b3dbattle3d0001"]
+
+[ext_resource type="Script" path="res://scripts/battle_scene.gd" id="1_scene"]
+[ext_resource type="Script" path="res://scripts/presentation/battle_view_3d.gd" id="2_view"]
+[ext_resource type="PackedScene" path="res://scenes/battle_hud.tscn" id="4_hud"]
+
+[node name="Battle3D" type="Node"]
+script = ExtResource("1_scene")
+
+[node name="View" type="Node3D" parent="."]
+script = ExtResource("2_view")
+
+[node name="HUD" parent="." instance=ExtResource("4_hud")]
