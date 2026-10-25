@@ -277,10 +277,9 @@ func _on_battle_started() -> void:
 		var nm := _label(u.display_name(), 13, Color(1, 1, 1) if u.team == "ally" else Color(1, 0.75, 0.75))
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		root.add_child(nm)
-		# 체력: 캐릭터 등 뒤의 세로 바 (아래에서 위로 참). 위치는 _process 에서 매 프레임 갱신
+		# 체력 바 (3D 비교 모드용, 2D 뷰는 발밑에 직접 그림). 위치는 _process 에서 매 프레임 갱신
 		var hp := ProgressBar.new()
 		hp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		hp.fill_mode = ProgressBar.FILL_BOTTOM_TO_TOP
 		hp.show_percentage = false
 		hp.max_value = u.data.max_hp
 		var bg := StyleBoxFlat.new()

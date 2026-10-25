@@ -24,16 +24,15 @@ func get_unit_screen_pos(_unit: UnitRuntime) -> Vector2:
 	return Vector2.ZERO
 
 
-## true 면 뷰가 등 뒤 체력 바를 직접 그린다 (HUD 는 그리지 않음)
+## true 면 뷰가 체력 바를 직접 그린다 (HUD 는 그리지 않음)
 func draws_back_bars() -> bool:
 	return false
 
 
-## 등 뒤 세로 체력 바 자리 (화면 좌표). 아군은 오른쪽(적)을 보므로 등이 왼쪽, 적은 오른쪽.
+## HUD 가 그리는 체력 바 자리 (화면 좌표, 3D 비교 모드용): 머리 위 짧은 가로 바
 func get_unit_back_bar_rect(unit: UnitRuntime) -> Rect2:
 	var head := get_unit_screen_pos(unit)
-	var dir := -1.0 if unit.team == "ally" else 1.0
-	return Rect2(head + Vector2(dir * 40.0 - 4.0, 30.0), Vector2(8, 70))
+	return Rect2(head + Vector2(-23.0, -6.0), Vector2(46, 6))
 
 
 func get_slot_screen_pos(_key: String) -> Vector2:
