@@ -198,8 +198,8 @@ func apply_lighting(p: Dictionary, zone: String) -> void:
 				m.set_shader_parameter("accent_color", p.accent)
 				m.set_shader_parameter("key_mix", 0.62)
 		m.set_shader_parameter("accent_mix", 0.85)
-		m.set_shader_parameter("shadow_depth", 0.78)
-		m.set_shader_parameter("shadow_hue", 0.40)
+		m.set_shader_parameter("shadow_depth", 0.82)
+		m.set_shader_parameter("shadow_hue", 0.18)
 		m.set_shader_parameter("use_near_rim", false)
 		m.set_shader_parameter("use_rim", Game.rim_enabled)
 		m.set_shader_parameter("debug_view", int(Game.cli.get("charview", "0")))
@@ -222,16 +222,16 @@ func apply_light_probe(p: Dictionary, key: Dictionary, rim: Dictionary) -> void:
 		var near_rim := false
 		if key.is_empty():
 			m.set_shader_parameter("key_color", ambient.lightened(0.5))
-			m.set_shader_parameter("key_mix", 0.25)
-			m.set_shader_parameter("shadow_depth", 0.86)
-			m.set_shader_parameter("shadow_hue", 0.30)
+			m.set_shader_parameter("key_mix", 0.2)
+			m.set_shader_parameter("shadow_depth", 0.88)
+			m.set_shader_parameter("shadow_hue", 0.12)
 		else:
 			var k := clampf(float(key.intensity) / 3.0, 0.0, 1.0)
 			from_right = key.from_right
 			m.set_shader_parameter("key_color", key.color)
-			m.set_shader_parameter("key_mix", lerpf(0.45, 0.70, k))
-			m.set_shader_parameter("shadow_depth", 0.80)
-			m.set_shader_parameter("shadow_hue", 0.35)
+			m.set_shader_parameter("key_mix", lerpf(0.45, 0.60, k))
+			m.set_shader_parameter("shadow_depth", 0.82)
+			m.set_shader_parameter("shadow_hue", 0.18)
 			if key.get("behind", false) and Game.rim_enabled:
 				near_rim = true
 				m.set_shader_parameter("near_rim_color", key.color)
@@ -350,13 +350,13 @@ func play_death() -> void:
 	if rig != null:
 		rig.play("death")
 		var tw2 := create_tween()
-		tw2.tween_property(flip, "modulate", Color(0.45, 0.45, 0.5, 0.65), 0.8)
+		tw2.tween_property(flip, "modulate", Color(0.55, 0.55, 0.6, 1.0), 0.8)   # 어둡게만, 투명하게 하지 않음
 		z_index = 5
 		set_highlight("none")
 		return
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(flip, "rotation", (-1.35 if unit.team == "ally" else 1.35), 0.45).set_trans(Tween.TRANS_BOUNCE)
-	tw.tween_property(flip, "modulate", Color(0.45, 0.45, 0.5, 0.55), 0.6)
+	tw.tween_property(flip, "modulate", Color(0.55, 0.55, 0.6, 1.0), 0.6)
 	z_index = 5
 	set_highlight("none")

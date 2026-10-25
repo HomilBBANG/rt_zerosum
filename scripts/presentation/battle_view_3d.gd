@@ -526,16 +526,64 @@ func _blocked_by_door_leaf(a: Vector3, b: Vector3) -> bool:
 
 
 ## 캐릭터 그림자 대리 물체: 보이지 않고 그림자만 드리움
-func set_shadow_proxy(id: int, pos: Vector3, height: float, alive: bool) -> void:
+## 2D 캐릭터의 그림자를 3D 바닥에 드리우는 대리 물체 (화면에는 안 보이고 그림자만 그림).
+## 리그의 원화 실루엣을 카메라를 향한 판(알파 시저)으로 세워 캐릭터 모양 그림자를 만든다. 실루엣이 없으면 캡슐.
+func set_shadow_proxy(id: int, pos: Vector3, height: float, alive: bool, sprite_id: String = "", mirror: bool = false) -> void:
 	var mi: MeshInstance3D = _proxies.get(id, null)
+	var sil := _silhouette(sprite_id)
 	if mi == null:
 		mi = MeshInstance3D.new()
-		var cap := CapsuleMesh.new()
-		cap.radius = 0.22
-		mi.mesh = cap
+		if sil.is_empty():
+			var cap := CapsuleMesh.new()
+			cap.radius = 0.22
+			mi.mesh = cap
+		else:
+			var q := QuadMesh.new()
+			var m := StandardMaterial3D.new()
+			m.albedo_texture = sil.tex
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+			m.alpha_scissor_threshold = 0.5
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+			m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			q.material = m
+			mi.mesh = q
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 		add_child(mi)
 		_proxies[id] = mi
-	(mi.mesh as CapsuleMesh).height = height
-	mi.position = pos + Vector3(0, height * 0.5, 0)
+	if mi.mesh is QuadMesh:
+		# 리그 픽셀 → 미터: 정수리~발바닥(figure_px)이 캐릭터 키가 되도록. 발 기준점(ground)이 슬롯 위치에 오게 판을 옮긴다.
+		var mpp: float = height / float(sil.figure_px)
+		var size: Vector2 = sil.image_size * mpp
+		(mi.mesh as QuadMesh).size = size
+		var off := Vector2(size.x * 0.5 - sil.ground.x * mpp, sil.image_size.y * mpp - sil.ground.y * mpp - size.y * 0.5)
+		var sx := -1.0 if mirror else 1.0
+		mi.position = pos + Vector3(off.x * sx, -off.y, 0.0)
+		mi.scale = Vector3(sx, 1.0, 1.0)
+	else:
+		(mi.mesh as CapsuleMesh).height = height
+		mi.position = pos + Vector3(0, height * 0.5, 0)
 	mi.visible = alive
+
+
+var _sil_cache: Dictionary = {}
+
+
+func _silhouette(sprite_id: String) -> Dictionary:
+	if sprite_id == "":
+		return {}
+	if _sil_cache.has(sprite_id):
+		return _sil_cache[sprite_id]
+	var info := {}
+	var dir := "res://assets/sprites/rig_%s/" % sprite_id
+	var f := FileAccess.open(dir + "rig.json", FileAccess.READ)
+	if f != null:
+		var rig: Variant = JSON.parse_string(f.get_as_text())
+		if rig is Dictionary and rig.has("silhouette") and rig.has("figure_px"):
+			info = {
+				"tex": load(dir + str(rig.silhouette)),
+				"image_size": Vector2(float(rig.image_size[0]), float(rig.image_size[1])),
+				"ground": Vector2(float(rig.ground[0]), float(rig.ground[1])),
+				"figure_px": float(rig.figure_px),
+			}
+	_sil_cache[sprite_id] = info
+	return info

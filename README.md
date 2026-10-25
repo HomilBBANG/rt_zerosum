@@ -50,8 +50,9 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cl
 3D 뷰도 같은 각도(40°)로 맞춰 두었습니다.
 
 ## 전투 편성 (게임 기본)
-게임은 **사용자 제공 원화 캐릭터만** 배치합니다: 아군 니키타(저격수, 168cm, 군복·롱코트, `rig_nikita_army`)·하나(돌격소총수, 176.8cm, `rig_hero2`),
-적은 같은 두 캐릭터를 좌우 반전해 세운 2대2 전투입니다(`TestRoster.build_provided_*`).
+게임은 **사용자 제공 원화 캐릭터만** 배치합니다: 아군 키라(돌격병, 165cm, 전열, `rig_kira`)·하나(돌격소총수, 176.8cm, 중열, `rig_hero2`)·니키타(저격수, 168cm, 후열, `rig_nikita_army`),
+적은 같은 세 캐릭터를 좌우 반전해 같은 열에 세운 3대3 전투입니다(`TestRoster.build_provided_*`).
+바닥 그림자는 리그의 `silhouette.png`(원화 실루엣)를 3D 배경 안에 판으로 세워 실제 광원으로 드리운 캐릭터 모양 그림자입니다.
 도형으로 생성한 12인(`build_allies/build_enemies`)은 규칙 테스트와 리그 벤치에서만 씁니다.
 새 캐릭터 추가: 원화를 `assets/source/` 에 두고(검정 배경 원화는 먼저 `python3 tools/remove_black_bg.py 입력 출력` 으로 투명화) `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
 `python3 tools/rig_cutter.py <id>` → 임포트 후 `tools/set_mipmaps.py` → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.

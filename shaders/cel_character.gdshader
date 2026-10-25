@@ -1,10 +1,11 @@
-// 캐릭터 셀 라이팅 v4 — "원화 보전 + 쨍한 명암".
+// 캐릭터 셀 라이팅 v5 — "원화 색 또렷 + 불투명한 빛 + 선화 보존".
 // 원화의 밝기(명암)는 픽셀마다 그대로 두고 '색상'만 조명 쪽으로 옮긴다.
 // (곱하기는 보색 조명에서 원화를 어둡게 죽이고, 스크린은 어두운 의상에 회색 막을 씌워 둘 다 쓰지 않음)
-//   빛 받는 면 : 원화 밝기 유지 + 광원 색상 쪽으로 이동 + 15% 밝게 + 광원색 소량 더함(검정 옷에도 빛이 맺힘)
-//   주변광     : 원화 거의 그대로 (8% 물듦)
-//   그림자     : 원화 밝기의 78% + 그림자 색상 쪽으로 40% 이동 (셀 경계는 마스크로 하드 에지)
-//   림         : 반대 조명색 선
+//   빛 받는 면 : 광원색으로 '칠한' 면. 원화 밝기를 끌어올린 뒤 광원 색상으로 key_mix 만큼 덮는다(반투명 막이 아니라 셀 칠).
+//               선화(윤곽선·주름선처럼 아주 어두운 픽셀)는 빛을 받지 않고 원화 그대로 남아 그림이 뭉개지지 않는다.
+//   주변광     : 원화 그대로
+//   그림자     : 원화 밝기의 82% + 그림자 색상 쪽으로 약간(18%) — 그림자 속에서도 고유색이 보이게
+//   림         : 조명색 선 (선화 제외)
 //   눈동자     : eye_color 로 진하게
 // zone_mask: 0 그림자 / 85 주변광 / 128 눈동자 / 170 주조명 / 255 림
 shader_type canvas_item;
@@ -20,13 +21,15 @@ uniform vec4 shadow_tint : source_color = vec4(0.06, 0.18, 0.19, 1.0);
 uniform vec4 ambient_tint : source_color = vec4(0.42, 0.75, 0.72, 1.0);
 uniform vec4 key_color : source_color = vec4(1.0, 0.12, 0.47, 1.0);
 uniform vec4 accent_color : source_color = vec4(0.22, 1.0, 0.73, 1.0);
-uniform float key_mix : hint_range(0.0, 1.0) = 0.6;       // 빛 받는 면에 광원색을 얹는 세기
+uniform float key_mix : hint_range(0.0, 1.0) = 0.55;      // 빛 받는 면을 광원 색상으로 덮는 정도 (1 = 광원색으로 완전히 칠함)
 uniform float accent_mix : hint_range(0.0, 1.0) = 0.85;   // 림 세기
-uniform float shadow_depth : hint_range(0.3, 1.0) = 0.78; // 그림자 밝기 (원화 대비)
-uniform float shadow_hue : hint_range(0.0, 1.0) = 0.40;   // 그림자를 그림자 색상으로 옮기는 정도
-uniform float ambient_mix : hint_range(0.0, 1.0) = 0.08;  // 주변광 구역의 색 물듦
-uniform float lit_gain : hint_range(0.8, 1.5) = 1.15;     // 빛 받는 면 밝기
-uniform float light_lift : hint_range(0.0, 0.5) = 0.20;   // 빛 받는 면에 광원색을 더하는 양 (어두운 의상도 빛이 '맺히게')
+uniform float shadow_depth : hint_range(0.3, 1.0) = 0.82; // 그림자 밝기 (원화 대비)
+uniform float shadow_hue : hint_range(0.0, 1.0) = 0.18;   // 그림자를 그림자 색상으로 옮기는 정도
+uniform float ambient_mix : hint_range(0.0, 1.0) = 0.0;  // 주변광 구역의 색 물듦
+uniform float lit_gain : hint_range(0.8, 1.6) = 1.18;     // 빛 받는 면 밝기
+uniform float light_lift : hint_range(0.0, 0.5) = 0.10;   // 빛 받는 면 밝기 바닥값 (검정 의상도 빛이 '맺히게')
+uniform vec2 line_ratio = vec2(0.55, 0.80);   // 주변 평균 밝기 대비 이 비율보다 어두운 픽셀 = 선화 → 빛을 입히지 않음
+uniform float line_radius = 2.5;               // 주변 평균을 볼 거리 (텍셀)
 uniform float saturation : hint_range(0.0, 2.0) = 1.18;
 uniform bool use_rim = true;
 uniform vec4 eye_color : source_color = vec4(0.3, 0.6, 1.0, 1.0);
@@ -47,7 +50,23 @@ vec3 tint_keep_L(vec3 c, float L) {
 	return h * (L / max(lum(h), 0.001));
 }
 
-vec3 shade(vec3 base, float zone) {
+// 선화 가중치: 1 = 칠한 면, 0 = 선화. 절대 밝기가 아니라 '주변보다 확 어두운가'로 판단해서
+// 검정 의상처럼 원래 어두운 면에도 빛은 입히고, 그 위의 선(윤곽·주름)만 남긴다. 빛·림은 칠한 면에만.
+float line_weight(sampler2D tex, vec2 uv, vec2 texel, float L) {
+	float sum = 0.0;
+	float wsum = 0.0;
+	for (int i = 0; i < 8; i++) {
+		float ang = 6.2831853 * float(i) / 8.0;
+		vec4 t = texture(tex, uv + vec2(cos(ang), sin(ang)) * texel * line_radius);
+		sum += lum(t.rgb) * t.a;
+		wsum += t.a;
+	}
+	float avg = sum / max(wsum, 0.001);
+	float r = L / max(avg, 0.03);
+	return smoothstep(line_ratio.x, line_ratio.y, r) * smoothstep(0.015, 0.05, L);
+}
+
+vec3 shade(vec3 base, float zone, float lw) {
 	float L = lum(base);
 	if (zone < 0.17 || (zone >= 0.83 && !use_rim)) {
 		return clamp(mix(base, tint_keep_L(shadow_tint.rgb, L), shadow_hue) * shadow_depth, 0.0, 1.0);
@@ -58,27 +77,30 @@ vec3 shade(vec3 base, float zone) {
 		e = mix(e, e * mix(vec3(1.0), key_color.rgb, 0.5), 0.12);
 		return clamp(e, 0.0, 1.0);
 	} else if (zone < 0.83) {
-		vec3 lit = mix(base, tint_keep_L(key_color.rgb, L), key_mix * 0.55) * lit_gain;
-		return clamp(lit + key_color.rgb * key_mix * light_lift, 0.0, 1.0);
+		float Ll = min(L * lit_gain + light_lift * (1.0 - L), 0.97);
+		vec3 lit = mix(base * (Ll / max(L, 0.001)), tint_keep_L(key_color.rgb, Ll), key_mix);
+		return mix(base, clamp(lit, 0.0, 1.0), lw);
 	}
-	return mix(base, accent_color.rgb, accent_mix);
+	return mix(base, accent_color.rgb, accent_mix * lw);
 }
 
-vec3 shade2(vec3 base, vec2 uv) {
-	vec3 c = shade(base, texture(zone_mask, uv).r);
+vec3 shade2(vec3 base, vec2 uv, float lw) {
+	vec3 c = shade(base, texture(zone_mask, uv).r, lw);
 	if (use_near_rim && texture(near_rim_mask, uv).r >= 0.83) {
-		c = mix(c, near_rim_color.rgb, near_rim_mix);
+		c = mix(c, near_rim_color.rgb, near_rim_mix * lw);
 	}
 	return c;
 }
 
 void fragment() {
-	vec4 base = texture(TEXTURE, UV) * COLOR;
+	// Godot 4: fragment 의 COLOR 는 이미 텍스처색 × 정점색(모듈레이트). 다시 텍스처를 곱하면 색이 제곱돼 어두워진다.
+	vec4 base = COLOR;
+	float lw = line_weight(TEXTURE, UV, TEXTURE_PIXEL_SIZE, lum(base.rgb));
 	vec2 d = fwidth(UV) * 0.25;
-	vec3 o = shade2(base.rgb, UV + vec2(-d.x, -d.y))
-		+ shade2(base.rgb, UV + vec2(d.x, -d.y))
-		+ shade2(base.rgb, UV + vec2(-d.x, d.y))
-		+ shade2(base.rgb, UV + vec2(d.x, d.y));
+	vec3 o = shade2(base.rgb, UV + vec2(-d.x, -d.y), lw)
+		+ shade2(base.rgb, UV + vec2(d.x, -d.y), lw)
+		+ shade2(base.rgb, UV + vec2(-d.x, d.y), lw)
+		+ shade2(base.rgb, UV + vec2(d.x, d.y), lw);
 	o *= 0.25;
 	float l = lum(o);
 	o = clamp(mix(vec3(l), o, saturation), 0.0, 1.0);

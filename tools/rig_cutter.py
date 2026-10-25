@@ -135,7 +135,43 @@ NIKITA_ARMY = {
 }
 
 
-CHARACTERS = {"nikita_army": lambda: NIKITA_ARMY, "hero2": lambda: HERO2}
+# ---- kira (키라): 짙은 군모, 갈색 낮은 포니테일, 짙은 회갈색 긴팔 전투복(왼손 주머니), 와이드 카고 팬츠, 검정 부츠 (원화 1024x1536)
+# 의상이 무채색(r-b≈15)이고 머리는 갈색(r-b≈30), 피부는 r-b≈80 이라 neutral 분류가 그대로 맞는다.
+# 화면 왼쪽 팔은 주머니에 손을 넣은 자세라 아래팔이 안쪽(골반)으로 꺾인다.
+KIRA = {
+    "src": "kira.png", "classify": "neutral", "head_rect": (400, 0, 320, 300),
+    "irises": [(507, 184, 17), (595, 209, 14)], "iris_rule": "neutral",   # 회색 홍채
+    "eyes": [(507, 184), (595, 209)], "ground": (545, 1525),
+    "bones": [
+        ("hip", "", (550, 610)), ("spine", "hip", (550, 520)), ("chest", "spine", (545, 420)),
+        ("head", "chest", (545, 295)),
+        ("shoulder_l", "chest", (400, 385)), ("elbow_l", "shoulder_l", (320, 610)), ("wrist_l", "elbow_l", (440, 700)),
+        ("shoulder_r", "chest", (640, 395)), ("elbow_r", "shoulder_r", (705, 615)), ("wrist_r", "elbow_r", (755, 810)),
+        ("hip_l", "hip", (490, 640)), ("knee_l", "hip_l", (410, 1000)), ("ankle_l", "knee_l", (340, 1370)),
+        ("hip_r", "hip", (610, 640)), ("knee_r", "hip_r", (650, 1000)), ("ankle_r", "knee_r", (740, 1380)),
+    ],
+    "parts": [
+        ("hair_back", "head", "hair", [(360, 150), (520, 150), (520, 650), (360, 650)], 0),
+        ("foot_l", "ankle_l", "any", [(215, 1335), (465, 1335), (465, 1532), (215, 1532)], 1),
+        ("foot_r", "ankle_r", "any", [(635, 1335), (875, 1335), (875, 1532), (635, 1532)], 1),
+        ("shin_l", "knee_l", "dark", [(245, 990), (560, 990), (515, 1405), (225, 1405)], 2),
+        ("shin_r", "knee_r", "dark", [(560, 990), (795, 990), (825, 1425), (575, 1425)], 2),
+        ("thigh_l", "hip_l", "dark", [(400, 610), (570, 610), (562, 1010), (255, 1010), (330, 800)], 3),
+        ("thigh_r", "hip_r", "dark", [(560, 610), (690, 610), (725, 780), (775, 1010), (560, 1010)], 3),
+        ("hips", "hip", "dark", [(428, 565), (665, 565), (670, 662), (424, 662)], 4),
+        ("torso", "chest", "skindark", [(425, 290), (640, 290), (665, 400), (655, 600), (440, 600), (432, 400)], 5),
+        ("arm_upper_l", "shoulder_l", "dark", [(295, 350), (455, 350), (445, 450), (410, 600), (365, 645), (288, 625), (295, 500)], 6),
+        ("arm_upper_r", "shoulder_r", "dark", [(615, 370), (680, 380), (722, 520), (742, 630), (670, 640), (640, 500)], 6),
+        ("arm_lower_l", "elbow_l", "skindark", [(288, 590), (392, 590), (432, 668), (456, 746), (374, 746), (288, 662)], 7),
+        ("arm_lower_r", "elbow_r", "skindark", [(660, 600), (745, 600), (772, 720), (778, 822), (708, 822), (690, 700)], 7),
+        ("hand_l", "wrist_l", "notdark", [(412, 642), (482, 642), (482, 732), (412, 732)], 8),
+        ("hand_r", "wrist_r", "notdark", [(718, 788), (812, 788), (812, 948), (718, 948)], 8),
+        ("head", "head", "any", [(398, 0), (716, 0), (716, 192), (652, 252), (602, 286), (555, 300), (500, 282), (470, 262), (398, 245)], 9),
+    ],
+}
+
+
+CHARACTERS = {"nikita_army": lambda: NIKITA_ARMY, "hero2": lambda: HERO2, "kira": lambda: KIRA}
 
 
 def classify(im, mode="warm"):
@@ -251,10 +287,15 @@ def build(cid):
     # 정수리(알파 기준)~발바닥 픽셀 높이: 게임이 캐릭터 키(cm)에 맞춰 배율을 정하는 기준
     abox = im.split()[3].point(lambda v: 255 if v > 40 else 0).getbbox()
     figure_px = GROUND[1] - abox[1]
+    # 3D 배경의 그림자용 실루엣(원화 알파, 절반 해상도): 캡슐 대신 캐릭터 모양 그림자를 드리운다
+    sil = Image.new("RGBA", (w, h), (255, 255, 255, 0))
+    sil.putalpha(im.split()[3].point(lambda v: 255 if v > 100 else 0))
+    sil.resize((w // 2, h // 2), Image.LANCZOS).save(os.path.join(OUT, "silhouette.png"))
     rig = {"image_size": [w, h], "ground": list(GROUND), "scale": round(0.156 / K, 4), "figure_px": figure_px,
            "bones": [{"name": n, "parent": p, "pos": list(pos)} for n, p, pos in BONES],
            "parts": [], "weapon_bone": "wrist_r", "head_bone": "head",
-           "eyes": EYES, "head_rect": [round(v * K) for v in d["head_rect"]]}
+           "eyes": EYES, "head_rect": [round(v * K) for v in d["head_rect"]],
+           "silhouette": "silhouette.png"}
     debug = Image.new("RGBA", (w * 2, h), (60, 60, 70, 255))
     debug.alpha_composite(im, (0, 0))
     dd = ImageDraw.Draw(debug)

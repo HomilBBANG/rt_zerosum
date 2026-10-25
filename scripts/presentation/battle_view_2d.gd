@@ -289,7 +289,7 @@ func relight() -> void:
 		var u: UnitRuntime = s.unit
 		var w := slot_world(u.team, u.row, u.index)
 		var h := 1.75 * (u.data.height_cm / 175.0)
-		bg3d.set_shadow_proxy(id, w, h, u.alive)
+		bg3d.set_shadow_proxy(id, w, h, u.alive, u.data.sprite_id, u.team == "enemy")
 		var probes: Array = bg3d.light_probe(w, h)
 		var key: Dictionary = probes[0] if not probes.is_empty() and probes[0].intensity > 0.3 else {}
 		var rim: Dictionary = {}

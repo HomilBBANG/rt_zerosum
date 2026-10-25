@@ -28,7 +28,8 @@ vec3 zone_color(vec3 base, float zone) {
 }
 
 void fragment() {
-	vec4 base = texture(TEXTURE, UV) * COLOR;
+	// Godot 4: fragment 의 COLOR 는 이미 텍스처색 × 정점색(모듈레이트). 다시 텍스처를 곱하면 색이 제곱돼 어두워진다.
+	vec4 base = COLOR;
 	// 구역 코드는 보간 불가(최근접) → 화면 픽셀 안 4점의 결과 색을 평균해 경계 계단 제거 (v0.4)
 	vec2 d = fwidth(UV) * 0.25;
 	vec3 out_rgb = zone_color(base.rgb, texture(zone_mask, UV + vec2(-d.x, -d.y)).r)
