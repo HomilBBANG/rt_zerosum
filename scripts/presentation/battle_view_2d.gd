@@ -295,29 +295,44 @@ func get_unit_screen_pos(unit: UnitRuntime) -> Vector2:
 	return world.get_global_transform_with_canvas() * (s.position + s.head_screen_offset() * s.scale.y)
 
 
-## 발밑 체력 바(짧은 가로 바): 월드 안에서 모든 캐릭터보다 아래 층(z)에 그려 캐릭터를 가리지 않는다.
+## 발밑 체력 칸: 월드 안에서 모든 캐릭터보다 아래 층(z)에 그려 캐릭터를 가리지 않는다.
 func draws_back_bars() -> bool:
 	return true
 
 
-## 월드 좌표의 바 자리: 발 바로 아래(하이라이트 링 아래), 원근 배율에 맞춘 짧은 길이
-func _foot_bar_rect_world(s: UnitSprite2D) -> Rect2:
-	var k := s.scale.y
-	var w := 46.0 * k
-	var h := maxf(5.0, 6.0 * k)
-	return Rect2(s.position.x - w * 0.5, s.position.y + 17.0 * k, w, h)
+## 발밑 체력 칸: 외곽선 없는 짧은 평행사변형 여러 개 (아군 3칸, 적 10칸). 체력 비율만큼 칸이 차고, 걸친 칸은 일부만 참.
+const HP_SEGMENTS_ALLY := 3
+const HP_SEGMENTS_ENEMY := 10
+const HP_COLOR := Color(0.95, 0.16, 0.14)
+const HP_EMPTY := Color(0.25, 0.04, 0.04, 0.7)
 
 
 func _draw_back_bars() -> void:
 	for id in sprites:
 		var s: UnitSprite2D = sprites[id]
 		var u: UnitRuntime = s.unit
-		var r := _foot_bar_rect_world(s)
+		var k := s.scale.y
+		var n := HP_SEGMENTS_ALLY if u.team == "ally" else HP_SEGMENTS_ENEMY
+		var seg_w := (15.0 if n <= 3 else 8.0) * k
+		var gap := 3.0 * k
+		var h := maxf(6.0, 8.0 * k)
+		var skew := h * 0.6   # 윗변을 오른쪽으로 밀어 기울임
+		var total := n * seg_w + (n - 1) * gap + skew
+		var x0 := s.position.x - total * 0.5
+		var y := s.position.y + 17.0 * k
 		var a := 1.0 if u.alive else 0.35
-		var frac := clampf(float(u.hp) / float(maxi(u.data.max_hp, 1)), 0.0, 1.0)
-		back_bars.draw_rect(r.grow(1.0), Color(0, 0, 0, 0.9 * a))
-		back_bars.draw_rect(r, Color(0.08, 0.02, 0.02, 0.85 * a))
-		back_bars.draw_rect(Rect2(r.position, Vector2(r.size.x * frac, r.size.y)), Color(0.95, 0.16, 0.14, a))
+		var filled := clampf(float(u.hp) / float(maxi(u.data.max_hp, 1)), 0.0, 1.0) * n
+		for i in n:
+			var x := x0 + i * (seg_w + gap)
+			back_bars.draw_colored_polygon(_para(x, y, seg_w, h, skew), Color(HP_EMPTY, HP_EMPTY.a * a))
+			var f := clampf(filled - i, 0.0, 1.0)
+			if f > 0.0:
+				back_bars.draw_colored_polygon(_para(x, y, seg_w * f, h, skew), Color(HP_COLOR, a))
+
+
+## 아래변 왼쪽이 (x, y+h) 인 평행사변형
+func _para(x: float, y: float, w: float, h: float, skew: float) -> PackedVector2Array:
+	return PackedVector2Array([Vector2(x + skew, y), Vector2(x + skew + w, y), Vector2(x + w, y + h), Vector2(x, y + h)])
 
 
 func get_slot_screen_pos(key: String) -> Vector2:
