@@ -87,7 +87,7 @@ static func build_allies() -> Array[UnitData]:
 		_unit("a_raon", "라온", "ally", "저격수", 6, 11, "ranged", 24, 5, 2, 0,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("sniper", "저격총", "ranged", 3), W("knife", "단검", "melee", 0)], 2, 0,
-			{"skin": "#f4cdb6", "hair": "#8a3a2a", "jacket": "#1a1a1e", "pants": "#17171a", "accent": "#d9d9e0", "eyes": "#6a6f78", "hair_style": "long", "sprite_id": "hero"}),
+			{"skin": "#f4cdb6", "hair": "#7a3424", "jacket": "#2e2a2a", "pants": "#2a2726", "accent": "#d9d9e0", "eyes": "#6a6f78", "hair_style": "long", "sprite_id": "hero"}),
 		_unit("a_doyun", "도윤", "ally", "통신병", 5, 9, "ranged", 26, 8, 3, 0,
 			["basic_attack", "rally", "heal", "ultimate"],
 			[W("smg", "기관단총", "ranged", 0), W("club", "곤봉", "melee", 1)], 2, 1,
@@ -133,7 +133,7 @@ static func build_provided_allies() -> Array[UnitData]:
 		_unit("a_nikita", "니키타", "ally", "저격수", 6, 11, "ranged", 24, 5, 2, 0,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("sniper", "저격총", "ranged", 3), W("knife", "단검", "melee", 0)], 2, 1,
-			{"skin": "#f4cdb6", "hair": "#8a3a2a", "jacket": "#1a1a1e", "pants": "#17171a", "accent": "#d9d9e0", "eyes": "#6a6f78", "eye_paint": "#4f9cff", "hair_style": "long", "sprite_id": "hero", "height_cm": 168.0}),
+			{"skin": "#f4cdb6", "hair": "#7a3424", "jacket": "#2e2a2a", "pants": "#2a2726", "accent": "#d9d9e0", "eyes": "#6a6f78", "eye_paint": "#4f9cff", "hair_style": "long", "sprite_id": "hero", "height_cm": 168.0}),
 		_unit("a_hana", "하나", "ally", "돌격소총수", 5, 9, "ranged", 34, 6, 2, 1,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("rifle", "소총", "ranged", 1), W("bayonet", "대검", "melee", 2)], 0, 1,
@@ -151,7 +151,7 @@ static func build_provided_enemies() -> Array[UnitData]:
 		_unit("e_nikita", "적 저격수", "enemy", "저격수", 6, 12, "ranged", 24, 5, 2, 0,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("sniper", "저격총", "ranged", 3)], 2, 1,
-			{"skin": "#f4cdb6", "hair": "#8a3a2a", "jacket": "#1a1a1e", "pants": "#17171a", "accent": "#ff2e7a", "eyes": "#6a6f78", "eye_paint": "#4f9cff", "hair_style": "long", "sprite_id": "hero", "height_cm": 168.0}),
+			{"skin": "#f4cdb6", "hair": "#7a3424", "jacket": "#2e2a2a", "pants": "#2a2726", "accent": "#ff2e7a", "eyes": "#6a6f78", "eye_paint": "#4f9cff", "hair_style": "long", "sprite_id": "hero", "height_cm": 168.0}),
 	]
 	return out
 
