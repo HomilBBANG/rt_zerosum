@@ -8,7 +8,7 @@ mkdir -p "$OUT"
 cd "$(dirname "$0")/.."
 run() { # mode preset state name extra...
   local mode="$1" preset="$2" state="$3" name="$4"; shift 4
-  timeout 150 xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . --rendering-driver opengl3 --quit-after 1500 \
+  timeout 150 xvfb-run -a -s "-screen 0 2560x1440x24" "$GODOT" --path . --rendering-driver opengl3 --quit-after 1500 \
     --log-file "/tmp/rt_shot_${name}.log" ++ --mode="$mode" --preset="$preset" --shot="$PWD/$OUT/$name.png" --enemy_delay=0.15 "$@" > /dev/null 2>&1
   echo "[$name] $(grep -c 'SCRIPT ERROR' /tmp/rt_shot_${name}.log 2>/dev/null) script errors"
 }

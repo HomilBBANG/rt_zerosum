@@ -22,7 +22,33 @@ var last_result: Dictionary = {}
 var cli: Dictionary = {}
 
 
+## 렌더 해상도: 창(=렌더 버퍼)을 QHD(2560×1440 픽셀)로 고정. 게임 좌표는 1280×720 그대로이고
+## stretch=canvas_items 라 화면은 창의 실제 픽셀 해상도로 그려진다. 모니터가 QHD 보다 작으면 16:9 로 맞춰 줄임. F11 전체 화면.
+const RENDER_SIZE := Vector2i(2560, 1440)
+
+
+func _fit_window() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var win := get_window()
+	if cli.has("shot"):
+		win.size = RENDER_SIZE   # 스크린샷은 항상 QHD
+		return
+	var usable := DisplayServer.screen_get_usable_rect(win.current_screen)
+	var s := minf(1.0, minf(float(usable.size.x) / RENDER_SIZE.x, float(usable.size.y - 60) / RENDER_SIZE.y))
+	var size := Vector2i(int(RENDER_SIZE.x * s), int(RENDER_SIZE.y * s))
+	win.size = size
+	win.position = usable.position + (usable.size - size) / 2
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
+		var win := get_window()
+		win.mode = Window.MODE_WINDOWED if win.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+
+
 func _ready() -> void:
+	call_deferred("_fit_window")
 	# 게임 기본 편성: 사용자 제공 캐릭터만 (생성 원화 12인은 테스트·벤치 전용)
 	allies = TestRoster.build_provided_allies()
 	enemies = TestRoster.build_provided_enemies()

@@ -37,7 +37,8 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cl
 ## 실행
 1. 위 설치 스크립트를 썼다면 `play.bat` / `play.sh`. 직접 설치한 Godot 4.7 (stable) 로 이 폴더를 열어 F5 해도 됩니다. 메인 씬 `scenes/main_menu.tscn`.
 2. 메뉴에서 **표현 모드(2D/3D)**, 조명 프리셋(G1~G4), 선공(동전/아군 기습/적 매복), 시드를 고른 뒤 편성 → 전투.
-3. 전투 중 단축키: `1~4` 조명 프리셋 즉시 교체 · `Tab` 2D↔3D 즉시 전환 · `F1` 디버그 패널 · `F2` HUD 숨김 · `F3` 캐릭터 림 라인 켜기/끄기 · `R` 재시작 · `Space` 턴 종료 · 우클릭 취소.
+3. 화면: 창은 **QHD(2560×1440 픽셀)** 로 고정해 그 해상도로 렌더합니다(모니터가 작으면 16:9 로 맞춰 줄임). `F11` 전체 화면.
+4. 전투 중 단축키: `1~4` 조명 프리셋 즉시 교체 · `Tab` 2D↔3D 즉시 전환 · `F1` 디버그 패널 · `F2` HUD 숨김 · `F3` 캐릭터 림 라인 켜기/끄기 · `R` 재시작 · `Space` 턴 종료 · 우클릭 취소.
 
 렌더러는 `gl_compatibility` 로 두었습니다(저사양/소프트웨어 렌더 검증 포함). Forward+ 로 바꿔도 셰이더는 그대로 동작합니다.
 
@@ -49,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cl
 3D 뷰도 같은 각도(40°)로 맞춰 두었습니다.
 
 ## 전투 편성 (게임 기본)
-게임은 **사용자 제공 원화 캐릭터만** 배치합니다: 아군 니키타(저격수, 168cm, `rig_hero`)·하나(돌격소총수, 176.8cm, `rig_hero2`),
+게임은 **사용자 제공 원화 캐릭터만** 배치합니다: 아군 니키타(저격수, 168cm, 군복·롱코트, `rig_nikita_army`)·하나(돌격소총수, 176.8cm, `rig_hero2`),
 적은 같은 두 캐릭터를 좌우 반전해 세운 2대2 전투입니다(`TestRoster.build_provided_*`).
 도형으로 생성한 12인(`build_allies/build_enemies`)은 규칙 테스트와 리그 벤치에서만 씁니다.
 새 캐릭터 추가: 원화를 `assets/source/` 에 두고 `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
@@ -57,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cl
 캐릭터 키는 `rig.json` 의 `figure_px`(원화 정수리~발 픽셀)를 화면 230px = 175cm 기준으로 환산해 2D·3D 모두에 반영됩니다.
 
 ## Skeleton2D 리그 (2D 확정 후 비용 테스트)
-사용자 제공 원화 1장을 `tools/rig_cutter.py` 로 17개 파츠 + 16개 본 + 파츠별 구역 마스크로 잘라 `assets/sprites/rig_hero/` 에 두고,
+사용자 제공 원화 1장을 `tools/rig_cutter.py` 로 17개 파츠 + 16개 본 + 파츠별 구역 마스크로 잘라 `assets/sprites/rig_<id>/` 에 두고,
 `RiggedUnit2D` 가 rig.json 으로 Bone2D 트리와 애니메이션(idle/attack/hit/heal/death)을 만든다. 아군 '라온' 슬롯이 이 캐릭터다.
 비용 측정 결과와 파이프라인은 `docs/skeleton2d_cost.md`, 벤치는 메뉴의 "리그 벤치" 또는
 `++ --scene=bench --count=48 --rig=1` (B 본 표시, Tab 평면↔리그, +/- 인원).
@@ -72,7 +73,7 @@ AP 상한 버림/이월/0 자동 종료, 이동/교환 AP 1, 무기 변경 AP 1,
 
 ## 스크린샷 일괄 렌더
 ```
-GODOT=/path/to/godot tools/render_shots.sh docs/screenshots      # Xvfb + Mesa 소프트웨어 렌더
+GODOT=/path/to/godot tools/render_shots.sh docs/screenshots      # Xvfb + Mesa 소프트웨어 렌더, QHD 출력
 ```
 CLI 인자(`++` 뒤): `--scene=battle|formation|result|menu --mode=2d|3d --preset=g1..g4 --shot=경로 --autoplay=aim|move|fight:N --hud=0`.
 디버그: `--charview=1`(캐릭터 원화를 조명 없이 출력), `--outline=0`(외곽선 끔), `--rim=0`(림 끔).
