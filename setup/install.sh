@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # RT Zerosum 설치 (macOS / Linux): ~/Game (/Users/<이름>/Game) 에 프로젝트를 받고 Godot 4.7 을 _engine/ 에 내려받은 뒤 실행.
-# 사용:  curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/claude/clever-keller-maq0u6/setup/install.sh | bash
+# 사용:  curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/install.sh | bash
 # 옵션(환경변수): GAME_DIR=설치폴더  GAME_BRANCH=브랜치  NO_RUN=1(설치만)
 set -euo pipefail
 REPO="https://github.com/HomilBBANG/rt_zerosum.git"
-BRANCH="${GAME_BRANCH:-claude/clever-keller-maq0u6}"
+BRANCH="${GAME_BRANCH:-main}"
 DIR="${GAME_DIR:-$HOME/Game}"
 GODOT_VER="4.7-stable"
 BASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VER}"

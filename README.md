@@ -10,13 +10,13 @@ Godot 4.7 을 `game/_engine/` 에 자동으로 내려받아 바로 실행합니�
 
 **Windows** — 시작 메뉴에서 PowerShell 을 열고 붙여넣기:
 ```powershell
-irm https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/claude/clever-keller-maq0u6/setup/install_windows.ps1 | iex
+irm https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/install_windows.ps1 | iex
 ```
 설치가 끝나면 바탕화면에 **RT Zerosum** 바로가기가 생깁니다. 이후 실행은 바로가기 또는 `Game\play.bat`.
 
 **macOS (노트북·컴퓨터 공통)** — 터미널에 붙여넣기:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/claude/clever-keller-maq0u6/setup/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/install.sh | bash
 ```
 이후 실행은 Finder 에서 `Game/play.command` 더블클릭, 또는 `~/Game/play.sh`.
 `~/Game` 폴더가 이미 있고 다른 파일이 들어 있어도 지우지 않고 그 자리에 연결합니다(이름이 겹치는 파일이 있으면 멈추고 알려줌).
