@@ -17,16 +17,54 @@ var bg_mat: ShaderMaterial
 var _marker_nodes: Array[Node2D] = []
 
 
+## 가상 카메라 (tools/gen_sprites.py CAMERA 와 같은 값, manifest.json "camera").
+## 40° 내려다보는 원근: 바닥 위 슬롯(월드 m)을 화면으로 투영하고, 거리로 캐릭터 크기를 정한다.
+static var cam: Dictionary = {}
+static var _cam_ready := false
+static var _C := Vector3.ZERO
+static var _F := Vector3.ZERO
+static var _U := Vector3.ZERO
+static var _focal := 1255.0
+
+
+static func set_camera(c: Dictionary) -> void:
+	cam = c
+	var p := deg_to_rad(float(c.get("pitch_deg", 40.0)))
+	var t: Array = c.get("target", [0.0, 0.0, 0.6])
+	var d := float(c.get("dist", 15.0))
+	var scr: Array = c.get("screen", [1280, 720])
+	_focal = (float(scr[1]) * 0.5) / tan(deg_to_rad(float(c.get("vfov_deg", 32.0)) * 0.5))
+	_C = Vector3(float(t[0]), float(t[1]) + d * sin(p), float(t[2]) + d * cos(p))
+	_F = Vector3(0.0, -sin(p), -cos(p))
+	_U = Vector3(0.0, cos(p), -sin(p))
+	_cam_ready = true
+
+
+static func project(w: Vector3) -> Vector2:
+	var v := w - _C
+	var zc := v.dot(_F)
+	return Vector2(float(cam.cx) + _focal * v.x / zc, float(cam.cy) - _focal * v.dot(_U) / zc)
+
+
+static func slot_world(team: String, row: int, index: int) -> Vector3:
+	# 아군 왼쪽(전방이 중앙 쪽), 적 오른쪽. index 1 이 카메라에 가까운 줄, 진영 바깥으로 살짝 엇갈림.
+	var sl: Dictionary = cam.get("slot", {})
+	var rx: Array = sl.get("row_x", [1.3, 3.0, 4.7])
+	var iz: Array = sl.get("index_z", [-0.3, 1.5])
+	var sign := -1.0 if team == "ally" else 1.0
+	var x := sign * (float(rx[row]) + float(sl.get("index_dx", 0.4)) * index)
+	return Vector3(x, 0.0, float(iz[index]))
+
+
 static func slot_position(team: String, row: int, index: int) -> Vector2:
-	# 횡스크롤: 아군 좌측(후방→전방 = 왼쪽→오른쪽), 적 우측. index 1 이 카메라에 더 가깝다(아래쪽).
-	var x: float
-	if team == "ally":
-		x = 470.0 - row * 150.0
-	else:
-		x = 810.0 + row * 150.0
-	var y := 566.0 + index * 82.0
-	x += (-34.0 if team == "ally" else 34.0) * index
-	return Vector2(x, y)
+	return project(slot_world(team, row, index))
+
+
+## 슬롯에 선 캐릭터의 화면 배율 (스프라이트 기준 키 sprite_px 가 원근 키가 되도록)
+static func slot_scale(team: String, row: int, index: int) -> float:
+	var v := slot_world(team, row, index) - _C
+	var px := _focal * float(cam.get("unit_height_m", 1.75)) / v.dot(_F)
+	return px / float(cam.get("sprite_px", 230.0))
 
 
 static func zone_for_slot(team: String, row: int) -> String:
@@ -41,9 +79,9 @@ static func zone_for_slot(team: String, row: int) -> String:
 
 
 func _ready() -> void:
-	world.position.y = -96.0  # 하단 HUD 에 전열이 가리지 않도록 전장을 위로
 	var f := FileAccess.open("res://assets/sprites/manifest.json", FileAccess.READ)
 	manifest = JSON.parse_string(f.get_as_text())
+	set_camera(manifest.get("camera", {}))
 	bg_mat = ShaderMaterial.new()
 	bg_mat.shader = ZONE_SHADER
 	bg_mat.set_shader_parameter("zone_mask", load("res://assets/textures/bg_barracks_mask.png"))
@@ -72,6 +110,7 @@ func _spawn_units() -> void:
 		units_root.add_child(s)
 		s.build(u, manifest)
 		s.position = slot_position(u.team, u.row, u.index)
+		s.scale = Vector2.ONE * slot_scale(u.team, u.row, u.index)
 		s.clicked.connect(func(unit): unit_clicked.emit(unit))
 		sprites[u.instance_id] = s
 	_sort_units()
@@ -103,7 +142,7 @@ func get_unit_screen_pos(unit: UnitRuntime) -> Vector2:
 	var s := sprite_of(unit)
 	if s == null:
 		return Vector2.ZERO
-	return world.get_global_transform_with_canvas() * (s.position + s.head_screen_offset())
+	return world.get_global_transform_with_canvas() * (s.position + s.head_screen_offset() * s.scale.y)
 
 
 func get_slot_screen_pos(key: String) -> Vector2:
@@ -130,6 +169,7 @@ func show_slot_markers(options: Array[Dictionary]) -> void:
 		m.kind = o.kind
 		m.key = o.key
 		m.position = slot_position(info.team, info.row, info.index)
+		m.scale = Vector2.ONE * slot_scale(info.team, info.row, info.index)
 		m.clicked.connect(func(k): slot_clicked.emit(k))
 		markers_root.add_child(m)
 		_marker_nodes.append(m)
@@ -168,7 +208,9 @@ func _on_unit_moved(unit: UnitRuntime, _from_key: String, _to_key: String) -> vo
 	var s := sprite_of(unit)
 	_begin_busy()
 	var tw := create_tween()
+	tw.set_parallel(true)
 	tw.tween_property(s, "position", slot_position(unit.team, unit.row, unit.index), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(s, "scale", Vector2.ONE * slot_scale(unit.team, unit.row, unit.index), 0.35)
 	await tw.finished
 	_sort_units()
 	apply_preset(preset)
@@ -183,6 +225,8 @@ func _on_units_swapped(a: UnitRuntime, b: UnitRuntime) -> void:
 	tw.set_parallel(true)
 	tw.tween_property(sa, "position", slot_position(a.team, a.row, a.index), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_property(sb, "position", slot_position(b.team, b.row, b.index), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(sa, "scale", Vector2.ONE * slot_scale(a.team, a.row, a.index), 0.35)
+	tw.tween_property(sb, "scale", Vector2.ONE * slot_scale(b.team, b.row, b.index), 0.35)
 	await tw.finished
 	_sort_units()
 	apply_preset(preset)

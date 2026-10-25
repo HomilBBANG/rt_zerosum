@@ -201,7 +201,7 @@ func _build_ui() -> void:
 	log_panel.offset_left = -400
 	log_panel.offset_right = -12
 	log_panel.offset_top = 84
-	log_panel.offset_bottom = 230
+	log_panel.offset_bottom = 176
 	log_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(log_panel)
 	log_box = RichTextLabel.new()

@@ -435,5 +435,35 @@
   "unlit": 128,
   "key": 170,
   "accent": 255
+ },
+ "camera": {
+  "pitch_deg": 40.0,
+  "dist": 15.0,
+  "target": [
+   0.0,
+   0.0,
+   0.6
+  ],
+  "vfov_deg": 32.0,
+  "cx": 640.0,
+  "cy": 430.0,
+  "screen": [
+   1280,
+   720
+  ],
+  "unit_height_m": 1.75,
+  "sprite_px": 230.0,
+  "slot": {
+   "row_x": [
+    1.3,
+    3.0,
+    4.7
+   ],
+   "index_z": [
+    0.0,
+    1.8
+   ],
+   "index_dx": 0.4
+  }
  }
 }

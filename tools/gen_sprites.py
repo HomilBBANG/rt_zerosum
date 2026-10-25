@@ -449,96 +449,141 @@ def draw_face_texture(spec):
     return c.down()
 
 
-# ------------------------------------------------------------------ background plate
+# ------------------------------------------------------------------ background plate (40° 내려다보는 원근 카메라)
+# 2D 전투의 가상 카메라. Godot battle_view_2d.gd 가 manifest.json 의 같은 값으로 슬롯 위치·크기를 투영한다.
+# 좌표: x 오른쪽, y 위, z 카메라 쪽(m). 뒷벽 z=-3.6, 바닥 y=0.
+CAMERA = {"pitch_deg": 40.0, "dist": 15.0, "target": [0.0, 0.0, 0.6], "vfov_deg": 32.0,
+          "cx": 640.0, "cy": 430.0, "screen": [1280, 720], "unit_height_m": 1.75, "sprite_px": 230.0,
+          "slot": {"row_x": [1.3, 3.0, 4.7], "index_z": [0.0, 1.8], "index_dx": 0.4}}
+WALL_Z = -3.6
+
+
+class Cam:
+    def __init__(self, c):
+        p = math.radians(c["pitch_deg"])
+        self.f = (c["screen"][1] / 2) / math.tan(math.radians(c["vfov_deg"] / 2))
+        t = c["target"]
+        self.C = (t[0], t[1] + c["dist"] * math.sin(p), t[2] + c["dist"] * math.cos(p))
+        self.F = (0.0, -math.sin(p), -math.cos(p))
+        self.U = (0.0, math.cos(p), -math.sin(p))
+        self.cx, self.cy = c["cx"], c["cy"]
+
+    def p(self, x, y, z):
+        v = (x - self.C[0], y - self.C[1], z - self.C[2])
+        zc = v[1] * self.F[1] + v[2] * self.F[2]
+        yc = v[1] * self.U[1] + v[2] * self.U[2]
+        return (self.cx + self.f * v[0] / zc, self.cy - self.f * yc / zc)
+
+    def poly(self, pts3):
+        return [self.p(*q) for q in pts3]
+
+
 def draw_background():
     BW, BH = 1280, 720
     global S
     S_prev = S
     S = 2
+    cam = Cam(CAMERA)
     c = Canvas(BW, BH)
-    wall = hexc("#cbc4b8"); wall_line = hexc("#a79f93"); floor_c = hexc("#b9b1a3"); base_c = hexc("#9d968c")
-    frame = hexc("#5e5650"); open_c = hexc("#f4f0e8"); prop = hexc("#8f8880"); prop_d = hexc("#6f6962")
-    # wall + panels
-    c.poly([(0, 0), (BW, 0), (BW, 520), (0, 520)], wall, lw=0)
-    for y in range(40, 520, 60):
-        c.line([(0, y), (BW, y)], wall_line, 2)
-    # ceiling pipe
-    c.rrect((0, 18, BW, 34), 4, hexc("#8d857b"), lw=2.5)
-    for x in range(100, BW, 240):
-        c.rrect((x, 8, x + 22, 44), 4, hexc("#7a736a"), lw=2.5)
-    # baseboard
-    c.poly([(0, 500), (BW, 500), (BW, 522), (0, 522)], base_c, lw=2.5)
-    # floor + planks converging
-    c.poly([(0, 520), (BW, 520), (BW, BH), (0, BH)], floor_c, lw=0)
-    vpx, vpy = 640, 380
-    for x in range(-800, BW + 801, 110):
-        c.line([(x, BH), (vpx + (x - vpx) * ((520 - vpy) / (BH - vpy)), 520)], shade(floor_c, 0.82), 2.5)
-    for y in (560, 612, 672):
-        c.line([(0, y), (BW, y)], shade(floor_c, 0.82), 2)
-    c.line([(0, 521), (BW, 521)], LINE, 3)
-    # window (left)
-    c.poly([(118, 84), (334, 84), (334, 306), (118, 306)], frame, lw=3)
-    c.poly([(136, 102), (316, 102), (316, 288), (136, 288)], open_c, lw=0)
-    c.line([(226, 102), (226, 288)], frame, 10)
-    c.line([(136, 196), (316, 196)], frame, 10)
-    # notice board
-    c.rrect((610, 150, 790, 300), 6, hexc("#7b6b5a"), lw=3)
-    c.rrect((624, 164, 776, 286), 3, hexc("#d8cfbf"), lw=2)
-    for i, (x, y, w, h) in enumerate([(636, 176, 48, 60), (696, 176, 66, 40), (636, 244, 120, 30), (696, 224, 66, 12)]):
-        c.rrect((x, y, x + w, y + h), 2, [hexc("#e9e2d4"), hexc("#c8d7d2"), hexc("#efe7d6"), hexc("#d9c9bd")][i % 4], lw=1.5)
-    # lockers (left-center)
-    for i, x in enumerate((410, 470)):
-        c.poly([(x, 290), (x + 58, 290), (x + 58, 520), (x, 520)], prop if i == 0 else shade(prop, 0.94), lw=3)
-        c.line([(x + 10, 320), (x + 48, 320)], prop_d, 3)
-        c.line([(x + 10, 334), (x + 48, 334)], prop_d, 3)
-        c.rrect((x + 42, 400, x + 50, 424), 2, prop_d, lw=1.5)
-    # crates (under window)
-    c.poly([(150, 420), (280, 420), (280, 520), (150, 520)], hexc("#a08c72"), lw=3)
-    c.line([(150, 420), (280, 520)], shade(hexc("#a08c72"), 0.8), 3)
-    c.line([(280, 420), (150, 520)], shade(hexc("#a08c72"), 0.8), 3)
-    c.poly([(176, 352), (256, 352), (256, 420), (176, 420)], hexc("#a08c72"), lw=3)
-    # table (center-right)
-    c.poly([(690, 430), (930, 430), (940, 448), (680, 448)], hexc("#7d6a56"), lw=3)
-    for x in (696, 916):
-        c.poly([(x, 448), (x + 12, 448), (x + 12, 520), (x, 520)], hexc("#5d4e3f"), lw=2.5)
-    c.rrect((760, 410, 820, 430), 3, hexc("#5f7f86"), lw=2.5)  # radio box
-    # doorway (right) with half-open door leaf
-    c.poly([(1004, 110), (1196, 110), (1196, 522), (1004, 522)], frame, lw=3)
-    c.poly([(1020, 126), (1180, 126), (1180, 520), (1020, 520)], open_c, lw=0)
-    # distant exterior silhouettes inside opening
-    c.poly([(1020, 300), (1180, 300), (1180, 520), (1020, 520)], hexc("#e6e0d6"), lw=0)
-    c.poly([(1040, 300), (1100, 300), (1100, 250), (1140, 250), (1140, 300), (1180, 300), (1180, 320), (1040, 320)], hexc("#d9d2c6"), lw=0)
-    c.poly([(1020, 126), (1070, 126), (1120, 520), (1020, 520)], hexc("#8a7b6e"), lw=3)  # door leaf (perspective)
-    c.rrect((1098, 330, 1108, 350), 2, hexc("#d8b24a"), lw=1.5)
-    # pillar at far right edge
-    c.poly([(1232, 0), (1280, 0), (1280, 522), (1232, 522)], hexc("#b4ada1"), lw=3)
-    img = c.down()
-
-    # ------- zone mask (hard-edge light polygons)
-    m = Image.new("L", (BW, BH), Z_AMBIENT)
+    m = Image.new("L", (BW * S, BH * S), Z_AMBIENT)   # 마스크도 같은 배율로 그린 뒤 축소
     md = ImageDraw.Draw(m)
-    # shadow: far corners + cast shadows (opposite of door light = leftwards)
-    md.polygon([(0, 0), (120, 0), (0, 300)], fill=Z_SHADOW)
-    md.polygon([(410, 520), (410, 290), (330, 330), (300, 520)], fill=Z_SHADOW)           # locker cast
-    md.polygon([(528, 520), (528, 290), (410, 290), (410, 520)], fill=Z_SHADOW)           # locker front dark side
-    md.polygon([(680, 448), (940, 448), (900, 520), (640, 520)], fill=Z_SHADOW)           # under table
-    md.polygon([(0, 560), (300, 520), (330, 580), (0, 640)], fill=Z_SHADOW)               # floor left shadow strip
-    md.polygon([(150, 420), (280, 420), (280, 520), (150, 520)], fill=Z_SHADOW)
-    # window accent: panes + beam on floor
-    md.polygon([(136, 102), (316, 102), (316, 288), (136, 288)], fill=Z_ACCENT)
-    md.polygon([(60, 522), (330, 522), (440, 720), (0, 720), (0, 600)], fill=Z_ACCENT)     # beam
-    md.polygon([(136, 306), (316, 306), (316, 350), (136, 350)], fill=Z_ACCENT)            # wall below window
-    # door key: opening + wedge across the floor (+ sliver on wall left of door)
-    md.polygon([(1020, 126), (1180, 126), (1180, 520), (1020, 520)], fill=Z_KEY)
-    md.polygon([(1010, 522), (1196, 522), (1280, 560), (1280, 720), (560, 720), (820, 560)], fill=Z_KEY)
-    md.polygon([(960, 300), (1004, 300), (1004, 522), (930, 522)], fill=Z_KEY)
-    md.polygon([(1232, 0), (1280, 0), (1280, 522), (1232, 522)], fill=Z_KEY)
-    # door leaf blocks part of wedge (shadow of leaf)
-    md.polygon([(1020, 522), (1120, 522), (980, 720), (860, 720)], fill=Z_SHADOW)
-    # radio screen unlit
-    md.rectangle([766, 414, 814, 426], fill=Z_UNLIT)
+
+    def mpoly(pts3, code):
+        md.polygon(sc(cam.poly(pts3)), fill=code)
+
+    wall = hexc("#cbc4b8"); wall_line = hexc("#aaa296"); floor_c = hexc("#b9b1a3"); base_c = hexc("#9d968c")
+    frame = hexc("#5e5650"); open_c = hexc("#f4f0e8"); prop = hexc("#8f8880"); wood = hexc("#7d6a56")
+    crate_c = hexc("#a08c72")
+    X0, X1 = -12.0, 12.0
+    # 바닥 + 타일
+    c.poly(cam.poly([(X0, 0, WALL_Z), (X1, 0, WALL_Z), (X1, 0, 12), (X0, 0, 12)]), floor_c, lw=0)
+    for gx in range(-12, 13):
+        c.line(cam.poly([(gx, 0, WALL_Z), (gx, 0, 12)]), shade(floor_c, 0.84), 2)
+    for gz in range(-3, 12):
+        c.line(cam.poly([(X0, 0, gz + 0.4), (X1, 0, gz + 0.4)]), shade(floor_c, 0.84), 2)
+    # 뒷벽 + 패널선 + 걸레받이
+    c.poly(cam.poly([(X0, 0, WALL_Z), (X1, 0, WALL_Z), (X1, 6, WALL_Z), (X0, 6, WALL_Z)]), wall, lw=0)
+    for y in (0.8, 1.6, 2.4, 3.2, 4.0):
+        c.line(cam.poly([(X0, y, WALL_Z), (X1, y, WALL_Z)]), wall_line, 2)
+    c.poly(cam.poly([(X0, 0, WALL_Z + 0.05), (X1, 0, WALL_Z + 0.05), (X1, 0.16, WALL_Z + 0.05), (X0, 0.16, WALL_Z + 0.05)]), base_c, lw=2.5)
+    c.line(cam.poly([(X0, 0, WALL_Z + 0.05), (X1, 0, WALL_Z + 0.05)]), LINE, 3)
+    # 창 (왼쪽)
+    wx0, wx1, wy0, wy1 = -5.4, -3.2, 1.0, 2.5
+    c.poly(cam.poly([(wx0 - 0.12, wy0 - 0.12, WALL_Z), (wx1 + 0.12, wy0 - 0.12, WALL_Z), (wx1 + 0.12, wy1 + 0.12, WALL_Z), (wx0 - 0.12, wy1 + 0.12, WALL_Z)]), frame, lw=3)
+    c.poly(cam.poly([(wx0, wy0, WALL_Z), (wx1, wy0, WALL_Z), (wx1, wy1, WALL_Z), (wx0, wy1, WALL_Z)]), open_c, lw=0)
+    c.line(cam.poly([((wx0 + wx1) / 2, wy0, WALL_Z), ((wx0 + wx1) / 2, wy1, WALL_Z)]), frame, 8)
+    c.line(cam.poly([(wx0, (wy0 + wy1) / 2, WALL_Z), (wx1, (wy0 + wy1) / 2, WALL_Z)]), frame, 8)
+    # 게시판
+    c.poly(cam.poly([(-0.9, 1.1, WALL_Z), (0.9, 1.1, WALL_Z), (0.9, 2.2, WALL_Z), (-0.9, 2.2, WALL_Z)]), hexc("#7b6b5a"), lw=3)
+    c.poly(cam.poly([(-0.78, 1.2, WALL_Z), (0.78, 1.2, WALL_Z), (0.78, 2.1, WALL_Z), (-0.78, 2.1, WALL_Z)]), hexc("#d8cfbf"), lw=2)
+    for (a, b, y0, y1, col) in [(-0.68, -0.2, 1.55, 2.0, "#e9e2d4"), (-0.1, 0.65, 1.7, 2.0, "#c8d7d2"), (-0.68, 0.65, 1.28, 1.45, "#efe7d6")]:
+        c.poly(cam.poly([(a, y0, WALL_Z), (b, y0, WALL_Z), (b, y1, WALL_Z), (a, y1, WALL_Z)]), hexc(col), lw=1.5)
+    # 문 (오른쪽) + 바깥 + 열린 문짝
+    dx0, dx1, dh = 3.0, 4.4, 2.6
+    c.poly(cam.poly([(dx0 - 0.14, 0, WALL_Z), (dx1 + 0.14, 0, WALL_Z), (dx1 + 0.14, dh + 0.14, WALL_Z), (dx0 - 0.14, dh + 0.14, WALL_Z)]), frame, lw=3)
+    c.poly(cam.poly([(dx0, 0, WALL_Z), (dx1, 0, WALL_Z), (dx1, dh, WALL_Z), (dx0, dh, WALL_Z)]), open_c, lw=0)
+    c.poly(cam.poly([(dx0 + 0.3, 0, WALL_Z), (dx1, 0, WALL_Z), (dx1, 0.9, WALL_Z), (dx0 + 0.3, 0.9, WALL_Z)]), hexc("#e6e0d6"), lw=0)
+    ang = math.radians(55)
+    lx, lz = dx0 + 1.3 * math.cos(ang) * 0.0, WALL_Z
+    leaf_end = (dx0 + 1.3 * math.cos(ang), WALL_Z + 1.3 * math.sin(ang))
+    leaf = [(dx0, 0, WALL_Z), (leaf_end[0], 0, leaf_end[1]), (leaf_end[0], dh - 0.05, leaf_end[1]), (dx0, dh - 0.05, WALL_Z)]
+    # 기둥 (오른쪽 끝)
+    def box(x0, x1, z0, z1, h, col, top=None, side=None, y0=0.0):
+        """painter's box (y0~h): 윗면 + 앞면(+z) + 카메라 쪽 옆면"""
+        top = top or shade(col, 1.12); side = side or shade(col, 0.82)
+        camx = cam.C[0]
+        if x1 < camx:
+            c.poly(cam.poly([(x1, y0, z0), (x1, y0, z1), (x1, h, z1), (x1, h, z0)]), side)
+        elif x0 > camx:
+            c.poly(cam.poly([(x0, y0, z0), (x0, y0, z1), (x0, h, z1), (x0, h, z0)]), side)
+        c.poly(cam.poly([(x0, y0, z1), (x1, y0, z1), (x1, h, z1), (x0, h, z1)]), col)
+        c.poly(cam.poly([(x0, h, z0), (x1, h, z0), (x1, h, z1), (x0, h, z1)]), top)
+    # 소품 (뒤에서 앞으로)
+    box(6.0, 6.6, WALL_Z, WALL_Z + 0.5, 6.0, hexc("#b4ada1"))
+    for i, (a, b) in enumerate([(-2.4, -1.8), (-1.8, -1.2)]):
+        box(a, b, WALL_Z, WALL_Z + 0.55, 2.0, prop if i == 0 else shade(prop, 0.95))
+        fz = WALL_Z + 0.55
+        c.line(cam.poly([(a + 0.1, 1.75, fz), (b - 0.1, 1.75, fz)]), shade(prop, 0.7), 3)
+        c.line(cam.poly([(a + 0.1, 1.65, fz), (b - 0.1, 1.65, fz)]), shade(prop, 0.7), 3)
+        c.poly(cam.poly([(b - 0.14, 0.95, fz), (b - 0.08, 0.95, fz), (b - 0.08, 1.15, fz), (b - 0.14, 1.15, fz)]), shade(prop, 0.6), lw=1.5)
+    box(-6.4, -5.0, WALL_Z + 0.1, WALL_Z + 1.1, 0.9, crate_c)
+    box(-6.1, -5.3, WALL_Z + 0.2, WALL_Z + 0.95, 0.65 + 0.9, crate_c, y0=0.9)
+    # 탁자: 다리 → 상판 → 무전기
+    for lx_ in (0.95, 2.65):
+        for lz_ in (WALL_Z + 0.25, WALL_Z + 1.05):
+            box(lx_ - 0.05, lx_ + 0.05, lz_ - 0.05, lz_ + 0.05, 0.8, hexc("#5d4e3f"))
+    box(0.8, 2.8, WALL_Z + 0.15, WALL_Z + 1.15, 0.86, wood, y0=0.78)
+    box(1.5, 2.1, WALL_Z + 0.45, WALL_Z + 0.8, 1.06, hexc("#5f7f86"), y0=0.86)
+    c.poly(cam.poly(leaf), hexc("#8a7b6e"), lw=3)
+    c.poly(cam.poly([(leaf_end[0] - 0.12, 1.05, leaf_end[1] - 0.1), (leaf_end[0] - 0.05, 1.05, leaf_end[1] - 0.02), (leaf_end[0] - 0.05, 1.25, leaf_end[1] - 0.02), (leaf_end[0] - 0.12, 1.25, leaf_end[1] - 0.1)]), hexc("#d8b24a"), lw=1.5)
+
+    # ------- 구역 마스크 (월드 좌표 다각형 → 같은 카메라로 투영)
+    sl = CAMERA["slot"]
+    # 그림자: 왼쪽 벽 구석, 사물함/탁자/상자가 문빛(오른쪽)에서 왼쪽으로 드리운 그림자
+    mpoly([(X0, 0, WALL_Z), (-7.6, 0, WALL_Z), (-7.6, 6, WALL_Z), (X0, 6, WALL_Z)], Z_SHADOW)
+    mpoly([(X0, 0, WALL_Z), (-7.6, 0, WALL_Z), (-9.5, 0, 12), (X0, 0, 12)], Z_SHADOW)
+    mpoly([(-2.4, 0, WALL_Z), (-1.2, 0, WALL_Z), (-1.2, 0, WALL_Z + 0.55), (-3.6, 0, WALL_Z + 1.9), (-3.9, 0, WALL_Z)], Z_SHADOW)
+    mpoly([(-2.4, 0, WALL_Z), (-1.2, 0, WALL_Z), (-1.2, 2.0, WALL_Z), (-2.4, 2.0, WALL_Z)], Z_SHADOW)
+    mpoly([(-1.2, 0, WALL_Z), (-1.2, 0, WALL_Z + 0.55), (-1.2, 2.0, WALL_Z + 0.55), (-1.2, 2.0, WALL_Z)], Z_SHADOW)
+    mpoly([(0.8, 0, WALL_Z + 0.15), (2.8, 0, WALL_Z + 0.15), (2.8, 0, WALL_Z + 1.15), (0.2, 0, WALL_Z + 1.5), (0.4, 0, WALL_Z + 0.15)], Z_SHADOW)
+    mpoly([(-6.4, 0, WALL_Z + 0.1), (-5.0, 0, WALL_Z + 0.1), (-5.0, 0, WALL_Z + 1.1), (-6.8, 0, WALL_Z + 1.6)], Z_SHADOW)
+    # 창빛(보조광): 유리 + 아래 벽 + 아군 후열을 덮는 바닥 빔
+    mpoly([(wx0, wy0, WALL_Z), (wx1, wy0, WALL_Z), (wx1, wy1, WALL_Z), (wx0, wy1, WALL_Z)], Z_ACCENT)
+    mpoly([(wx0, 0.2, WALL_Z), (wx1, 0.2, WALL_Z), (wx1, wy0 - 0.12, WALL_Z), (wx0, wy0 - 0.12, WALL_Z)], Z_ACCENT)
+    bx_r = -sl["row_x"][2] + 0.65   # 아군 후열 오른쪽 끝 바로 바깥 (중열은 빔 밖)
+    mpoly([(wx0 - 0.6, 0, WALL_Z), (wx1 + 0.2, 0, WALL_Z), (bx_r, 0, 3.4), (-6.6, 0, 3.4)], Z_ACCENT)
+    # 문빛(주조명): 개구부 + 오른쪽 벽 조각 + 적 진영을 덮는 바닥 쐐기 + 문짝 그림자 띠
+    mpoly([(dx0, 0, WALL_Z), (dx1, 0, WALL_Z), (dx1, dh, WALL_Z), (dx0, dh, WALL_Z)], Z_KEY)
+    mpoly([(dx1 + 0.14, 0, WALL_Z), (6.0, 0, WALL_Z), (6.0, 3.6, WALL_Z), (dx1 + 0.14, 3.0, WALL_Z)], Z_KEY)
+    mpoly([(6.0, 0, WALL_Z + 0.5), (6.6, 0, WALL_Z + 0.5), (6.6, 6, WALL_Z + 0.5), (6.0, 6, WALL_Z + 0.5)], Z_KEY)
+    mpoly([(dx0, 0, WALL_Z), (dx1 + 0.4, 0, WALL_Z), (X1, 0, 2.0), (X1, 0, 12), (-1.0, 0, 12), (-0.6, 0, 3.4)], Z_KEY)
+    mpoly([(dx0 + 0.05, 0, WALL_Z), (dx0 + 0.32, 0, WALL_Z), (2.75, 0, -0.8), (2.45, 0, -0.8)], Z_SHADOW)   # 문짝 그림자: 캐릭터 뒤에서 끝남
+    mpoly(leaf, Z_AMBIENT)
+    mpoly([(1.5, 1.06, WALL_Z + 0.8), (2.1, 1.06, WALL_Z + 0.8), (2.1, 0.9, WALL_Z + 0.8), (1.5, 0.9, WALL_Z + 0.8)], Z_UNLIT)
+    img = c.down()
+    mask = m.resize((BW, BH), Image.NEAREST)
     S = S_prev
-    return img, m
+    return img, mask
 
 
 # ------------------------------------------------------------------ main
@@ -563,7 +608,8 @@ WEAPONS = {  # id: default angle (deg, +cw) when held
 
 
 def main():
-    manifest = {"units": {}, "weapons": {}, "zones": {"shadow": 0, "ambient": 85, "unlit": 128, "key": 170, "accent": 255}}
+    manifest = {"units": {}, "weapons": {}, "zones": {"shadow": 0, "ambient": 85, "unlit": 128, "key": 170, "accent": 255},
+                "camera": CAMERA}
     for uid, spec in UNITS.items():
         img, mask_r, mask_l, meta = draw_character(spec)
         img.save(os.path.join(OUT_SPR, f"{uid}.png"))

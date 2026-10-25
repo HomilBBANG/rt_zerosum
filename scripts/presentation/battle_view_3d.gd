@@ -38,11 +38,15 @@ static func slot_position(team: String, row: int, index: int) -> Vector3:
 
 func _ready() -> void:
 	camera = Camera3D.new()
+	# 2D 가상 카메라와 같은 구도: 대상에서 뒤로 물러나 40° 내려다봄
 	camera.fov = 34.0
-	camera.position = Vector3(0.0, 3.7, 11.6)
+	var pitch := deg_to_rad(40.0)
+	var target := Vector3(0.0, 0.7, 0.9)
+	var dist := 15.5
+	camera.position = target + Vector3(0.0, sin(pitch), cos(pitch)) * dist
 	camera.near = 0.2
 	add_child(camera)
-	camera.look_at(Vector3(0.0, 0.95, 0.6), Vector3.UP)
+	camera.look_at(target, Vector3.UP)
 	env = WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_COLOR
