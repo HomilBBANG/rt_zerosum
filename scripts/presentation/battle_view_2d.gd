@@ -8,6 +8,7 @@ const UNIT_SCRIPT := preload("res://scripts/presentation/unit_sprite_2d.gd")
 @onready var world: Node2D = $World
 @onready var bg: Sprite2D = $World/Background
 @onready var units_root: Node2D = $World/Units
+var back_bars: Node2D   # 체력 바 층: 캐릭터(z 10~)와 쓰러진 캐릭터(z 5)보다 아래
 @onready var markers_root: Node2D = $World/Markers
 @onready var clear_rect: ColorRect = $Clear
 
@@ -112,6 +113,11 @@ func _ready() -> void:
 	if Game.cli.get("bg", "3d") == "3d":
 		_make_3d_background()
 	_make_camera()
+	back_bars = Node2D.new()
+	back_bars.name = "BackBars"
+	back_bars.z_index = 2
+	world.add_child(back_bars)
+	back_bars.draw.connect(_draw_back_bars)
 
 
 func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
@@ -237,6 +243,8 @@ var _last_view := Vector3(-1, -1, -1)
 
 
 func _process(_delta: float) -> void:
+	if back_bars != null:
+		back_bars.queue_redraw()   # 이동 트윈·피해 반영
 	# 2D 카메라가 움직이거나 줌이 바뀌면 3D 배경 카메라를 맞추고 다시 렌더
 	if bg3d == null or bcam == null:
 		return
@@ -287,19 +295,33 @@ func get_unit_screen_pos(unit: UnitRuntime) -> Vector2:
 	return world.get_global_transform_with_canvas() * (s.position + s.head_screen_offset() * s.scale.y)
 
 
-func get_unit_back_bar_rect(unit: UnitRuntime) -> Rect2:
-	var s := sprite_of(unit)
-	if s == null:
-		return super.get_unit_back_bar_rect(unit)
-	var xf := world.get_global_transform_with_canvas()
-	var k := xf.get_scale().y * s.scale.y   # 스프라이트 로컬 px → 화면 px
-	var feet := xf * s.position
+## 등 뒤 세로 체력 바: 월드 안에서 모든 캐릭터보다 아래 층(z)에 그려 캐릭터를 절대 가리지 않는다 (앞 캐릭터가 바를 가림).
+func draws_back_bars() -> bool:
+	return true
+
+
+## 월드 좌표의 바 자리: 발 위치·키·원화 몸의 등 쪽 가장자리(키의 20% 이내). 아군은 오른쪽(적)을 보므로 등이 왼쪽.
+func _back_bar_rect_world(s: UnitSprite2D) -> Rect2:
+	var k := s.scale.y
 	var h := -s.head_screen_offset().y * k
-	var dir := -1.0 if unit.team == "ally" else 1.0
+	var dir := -1.0 if s.unit.team == "ally" else 1.0
 	var bar_h := clampf(h * 0.5, 50.0, 150.0)
-	var x := feet.x + dir * (s.back_extent() * k + 9.0)
-	var bottom := feet.y - h * 0.22
+	var x := s.position.x + dir * (s.back_extent() * k + 9.0)
+	var bottom := s.position.y - h * 0.22
 	return Rect2(x - 4.0, bottom - bar_h, 8.0, bar_h)
+
+
+func _draw_back_bars() -> void:
+	for id in sprites:
+		var s: UnitSprite2D = sprites[id]
+		var u: UnitRuntime = s.unit
+		var r := _back_bar_rect_world(s)
+		var a := 1.0 if u.alive else 0.35
+		var frac := clampf(float(u.hp) / float(maxi(u.data.max_hp, 1)), 0.0, 1.0)
+		back_bars.draw_rect(r.grow(1.0), Color(0, 0, 0, 0.9 * a))
+		back_bars.draw_rect(r, Color(0.08, 0.02, 0.02, 0.85 * a))
+		var fh := r.size.y * frac
+		back_bars.draw_rect(Rect2(r.position.x, r.end.y - fh, r.size.x, fh), Color(0.95, 0.16, 0.14, a))
 
 
 func get_slot_screen_pos(key: String) -> Vector2:

@@ -289,11 +289,12 @@ func _on_battle_started() -> void:
 		bg.set_border_width_all(1)
 		bg.border_color = Color(0, 0, 0, 0.9)
 		var fill := StyleBoxFlat.new()
-		fill.bg_color = Color(0.35, 0.95, 0.45) if u.team == "ally" else Color(1.0, 0.35, 0.3)
+		fill.bg_color = Color(0.95, 0.16, 0.14)   # 체력은 아군·적 모두 붉은색
 		fill.set_corner_radius_all(2)
 		hp.add_theme_stylebox_override("background", bg)
 		hp.add_theme_stylebox_override("fill", fill)
 		floating_root.add_child(hp)
+		hp.visible = not view.draws_back_bars()   # 2D 뷰는 월드 안에서 캐릭터 아래 층에 직접 그림
 		var ap := _label("", 12, Color(0.55, 0.9, 1.0))
 		ap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		root.add_child(ap)
