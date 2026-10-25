@@ -34,10 +34,11 @@ vec3 tinted(vec3 base, vec3 light, float strength, float target_lum, float add) 
 vec3 shade(vec3 base, float zone) {
 	float L = lum(base);
 	if (zone < 0.17 || (zone >= 0.83 && !use_rim)) {
-		// 그림자: 그림자색으로 물들되 원화 명암의 약 절반 밝기 (검정으로 뭉개지지 않게)
-		return tinted(base, shadow_tint.rgb * 2.5 + vec3(0.1), 0.85, L * 0.42 + shadow_lift * 0.12, 0.0);
+		// 그림자: 그림자색으로 물들되 원화 밝기의 약 62% (46% 에서 올림: 얼굴의 어두운 띠 완화)
+		return tinted(base, shadow_tint.rgb * 2.5 + vec3(0.1), 0.85, L * 0.62 + shadow_lift * 0.06, 0.0);
 	} else if (zone < 0.45) {
-		return tinted(base, ambient_tint.rgb, 0.55, L * 0.95, 0.02);
+		// 주변광: 곱하기 강도 0.25 (0.55 에서 낮춤: 보색 조명이 피부·머리색을 올리브로 죽이지 않게)
+		return tinted(base, ambient_tint.rgb, 0.25, L * 0.95, 0.02);
 	} else if (zone < 0.55) {
 		// 눈동자: 원화 명암(동공 어둡게)은 살리고 색은 eye_color 로 진하게. 조명은 아주 약하게만
 		vec3 e = eye_color.rgb * (L / max(lum(eye_color.rgb), 0.05)) * 1.35;
