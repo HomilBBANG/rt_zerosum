@@ -11,6 +11,11 @@ shader_type canvas_item;
 render_mode unshaded;
 
 uniform sampler2D zone_mask : filter_nearest, repeat_disable;
+// 반대 방향 마스크: 그 림(255) 구역이 '빛 쪽' 가장자리에 해당 → 빛 쪽 몸을 밝히면서 같은 쪽 가장자리에 림을 더할 때 사용
+uniform sampler2D near_rim_mask : filter_nearest, repeat_disable;
+uniform bool use_near_rim = false;
+uniform vec4 near_rim_color : source_color = vec4(1.0);
+uniform float near_rim_mix : hint_range(0.0, 1.0) = 0.85;
 uniform vec4 shadow_tint : source_color = vec4(0.06, 0.18, 0.19, 1.0);
 uniform vec4 ambient_tint : source_color = vec4(0.42, 0.75, 0.72, 1.0);
 uniform vec4 key_color : source_color = vec4(1.0, 0.12, 0.47, 1.0);
@@ -59,13 +64,21 @@ vec3 shade(vec3 base, float zone) {
 	return mix(base, accent_color.rgb, accent_mix);
 }
 
+vec3 shade2(vec3 base, vec2 uv) {
+	vec3 c = shade(base, texture(zone_mask, uv).r);
+	if (use_near_rim && texture(near_rim_mask, uv).r >= 0.83) {
+		c = mix(c, near_rim_color.rgb, near_rim_mix);
+	}
+	return c;
+}
+
 void fragment() {
 	vec4 base = texture(TEXTURE, UV) * COLOR;
 	vec2 d = fwidth(UV) * 0.25;
-	vec3 o = shade(base.rgb, texture(zone_mask, UV + vec2(-d.x, -d.y)).r)
-		+ shade(base.rgb, texture(zone_mask, UV + vec2(d.x, -d.y)).r)
-		+ shade(base.rgb, texture(zone_mask, UV + vec2(-d.x, d.y)).r)
-		+ shade(base.rgb, texture(zone_mask, UV + vec2(d.x, d.y)).r);
+	vec3 o = shade2(base.rgb, UV + vec2(-d.x, -d.y))
+		+ shade2(base.rgb, UV + vec2(d.x, -d.y))
+		+ shade2(base.rgb, UV + vec2(-d.x, d.y))
+		+ shade2(base.rgb, UV + vec2(d.x, d.y));
 	o *= 0.25;
 	float l = lum(o);
 	o = clamp(mix(vec3(l), o, saturation), 0.0, 1.0);

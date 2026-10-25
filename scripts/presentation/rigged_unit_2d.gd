@@ -92,8 +92,10 @@ func _update_masks() -> void:
 	if mirrored:
 		tex_from_right = not tex_from_right
 	var suffix := "_mask_r.png" if tex_from_right else "_mask_l.png"
+	var opposite := "_mask_l.png" if tex_from_right else "_mask_r.png"
 	for i in parts.size():
 		mats[i].set_shader_parameter("zone_mask", load(rig_dir.path_join(part_names[i] + suffix)))
+		mats[i].set_shader_parameter("near_rim_mask", load(rig_dir.path_join(part_names[i] + opposite)))
 
 
 func set_param(key: String, value: Variant) -> void:

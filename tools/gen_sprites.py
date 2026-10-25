@@ -453,7 +453,7 @@ def draw_face_texture(spec):
 # ------------------------------------------------------------------ background plate (40° 내려다보는 원근 카메라)
 # 2D 전투의 가상 카메라. Godot battle_view_2d.gd 가 manifest.json 의 같은 값으로 슬롯 위치·크기를 투영한다.
 # 좌표: x 오른쪽, y 위, z 카메라 쪽(m). 뒷벽 z=-3.6, 바닥 y=0.
-CAMERA = {"pitch_deg": 40.0, "dist": 15.0, "target": [0.0, 0.0, 0.6], "vfov_deg": 32.0,
+CAMERA = {"pitch_deg": 50.0, "dist": 15.0, "target": [0.0, 0.0, 0.6], "vfov_deg": 32.0,
           "cx": 640.0, "cy": 430.0, "screen": [1280, 720], "unit_height_m": 1.75, "sprite_px": 230.0,
           "slot": {"row_x": [1.3, 3.0, 4.7], "index_z": [0.0, 1.8], "index_dx": 0.4}}
 WALL_Z = -3.6

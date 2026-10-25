@@ -164,13 +164,16 @@ func _update_light_masks() -> void:
 	if unit.team == "enemy":
 		tex_from_right = not tex_from_right
 	var suffix := "_mask_r" if tex_from_right else "_mask_l"
+	var opposite := "_mask_l" if tex_from_right else "_mask_r"
 	if rig != null:
 		rig.set_light_direction(tex_from_right)   # 적은 좌우 반전 → 반전된 방향의 마스크
 	else:
 		mat.set_shader_parameter("zone_mask", load("res://assets/sprites/%s%s.png" % [unit.data.sprite_id, suffix]))
+		mat.set_shader_parameter("near_rim_mask", load("res://assets/sprites/%s%s.png" % [unit.data.sprite_id, opposite]))
 	if weapon.visible:
 		var wid: String = unit.current_weapon().get("id", "")
 		wmat.set_shader_parameter("zone_mask", load("res://assets/sprites/w_%s%s.png" % [wid, suffix]))
+		wmat.set_shader_parameter("near_rim_mask", load("res://assets/sprites/w_%s%s.png" % [wid, opposite]))
 
 
 ## 프리셋 적용. zone: "key" | "accent" | "ambient" — 유닛이 서 있는 빛 영역
@@ -197,14 +200,16 @@ func apply_lighting(p: Dictionary, zone: String) -> void:
 		m.set_shader_parameter("accent_mix", 0.85)
 		m.set_shader_parameter("shadow_depth", 0.78)
 		m.set_shader_parameter("shadow_hue", 0.40)
+		m.set_shader_parameter("use_near_rim", false)
 		m.set_shader_parameter("use_rim", Game.rim_enabled)
 		m.set_shader_parameter("debug_view", int(Game.cli.get("charview", "0")))
 		m.set_shader_parameter("eye_color", Color(unit.data.palette.get("eye_paint", unit.data.palette.get("eyes", "#4f9cff"))))
 
 
 ## 3D 배경 모드: 캐릭터 위치에 실제로 닿는 빛으로 명암을 정한다.
-## - 빛이 앞(카메라 쪽)에서 오면: 빛 쪽 몸을 광원색으로 밝히는 키 라이트 + 반대편 역광이 있으면 림
-## - 빛이 뒤(벽의 창·문)에서 오면: 정면은 주변광(원화색), 빛 쪽 가장자리만 광원색 림 (역광)
+## - 닿는 빛이 있으면: 빛 쪽 얼굴·몸을 그 광원색으로 밝힘(키), 반대편은 셀 그림자.
+##   빛이 뒤(벽의 창·문)에서 오면 빛 쪽 가장자리에 같은 색 림을 더함(역광이 몸을 감싸는 느낌).
+##   반대편 가장자리 림은 그쪽에서 실제로 오는 두 번째 빛이 있을 때만.
 ## - 닿는 빛이 없으면: 주변광만, 림 없음
 func apply_light_probe(p: Dictionary, key: Dictionary, rim: Dictionary) -> void:
 	ui_accent = p.get("ui_accent", ui_accent)
@@ -213,36 +218,30 @@ func apply_light_probe(p: Dictionary, key: Dictionary, rim: Dictionary) -> void:
 	for m in _all_mats():
 		m.set_shader_parameter("shadow_tint", p.shadow)
 		m.set_shader_parameter("ambient_tint", ambient)
-		var use_rim := false
+		var far_rim := false
+		var near_rim := false
 		if key.is_empty():
 			m.set_shader_parameter("key_color", ambient.lightened(0.5))
 			m.set_shader_parameter("key_mix", 0.25)
 			m.set_shader_parameter("shadow_depth", 0.86)
 			m.set_shader_parameter("shadow_hue", 0.30)
-		elif key.get("behind", false):
-			var k := clampf(float(key.intensity) / 3.0, 0.0, 1.0)
-			# 림이 빛 쪽 가장자리에 오도록 마스크 방향을 반대로 (마스크의 림은 '빛 반대편' 가장자리)
-			from_right = not key.from_right
-			m.set_shader_parameter("key_color", ambient.lightened(0.45).lerp(key.color, 0.18))
-			m.set_shader_parameter("key_mix", 0.22)
-			# 역광: 정면은 채움광으로 고르게 → 림 안쪽의 그림자 띠가 보라색 등으로 튀지 않게 거의 없앰
-			m.set_shader_parameter("shadow_depth", 0.94)
-			m.set_shader_parameter("shadow_hue", 0.08)
-			m.set_shader_parameter("accent_color", key.color)
-			m.set_shader_parameter("accent_mix", lerpf(0.7, 0.95, k))
-			use_rim = Game.rim_enabled
 		else:
 			var k := clampf(float(key.intensity) / 3.0, 0.0, 1.0)
 			from_right = key.from_right
 			m.set_shader_parameter("key_color", key.color)
-			m.set_shader_parameter("key_mix", lerpf(0.35, 0.65, k))
-			m.set_shader_parameter("shadow_depth", 0.78)
-			m.set_shader_parameter("shadow_hue", 0.40)
-			if not rim.is_empty():
+			m.set_shader_parameter("key_mix", lerpf(0.45, 0.70, k))
+			m.set_shader_parameter("shadow_depth", 0.80)
+			m.set_shader_parameter("shadow_hue", 0.35)
+			if key.get("behind", false) and Game.rim_enabled:
+				near_rim = true
+				m.set_shader_parameter("near_rim_color", key.color)
+				m.set_shader_parameter("near_rim_mix", lerpf(0.7, 0.92, k))
+			if not rim.is_empty() and Game.rim_enabled:
+				far_rim = true
 				m.set_shader_parameter("accent_color", rim.color)
 				m.set_shader_parameter("accent_mix", clampf(0.45 + float(rim.intensity) / 4.0, 0.45, 0.85))
-				use_rim = Game.rim_enabled
-		m.set_shader_parameter("use_rim", use_rim)
+		m.set_shader_parameter("use_rim", far_rim)
+		m.set_shader_parameter("use_near_rim", near_rim)
 		m.set_shader_parameter("debug_view", int(Game.cli.get("charview", "0")))
 		m.set_shader_parameter("eye_color", Color(unit.data.palette.get("eye_paint", unit.data.palette.get("eyes", "#4f9cff"))))
 	set_light_direction(from_right)

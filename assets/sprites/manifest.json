@@ -437,7 +437,7 @@
   "accent": 255
  },
  "camera": {
-  "pitch_deg": 40.0,
+  "pitch_deg": 50.0,
   "dist": 15.0,
   "target": [
    0.0,
