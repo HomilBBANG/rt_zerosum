@@ -53,7 +53,7 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cl
 게임은 **사용자 제공 원화 캐릭터만** 배치합니다: 아군 니키타(저격수, 168cm, 군복·롱코트, `rig_nikita_army`)·하나(돌격소총수, 176.8cm, `rig_hero2`),
 적은 같은 두 캐릭터를 좌우 반전해 세운 2대2 전투입니다(`TestRoster.build_provided_*`).
 도형으로 생성한 12인(`build_allies/build_enemies`)은 규칙 테스트와 리그 벤치에서만 씁니다.
-새 캐릭터 추가: 원화를 `assets/source/` 에 두고 `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
+새 캐릭터 추가: 원화를 `assets/source/` 에 두고(검정 배경 원화는 먼저 `python3 tools/remove_black_bg.py 입력 출력` 으로 투명화) `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
 `python3 tools/rig_cutter.py <id>` → 임포트 후 `tools/set_mipmaps.py` → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.
 캐릭터 키는 `rig.json` 의 `figure_px`(원화 정수리~발 픽셀)를 화면 230px = 175cm 기준으로 환산해 2D·3D 모두에 반영됩니다.
 

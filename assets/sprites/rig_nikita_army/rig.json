@@ -5,57 +5,57 @@
  ],
  "ground": [
   270,
-  760
+  762
  ],
  "scale": 0.312,
- "figure_px": 757,
+ "figure_px": 759,
  "bones": [
   {
    "name": "hip",
    "parent": "",
    "pos": [
-    252,
-    288
+    270,
+    300
    ]
   },
   {
    "name": "spine",
    "parent": "hip",
    "pos": [
-    250,
-    250
+    270,
+    260
    ]
   },
   {
    "name": "chest",
    "parent": "spine",
    "pos": [
-    248,
-    200
+    270,
+    210
    ]
   },
   {
    "name": "head",
    "parent": "chest",
    "pos": [
-    250,
-    135
+    270,
+    146
    ]
   },
   {
    "name": "shoulder_l",
    "parent": "chest",
    "pos": [
-    178,
-    162
+    196,
+    186
    ]
   },
   {
    "name": "elbow_l",
    "parent": "shoulder_l",
    "pos": [
-    152,
-    295
+    176,
+    302
    ]
   },
   {
@@ -63,79 +63,79 @@
    "parent": "elbow_l",
    "pos": [
     165,
-    395
+    400
    ]
   },
   {
    "name": "shoulder_r",
    "parent": "chest",
    "pos": [
-    320,
-    175
+    331,
+    195
    ]
   },
   {
    "name": "elbow_r",
    "parent": "shoulder_r",
    "pos": [
-    362,
-    295
+    358,
+    302
    ]
   },
   {
    "name": "wrist_r",
    "parent": "elbow_r",
    "pos": [
-    400,
-    385
+    386,
+    396
    ]
   },
   {
    "name": "hip_l",
    "parent": "hip",
    "pos": [
-    225,
-    305
+    240,
+    316
    ]
   },
   {
    "name": "knee_l",
    "parent": "hip_l",
    "pos": [
-    190,
-    498
+    210,
+    510
    ]
   },
   {
    "name": "ankle_l",
    "parent": "knee_l",
    "pos": [
-    150,
-    672
+    161,
+    661
    ]
   },
   {
    "name": "hip_r",
    "parent": "hip",
    "pos": [
-    292,
-    305
+    305,
+    316
    ]
   },
   {
    "name": "knee_r",
    "parent": "hip_r",
    "pos": [
-    320,
-    498
+    330,
+    510
    ]
   },
   {
    "name": "ankle_r",
    "parent": "knee_r",
    "pos": [
-    352,
-    668
+    356,
+    661
    ]
   }
  ],
@@ -145,12 +145,12 @@
    "bone": "head",
    "tex": "hair_back.png",
    "origin": [
-    185,
-    44
+    181,
+    48
    ],
    "size": [
-    150,
-    118
+    160,
+    154
    ],
    "z": 0
   },
@@ -159,12 +159,12 @@
    "bone": "ankle_l",
    "tex": "foot_l.png",
    "origin": [
-    108,
-    658
+    110,
+    645
    ],
    "size": [
-    92,
-    105
+    98,
+    117
    ],
    "z": 1
   },
@@ -173,12 +173,12 @@
    "bone": "ankle_r",
    "tex": "foot_r.png",
    "origin": [
-    317,
-    648
+    313,
+    645
    ],
    "size": [
-    116,
-    115
+    105,
+    118
    ],
    "z": 1
   },
@@ -187,12 +187,12 @@
    "bone": "knee_l",
    "tex": "shin_l.png",
    "origin": [
-    68,
-    491
+    67,
+    499
    ],
    "size": [
-    206,
-    183
+    209,
+    179
    ],
    "z": 2
   },
@@ -201,12 +201,12 @@
    "bone": "knee_r",
    "tex": "shin_r.png",
    "origin": [
-    267,
-    491
+    268,
+    499
    ],
    "size": [
-    205,
-    197
+    203,
+    204
    ],
    "z": 2
   },
@@ -215,12 +215,12 @@
    "bone": "hip_l",
    "tex": "thigh_l.png",
    "origin": [
-    135,
-    279
+    132,
+    299
    ],
    "size": [
-    139,
-    223
+    144,
+    209
    ],
    "z": 3
   },
@@ -229,12 +229,12 @@
    "bone": "hip_r",
    "tex": "thigh_r.png",
    "origin": [
-    267,
-    279
+    268,
+    299
    ],
    "size": [
-    157,
-    223
+    151,
+    209
    ],
    "z": 3
   },
@@ -243,12 +243,12 @@
    "bone": "hip",
    "tex": "hips.png",
    "origin": [
-    195,
-    257
+    211,
+    278
    ],
    "size": [
-    133,
-    56
+    122,
+    50
    ],
    "z": 4
   },
@@ -257,12 +257,12 @@
    "bone": "chest",
    "tex": "torso.png",
    "origin": [
-    190,
-    127
+    208,
+    143
    ],
    "size": [
-    118,
-    157
+    120,
+    155
    ],
    "z": 5
   },
@@ -271,12 +271,12 @@
    "bone": "shoulder_l",
    "tex": "arm_upper_l.png",
    "origin": [
-    148,
-    153
+    155,
+    173
    ],
    "size": [
-    52,
-    155
+    68,
+    153
    ],
    "z": 6
   },
@@ -285,12 +285,12 @@
    "bone": "shoulder_r",
    "tex": "arm_upper_r.png",
    "origin": [
-    298,
-    164
+    313,
+    183
    ],
    "size": [
-    81,
-    139
+    60,
+    136
    ],
    "z": 6
   },
@@ -299,12 +299,12 @@
    "bone": "elbow_l",
    "tex": "arm_lower_l.png",
    "origin": [
-    145,
-    279
+    153,
+    289
    ],
    "size": [
-    38,
-    123
+    55,
+    117
    ],
    "z": 7
   },
@@ -313,12 +313,12 @@
    "bone": "elbow_r",
    "tex": "arm_lower_r.png",
    "origin": [
-    344,
-    279
+    333,
+    289
    ],
    "size": [
-    69,
-    122
+    64,
+    114
    ],
    "z": 7
   },
@@ -328,11 +328,11 @@
    "tex": "hand_l.png",
    "origin": [
     143,
-    385
+    389
    ],
    "size": [
-    35,
-    50
+    33,
+    62
    ],
    "z": 8
   },
@@ -341,12 +341,12 @@
    "bone": "wrist_r",
    "tex": "hand_r.png",
    "origin": [
-    382,
-    348
+    372,
+    383
    ],
    "size": [
-    36,
-    88
+    31,
+    62
    ],
    "z": 8
   },
@@ -355,12 +355,12 @@
    "bone": "head",
    "tex": "head.png",
    "origin": [
-    185,
+    181,
     3
    ],
    "size": [
-    159,
-    155
+    175,
+    164
    ],
    "z": 9
   }
@@ -369,18 +369,18 @@
  "head_bone": "head",
  "eyes": [
   [
-   261,
-   80
+   254,
+   95
   ],
   [
-   300,
-   92
+   298,
+   105
   ]
  ],
  "head_rect": [
-  165,
+  170,
   0,
-  180,
-  165
+  190,
+  170
  ]
 }
