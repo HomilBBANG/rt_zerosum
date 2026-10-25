@@ -191,6 +191,7 @@ func apply_lighting(p: Dictionary, zone: String) -> void:
 				m.set_shader_parameter("accent_color", p.accent)
 				m.set_shader_parameter("key_mix", 0.62)
 		m.set_shader_parameter("accent_mix", 0.85)
+		m.set_shader_parameter("use_rim", Game.rim_enabled)
 
 
 func set_highlight(kind: String) -> void:

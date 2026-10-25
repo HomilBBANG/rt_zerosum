@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cl
 ## 실행
 1. 위 설치 스크립트를 썼다면 `play.bat` / `play.sh`. 직접 설치한 Godot 4.7 (stable) 로 이 폴더를 열어 F5 해도 됩니다. 메인 씬 `scenes/main_menu.tscn`.
 2. 메뉴에서 **표현 모드(2D/3D)**, 조명 프리셋(G1~G4), 선공(동전/아군 기습/적 매복), 시드를 고른 뒤 편성 → 전투.
-3. 전투 중 단축키: `1~4` 조명 프리셋 즉시 교체 · `Tab` 2D↔3D 즉시 전환 · `F1` 디버그 패널 · `F2` HUD 숨김 · `R` 재시작 · `Space` 턴 종료 · 우클릭 취소.
+3. 전투 중 단축키: `1~4` 조명 프리셋 즉시 교체 · `Tab` 2D↔3D 즉시 전환 · `F1` 디버그 패널 · `F2` HUD 숨김 · `F3` 캐릭터 림 라인 켜기/끄기 · `R` 재시작 · `Space` 턴 종료 · 우클릭 취소.
 
 렌더러는 `gl_compatibility` 로 두었습니다(저사양/소프트웨어 렌더 검증 포함). Forward+ 로 바꿔도 셰이더는 그대로 동작합니다.
 

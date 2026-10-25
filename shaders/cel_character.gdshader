@@ -14,6 +14,7 @@ uniform float key_mix : hint_range(0.0, 1.0) = 0.6;
 uniform float accent_mix : hint_range(0.0, 1.0) = 0.85;
 uniform float shadow_lift : hint_range(0.0, 1.0) = 0.22;
 uniform float saturation : hint_range(0.0, 2.0) = 1.3;
+uniform bool use_rim = true;   // false: 림 구역을 그림자로 (림 라인 없음)
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
 
 float lum(vec3 c) {
@@ -31,7 +32,7 @@ vec3 tinted(vec3 base, vec3 light, float strength, float target_lum, float add) 
 
 vec3 shade(vec3 base, float zone) {
 	float L = lum(base);
-	if (zone < 0.17) {
+	if (zone < 0.17 || (zone >= 0.83 && !use_rim)) {
 		// 그림자: 그림자색으로 물들되 원화 명암의 약 절반 밝기 (검정으로 뭉개지지 않게)
 		return tinted(base, shadow_tint.rgb * 2.5 + vec3(0.1), 0.85, L * 0.42 + shadow_lift * 0.12, 0.0);
 	} else if (zone < 0.45) {

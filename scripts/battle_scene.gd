@@ -1,6 +1,6 @@
 extends Node
 ## 전투 씬 공통 스크립트 (battle_2d.tscn / battle_3d.tscn 양쪽에서 사용).
-## 컨트롤러 생성 → 뷰/HUD 연결 → 전투 시작 → 결과 전환. 단축키: 1~4 조명 프리셋, Tab 2D/3D 전환, F1 디버그, F2 HUD, R 재시작, Esc 메뉴.
+## 컨트롤러 생성 → 뷰/HUD 연결 → 전투 시작 → 결과 전환. 단축키: 1~4 조명 프리셋, Tab 2D/3D 전환, F1 디버그, F2 HUD, F3 림 라인, R 재시작, Esc 메뉴.
 
 @onready var view: BattleViewBase = $View
 @onready var hud: BattleHUD = $HUD
@@ -51,6 +51,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				Game.mode = "3d" if Game.mode == "2d" else "2d"
 				Game.start_battle()
 			KEY_F1: hud.toggle_debug()
+			KEY_F3:
+				Game.rim_enabled = not Game.rim_enabled
+				view.apply_preset(preset)
+				hud.show_toast("림 라인 %s" % ("켬" if Game.rim_enabled else "끔"))
 			KEY_F2: hud.visible = not hud.visible
 			KEY_R:
 				Game.restart_count += 1

@@ -17,6 +17,7 @@ var allies: Array[UnitData] = []
 var enemies: Array[UnitData] = []
 var actions: Dictionary = {}
 var restart_count: int = 0
+var rim_enabled: bool = true      # 캐릭터 림 라인 (F3 토글, CLI --rim=0)
 var last_result: Dictionary = {}
 var cli: Dictionary = {}
 
@@ -35,6 +36,8 @@ func _ready() -> void:
 		ambush = cli.ambush
 	if cli.has("seed"):
 		seed_value = int(cli.seed)
+	if cli.has("rim"):
+		rim_enabled = cli.rim != "0"
 	if cli.has("scene"):
 		call_deferred("_cli_jump")
 
