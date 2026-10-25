@@ -89,6 +89,8 @@ func _ready() -> void:
 	bg_mat.shader = ZONE_SHADER
 	bg_mat.set_shader_parameter("zone_mask", load("res://assets/textures/bg_barracks_mask.png"))
 	bg.material = bg_mat
+	if Game.cli.get("bg", "3d") == "3d":
+		_make_3d_background()
 	_make_camera()
 
 
@@ -97,6 +99,7 @@ func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
 	controller.battle_started.connect(_spawn_units)
 	controller.battle_started.connect(_play_intro)
 	controller.actor_started.connect(func(u, _r): focus_unit(u, CAM_MOVE_TIME))
+	controller.unit_died.connect(func(_u): relight())   # 쓰러진 캐릭터의 바닥 그림자 제거
 	if not controller.slots.all_units().is_empty():
 		_spawn_units()
 	controller.action_resolved.connect(_on_action_resolved)
@@ -193,17 +196,77 @@ func _spawn_units() -> void:
 		sprites[u.instance_id] = s
 	_sort_units()
 	apply_preset(preset)
+	relight()
 
 func apply_preset(p: Dictionary) -> void:
 	preset = p
 	LightingPresets.apply_to_material(bg_mat, p)
 	clear_rect.color = p.clear
+	if bg3d != null:
+		bg3d.apply_preset(p)
+		relight()
+		return
 	for id in sprites:
 		var s: UnitSprite2D = sprites[id]
 		var zone := zone_for_slot(s.unit.team, s.unit.row)
 		s.apply_lighting(p, zone)
 		# 빛 방향: 창문(좌) 영역은 왼쪽에서, 나머지는 문(우)에서
 		s.set_light_direction(zone != "accent")
+
+
+# ---------------------------------------------------------------- 3D 배경 (하이브리드)
+## 배경은 3D 방(실제 스폿라이트·하드 섀도우)을 2D 가상 카메라와 같은 투영으로 렌더해 텍스처로 깔고,
+## 2D 캐릭터는 자기 위치에 실제로 닿는 빛(원뿔·개구부 통과)으로 명암·림 색과 방향을 정한다.
+const BG3D_SCRIPT := preload("res://scripts/presentation/battle_view_3d.gd")
+const BG_RENDER_SIZE := Vector2i(3584, 2016)   # QHD × 전투 줌 1.4 → 줌인해도 배경이 흐려지지 않게
+
+var bg_vp: SubViewport
+var bg3d: Node   # BattleView3D (배경 모드)
+
+
+func _make_3d_background() -> void:
+	bg_vp = SubViewport.new()
+	bg_vp.name = "Background3D"
+	bg_vp.size = BG_RENDER_SIZE
+	bg_vp.own_world_3d = true
+	bg_vp.msaa_3d = Viewport.MSAA_4X
+	bg_vp.positional_shadow_atlas_size = 4096
+	bg_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(bg_vp)
+	bg3d = Node3D.new()
+	bg3d.set_script(BG3D_SCRIPT)
+	bg_vp.add_child(bg3d)
+	bg3d.configure_as_background(cam)
+	bg.texture = bg_vp.get_texture()
+	bg.material = null
+	bg.scale = Vector2.ONE * (1280.0 / float(BG_RENDER_SIZE.x))
+
+
+func _rerender_bg() -> void:
+	if bg_vp != null:
+		bg_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+## 모든 유닛의 조명을 3D 광원 기준으로 다시 계산 + 그림자 대리 물체 갱신 + 배경 재렌더
+func relight() -> void:
+	if bg3d == null:
+		return
+	for id in sprites:
+		var s: UnitSprite2D = sprites[id]
+		var u: UnitRuntime = s.unit
+		var w := slot_world(u.team, u.row, u.index)
+		var h := 1.75 * (u.data.height_cm / 175.0)
+		bg3d.set_shadow_proxy(id, w, h, u.alive)
+		var probes: Array = bg3d.light_probe(w, h)
+		var key: Dictionary = probes[0] if not probes.is_empty() and probes[0].intensity > 0.3 else {}
+		var rim: Dictionary = {}
+		if not key.is_empty():
+			for pr in probes.slice(1):
+				if pr.from_right != key.from_right and pr.intensity > 0.3:
+					rim = pr
+					break
+		s.apply_light_probe(preset, key, rim)
+	_rerender_bg()
 
 
 func _sort_units() -> void:
@@ -292,6 +355,7 @@ func _on_unit_moved(unit: UnitRuntime, _from_key: String, _to_key: String) -> vo
 	await tw.finished
 	_sort_units()
 	apply_preset(preset)
+	relight()
 	_end_busy()
 
 
@@ -308,6 +372,7 @@ func _on_units_swapped(a: UnitRuntime, b: UnitRuntime) -> void:
 	await tw.finished
 	_sort_units()
 	apply_preset(preset)
+	relight()
 	_end_busy()
 
 

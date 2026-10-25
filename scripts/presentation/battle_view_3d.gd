@@ -109,6 +109,12 @@ func _build_room() -> void:
 	_box_at(Vector3(6.0, H, 0.3), Vector3(0.4, H / 2, WZ), wall)          # -2.6 .. 3.4
 	_box_at(Vector3(1.4, H - 3.2, 0.3), Vector3(4.1, 3.2 + (H - 3.2) / 2, WZ), wall)  # 문 위
 	_box_at(Vector3(7.2, H, 0.3), Vector3(8.4, H / 2, WZ), wall)          # 4.8 .. 12
+	# 바닥 타일선 (2D 배경과 같은 1m 격자)
+	var grid := _room_mat(Color(0.60, 0.57, 0.52), 1, 0.0)
+	for gx in range(-12, 13):
+		_box_at(Vector3(0.025, 0.004, 16.0), Vector3(gx, 0.002, WZ + 8.0), grid).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for gz in range(0, 15):
+		_box_at(Vector3(24.0, 0.004, 0.025), Vector3(0, 0.002, WZ + 0.6 + gz), grid).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# 벽 패널 선: 외곽선 스타일 박스 (얇은 띠, 벽과 같은 색 → 외곽선만 보임)
 	for y in [1.0, 2.0, 3.0, 4.0]:
 		_box_at(Vector3(24, 0.05, 0.03), Vector3(0, y, WZ + 0.16), _room_mat(Color(0.80, 0.77, 0.72), 1, 0.012))
@@ -384,3 +390,140 @@ func _on_unit_died(unit: UnitRuntime) -> void:
 	var m := model_of(unit)
 	if m:
 		m.play_death()
+
+
+
+# ================================================================ 2D 전투용 3D 배경 모드
+## BattleView2D 가 SubViewport 안에 이 노드를 만들어 배경으로 쓴다. 캐릭터는 2D 리그 그대로이고,
+## (1) 카메라를 2D 가상 카메라와 같은 투영으로 맞추고 (2) 캐릭터 위치의 실제 조명을 light_probe 로 알려주며
+## (3) 보이지 않는 그림자 대리 물체로 캐릭터 그림자를 바닥에 드리운다.
+const WALL_Z := -3.4
+const OPENING_DOOR := Rect2(3.4, 0.0, 1.4, 3.2)     # x, y, w, h (벽면 z = WALL_Z)
+const OPENING_WINDOW := Rect2(-4.6, 1.5, 2.0, 1.6)
+const DOOR_LEAF_ANGLE := 55.0   # _build_room 의 반쯤 열린 문짝과 같은 값
+const DOOR_LEAF_LEN := 1.3
+const DOOR_LEAF_H := 3.1
+var bg_mode := false
+var _proxies: Dictionary = {}
+
+
+func configure_as_background(c: Dictionary) -> void:
+	bg_mode = true
+	key_light2.visible = false        # 3D 캐릭터 전용 홍수광은 배경 모드에서 불필요
+	accent_light2.visible = false
+	var p := deg_to_rad(float(c.get("pitch_deg", 40.0)))
+	var t: Array = c.get("target", [0.0, 0.0, 0.6])
+	var target := Vector3(float(t[0]), float(t[1]), float(t[2]))
+	var d := float(c.get("dist", 15.0))
+	var scr: Array = c.get("screen", [1280, 720])
+	var W := float(scr[0])
+	var H := float(scr[1])
+	camera.position = target + Vector3(0.0, sin(p), cos(p)) * d
+	camera.look_at(target, Vector3.UP)
+	var near := 0.3
+	var size := 2.0 * near * tan(deg_to_rad(float(c.get("vfov_deg", 32.0))) * 0.5)
+	# 2D 투영의 주점(cx, cy)이 화면 중앙이 아니므로 프러스텀을 그만큼 옮긴다 (off-axis)
+	var off := Vector2(-(float(c.get("cx", W * 0.5)) - W * 0.5) / H * size, (float(c.get("cy", H * 0.5)) - H * 0.5) / H * size)
+	camera.set_frustum(size, off, near, 120.0)
+	if Game.cli.get("bgdebug", "0") == "1":
+		_debug_markers()
+
+
+func _debug_markers() -> void:
+	var m := ShaderMaterial.new()
+	m.shader = UNLIT
+	m.set_shader_parameter("tint", Color(1, 0, 0))
+	for team in ["ally", "enemy"]:
+		for r in 3:
+			for i in 2:
+				var w := BattleView2D.slot_world(team, r, i)
+				var disc := CylinderMesh.new()
+				disc.top_radius = 0.12
+				disc.bottom_radius = 0.12
+				disc.height = 0.02
+				var mi := MeshInstance3D.new()
+				mi.mesh = disc
+				mi.material_override = m
+				mi.position = w + Vector3(0, 0.01, 0)
+				add_child(mi)
+
+
+func _opening_for(light: Light3D) -> Rect2:
+	if light == key_light:
+		return OPENING_DOOR
+	if light == accent_light:
+		return OPENING_WINDOW
+	return Rect2()
+
+
+## 월드 점 p 에 닿는 색광 목록 [{color, intensity, from_right, light}] (강한 순)
+## 스폿 원뿔 + 거리 감쇠 + 벽 개구부(문/창) 통과 여부로 계산. 키 높이 3점 평균.
+func light_probe(p: Vector3, height: float = 1.7) -> Array:
+	var out: Array = []
+	for light in [key_light, accent_light]:
+		if not light.visible:
+			continue
+		var acc := 0.0
+		for hk in [0.25, 0.55, 0.85]:
+			acc += _spot_at(light, p + Vector3(0, height * hk, 0))
+		acc /= 3.0
+		if acc > 0.001:
+			var lc: Color = light.light_color
+			var lv: Vector3 = (light.global_position - (p + Vector3(0, height * 0.6, 0))).normalized()
+			# behind: 빛이 캐릭터 뒤(벽 쪽, -z)에서 옴 → 정면이 아니라 가장자리(림)를 비춤
+			out.append({"color": lc, "intensity": acc, "from_right": light.global_position.x > p.x, "behind": lv.z < -0.2, "dir": lv, "light": light})
+	out.sort_custom(func(a, b): return a.intensity > b.intensity)
+	return out
+
+
+func _spot_at(light: SpotLight3D, q: Vector3) -> float:
+	var L := light.global_position
+	var to := q - L
+	var dist := to.length()
+	if dist < 0.01 or dist > light.spot_range:
+		return 0.0
+	var dir := to / dist
+	var fwd := -light.global_transform.basis.z
+	var edge := cos(deg_to_rad(light.spot_angle))
+	var c := dir.dot(fwd)
+	if c <= edge:
+		return 0.0
+	var cone := clampf((c - edge) / maxf(1.0 - edge, 0.001) * 3.0, 0.0, 1.0)
+	var rect := _opening_for(light)
+	if rect.size != Vector2.ZERO and absf(q.z - L.z) > 0.001:
+		var tt := (WALL_Z - L.z) / (q.z - L.z)
+		if tt > 0.0 and tt < 1.0:
+			var hit := L + to * tt
+			if not rect.has_point(Vector2(hit.x, hit.y)):
+				return 0.0
+	# 반쯤 열린 문짝(경첩 x=3.4)이 문빛을 가림
+	if light == key_light and _blocked_by_door_leaf(L, q):
+		return 0.0
+	return light.light_energy * cone * sqrt(clampf(1.0 - dist / light.spot_range, 0.0, 1.0))
+
+
+func _blocked_by_door_leaf(a: Vector3, b: Vector3) -> bool:
+	var ang := deg_to_rad(DOOR_LEAF_ANGLE)
+	var p0 := Vector2(OPENING_DOOR.position.x, WALL_Z)
+	var p1 := p0 + Vector2(cos(ang), sin(ang)) * DOOR_LEAF_LEN
+	var hit = Geometry2D.segment_intersects_segment(Vector2(a.x, a.z), Vector2(b.x, b.z), p0, p1)
+	if hit == null:
+		return false
+	var t := (Vector2(a.x, a.z).distance_to(hit)) / maxf(Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z)), 0.001)
+	return lerpf(a.y, b.y, t) < DOOR_LEAF_H
+
+
+## 캐릭터 그림자 대리 물체: 보이지 않고 그림자만 드리움
+func set_shadow_proxy(id: int, pos: Vector3, height: float, alive: bool) -> void:
+	var mi: MeshInstance3D = _proxies.get(id, null)
+	if mi == null:
+		mi = MeshInstance3D.new()
+		var cap := CapsuleMesh.new()
+		cap.radius = 0.22
+		mi.mesh = cap
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+		add_child(mi)
+		_proxies[id] = mi
+	(mi.mesh as CapsuleMesh).height = height
+	mi.position = pos + Vector3(0, height * 0.5, 0)
+	mi.visible = alive
