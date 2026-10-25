@@ -103,6 +103,17 @@ func set_param(key: String, value: Variant) -> void:
 		m.set_shader_parameter(key, value)
 
 
+## 원화 몸의 좌우 범위 (발 기준, 리그 로컬 px): x = 왼쪽 끝(음수), y = 오른쪽 끝
+func body_x_extent() -> Vector2:
+	var gx := float(rig.ground[0])
+	var lo := INF
+	var hi := -INF
+	for p in rig.parts:
+		lo = minf(lo, float(p.origin[0]))
+		hi = maxf(hi, float(p.origin[0]) + float(p.size[0]))
+	return Vector2(lo - gx, hi - gx) * scale_factor
+
+
 func head_top_local() -> Vector2:
 	var hr: Array = rig.get("head_rect", [0, 0, 0, 0])
 	var ground: Array = rig.ground

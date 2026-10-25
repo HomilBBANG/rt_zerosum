@@ -287,6 +287,21 @@ func get_unit_screen_pos(unit: UnitRuntime) -> Vector2:
 	return world.get_global_transform_with_canvas() * (s.position + s.head_screen_offset() * s.scale.y)
 
 
+func get_unit_back_bar_rect(unit: UnitRuntime) -> Rect2:
+	var s := sprite_of(unit)
+	if s == null:
+		return super.get_unit_back_bar_rect(unit)
+	var xf := world.get_global_transform_with_canvas()
+	var k := xf.get_scale().y * s.scale.y   # 스프라이트 로컬 px → 화면 px
+	var feet := xf * s.position
+	var h := -s.head_screen_offset().y * k
+	var dir := -1.0 if unit.team == "ally" else 1.0
+	var bar_h := clampf(h * 0.5, 50.0, 150.0)
+	var x := feet.x + dir * (s.back_extent() * k + 9.0)
+	var bottom := feet.y - h * 0.22
+	return Rect2(x - 4.0, bottom - bar_h, 8.0, bar_h)
+
+
 func get_slot_screen_pos(key: String) -> Vector2:
 	var info := SlotManager.parse_key(key)
 	return world.get_global_transform_with_canvas() * slot_position(info.team, info.row, info.index)

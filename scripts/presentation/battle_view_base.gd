@@ -24,6 +24,13 @@ func get_unit_screen_pos(_unit: UnitRuntime) -> Vector2:
 	return Vector2.ZERO
 
 
+## 등 뒤 세로 체력 바 자리 (화면 좌표). 아군은 오른쪽(적)을 보므로 등이 왼쪽, 적은 오른쪽.
+func get_unit_back_bar_rect(unit: UnitRuntime) -> Rect2:
+	var head := get_unit_screen_pos(unit)
+	var dir := -1.0 if unit.team == "ally" else 1.0
+	return Rect2(head + Vector2(dir * 40.0 - 4.0, 30.0), Vector2(8, 70))
+
+
 func get_slot_screen_pos(_key: String) -> Vector2:
 	return Vector2.ZERO
 

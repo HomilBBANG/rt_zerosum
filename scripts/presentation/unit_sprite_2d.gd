@@ -310,6 +310,17 @@ func _process(delta: float) -> void:
 			m.set_shader_parameter("flash_color", Color(1, 1, 1, _flash))
 
 
+## 등 뒤 체력 바 기준: 발에서 등 쪽 몸 가장자리까지 거리 (스프라이트 로컬 px, 양수).
+## 원화가 보는 방향의 반대쪽이 등. 갈기·꼬리·발톱처럼 멀리 뻗은 부분 때문에 바가 너무 멀어지지 않게 키의 20% 로 제한.
+func back_extent() -> float:
+	var h := -head_screen_offset().y
+	var d := 30.0
+	if rig != null:
+		var ext := rig.body_x_extent()
+		d = -ext.x if not bool(unit.data.palette.get("art_faces_left", false)) else ext.y
+	return clampf(d, 18.0, h * 0.2)
+
+
 func head_screen_offset() -> Vector2:
 	if rig != null:
 		return Vector2(0, -rig_height - 6)

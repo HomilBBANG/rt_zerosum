@@ -268,6 +268,7 @@ func _button(text: String, color: Color) -> Button:
 func _on_battle_started() -> void:
 	for id in floating:
 		floating[id].root.queue_free()
+		floating[id].hp.queue_free()
 	floating.clear()
 	for u in controller.slots.all_units():
 		var root := VBoxContainer.new()
@@ -276,19 +277,23 @@ func _on_battle_started() -> void:
 		var nm := _label(u.display_name(), 13, Color(1, 1, 1) if u.team == "ally" else Color(1, 0.75, 0.75))
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		root.add_child(nm)
+		# 체력: 캐릭터 등 뒤의 세로 바 (아래에서 위로 참). 위치는 _process 에서 매 프레임 갱신
 		var hp := ProgressBar.new()
-		hp.custom_minimum_size = Vector2(72, 9)
+		hp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hp.fill_mode = ProgressBar.FILL_BOTTOM_TO_TOP
 		hp.show_percentage = false
 		hp.max_value = u.data.max_hp
 		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0, 0, 0, 0.75)
-		bg.set_corner_radius_all(2)
+		bg.bg_color = Color(0, 0, 0, 0.8)
+		bg.set_corner_radius_all(3)
+		bg.set_border_width_all(1)
+		bg.border_color = Color(0, 0, 0, 0.9)
 		var fill := StyleBoxFlat.new()
 		fill.bg_color = Color(0.35, 0.95, 0.45) if u.team == "ally" else Color(1.0, 0.35, 0.3)
 		fill.set_corner_radius_all(2)
 		hp.add_theme_stylebox_override("background", bg)
 		hp.add_theme_stylebox_override("fill", fill)
-		root.add_child(hp)
+		floating_root.add_child(hp)
 		var ap := _label("", 12, Color(0.55, 0.9, 1.0))
 		ap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		root.add_child(ap)
@@ -491,6 +496,7 @@ func _refresh_floating() -> void:
 		e.hp.value = u.hp
 		e.ap.text = "AP %d/%d" % [u.ap, u.data.max_ap]
 		e.root.modulate = Color(1, 1, 1, 1) if u.alive else Color(1, 1, 1, 0.35)
+		e.hp.modulate = e.root.modulate
 
 
 func _refresh_timeline() -> void:
@@ -557,6 +563,9 @@ func _process(delta: float) -> void:
 		var min_y := 186.0 if pos.x + e.root.size.x > 1280.0 - 400.0 else 104.0
 		pos.y = maxf(pos.y, min_y)
 		e.root.position = pos
+		var r: Rect2 = view.get_unit_back_bar_rect(e.unit)
+		e.hp.position = r.position
+		e.hp.size = r.size
 	if debug_panel.visible:
 		var d := controller.debug_snapshot()
 		var lines := PackedStringArray()
