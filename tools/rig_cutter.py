@@ -322,9 +322,33 @@ SLIME = {
 }
 
 
+# ---- wolf (늑대, 괴물): 뿔 달린 회흑색 늑대인간, 오른쪽을 보고 앞으로 숙인 자세 (원화 1024x1536). 키 4m, 한 칸, 적 전용.
+# 팔·다리를 통째로 한 파츠씩(윗팔·허벅지 본), 나머지(갈기·몸통·꼬리)는 "나머지" 파츠로.
+WOLF = {
+    "src": "wolf.png", "classify": "warm", "head_rect": (600, 60, 420, 640),
+    "irises": [], "eyes": [], "ground": (500, 1490),
+    "bones": [
+        ("hip", "", (500, 800)), ("spine", "hip", (480, 650)), ("chest", "spine", (480, 450)),
+        ("head", "chest", (680, 430)),
+        ("shoulder_l", "chest", (500, 660)), ("elbow_l", "shoulder_l", (560, 880)), ("wrist_l", "elbow_l", (560, 1080)),
+        ("shoulder_r", "chest", (690, 600)), ("elbow_r", "shoulder_r", (820, 860)), ("wrist_r", "elbow_r", (880, 1000)),
+        ("hip_l", "hip", (430, 950)), ("knee_l", "hip_l", (300, 1150)), ("ankle_l", "knee_l", (180, 1400)),
+        ("hip_r", "hip", (620, 760)), ("knee_r", "hip_r", (660, 1060)), ("ankle_r", "knee_r", (720, 1330)),
+    ],
+    "parts": [
+        ("thigh_l", "hip_l", "any", [(250, 1000), (430, 940), (470, 1060), (470, 1270), (330, 1300), (320, 1536), (0, 1536), (0, 1300), (150, 1150)], 2),
+        ("thigh_r", "hip_r", "any", [(600, 660), (700, 640), (740, 900), (760, 1200), (1000, 1340), (1000, 1536), (600, 1536), (640, 1270), (650, 1050), (610, 900)], 3),
+        ("body", "chest", "any", None, 4),
+        ("arm_upper_l", "shoulder_l", "any", [(430, 680), (600, 660), (610, 900), (640, 1050), (660, 1280), (470, 1280), (470, 1060), (430, 900)], 6),
+        ("arm_upper_r", "shoulder_r", "any", [(720, 620), (800, 690), (880, 700), (900, 800), (990, 960), (990, 1220), (760, 1220), (760, 1000), (720, 860), (680, 700)], 7),
+        ("head", "head", "any", [(600, 40), (1024, 40), (1024, 560), (880, 700), (800, 690), (720, 620), (640, 560), (600, 400)], 9),
+    ],
+}
+
+
 CHARACTERS = {"nikita_army": lambda: NIKITA_ARMY, "hero2": lambda: HERO2, "kira": lambda: KIRA,
               "alma": lambda: ALMA, "ethan": lambda: ETHAN, "dan": lambda: DAN,
-              "ghoul": lambda: GHOUL, "slime": lambda: SLIME}
+              "ghoul": lambda: GHOUL, "slime": lambda: SLIME, "wolf": lambda: WOLF}
 
 
 def classify(im, mode="warm"):
@@ -382,7 +406,7 @@ def _scale_defs(k):
     global BONES, PARTS, EYES, GROUND
     sp = lambda pt: (round(pt[0] * k), round(pt[1] * k))
     BONES = [(n, p, sp(pos)) for n, p, pos in BONES]
-    PARTS = [(n, b, kind, [sp(q) for q in poly], z) for n, b, kind, poly, z in PARTS]
+    PARTS = [(n, b, kind, None if poly is None else [sp(q) for q in poly], z) for n, b, kind, poly, z in PARTS]
     EYES = [sp(e) for e in EYES]
     GROUND = sp(GROUND)
 
@@ -455,7 +479,14 @@ def build(cid):
     palette = [(255, 80, 80), (80, 200, 255), (120, 255, 120), (255, 200, 60), (220, 120, 255), (255, 140, 200), (120, 220, 220)]
     for i, (name, bone, kind, poly, z) in enumerate(PARTS):
         pm = Image.new("L", (w, h), 0)
-        ImageDraw.Draw(pm).polygon(poly, fill=255)
+        if poly is None:
+            # 나머지 파츠: 다른 파츠 다각형에 들지 않은 모든 픽셀 (갈기·꼬리처럼 엉킨 부분이 빠지지 않게)
+            pm.paste(255, (0, 0, w, h))
+            for _n, _b, _k, other, _z in PARTS:
+                if other is not None:
+                    ImageDraw.Draw(pm).polygon(other, fill=0)
+        else:
+            ImageDraw.Draw(pm).polygon(poly, fill=255)
         pm = ImageChops.multiply(pm, cls[kind])
         pm = pm.filter(ImageFilter.MaxFilter(3))          # 이음새 1px 팽창 (축소 원화 기준)
         pm = ImageChops.multiply(pm, cls["any"])
@@ -470,7 +501,8 @@ def build(cid):
         mask_l.crop(bbox).save(os.path.join(OUT, f"{name}_mask_l.png"))
         rig["parts"].append({"name": name, "bone": bone, "tex": f"{name}.png", "origin": [bbox[0], bbox[1]], "size": [crop.width, crop.height], "z": z})
         col = palette[i % len(palette)]
-        dd.polygon(poly, outline=col + (255,), width=3)
+        if poly is not None:
+            dd.polygon(poly, outline=col + (255,), width=3)
         # exploded view on right half
         debug.alpha_composite(crop, (w + bbox[0] + (i % 2) * 40, bbox[1]))
         dd.text((bbox[0] + 4, bbox[1] + 4), name, fill=col + (255,))

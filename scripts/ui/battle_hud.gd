@@ -552,8 +552,11 @@ func _process(delta: float) -> void:
 			toast.visible = false
 	for id in floating:
 		var e: Dictionary = floating[id]
-		var pos: Vector2 = view.get_unit_screen_pos(e.unit)
-		e.root.position = pos - Vector2(e.root.size.x * 0.5, 40)
+		var pos: Vector2 = view.get_unit_screen_pos(e.unit) - Vector2(e.root.size.x * 0.5, 40)
+		# 키 큰 괴물(4m)은 머리 위 표시가 상단 바·전투 기록에 가리지 않게 그 아래로 내림
+		var min_y := 186.0 if pos.x + e.root.size.x > 1280.0 - 400.0 else 104.0
+		pos.y = maxf(pos.y, min_y)
+		e.root.position = pos
 	if debug_panel.visible:
 		var d := controller.debug_snapshot()
 		var lines := PackedStringArray()
