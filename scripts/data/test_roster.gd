@@ -159,24 +159,18 @@ static func build_provided_allies() -> Array[UnitData]:
 
 
 static func build_provided_enemies() -> Array[UnitData]:
-	# 괴물은 적으로만 등장. 구울(2.4m)·슬라임(4m)은 전방+중앙 두 칸 차지(row_span 2) — 구울은 앞줄(index 1), 슬라임은 뒷줄(index 0).
-	# 늑대(4m)는 한 칸, 남은 후방 자리.
+	# 괴물은 적으로만 등장. 구울(2.4m)은 전방+중앙 두 칸 차지(row_span 2, 앞줄 index 1), 늑대(4m)는 후방 한 칸.
 	# 아군 6인을 상대하므로 체력이 크다 (임시 밸런스)
 	var ghoul := _unit("e_ghoul", "구울", "enemy", "괴물", 6, 10, "melee", 110, 6, 2, 2,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("claw", "발톱", "melee", 3)], 0, 1,
 			{"skin": "#e7a58f", "hair": "#8e1c22", "jacket": "#4b403c", "pants": "#4b403c", "accent": "#ff3b3b", "eyes": "#1a0d0d", "hair_style": "bald", "sprite_id": "ghoul", "height_cm": 240.0, "art_faces_left": true})
 	ghoul.row_span = 2
-	var slime := _unit("e_slime", "슬라임", "enemy", "괴물", 4, 5, "melee", 130, 5, 2, 3,
-			["basic_attack", "heavy_attack"],
-			[W("slam", "덮치기", "melee", 2)], 0, 0,
-			{"skin": "#2c4a6e", "hair": "#2c4a6e", "jacket": "#1e3350", "pants": "#1e3350", "accent": "#6fd0ff", "eyes": "#9fe8ff", "hair_style": "bald", "sprite_id": "slime", "height_cm": 400.0})
-	slime.row_span = 2
 	var wolf := _unit("e_wolf", "늑대", "enemy", "괴물", 7, 12, "melee", 90, 6, 2, 1,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("claw", "발톱", "melee", 3)], 2, 0,
 			{"skin": "#6e6f7a", "hair": "#2a2a33", "jacket": "#2a2a33", "pants": "#2a2a33", "accent": "#d8cfc0", "eyes": "#e8e0d0", "hair_style": "spiky", "sprite_id": "wolf", "height_cm": 400.0})
-	var out: Array[UnitData] = [ghoul, slime, wolf]
+	var out: Array[UnitData] = [ghoul, wolf]
 	return out
 
 
