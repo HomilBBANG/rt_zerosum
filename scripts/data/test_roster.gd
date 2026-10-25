@@ -125,6 +125,36 @@ static func build_enemies() -> Array[UnitData]:
 	return out
 
 
+## 사용자 제공 원화 캐릭터만으로 구성한 전투 (게임 기본). 같은 두 캐릭터를 적으로도 세운다.
+## 생성 원화 12인(build_allies/build_enemies)은 규칙 테스트·벤치용으로만 유지.
+static func build_provided_allies() -> Array[UnitData]:
+	var out: Array[UnitData] = [
+		_unit("a_raon", "라온", "ally", "저격수", 6, 11, "ranged", 24, 5, 2, 0,
+			["basic_attack", "heavy_attack", "ultimate"],
+			[W("sniper", "저격총", "ranged", 3), W("knife", "단검", "melee", 0)], 2, 1,
+			{"skin": "#f4cdb6", "hair": "#8a3a2a", "jacket": "#1a1a1e", "pants": "#17171a", "accent": "#d9d9e0", "eyes": "#6a6f78", "hair_style": "long", "sprite_id": "hero"}),
+		_unit("a_seorin", "세린", "ally", "돌격소총수", 5, 9, "ranged", 34, 6, 2, 1,
+			["basic_attack", "heavy_attack", "ultimate"],
+			[W("rifle", "소총", "ranged", 1), W("bayonet", "대검", "melee", 2)], 0, 1,
+			{"skin": "#c98a62", "hair": "#7a6455", "jacket": "#2b2a2a", "pants": "#3a3837", "accent": "#b9b2a6", "eyes": "#c99a3a", "hair_style": "ponytail", "sprite_id": "hero2"}),
+	]
+	return out
+
+
+static func build_provided_enemies() -> Array[UnitData]:
+	var out: Array[UnitData] = [
+		_unit("e_seorin", "적 돌격소총수", "enemy", "돌격소총수", 5, 10, "ranged", 34, 6, 2, 1,
+			["basic_attack", "heavy_attack"],
+			[W("rifle", "소총", "ranged", 1)], 0, 1,
+			{"skin": "#c98a62", "hair": "#7a6455", "jacket": "#2b2a2a", "pants": "#3a3837", "accent": "#ff5c5c", "eyes": "#c99a3a", "hair_style": "ponytail", "sprite_id": "hero2"}),
+		_unit("e_raon", "적 저격수", "enemy", "저격수", 6, 12, "ranged", 24, 5, 2, 0,
+			["basic_attack", "heavy_attack", "ultimate"],
+			[W("sniper", "저격총", "ranged", 3)], 2, 1,
+			{"skin": "#f4cdb6", "hair": "#8a3a2a", "jacket": "#1a1a1e", "pants": "#17171a", "accent": "#ff2e7a", "eyes": "#6a6f78", "hair_style": "long", "sprite_id": "hero"}),
+	]
+	return out
+
+
 static func find_unit(list: Array[UnitData], id: String) -> UnitData:
 	for u in list:
 		if u.id == id:

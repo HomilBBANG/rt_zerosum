@@ -161,7 +161,7 @@ func _update_light_masks() -> void:
 		tex_from_right = not tex_from_right
 	var suffix := "_mask_r" if tex_from_right else "_mask_l"
 	if rig != null:
-		rig.set_light_direction(light_from_right)
+		rig.set_light_direction(tex_from_right)   # 적은 좌우 반전 → 반전된 방향의 마스크
 	else:
 		mat.set_shader_parameter("zone_mask", load("res://assets/sprites/%s%s.png" % [unit.data.sprite_id, suffix]))
 	if weapon.visible:

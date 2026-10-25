@@ -48,6 +48,13 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cl
 각도나 거리를 바꾸려면 `CAMERA` 를 수정하고 `python3 tools/gen_sprites.py` 를 다시 실행하면 배경과 배치가 함께 바뀝니다.
 3D 뷰도 같은 각도(40°)로 맞춰 두었습니다.
 
+## 전투 편성 (게임 기본)
+게임은 **사용자 제공 원화 캐릭터만** 배치합니다: 아군 라온(저격수, `rig_hero`)·세린(돌격소총수, `rig_hero2`),
+적은 같은 두 캐릭터를 좌우 반전해 세운 2대2 전투입니다(`TestRoster.build_provided_*`).
+도형으로 생성한 12인(`build_allies/build_enemies`)은 규칙 테스트와 리그 벤치에서만 씁니다.
+새 캐릭터 추가: 원화를 `assets/source/` 에 두고 `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
+`python3 tools/rig_cutter.py <id>` → 임포트 후 `tools/set_mipmaps.py` → 로스터에 `sprite_id: "<id>"` 로 등록.
+
 ## Skeleton2D 리그 (2D 확정 후 비용 테스트)
 사용자 제공 원화 1장을 `tools/rig_cutter.py` 로 17개 파츠 + 16개 본 + 파츠별 구역 마스크로 잘라 `assets/sprites/rig_hero/` 에 두고,
 `RiggedUnit2D` 가 rig.json 으로 Bone2D 트리와 애니메이션(idle/attack/hit/heal/death)을 만든다. 아군 '라온' 슬롯이 이 캐릭터다.

@@ -23,8 +23,9 @@ var cli: Dictionary = {}
 
 
 func _ready() -> void:
-	allies = TestRoster.build_allies()
-	enemies = TestRoster.build_enemies()
+	# 게임 기본 편성: 사용자 제공 캐릭터만 (생성 원화 12인은 테스트·벤치 전용)
+	allies = TestRoster.build_provided_allies()
+	enemies = TestRoster.build_provided_enemies()
 	actions = TestRoster.build_actions()
 	reset_formation()
 	_parse_cli()

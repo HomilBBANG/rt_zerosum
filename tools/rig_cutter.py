@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """레퍼런스 원화 1장 → Skeleton2D 컷아웃 파츠 + 관절 정의(rig.json) + 구역 마스크.
 
-입력: assets/source/char_ref.png (1024x1536, 투명 배경)
-출력: assets/sprites/rig_hero/<part>.png, <part>_mask_r/_l.png, rig.json, _debug_parts.png, _debug_bones.png
+입력: assets/source/<원화>.png (투명 배경). 캐릭터별 정의는 CHARACTERS 참고.
+출력: assets/sprites/rig_<id>/<part>.png, <part>_mask_r/_l.png, rig.json, _debug_parts.png
+사용: python3 tools/rig_cutter.py [id ...]   (생략하면 전부)
 
 절차(제작 비용 산정용으로 단계 수를 셉니다):
  1) 색 분류 (머리카락 / 피부 / 어두운 의상)        — 자동
@@ -19,7 +20,7 @@ from gen_sprites import build_zone_mask, Z_UNLIT  # noqa
 
 SRC = os.path.join(ROOT, "assets", "source", "char_ref.png")
 OUT = os.path.join(ROOT, "assets", "sprites", "rig_hero")
-os.makedirs(OUT, exist_ok=True)
+CLASSIFY = "warm"
 
 # ---- 2) 관절(본) : name, parent, 이미지 좌표 (rest 회전 0, 위치만)
 BONES = [
@@ -63,10 +64,53 @@ PARTS = [
 ]
 EYES = [(492, 206), (596, 206)]
 GROUND = (585, 1505)
+HEAD_RECT = (360, 20, 380, 340)
+
+# ---- hero2: 갈색 곱슬 포니테일, 회흑색 전투복, 부츠 (원화 1024x1536)
+HERO2 = {
+    "src": "char_ref2.png", "classify": "neutral", "head_rect": (430, 0, 280, 260),
+    "eyes": [(540, 150), (630, 160)], "ground": (590, 1505),
+    "bones": [
+        ("hip", "", (590, 580)), ("spine", "hip", (590, 500)), ("chest", "spine", (575, 380)),
+        ("head", "chest", (555, 240)),
+        ("shoulder_l", "chest", (410, 290)), ("elbow_l", "shoulder_l", (385, 520)), ("wrist_l", "elbow_l", (360, 725)),
+        ("shoulder_r", "chest", (660, 300)), ("elbow_r", "shoulder_r", (705, 520)), ("wrist_r", "elbow_r", (780, 740)),
+        ("hip_l", "hip", (520, 600)), ("knee_l", "hip_l", (430, 1010)), ("ankle_l", "knee_l", (330, 1335)),
+        ("hip_r", "hip", (650, 600)), ("knee_r", "hip_r", (680, 1010)), ("ankle_r", "knee_r", (715, 1340)),
+    ],
+    "parts": [
+        ("hair_back", "head", "notdark", [(300, 0), (720, 0), (720, 620), (300, 620)], 0),
+        ("foot_l", "ankle_l", "any", [(230, 1325), (430, 1325), (430, 1515), (230, 1515)], 1),
+        ("foot_r", "ankle_r", "any", [(600, 1330), (835, 1330), (835, 1515), (600, 1515)], 1),
+        ("shin_l", "knee_l", "dark", [(240, 1000), (566, 1000), (560, 1345), (230, 1345)], 2),
+        ("shin_r", "knee_r", "dark", [(562, 1000), (800, 1000), (800, 1352), (565, 1352)], 2),
+        ("thigh_l", "hip_l", "dark", [(420, 560), (588, 560), (570, 1030), (255, 1030)], 3),
+        ("thigh_r", "hip_r", "dark", [(580, 560), (725, 560), (795, 1030), (562, 1030)], 3),
+        ("hips", "hip", "dark", [(465, 495), (705, 495), (710, 640), (460, 640)], 4),
+        ("torso", "chest", "skindark", [(430, 225), (690, 225), (700, 330), (690, 525), (465, 525), (425, 330)], 5),
+        ("arm_upper_l", "shoulder_l", "dark", [(320, 255), (472, 280), (462, 540), (425, 565), (315, 565), (325, 400)], 6),
+        ("arm_upper_r", "shoulder_r", "dark", [(628, 265), (705, 285), (745, 520), (705, 565), (660, 545), (640, 400)], 6),
+        ("arm_lower_l", "elbow_l", "skindark", [(305, 500), (455, 500), (432, 700), (405, 745), (318, 745), (310, 600)], 7),
+        ("arm_lower_r", "elbow_r", "skindark", [(650, 500), (750, 500), (792, 700), (805, 755), (738, 755), (688, 600)], 7),
+        ("hand_l", "wrist_l", "skin", [(315, 705), (415, 705), (415, 855), (315, 855)], 8),
+        ("hand_r", "wrist_r", "skin", [(745, 715), (835, 715), (835, 885), (745, 885)], 8),
+        ("head", "head", "any", [(430, 0), (705, 0), (705, 255), (640, 255), (592, 236), (530, 242), (470, 248), (430, 228)], 9),
+    ],
+}
 
 
-def classify(im):
-    """returns dict of L masks: hair, skin, dark, any"""
+def _hero_def():
+    return {"src": "char_ref.png", "classify": "warm", "head_rect": HEAD_RECT, "eyes": EYES, "ground": GROUND,
+            "bones": BONES, "parts": PARTS}
+
+
+CHARACTERS = {"hero": _hero_def, "hero2": lambda: HERO2}
+
+
+def classify(im, mode="warm"):
+    """returns dict of L masks: hair, skin, dark, any
+    mode warm   : 붉은 머리 + 밝은 피부 + 검정 의상 (hero)
+    mode neutral: 갈색 머리 + 짙은 피부 + 무채색(회흑) 의상 (hero2) — 빨강-파랑 차이로 분리"""
     w, h = im.size
     px = im.load()
     hair = Image.new("L", (w, h), 0); skin = Image.new("L", (w, h), 0); dark = Image.new("L", (w, h), 0); anym = Image.new("L", (w, h), 0)
@@ -77,6 +121,15 @@ def classify(im):
             if a < 30:
                 continue
             ap[x, y] = 255
+            if mode == "neutral":
+                rb = r - b
+                if rb < 14 and max(r, g, b) < 150:
+                    dp[x, y] = 255
+                elif rb >= 52:
+                    sp[x, y] = 255
+                else:
+                    hp[x, y] = 255
+                continue
             sat = (r - b) / max(r, 1)
             if sat > 0.45 and r > 60 and r > g + 15:
                 hp[x, y] = 255
@@ -88,6 +141,7 @@ def classify(im):
                 dp[x, y] = 255  # 기타(회색/하이라이트)는 의상으로
     return {"hair": hair, "skin": skin, "dark": dark, "any": anym,
             "nothair": ImageChops.subtract(anym, hair),
+            "notdark": ImageChops.subtract(anym, dark),
             "skindark": ImageChops.lighter(skin, dark)}
 
 
@@ -104,19 +158,24 @@ def _scale_defs(k):
     GROUND = sp(GROUND)
 
 
-def main():
-    im = Image.open(SRC).convert("RGBA")
+def build(cid):
+    global BONES, PARTS, EYES, GROUND, OUT
+    d = CHARACTERS[cid]()
+    BONES, PARTS, EYES, GROUND = list(d["bones"]), list(d["parts"]), list(d["eyes"]), d["ground"]
+    OUT = os.path.join(ROOT, "assets", "sprites", f"rig_{cid}")
+    os.makedirs(OUT, exist_ok=True)
+    im = Image.open(os.path.join(ROOT, "assets", "source", d["src"])).convert("RGBA")
     im = im.resize((round(im.width * K), round(im.height * K)), Image.LANCZOS)
     _scale_defs(K)
     w, h = im.size
-    cls = classify(im)
+    cls = classify(im, d["classify"])
     mask_r = build_zone_mask(im, [], "right", rim=max(2, round(11 * K)), smooth=round(90 * K))
     mask_l = build_zone_mask(im, [], "left", rim=max(2, round(11 * K)), smooth=round(90 * K))
     # (예전: 눈 주변 '조명 무시' 타원 → 얼굴에서 눈 주변만 원래 색으로 튀어 제거. 셰이더가 원화 명암을 유지하므로 불필요)
     rig = {"image_size": [w, h], "ground": list(GROUND), "scale": round(0.156 / K, 4),
            "bones": [{"name": n, "parent": p, "pos": list(pos)} for n, p, pos in BONES],
            "parts": [], "weapon_bone": "wrist_r", "head_bone": "head",
-           "eyes": EYES, "head_rect": [round(v * K) for v in (360, 20, 380, 340)]}
+           "eyes": EYES, "head_rect": [round(v * K) for v in d["head_rect"]]}
     debug = Image.new("RGBA", (w * 2, h), (60, 60, 70, 255))
     debug.alpha_composite(im, (0, 0))
     dd = ImageDraw.Draw(debug)
@@ -153,7 +212,15 @@ def main():
     with open(os.path.join(OUT, "rig.json"), "w", encoding="utf-8") as f:
         json.dump(rig, f, ensure_ascii=False, indent=1)
     total = sum(os.path.getsize(os.path.join(OUT, fn)) for fn in os.listdir(OUT) if not fn.startswith("_"))
-    print("parts", len(rig["parts"]), "bones", len(BONES), "bytes", total)
+    print(cid, "parts", len(rig["parts"]), "bones", len(BONES), "bytes", total)
+
+
+def main():
+    ids = sys.argv[1:] or list(CHARACTERS)
+    snapshot = (BONES, PARTS, EYES, GROUND)
+    for cid in ids:
+        build(cid)
+        globals().update(dict(zip(("BONES", "PARTS", "EYES", "GROUND"), snapshot)))
 
 
 if __name__ == "__main__":
