@@ -34,6 +34,12 @@ uniform float accent_mix : hint_range(0.0, 1.0) = 0.85;
 uniform vec2 line_ratio = vec2(0.55, 0.80);   // 주변 평균 밝기 대비 이 비율보다 어두운 픽셀 = 선화 → 빛을 입히지 않음
 uniform float line_radius = 2.5;               // 주변 평균을 볼 거리 (텍셀)
 uniform vec2 black_range = vec2(0.09, 0.20);   // 이 밝기 아래는 '검정'으로 보고 빛을 입히지 않음
+uniform float face_keep : hint_range(0.0, 1.0) = 0.0;  // 얼굴: 팔레트·광원색이 덮는 정도를 줄여 원화색(입술·피부·눈썹·머리색)을 남김
+// 빛 지도 모드: 얼굴 보존을 파츠가 아니라 '몸 높이'로 — 빛 지도 v 좌표 face_band.x(턱) 위는 face_keep, face_band.y(목 아래)까지 서서히 0
+// (파츠별로 하면 머리카락·목이 파츠 경계에서 색이 갈림)
+uniform vec2 face_band = vec2(-1.0, -1.0);
+uniform float detail : hint_range(0.0, 1.5) = 0.6;     // 국소 대비 강조: 주변 평균보다 어두운 선은 더 어둡게 (이목구비·주름선 또렷)
+uniform float line_dark : hint_range(0.0, 1.0) = 0.45; // 선화를 그림자 색상의 더 어두운 선으로 눌러주는 정도
 uniform vec4 eye_color : source_color = vec4(0.3, 0.6, 1.0, 1.0);
 uniform bool paint_eyes = true;
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
@@ -65,7 +71,7 @@ vec3 no_burn(vec3 c) {
 }
 
 // 선화 가중치: 1 = 칠한 면, 0 = 선화 (주변보다 확 어두운 픽셀)
-float line_weight(sampler2D tex, vec2 uv, vec2 texel, float L) {
+float line_weight(sampler2D tex, vec2 uv, vec2 texel, float L, out float avg_out) {
 	float sum = 0.0;
 	float wsum = 0.0;
 	for (int i = 0; i < 8; i++) {
@@ -75,21 +81,22 @@ float line_weight(sampler2D tex, vec2 uv, vec2 texel, float L) {
 		wsum += t.a;
 	}
 	float avg = sum / max(wsum, 0.001);
+	avg_out = avg;
 	float r = L / max(avg, 0.03);
 	return smoothstep(line_ratio.x, line_ratio.y, r) * smoothstep(0.015, 0.05, L);
 }
 
 // 광원색 칠: 밝기를 살짝 올리고 광원 색상으로
-vec3 lit_color(vec3 base, float L, vec3 light_hue) {
-	float Ll = L + (1.0 - L) * light_lift;
-	return mix(no_burn(base * (Ll / max(L, 0.001))), no_burn(tint_keep_L(light_hue, Ll)), key_mix);
+vec3 lit_color(vec3 base, float L, vec3 light_hue, float fk) {
+	float Ll = L + (1.0 - L) * light_lift * (1.0 - 0.5 * fk);
+	return mix(no_burn(base * (Ll / max(L, 0.001))), no_burn(tint_keep_L(light_hue, Ll)), key_mix * (1.0 - 0.6 * fk));
 }
 
 // lw: 빛을 받을 수 있는 픽셀(선화·검정 아님), lm: 이 위치에 닿는 빛 (색 × 세기)
-vec3 shade(vec3 base, float zone, float near_zone, float lw, vec3 lm) {
+vec3 shade(vec3 base, float zone, float near_zone, float lw, vec3 lm, float fk) {
 	float L = lum(base);
-	vec3 amb = mix(base, tint_keep_L(ambient_tint.rgb, L), palette_mix);
-	vec3 shd = mix(base, tint_keep_L(shadow_tint.rgb, L), shadow_hue) * shadow_depth;
+	vec3 amb = mix(base, tint_keep_L(ambient_tint.rgb, L), palette_mix * (1.0 - fk));
+	vec3 shd = mix(base, tint_keep_L(shadow_tint.rgb, L), shadow_hue * (1.0 - fk)) * shadow_depth;
 	float lp = max(lm.r, max(lm.g, lm.b));
 	float lit = smoothstep(light_threshold, light_threshold + 0.05, lp) * lw;
 	vec3 lh = lm / max(lp, 0.0001);
@@ -106,7 +113,7 @@ vec3 shade(vec3 base, float zone, float near_zone, float lw, vec3 lm) {
 	} else if (zone < 0.45) {
 		c = amb;
 	} else if (zone < 0.83) {
-		c = mix(amb, lit_color(base, L, lh), lit);
+		c = mix(amb, lit_color(base, L, lh, fk), lit);
 	} else {
 		// 그림자 쪽 가장자리: 빛 지도 모드에선 그림자면, 2D 배경 모드에선 반대편 조명색 림
 		c = (!use_light_map && use_rim) ? mix(base, accent_color.rgb, accent_mix * lw) : shd;
@@ -121,10 +128,17 @@ void fragment() {
 	// Godot 4: fragment 의 COLOR 는 이미 텍스처색 × 정점색(모듈레이트). 다시 텍스처를 곱하면 색이 제곱돼 어두워진다.
 	vec4 base = COLOR;
 	float L0 = lum(base.rgb);
-	float lw = line_weight(TEXTURE, UV, TEXTURE_PIXEL_SIZE, L0) * smoothstep(black_range.x, black_range.y, L0);
+	float avgL;
+	float lwl = line_weight(TEXTURE, UV, TEXTURE_PIXEL_SIZE, L0, avgL);
+	float lw = lwl * smoothstep(black_range.x, black_range.y, L0);
 	vec3 lm;
+	float fk = face_keep;
 	if (use_light_map) {
-		lm = texture(light_map, clamp((world_pos - lm_rect.xy) / lm_rect.zw, vec2(0.0), vec2(1.0))).rgb;
+		vec2 luv = (world_pos - lm_rect.xy) / lm_rect.zw;
+		lm = texture(light_map, clamp(luv, vec2(0.0), vec2(1.0))).rgb;
+		if (face_band.y > 0.0) {
+			fk = face_keep * (1.0 - smoothstep(face_band.x, face_band.y, luv.y));
+		}
 	} else {
 		lm = key_color.rgb;
 	}
@@ -132,9 +146,14 @@ void fragment() {
 	vec3 o = vec3(0.0);
 	for (int i = 0; i < 4; i++) {
 		vec2 off = vec2((i % 2 == 0) ? -d.x : d.x, (i < 2) ? -d.y : d.y);
-		o += shade(base.rgb, texture(zone_mask, UV + off).r, texture(near_rim_mask, UV + off).r, lw, lm);
+		o += shade(base.rgb, texture(zone_mask, UV + off).r, texture(near_rim_mask, UV + off).r, lw, lm, fk);
 	}
 	o *= 0.25;
+	// 이목구비·선화 또렷하게: 주변보다 어두운 픽셀은 그 비율만큼 더 어둡게(국소 대비), 선화는 그림자 색상의 짙은 선으로
+	float ratio = clamp(L0 / max(avgL, 0.03), 0.0, 1.0);
+	o *= mix(1.0, ratio, detail);
+	vec3 ink = tint_keep_L(shadow_tint.rgb, L0) * 0.5;
+	o = mix(ink, o, mix(1.0, lwl, line_dark));
 	o = mix(o, flash_color.rgb, flash_color.a);
 	if (debug_view == 1) {
 		o = base.rgb;

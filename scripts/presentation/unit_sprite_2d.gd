@@ -31,6 +31,7 @@ const PX_PER_M := 230.0 / 1.75   # 리그 키 230px = 1.75m (스프라이트 로
 var _lm_tex: ImageTexture = null
 var _lm_local := Rect2()
 var _lm_xf := Transform2D()
+var _face_band := Vector2(-1, -1)
 
 
 func is_rigged() -> bool:
@@ -190,7 +191,18 @@ func _apply_palette(m: ShaderMaterial, p: Dictionary) -> void:
 	m.set_shader_parameter("key_mix", float(p.get("char_light_mix", 0.85)))
 	m.set_shader_parameter("use_rim", Game.rim_enabled)
 	m.set_shader_parameter("debug_view", int(Game.cli.get("charview", "0")))
+	# 얼굴은 원화색을 더 남겨 입술·피부·눈썹이 팔레트에 묻히지 않게
+	# (빛 지도 모드는 몸 높이 띠로 이어지게 적용, 2D 배경 모드는 head 파츠만)
+	m.set_shader_parameter("face_keep", 0.5 if (_lm_tex != null or _is_head_mat(m)) else 0.0)
+	m.set_shader_parameter("face_band", _face_band)
 	_apply_eye_paint(m)
+
+
+func _is_head_mat(m: ShaderMaterial) -> bool:
+	if rig == null:
+		return false
+	var i: int = rig.mats.find(m)
+	return i >= 0 and rig.part_names[i] == "head"
 
 
 ## 2D 배경 모드 프리셋 적용. zone: "key" | "accent" | "ambient" — 유닛이 서 있는 빛 영역 (빛 지도 없음)
@@ -220,6 +232,7 @@ func apply_light_map(p: Dictionary, img: Image, from_right: bool, lm_w: float, l
 	else:
 		_lm_tex.update(img)
 	_lm_local = Rect2(-lm_w * 0.5 * PX_PER_M, -lm_h * PX_PER_M, lm_w * PX_PER_M, lm_h * PX_PER_M)
+	_face_band = _face_band_for(lm_h)
 	for m in _all_mats():
 		_apply_palette(m, p)
 		m.set_shader_parameter("use_light_map", true)
@@ -227,6 +240,17 @@ func apply_light_map(p: Dictionary, img: Image, from_right: bool, lm_w: float, l
 	_lm_xf = Transform2D(0.0, Vector2(-INF, -INF))
 	_update_lm_rect()
 	set_light_direction(from_right)
+
+
+## 얼굴 보존 띠 (빛 지도 v 좌표): 턱 높이 위는 얼굴, 목까지 서서히 풀림. 리그의 head_rect 아래쪽 = 턱.
+func _face_band_for(lm_h: float) -> Vector2:
+	if rig == null or not rig.rig.has("head_rect") or not rig.rig.has("figure_px"):
+		return Vector2(-1, -1)
+	var hr: Array = rig.rig.head_rect
+	var chin_up: float = (float(rig.rig.ground[1]) - (float(hr[1]) + float(hr[3]))) / float(rig.rig.figure_px)   # 키 대비 턱 높이
+	var h_m := 1.75 * unit.data.height_cm / 175.0
+	var v := 1.0 - chin_up * h_m / lm_h
+	return Vector2(v - 0.01, v + 0.06)
 
 
 ## 빛 지도 영역을 캔버스 좌표로 (이동 트윈 중에도 따라가도록 매 프레임 확인)
