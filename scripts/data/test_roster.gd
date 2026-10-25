@@ -137,7 +137,7 @@ static func build_provided_allies() -> Array[UnitData]:
 		_unit("a_hana", "하나", "ally", "돌격소총수", 5, 9, "ranged", 34, 6, 2, 1,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("rifle", "소총", "ranged", 1), W("bayonet", "대검", "melee", 2)], 0, 1,
-			{"skin": "#c98a62", "hair": "#7a6455", "jacket": "#5e5a58", "pants": "#55514f", "accent": "#b9b2a6", "eyes": "#c99a3a", "hair_style": "ponytail", "sprite_id": "hero2", "height_cm": 176.8}),
+			{"skin": "#c98a62", "hair": "#7a6455", "jacket": "#9a9698", "pants": "#1e1b1a", "accent": "#e8e4e0", "eyes": "#c99a3a", "hair_style": "ponytail", "sprite_id": "hero2", "height_cm": 176.8}),
 	]
 	return out
 
@@ -147,7 +147,7 @@ static func build_provided_enemies() -> Array[UnitData]:
 		_unit("e_hana", "적 돌격소총수", "enemy", "돌격소총수", 5, 10, "ranged", 34, 6, 2, 1,
 			["basic_attack", "heavy_attack"],
 			[W("rifle", "소총", "ranged", 1)], 0, 1,
-			{"skin": "#c98a62", "hair": "#7a6455", "jacket": "#5e5a58", "pants": "#55514f", "accent": "#ff5c5c", "eyes": "#c99a3a", "hair_style": "ponytail", "sprite_id": "hero2", "height_cm": 176.8}),
+			{"skin": "#c98a62", "hair": "#7a6455", "jacket": "#9a9698", "pants": "#1e1b1a", "accent": "#ff5c5c", "eyes": "#c99a3a", "hair_style": "ponytail", "sprite_id": "hero2", "height_cm": 176.8}),
 		_unit("e_nikita", "적 저격수", "enemy", "저격수", 6, 12, "ranged", 24, 5, 2, 0,
 			["basic_attack", "heavy_attack", "ultimate"],
 			[W("sniper", "저격총", "ranged", 3)], 2, 1,
