@@ -75,6 +75,7 @@ AP 상한 버림/이월/0 자동 종료, 이동/교환 AP 1, 무기 변경 AP 1,
 GODOT=/path/to/godot tools/render_shots.sh docs/screenshots      # Xvfb + Mesa 소프트웨어 렌더
 ```
 CLI 인자(`++` 뒤): `--scene=battle|formation|result|menu --mode=2d|3d --preset=g1..g4 --shot=경로 --autoplay=aim|move|fight:N --hud=0`.
+디버그: `--charview=1`(캐릭터 원화를 조명 없이 출력), `--outline=0`(외곽선 끔), `--rim=0`(림 끔).
 
 ## 폴더
 ```

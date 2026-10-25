@@ -44,11 +44,15 @@ func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
 	group.clear_margin = 8.0
 	var om := ShaderMaterial.new()
 	om.shader = OUTLINE_SHADER
-	group.material = om
-	add_child(group)
+	if Game.cli.get("outline", "1") != "0":
+		group.material = om
 	flip = Node2D.new()
 	flip.name = "Flip"
-	group.add_child(flip)
+	if Game.cli.get("nogroup", "0") == "1":
+		add_child(flip)
+	else:
+		add_child(group)
+		group.add_child(flip)
 	if unit.team == "enemy":
 		flip.scale.x = -1.0
 	flip.scale *= BASE_SCALE
@@ -192,6 +196,7 @@ func apply_lighting(p: Dictionary, zone: String) -> void:
 				m.set_shader_parameter("key_mix", 0.62)
 		m.set_shader_parameter("accent_mix", 0.85)
 		m.set_shader_parameter("use_rim", Game.rim_enabled)
+		m.set_shader_parameter("debug_view", int(Game.cli.get("charview", "0")))
 		m.set_shader_parameter("eye_color", Color(unit.data.palette.get("eye_paint", unit.data.palette.get("eyes", "#4f9cff"))))
 
 

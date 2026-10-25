@@ -1,7 +1,12 @@
-// 캐릭터 전용 셀 라이팅 (배경은 cel_zoned_lighting).
-// 고유색 × 광원색(곱하기) + 약한 광원색 가산 + 채도 보정으로 색을 '입힌다' (덮어 섞으면 반투명 막처럼 보임).
-// zone_mask: 0 그림자 / 85 주변광 / 128 눈동자(eye_color 로 칠함) / 170 주조명 / 255 림(보조광)
-// 마스크는 구역 코드라 보간할 수 없으므로(최근접), 화면 픽셀 안에서 4번 샘플해 결과 색을 평균 → 명암 경계 계단 제거.
+// 캐릭터 셀 라이팅 v4 — "원화 보전 + 쨍한 명암".
+// 원화의 밝기(명암)는 픽셀마다 그대로 두고 '색상'만 조명 쪽으로 옮긴다.
+// (곱하기는 보색 조명에서 원화를 어둡게 죽이고, 스크린은 어두운 의상에 회색 막을 씌워 둘 다 쓰지 않음)
+//   빛 받는 면 : 원화 밝기 유지 + 광원 색상 쪽으로 이동 + 15% 밝게 + 광원색 소량 더함(검정 옷에도 빛이 맺힘)
+//   주변광     : 원화 거의 그대로 (8% 물듦)
+//   그림자     : 원화 밝기의 78% + 그림자 색상 쪽으로 40% 이동 (셀 경계는 마스크로 하드 에지)
+//   림         : 반대 조명색 선
+//   눈동자     : eye_color 로 진하게
+// zone_mask: 0 그림자 / 85 주변광 / 128 눈동자 / 170 주조명 / 255 림
 shader_type canvas_item;
 render_mode unshaded;
 
@@ -10,42 +15,46 @@ uniform vec4 shadow_tint : source_color = vec4(0.06, 0.18, 0.19, 1.0);
 uniform vec4 ambient_tint : source_color = vec4(0.42, 0.75, 0.72, 1.0);
 uniform vec4 key_color : source_color = vec4(1.0, 0.12, 0.47, 1.0);
 uniform vec4 accent_color : source_color = vec4(0.22, 1.0, 0.73, 1.0);
-uniform float key_mix : hint_range(0.0, 1.0) = 0.6;
-uniform float accent_mix : hint_range(0.0, 1.0) = 0.85;
-uniform float shadow_lift : hint_range(0.0, 1.0) = 0.22;
-uniform float saturation : hint_range(0.0, 2.0) = 1.3;
-uniform bool use_rim = true;   // false: 림 구역을 그림자로 (림 라인 없음)
-uniform vec4 eye_color : source_color = vec4(0.3, 0.6, 1.0, 1.0);   // 눈동자에 일부러 칠하는 색 (조명에 묻히지 않게)
+uniform float key_mix : hint_range(0.0, 1.0) = 0.6;       // 빛 받는 면에 광원색을 얹는 세기
+uniform float accent_mix : hint_range(0.0, 1.0) = 0.85;   // 림 세기
+uniform float shadow_depth : hint_range(0.3, 1.0) = 0.78; // 그림자 밝기 (원화 대비)
+uniform float shadow_hue : hint_range(0.0, 1.0) = 0.40;   // 그림자를 그림자 색상으로 옮기는 정도
+uniform float ambient_mix : hint_range(0.0, 1.0) = 0.08;  // 주변광 구역의 색 물듦
+uniform float lit_gain : hint_range(0.8, 1.5) = 1.15;     // 빛 받는 면 밝기
+uniform float light_lift : hint_range(0.0, 0.5) = 0.20;   // 빛 받는 면에 광원색을 더하는 양 (어두운 의상도 빛이 '맺히게')
+uniform float saturation : hint_range(0.0, 2.0) = 1.18;
+uniform bool use_rim = true;
+uniform vec4 eye_color : source_color = vec4(0.3, 0.6, 1.0, 1.0);
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
+uniform int debug_view = 0;   // 1: 원화 그대로 출력 (디버그)
 
 float lum(vec3 c) {
 	return dot(c, vec3(0.299, 0.587, 0.114));
 }
 
-// 고유색에 빛 색을 곱해 입힌 뒤, 밝기는 원화의 명암을 따르게 맞춘다.
-// → 색은 조명색으로 쨍하게 바뀌지만 눈썹·눈동자·턱선 같은 원화의 명암 차이는 그대로 남는다(선 없는 원화도 이목구비 유지).
-vec3 tinted(vec3 base, vec3 light, float strength, float target_lum, float add) {
-	vec3 filt = mix(vec3(1.0), light, strength);
-	vec3 t = base * filt + light * add;
-	t *= target_lum / max(lum(t), 0.02);
-	return clamp(t, 0.0, 1.0);
+vec3 hue_of(vec3 c) {   // 밝기를 1 로 맞춘 색상 (어두운 그림자색도 색상만 쓰기 위해)
+	return c / max(max(c.r, max(c.g, c.b)), 0.001);
+}
+
+// 원화 픽셀 밝기 L 은 그대로 두고 색상만 c 로 바꾼 색
+vec3 tint_keep_L(vec3 c, float L) {
+	vec3 h = hue_of(c);
+	return h * (L / max(lum(h), 0.001));
 }
 
 vec3 shade(vec3 base, float zone) {
 	float L = lum(base);
 	if (zone < 0.17 || (zone >= 0.83 && !use_rim)) {
-		// 그림자: 그림자색으로 물들되 원화 밝기의 약 62% (46% 에서 올림: 얼굴의 어두운 띠 완화)
-		return tinted(base, shadow_tint.rgb * 2.5 + vec3(0.1), 0.85, L * 0.62 + shadow_lift * 0.06, 0.0);
+		return clamp(mix(base, tint_keep_L(shadow_tint.rgb, L), shadow_hue) * shadow_depth, 0.0, 1.0);
 	} else if (zone < 0.45) {
-		// 주변광: 곱하기 강도 0.25 (0.55 에서 낮춤: 보색 조명이 피부·머리색을 올리브로 죽이지 않게)
-		return tinted(base, ambient_tint.rgb, 0.25, L * 0.95, 0.02);
+		return clamp(mix(base, tint_keep_L(ambient_tint.rgb, L), ambient_mix), 0.0, 1.0);
 	} else if (zone < 0.55) {
-		// 눈동자: 원화 명암(동공 어둡게)은 살리고 색은 eye_color 로 진하게. 조명은 아주 약하게만
 		vec3 e = eye_color.rgb * (L / max(lum(eye_color.rgb), 0.05)) * 1.35;
 		e = mix(e, e * mix(vec3(1.0), key_color.rgb, 0.5), 0.12);
 		return clamp(e, 0.0, 1.0);
 	} else if (zone < 0.83) {
-		return tinted(base, key_color.rgb, key_mix, L * 1.08 + 0.04, 0.06);
+		vec3 lit = mix(base, tint_keep_L(key_color.rgb, L), key_mix * 0.55) * lit_gain;
+		return clamp(lit + key_color.rgb * key_mix * light_lift, 0.0, 1.0);
 	}
 	return mix(base, accent_color.rgb, accent_mix);
 }
@@ -58,8 +67,11 @@ void fragment() {
 		+ shade(base.rgb, texture(zone_mask, UV + vec2(-d.x, d.y)).r)
 		+ shade(base.rgb, texture(zone_mask, UV + vec2(d.x, d.y)).r);
 	o *= 0.25;
-	float l = dot(o, vec3(0.299, 0.587, 0.114));
+	float l = lum(o);
 	o = clamp(mix(vec3(l), o, saturation), 0.0, 1.0);
 	o = mix(o, flash_color.rgb, flash_color.a);
+	if (debug_view == 1) {
+		o = base.rgb;
+	}
 	COLOR = vec4(o, base.a);
 }
