@@ -36,6 +36,7 @@ var _t := 0.0
 var _frame := -1
 var _done := false
 var _tex_from_right := true
+var speed_scale := 1.0     # 재생 속도 배율 (뛰기 시트가 없을 때 걷기를 빠르게 등)
 
 
 static func dir_of(id: String) -> String:
@@ -296,6 +297,7 @@ func is_static() -> bool:
 
 
 func _process(delta: float) -> void:
+	delta *= speed_scale
 	var n := (_a.get("frames", []) as Array).size()
 	if _done or n == 0 or (n == 1 and _a.loop):
 		return   # 한 장짜리 반복 동작은 넘길 프레임이 없음 (한 장짜리 hit 같은 1회 동작은 시간이 지나면 끝나야 함)

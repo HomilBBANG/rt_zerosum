@@ -33,6 +33,7 @@ func run(p_check: Callable) -> void:
 	_test_hp_medical()
 	_test_food_px_affinity()
 	_test_battle_rules()
+	_test_player_control()
 
 
 func _sim() -> BaseSim:
@@ -569,3 +570,74 @@ func _test_battle_rules() -> void:
 	_c(s.clock.weekday(BattleRules.next_fire(weekend, 0, clk)) >= 5, "요일 제한 (주말만)")
 	_c(BattleRules.describe(s.data.battle_rules[0]) == "06:00 기준 6시간마다", "규칙 설명 (%s)" % BattleRules.describe(s.data.battle_rules[0]))
 	_c(BattleRules.next_fire({"enabled": false, "mode": "interval"}, 0, clk) == -1, "꺼진 규칙은 발생 안 함")
+
+
+func _test_player_control() -> void:
+	print("[30] 플레이어 조작: 선택한 대원 이동·뛰기·도착 후 행동")
+	var s := _sim()
+	var dan: NpcAgent = s.npcs.npc_dan
+	s.skip(1)
+	var start := dan.facility
+	var r := s.issue_move("npc_dan", "b1_quarters")
+	_c(r.ok and dan.state == NpcAgent.MOVING and dan.dest == "b1_quarters" and not dan.running, "방 클릭 → 숙소로 걸어감 (%s 에서)" % start)
+	var walk_left := dan.path.size()
+	var r2 := s.issue_move("npc_dan", "b1_quarters", NAN, true)
+	_c(r2.ok and dan.running and dan.dest == "b1_quarters", "걷는 중 더블클릭 → 같은 곳으로 뛰기로 바뀜")
+	# 걷기 vs 뛰기 도착 시간
+	var a := _sim()
+	var b := _sim()
+	for x in [a, b]:
+		x.ledger.cash = 500
+		x.try_unlock("b1_training")
+		x.skip(1)
+	a.issue_move("npc_dan", "b1_training")
+	b.issue_move("npc_dan", "b1_training", NAN, true)
+	var ta := 0
+	var tb := 0
+	for m in 120:
+		a.skip(1)
+		b.skip(1)
+		if ta == 0 and a.npcs.npc_dan.state != NpcAgent.MOVING:
+			ta = m + 1
+		if tb == 0 and b.npcs.npc_dan.state != NpcAgent.MOVING:
+			tb = m + 1
+	_c(ta > 0 and tb > 0 and tb < ta, "뛰면 더 빨리 도착 (걷기 %d분 / 뛰기 %d분)" % [ta, tb])
+	_c(a.npcs.npc_dan.facility == "b1_training" and a.npcs.npc_dan.state == NpcAgent.STAYING and a.npcs.npc_dan.is_holding(), "도착 → 그 방에 머묾 (지시 대기)")
+	_c(not b.npcs.npc_dan.running, "도착하면 뛰기 해제")
+	var acts := a.room_actions("npc_dan").map(func(x): return x.id)
+	_c(acts.has("train"), "훈련실에서 우클릭 행동 = 훈련 %s" % [acts])
+	# 숙소에서 잠자기
+	s.skip(30)
+	_c(dan.facility == "b1_quarters" and dan.state == NpcAgent.STAYING, "숙소 도착")
+	acts = s.room_actions("npc_dan").map(func(x): return x.id)
+	_c(acts.has("sleep") and acts.has("rest") and acts.has("clean_here"), "숙소 행동 = 잠자기·쉬기·청소 %s" % [acts])
+	s.chars[dan.character_id].fatigue = 50.0
+	var r3 := s.issue_activity("npc_dan", "sleep")
+	s.skip(5)
+	_c(r3.ok and dan.activity == "sleep" and s.posture(dan).pose == "lie", "잠자기 → 침대에 누움")
+	var f0 := float(s.cstate(dan).fatigue)
+	s.skip(30)
+	_c(float(s.cstate(dan).fatigue) < f0, "자는 동안 피로 감소 (%.1f → %.1f)" % [f0, float(s.cstate(dan).fatigue)])
+	# 잠긴 방·작업 중
+	_c(not s.issue_move("npc_dan", "b2_storage").ok, "잠긴 방으로는 못 감")
+	var c := _sim()
+	c.ledger.cash = 500
+	c.try_unlock("b1_training")
+	c.skip(1)
+	c.issue_train("npc_kira")
+	_c(not c.issue_move("npc_kira", "f1_lounge").ok, "훈련 지시 중에는 이동 안 됨 (먼저 그만두기)")
+	_c(c.cancel_command("npc_kira").ok and c.npcs.npc_kira.command.is_empty() and c.issue_move("npc_kira", "f1_lounge").ok, "지시 그만두기 → 다시 보낼 수 있음")
+	# 다음 일정 블록이 시작되면 일정으로 복귀
+	var d := _sim()
+	d.skip(1)
+	d.issue_move("npc_ethan", "f1_lounge")
+	var back := false
+	for m in 24 * 60:
+		d.skip(1)
+		if not d.npcs.npc_ethan.is_holding():
+			back = true
+			break
+	_c(back, "다음 일정 블록이 시작되면 일정대로 움직임")
+	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(a.to_dict())))
+	_c(sv.npcs.npc_dan.is_holding() and sv.npcs.npc_dan.facility == "b1_training", "저장/불러오기 후 지시 대기 유지")
+

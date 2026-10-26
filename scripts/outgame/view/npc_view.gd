@@ -10,6 +10,7 @@ var screen_h: float = 80.0  # 화면에서의 키 (px)
 var _s: float = 0.4         # 캐릭터 배율
 var chr: CharacterSprite2D
 var hovered: bool = false
+var selected: bool = false   # 플레이어가 고른 대원 (발밑 고리·이름·목적지 선)
 var _anim := ""
 var _light := ""
 var _font: Font
@@ -113,7 +114,7 @@ func _process(delta: float) -> void:
 func _update_anim(n: NpcAgent) -> void:
 	var cands: Array = ["idle"]
 	if n.state == NpcAgent.MOVING:
-		cands = ["walk", "idle"]
+		cands = ["run", "walk", "idle"] if n.running else ["walk", "idle"]
 	elif _pose == "lie":
 		cands = ["sleep", "idle"]
 	elif _pose == "sit":
@@ -127,6 +128,7 @@ func _update_anim(n: NpcAgent) -> void:
 	elif n.state in [NpcAgent.CHATTING, NpcAgent.PLAYER_DIALOGUE]:
 		cands = ["talk", "idle"]
 	var want := chr.first_anim(cands)
+	chr.speed_scale = 1.8 if (n.running and n.state == NpcAgent.MOVING and want == "walk") else 1.0   # 뛰기 시트가 없으면 걷기를 빠르게
 	if want != _anim:
 		_anim = want
 		chr.play(want)
@@ -159,6 +161,8 @@ func _draw() -> void:
 		draw_set_transform(Vector2(0, 0), 0, Vector2(1, 0.3))
 		draw_circle(Vector2.ZERO, screen_h * 0.24, Color(0, 0, 0, 0.35))
 		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+	if selected:
+		_draw_selected(n)
 	if not sim.active_request(npc_id).is_empty():
 		var b := sin(Time.get_ticks_msec() / 180.0) * 3.0
 		var c := top + Vector2(0, -12 + b)
@@ -175,9 +179,28 @@ func _draw() -> void:
 	elif (n.activity == "sleep" and n.state == NpcAgent.STAYING) or n.state == NpcAgent.RECOVERING:
 		var t := Time.get_ticks_msec() / 600.0
 		_text(top + Vector2(10, -4 - fmod(t, 1.0) * 10), "Z", 16, Color(0.8, 0.9, 1, 1.0 - fmod(t, 1.0) * 0.6), _bold, true)
-	if hovered:
-		var label := "%s · %s" % [n.name, n.state_name() if n.state != NpcAgent.STAYING else OutgameData.ACTIVITIES.get(n.activity, n.activity)]
+	if hovered or selected:
+		var what: String = n.state_name() if n.state != NpcAgent.STAYING else OutgameData.ACTIVITIES.get(n.activity, n.activity)
+		if n.state == NpcAgent.MOVING:
+			what = "%s → %s" % ["뛰는 중" if n.running else "이동 중", sim.data.facility_name(n.dest)]
+		var label := "%s · %s" % [n.name, what]
 		_text(top + Vector2(0, -8), label, 15, Color(1, 1, 1), _font, true)
+
+
+## 선택 표시: 발밑에 노란 고리(숨쉬듯 커졌다 작아짐), 이동 중이면 가는 방향 화살표
+func _draw_selected(n: NpcAgent) -> void:
+	var pulse := 1.0 + sin(Time.get_ticks_msec() / 260.0) * 0.06
+	var r := maxf(18.0, screen_h * 0.3) * pulse
+	var col := Color(1.0, 0.86, 0.25)
+	draw_set_transform(Vector2(0, 2), 0.0, Vector2(1.0, 0.32))
+	draw_arc(Vector2.ZERO, r, 0.0, TAU, 40, Color(0, 0, 0, 0.5), 6.0)
+	draw_arc(Vector2.ZERO, r, 0.0, TAU, 40, col, 3.0)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if n.state == NpcAgent.MOVING:
+		var dir := float(n.facing)
+		var base := Vector2(dir * (r + 6.0), 2.0)
+		var tip := base + Vector2(dir * (14.0 if n.running else 9.0), 0.0)
+		draw_colored_polygon(PackedVector2Array([tip, base + Vector2(0, -6), base + Vector2(0, 6)]), Color(1.0, 0.62, 0.2) if n.running else col)
 
 
 func _heart(c: Vector2, r: float, col: Color) -> void:

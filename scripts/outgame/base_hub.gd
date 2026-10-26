@@ -39,6 +39,8 @@ var npc_views: Dictionary = {}     # npc id → NpcView
 var hud: OutgameHud
 var speed: int = 1                 # 0 = 정지, 1 / 4 / 16 배
 var _pick_npc: String = ""         # 청소 장소 고르는 중인 대원
+var selected: String = ""          # 선택한 대원 (클릭) — 방 클릭 = 그 방으로 이동, 더블클릭 = 뛰어감, 도착 후 우클릭 = 행동
+var move_mark: Dictionary = {}     # 이동 목표 표시 {pos(화면), t, run}
 var _hover_npc: String = ""
 var _cam_dirty := true
 var _zoom_goal := ZOOM_DEFAULT      # 부드럽게 따라가는 목표 확대
@@ -109,7 +111,8 @@ func _ready() -> void:
 		if not nb.is_empty():
 			sim.skip(maxi(0, int(nb.minute) - sim.clock.minute_int() - 10))
 	if Game.cli.has("base_ui"):
-		call_deferred("_cli_ui", str(Game.cli.base_ui))
+		for spec in str(Game.cli.base_ui).split(";"):   # 여러 개는 ; 로 (순서대로)
+			call_deferred("_cli_ui", spec)
 	Game.maybe_cli_capture(30)
 
 
@@ -204,6 +207,14 @@ func _process(delta: float) -> void:
 	if not hud.modal_open() and speed > 0 and sim.pending_battle.is_empty():
 		sim.advance(delta * sim.data.num("minutes_per_second", 1.0) * speed)
 	_update_hover()
+	if not move_mark.is_empty():
+		move_mark.t = float(move_mark.t) + delta
+		if float(move_mark.t) > 0.9:
+			move_mark = {}
+		under.move_mark = move_mark
+		under.queue_redraw()
+	if selected != "" and not sim.npcs.has(selected):
+		select("")
 	hud.refresh(delta)
 
 
@@ -274,7 +285,8 @@ func _update_hover() -> void:
 		if npc_views.has(n):
 			npc_views[n].hovered = true
 	under.hover_fid = "" if n != "" else under.facility_at_screen(p)
-	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if (n != "" or _bubble_at(p) != "" or _pick_npc != "") else Input.CURSOR_ARROW)
+	var go := selected != "" and under.hover_fid != ""
+	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if (n != "" or _bubble_at(p) != "" or _pick_npc != "" or go) else Input.CURSOR_ARROW)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -287,6 +299,14 @@ func _unhandled_input(event: InputEvent) -> void:
 					_end_pick()
 				elif hud.modal_open():
 					hud.close_top()
+				elif selected != "":
+					select("")
+				get_viewport().set_input_as_handled()
+				return
+			KEY_TAB:   # 다음 대원 선택
+				var ids: Array = sim.data.npc_order
+				if not ids.is_empty():
+					select(ids[(ids.find(selected) + 1) % ids.size()])
 				get_viewport().set_input_as_handled()
 			KEY_F1:
 				hud.toggle_debug()
@@ -315,7 +335,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			MOUSE_BUTTON_WHEEL_DOWN:
 				_zoom(1.0 / (1.15 * maxf(1.0, event.factor)), event.position)
 			MOUSE_BUTTON_LEFT:
-				_left_click(_world_mouse())
+				_left_click(_world_mouse(), event.double_click)
 			MOUSE_BUTTON_RIGHT:
 				_right_click(_world_mouse(), event.position)
 
@@ -351,7 +371,9 @@ func _update_zoom(delta: float) -> void:
 	cam_size = nz
 
 
-func _left_click(p: Vector2) -> void:
+## 왼쪽 클릭: 대원 = 선택 (선택한 대원을 한 번 더 = 대화) / 선택한 대원이 있으면 방 = 그 위치로 걸어감, 더블클릭 = 뛰어감 /
+## 선택 없으면 방 = 시설 창(잠긴 방 = 해금). 빈 곳 = 선택 해제
+func _left_click(p: Vector2, dbl: bool = false) -> void:
 	if _pick_npc != "":
 		var fid := under.facility_at_screen(p)
 		var r := sim.issue_clean(_pick_npc, fid)
@@ -364,25 +386,73 @@ func _left_click(p: Vector2) -> void:
 		hud.open_overhear(key)
 		return
 	var n := _npc_at(p)
-	if n != "":
-		hud.open_dialogue(n)
+	if n != "" and not (dbl and selected != "" and n != selected):
+		if n == selected and not dbl:
+			hud.open_dialogue(n)
+		else:
+			select(n)
 		return
 	var fid := under.facility_at_screen(p)
-	if fid == "":
+	if selected == "":
+		if fid == "":
+			return
+		if sim.is_unlocked(fid):
+			hud.open_facility(fid)
+		else:
+			hud.open_unlock(fid)
 		return
-	if sim.is_unlocked(fid):
-		hud.open_facility(fid)
-	else:
+	if fid == "":
+		select("")
+		return
+	if not sim.is_unlocked(fid):
 		hud.open_unlock(fid)
+		return
+	var r2 := sim.issue_move(selected, fid, room_x_at(fid, p), dbl)
+	if not r2.ok:
+		hud.show_toast(r2.msg, OutgameHud.BAD)
+		return
+	move_mark = {"pos": p, "t": 0.0, "run": dbl, "fid": fid}
 
 
+## 화면 점 → 그 방 안의 규칙 좌표 x (방 앞면 사각형에서의 가로 비율)
+func room_x_at(fid: String, p: Vector2) -> float:
+	var q := under.front_quad(fid)
+	var r := sim.data.facility_rect(fid)
+	var t := clampf((p.x - q[0].x) / maxf(1.0, q[1].x - q[0].x), 0.0, 1.0)
+	return r.position.x + t * r.size.x
+
+
+## 오른쪽 클릭: 대원 = 그 대원 선택 + 행동 메뉴 / 선택한 대원이 있는 방 = 그 방에서 할 행동 메뉴
 func _right_click(p: Vector2, screen: Vector2) -> void:
 	if _pick_npc != "":
 		_end_pick()
 		return
 	var n := _npc_at(p)
 	if n != "":
+		select(n)
 		hud.open_context(n, screen)   # 내장 팝업 위치 = 논리 화면 좌표
+		return
+	if selected == "":
+		return
+	var fid := under.facility_at_screen(p)
+	var sn: NpcAgent = sim.npcs[selected]
+	if fid == "":
+		select("")
+	elif sn.facility == fid and sn.state != NpcAgent.MOVING:
+		hud.open_context(selected, screen)
+	elif sn.state == NpcAgent.MOVING and sn.dest == fid:
+		hud.show_toast("%s 이(가) 아직 %s 로 가는 중입니다 — 도착하면 우클릭" % [sn.name, sim.data.facility_name(fid)], OutgameHud.BAD)
+	else:
+		hud.show_toast("%s 은(는) %s 에 없습니다 — 왼쪽 클릭으로 먼저 보내세요" % [sn.name, sim.data.facility_name(fid)], OutgameHud.BAD)
+
+
+func select(npc_id: String) -> void:
+	if npc_views.has(selected):
+		npc_views[selected].selected = false
+	selected = npc_id if sim.npcs.has(npc_id) else ""
+	if npc_views.has(selected):
+		npc_views[selected].selected = true
+	hud.show_selection(selected)
 
 
 func begin_clean_pick(npc_id: String) -> void:
@@ -453,6 +523,17 @@ func _cli_ui(spec: String) -> void:
 				hud.open_statement(sim.ledger.statements[-1])
 		"inspection":
 			sim.debug_inspect_now()
+		"select":   # select:npc_dan
+			select(p[1])
+		"move":   # move:npc_dan:b1_quarters[:run[:skip분]] — 선택 + 이동 (+ 시간 건너뛰기)
+			select(p[1])
+			var r := sim.issue_move(p[1], p[2], NAN, p.size() > 3 and p[3] == "run")
+			hud.show_toast(r.msg, OutgameHud.GOOD if r.ok else OutgameHud.BAD)
+			if p.size() > 4:
+				sim.skip(int(p[4]))
+		"act":   # act:npc_dan:sleep — 지금 방에서 행동
+			var r2 := sim.issue_activity(p[1], p[2])
+			hud.show_toast(r2.msg, OutgameHud.GOOD if r2.ok else OutgameHud.BAD)
 		"context":
 			var v: NpcView = npc_views[p[1]]
 			v._place(sim.npcs[p[1]])   # 시간 건너뛴 직후라 화면 위치 갱신

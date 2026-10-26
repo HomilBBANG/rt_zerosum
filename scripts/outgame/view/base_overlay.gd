@@ -12,6 +12,7 @@ var hub: Node
 var mode: String = "under"
 var hover_fid: String = ""
 var pick_mode: bool = false
+var move_mark: Dictionary = {}       # 이동 목표 표시 {pos, t, run} (BaseHub 가 채움)
 var bubble_rects: Dictionary = {}   # chat key → Rect2 (화면)
 var _font: Font
 var _bold: Font
@@ -55,6 +56,7 @@ func _draw() -> void:
 	for fid in sim.data.facility_order:
 		_draw_room(fid)
 	_draw_floor_labels()
+	_draw_move_mark()
 
 
 func _draw_room(fid: String) -> void:
@@ -174,3 +176,19 @@ func _text(pos: Vector2, s: String, size: int, col: Color, font: Font) -> void:
 	var p := pos - Vector2(w * 0.5, 0)
 	draw_string_outline(font, p, s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 4, Color(0, 0, 0, 0.75))
 	draw_string(font, p, s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
+
+
+## 방 클릭 = 이동 목표 표시: 걷기 = 초록 고리 하나, 뛰기(더블클릭) = 주황 고리 둘 + 빠르게 퍼짐
+func _draw_move_mark() -> void:
+	if move_mark.is_empty():
+		return
+	var t := float(move_mark.t) / 0.9
+	var col := Color(1.0, 0.62, 0.2) if move_mark.get("run", false) else Color(0.45, 1.0, 0.6)
+	var p: Vector2 = move_mark.pos
+	var a := 1.0 - t
+	draw_set_transform(p, 0.0, Vector2(1.0, 0.45))
+	draw_arc(Vector2.ZERO, 10.0 + t * 26.0, 0.0, TAU, 32, Color(col, a), 3.0)
+	if move_mark.get("run", false):
+		draw_arc(Vector2.ZERO, 4.0 + t * 40.0, 0.0, TAU, 32, Color(col, a * 0.8), 2.0)
+	draw_circle(Vector2.ZERO, 4.0, Color(col, a))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

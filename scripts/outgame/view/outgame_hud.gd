@@ -33,6 +33,10 @@ var zoom_label: Label
 var battle_bar: PanelContainer
 var battle_label: Label
 var battle_skip: Button
+var sel_panel: PanelContainer
+var sel_body: VBoxContainer
+var _sel_id := ""
+var _sel_t := 0.0
 var _modals: Array[Control] = []
 var _queue: Array[Callable] = []
 var _toast_t := 0.0
@@ -53,6 +57,7 @@ func setup(p_hub: Node, p_sim: BaseSim) -> void:
 	_build_zoom()
 	_build_debug()
 	_build_battle_bar()
+	_build_selection()
 	toast = _label("", 20, GOLD, true)
 	toast.set_anchors_and_offsets_preset(PRESET_CENTER_TOP)
 	toast.position = Vector2(340, 92)
@@ -184,7 +189,7 @@ func _build_log() -> void:
 	log_label.scroll_following = true
 	log_label.mouse_filter = MOUSE_FILTER_PASS
 	log_panel.add_child(log_label)
-	var hint := _label("좌클릭 대원: 대화 · 우클릭: 지시 · 말풍선: 엿듣기 · 검은 방: 해금 · WASD 이동 · 휠/핀치/Q·E 확대 · F1", 12, Color(0.8, 0.88, 0.95), true)
+	var hint := _label("대원 클릭: 선택 (한 번 더 = 대화) · 방 클릭: 이동 · 더블클릭: 뛰기 · 도착 후 우클릭: 행동 · Tab: 다음 대원 · Esc: 해제 · 말풍선: 엿듣기 · F1", 12, Color(0.8, 0.88, 0.95), true)
 	hint.position = Vector2(500, 696)
 	add_child(hint)
 
@@ -209,6 +214,55 @@ func _build_zoom() -> void:
 	plus.pressed.connect(func(): hub.zoom_step(1))
 	h.add_child(plus)
 	p.position = Vector2(1280 - 10 - p.get_combined_minimum_size().x, 640)
+
+
+## 오른쪽: 선택한 대원 카드 (이름·지금 하는 일·체력·피로도·친밀도·조작 안내)
+func _build_selection() -> void:
+	sel_panel = PanelContainer.new()
+	sel_panel.add_theme_stylebox_override("panel", _panel_style(Color(0.04, 0.05, 0.08, 0.88), Color(1.0, 0.86, 0.25)))
+	sel_panel.position = Vector2(1280 - 10 - 330, 300)
+	sel_panel.custom_minimum_size = Vector2(330, 0)
+	sel_panel.visible = false
+	add_child(sel_panel)
+	sel_body = _vbox(4)
+	sel_panel.add_child(sel_body)
+
+
+func show_selection(npc_id: String) -> void:
+	_sel_id = npc_id
+	_sel_t = 0.0
+	sel_panel.visible = npc_id != ""
+	_fill_selection()
+
+
+func _fill_selection() -> void:
+	for c in sel_body.get_children():
+		sel_body.remove_child(c)
+		c.queue_free()
+	if _sel_id == "" or not sim.npcs.has(_sel_id):
+		return
+	var n: NpcAgent = sim.npcs[_sel_id]
+	var row := _hbox(10)
+	sel_body.add_child(row)
+	row.add_child(_portrait_rect(_sprite_of(_sel_id), 56))
+	var col := _vbox(2)
+	row.add_child(col)
+	col.add_child(_label(n.name, 18, GOLD))
+	var what: String = n.state_name() if n.state != NpcAgent.STAYING else OutgameData.ACTIVITIES.get(n.activity, n.activity)
+	if n.state == NpcAgent.MOVING:
+		what = "%s → %s" % ["뛰는 중" if n.running else "걷는 중", sim.data.facility_name(n.dest)]
+	col.add_child(_label("%s · %s" % [sim.data.facility_name(n.facility), what], 14, Color(0.85, 0.9, 1)))
+	if n.is_holding():
+		col.add_child(_label("지시 대기 중 (다음 일정까지)", 12, Color(0.6, 1.0, 0.7)))
+	var card := _status_card(_sel_id)
+	sel_body.add_child(card)
+	var tip := "방 클릭: 걸어서 · 더블클릭: 뛰어서\n도착하면 우클릭: 그 방에서 할 행동 · 대원 다시 클릭: 대화"
+	if n.state == NpcAgent.MOVING:
+		tip = "가는 중 — 더블클릭하면 뛰어감\n도착하면 우클릭으로 행동 지시"
+	sel_body.add_child(_label(tip, 12, Color(0.75, 0.8, 0.9)))
+	sel_panel.reset_size()
+	var sz := sel_panel.get_combined_minimum_size()
+	sel_panel.position = Vector2(1280 - 10 - sz.x, 640 - 12 - sz.y)   # 오른쪽 아래 확대 버튼 위, 화면 안쪽
 
 
 ## 전투 발생 띠 (전투가 끝날 때까지 기지 시계 정지)
@@ -332,6 +386,11 @@ func refresh(delta: float) -> void:
 		speed_buttons[i].modulate = Color(1, 1, 0.5) if [0, 1, 4, 16][i] == hub.speed else Color(1, 1, 1)
 	cash_label.text = "$%d" % sim.ledger.cash
 	_update_battle_bar()
+	if _sel_id != "":
+		_sel_t -= delta
+		if _sel_t <= 0.0:
+			_sel_t = 0.3
+			_fill_selection()
 	zoom_label.text = "%d%%" % hub.zoom_percent()
 	var left := sim.minutes_to_settlement()
 	var ins := sim.inspection_this_month()
@@ -757,6 +816,7 @@ func _char_name(character_id: String) -> String:
 
 
 # ---------------------------------------------------------------- 대원 우클릭 메뉴
+## 우클릭 메뉴: 그 대원이 지금 있는 방에서 할 행동 (도착해 있을 때) + 어디서나 할 지시
 func open_context(npc_id: String, at: Vector2) -> void:
 	var n: NpcAgent = sim.npcs[npc_id]
 	var pm := PopupMenu.new()
@@ -764,25 +824,63 @@ func open_context(npc_id: String, at: Vector2) -> void:
 	pm.add_theme_font_size_override("font_size", 15)
 	pm.add_separator(n.name)
 	pm.add_item("대화", 0)
+	pm.add_item("정보·장비", 4)
+	pm.set_item_disabled(pm.get_item_index(0), n.state == NpcAgent.UNAVAILABLE)
+	var room_ids := {}
+	if n.state == NpcAgent.MOVING:
+		pm.add_separator("%s 로 가는 중 — 도착하면 행동" % sim.data.facility_name(n.dest))
+	elif n.state != NpcAgent.UNAVAILABLE:
+		pm.add_separator("%s 에서" % sim.data.facility_name(n.facility))
+		var acts := sim.room_actions(npc_id)
+		if acts.is_empty():
+			pm.add_item("(이 방에서 할 수 있는 일 없음)", 99)
+			pm.set_item_disabled(pm.get_item_index(99), true)
+		for i in acts.size():
+			var act: Dictionary = acts[i]
+			var id := 100 + i
+			room_ids[id] = act.id
+			pm.add_item(act.label if act.enabled or str(act.why) == "" else "%s — %s" % [act.label, act.why], id)
+			pm.set_item_disabled(pm.get_item_index(id), not act.enabled)
+	pm.add_separator("어디서나")
 	pm.add_item("청소 지시 → 장소 클릭", 1)
 	pm.add_item("업무·의뢰 지시", 2)
-	pm.add_item("훈련", 3)
-	pm.add_item("정보·장비", 4)
+	pm.add_item("훈련실로 (훈련)", 3)
 	pm.add_item("의무실로 (치료·휴식)", 5)
+	if not n.command.is_empty() and n.state != NpcAgent.UNAVAILABLE:
+		pm.add_item("지시 그만두기 → 일정대로", 6)
 	for id in [1, 2]:
 		pm.set_item_disabled(pm.get_item_index(id), not n.is_free())
 	pm.set_item_disabled(pm.get_item_index(3), not n.is_free() or sim.training_facility() == "")
-	pm.set_item_disabled(pm.get_item_index(0), n.state == NpcAgent.UNAVAILABLE)
 	var cs := sim.cstate(n)
 	pm.set_item_disabled(pm.get_item_index(5), not n.is_free() or sim.infirmary_facility() == "" or ((cs.statuses as Array).is_empty() and float(cs.hp) >= sim.char_max_hp(n.character_id)))
 	add_child(pm)
-	pm.id_pressed.connect(_on_context.bind(npc_id))
+	pm.id_pressed.connect(func(id): _on_context(id, npc_id, room_ids.get(id, "")))
 	pm.popup_hide.connect(pm.queue_free)
 	pm.position = Vector2i(at)
 	pm.popup()
 
 
-func _on_context(id: int, npc_id: String) -> void:
+func _on_context(id: int, npc_id: String, room_act: String = "") -> void:
+	var r := {}
+	match room_act:
+		"sleep", "rest", "eat":
+			r = sim.issue_activity(npc_id, room_act)
+		"clean_here":
+			r = sim.issue_clean(npc_id, sim.npcs[npc_id].facility, true)
+		"train":
+			r = sim.issue_train(npc_id)
+		"medical":
+			r = sim.issue_medical(npc_id)
+		"jobs":
+			open_contracts(npc_id)
+		"facility":
+			open_facility(sim.npcs[npc_id].facility)
+	if not r.is_empty():
+		show_toast(r.msg, GOOD if r.ok else BAD)
+		_sel_t = 0.0
+		return
+	if room_act != "":
+		return
 	match id:
 		0:
 			open_dialogue(npc_id)
@@ -791,13 +889,16 @@ func _on_context(id: int, npc_id: String) -> void:
 		2:
 			open_contracts(npc_id)
 		3:
-			var r := sim.issue_train(npc_id)
-			show_toast(r.msg, GOOD if r.ok else BAD)
+			var r3 := sim.issue_train(npc_id)
+			show_toast(r3.msg, GOOD if r3.ok else BAD)
 		4:
 			open_character(npc_id)
 		5:
-			var r := sim.issue_medical(npc_id)
-			show_toast(r.msg, GOOD if r.ok else BAD)
+			var r5 := sim.issue_medical(npc_id)
+			show_toast(r5.msg, GOOD if r5.ok else BAD)
+		6:
+			var r6 := sim.cancel_command(npc_id)
+			show_toast(r6.msg, GOOD if r6.ok else BAD)
 
 
 # ---------------------------------------------------------------- 의뢰 게시판 (업무 지시·외부 의뢰)

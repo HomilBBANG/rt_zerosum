@@ -39,10 +39,16 @@ var last_chat: int = -100000
 var need_think: bool = true        # 일정을 다시 볼 필요 (해금·지시 완료·대화 종료 등)
 var seat: String = ""              # 차지한 오브젝트 (침대·소파·의자·의무침대) id
 var meal_key: String = ""          # 마지막으로 식사한 끼 (중복 소모 방지)
+var running: bool = false          # 플레이어가 더블클릭으로 보낸 이동 = 뛰기 (도착하면 해제)
 
 
 func is_free() -> bool:
-	return command.is_empty() and state != PLAYER_DIALOGUE and state != UNAVAILABLE
+	return (command.is_empty() or is_holding()) and state != PLAYER_DIALOGUE and state != UNAVAILABLE
+
+
+## 플레이어가 직접 보낸 이동·행동(이동, 잠자기, 쉬기, 식사) — 다른 지시로 바로 바꿀 수 있음
+func is_holding() -> bool:
+	return str(command.get("type", "")) == "move"
 
 
 func is_working() -> bool:
@@ -56,7 +62,7 @@ func state_name() -> String:
 func to_dict() -> Dictionary:
 	return {"id": id, "pos": [pos.x, pos.y], "facing": facing, "facility": facility, "state": state, "activity": activity,
 		"dest": dest, "dest_x": dest_x, "command": command, "busy": busy, "resume_state": resume_state, "last_chat": last_chat,
-		"seat": seat, "meal_key": meal_key}
+		"seat": seat, "meal_key": meal_key, "running": running}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -75,4 +81,5 @@ func from_dict(d: Dictionary) -> void:
 	chat_key = ""
 	seat = str(d.get("seat", ""))
 	meal_key = str(d.get("meal_key", ""))
+	running = bool(d.get("running", false))
 	need_think = true

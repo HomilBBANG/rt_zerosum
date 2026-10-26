@@ -301,11 +301,24 @@ func _npc_minute(n: NpcAgent, m: int) -> void:
 				_log("%s 체력 회복 완료 (%d)" % [n.name, char_max_hp(n.character_id)])
 				_finish_command(n)
 			return
+	var mod := clock.minute_of_day(m)
+	var changes: Dictionary = _changes.get(n.id, {}).get(clock.weekday(m), {})
+	if n.is_holding():
+		# 플레이어가 보낸 이동·행동: 도착해서 그 행동을 하다가, 다음 일정 블록이 시작되면(또는 다 자면) 일정으로 복귀
+		if n.state == NpcAgent.MOVING:
+			return
+		_try_meal(n, m)
+		var slept := n.activity == "sleep" and float(cstate(n).fatigue) <= 0.0
+		if not (changes.has(mod) or slept):
+			return
+		if slept:
+			_log("%s 이(가) 푹 자고 일어났습니다" % n.name)
+		n.command = {}
+		_release_seat(n)
+		n.need_think = true
 	if not n.command.is_empty():
 		return   # 지시 장소로 이동 중
-	var mod := clock.minute_of_day(m)
 	_try_meal(n, m)
-	var changes: Dictionary = _changes.get(n.id, {}).get(clock.weekday(m), {})
 	if not (n.need_think or changes.has(mod)):
 		return
 	n.need_think = false
@@ -336,7 +349,7 @@ func _slot_x(n: NpcAgent, fid: String) -> float:
 	return r.position.x + 44.0 + frac * (r.size.x - 88.0)
 
 
-func _go(n: NpcAgent, fid: String, seat: String = "") -> bool:
+func _go(n: NpcAgent, fid: String, seat: String = "", at_x: float = NAN) -> bool:
 	var route := RoomRouteService.find_path(data, n.facility, fid, _is_open)
 	if route.is_empty():
 		n.dest_reason = "%s 로 가는 길 없음" % data.facility_name(fid)
@@ -346,7 +359,7 @@ func _go(n: NpcAgent, fid: String, seat: String = "") -> bool:
 		seat_owner[seat] = n.id
 		n.seat = seat
 	n.dest = fid
-	n.dest_x = data.object_x(n.seat) if n.seat != "" else _slot_x(n, fid)
+	n.dest_x = data.object_x(n.seat) if n.seat != "" else (at_x if not is_nan(at_x) else _slot_x(n, fid))
 	n.path = RoomRouteService.waypoints(data, route, n.dest_x)
 	n.state = NpcAgent.MOVING
 	npc_state_changed.emit(n.id)
@@ -358,7 +371,7 @@ func _move(step: float) -> void:
 	for n in npcs.values():
 		if n.state != NpcAgent.MOVING:
 			continue
-		var dist := speed * step
+		var dist := speed * step * (data.num("run_speed_mult", 2.2) if n.running else 1.0)
 		while dist > 0.0 and n.path.size() > 0:
 			var tgt: Vector2 = n.path[0]
 			var d: float = n.pos.distance_to(tgt)
@@ -380,11 +393,15 @@ func _move(step: float) -> void:
 
 func _arrive(n: NpcAgent) -> void:
 	n.facility = n.dest
+	n.running = false
 	var c := n.command
 	if c.is_empty():
 		n.state = NpcAgent.STAYING
 	else:
 		match str(c.type):
+			"move":
+				n.state = NpcAgent.STAYING
+				n.activity = str(c.get("activity", "idle"))
 			"clean":
 				n.state = NpcAgent.CLEANING
 				n.busy = data.num("clean_minutes", 20.0)
@@ -659,8 +676,131 @@ func cleaner_of(fid: String) -> String:
 	return ""
 
 
+## 플레이어 직접 이동: 선택한 대원을 그 방의 그 위치(x, 없으면 자리)로. run = 뛰기 (이미 그쪽으로 걷는 중이면 뛰기로만 바꿈).
+## 도착하면 그 방에 머묾 → 우클릭으로 행동 지시. 다음 일정 블록이 시작되면 일정으로 복귀. {ok, msg}
+func issue_move(npc_id: String, fid: String, x: float = NAN, run: bool = false) -> Dictionary:
+	var n: NpcAgent = npcs.get(npc_id)
+	if n == null:
+		return _fail("없는 대원")
+	if not data.facilities.has(fid):
+		return _fail("갈 곳을 클릭하세요")
+	if not unlocked.has(fid):
+		return _fail("%s 은(는) 잠겨 있습니다 (먼저 해금)" % data.facility_name(fid))
+	if not n.is_free():
+		return _fail("%s 은(는) 지금 %s — 우클릭 → '지시 그만두기' 후 보낼 수 있습니다" % [n.name, n.state_name()])
+	var r := data.facility_rect(fid)
+	var tx := clampf(x, r.position.x + 30.0, r.end.x - 30.0) if not is_nan(x) else NAN
+	if n.is_holding() and n.state == NpcAgent.MOVING and str(n.command.target) == fid and (is_nan(tx) or absf(tx - n.dest_x) < 40.0):
+		if run and not n.running:
+			n.running = true
+			npc_state_changed.emit(n.id)
+			return {"ok": true, "msg": "%s 이(가) %s 로 뛰어갑니다" % [n.name, data.facility_name(fid)]}
+		return {"ok": true, "msg": ""}
+	if not reachable(n.facility, fid):
+		return _fail("%s 에서 %s 까지 갈 수 있는 길이 없습니다 (잠긴 방)" % [data.facility_name(n.facility), data.facility_name(fid)])
+	if n.state == NpcAgent.CHATTING:
+		_end_chat_of(n, _minute)
+	n.command = {"type": "move", "target": fid, "activity": "idle", "issuer": "player"}
+	n.activity = "idle"
+	if not _go(n, fid, "", tx):
+		n.command = {}
+		return _fail(n.dest_reason)
+	n.running = run
+	return {"ok": true, "msg": "%s 이(가) %s 로 %s" % [n.name, data.facility_name(fid), "뛰어갑니다" if run else "갑니다"]}
+
+
+## 지금 있는 방에서 할 수 있는 행동 (우클릭 메뉴) — [{id, label, enabled, why}]
+func room_actions(npc_id: String) -> Array:
+	var n: NpcAgent = npcs.get(npc_id)
+	if n == null:
+		return []
+	var fid := n.facility
+	var tag := str(data.facilities.get(fid, {}).get("tag", ""))
+	var free := n.is_free() and n.state != NpcAgent.MOVING
+	var out: Array = []
+	var kinds: Array = data.objects_in(fid).map(func(o): return str(data.objects[o].kind))
+	if kinds.has("침대") or kinds.has("소파") or kinds.has("의무침대"):
+		out.append({"id": "sleep", "label": "잠자기 (피로 회복)", "enabled": free and _pick_seat(n, fid, "sleep") != "", "why": "빈 자리 없음"})
+	if not kinds.is_empty() or tag in ["공용", "생활"]:
+		out.append({"id": "rest", "label": "쉬기", "enabled": free, "why": ""})
+	if tag == "식당":
+		out.append({"id": "eat", "label": "식사 (식재료 %d끼)" % food, "enabled": free, "why": ""})
+	if cleanable(fid):
+		var dirty := float(cleanliness.get(fid, 100.0)) < 100.0 or not dirt_in(fid).is_empty()
+		out.append({"id": "clean_here", "label": "이 방 청소 (청결 %d)" % roundi(float(cleanliness.get(fid, 100.0))),
+			"enabled": free and dirty and cleaner_of(fid) == "", "why": "이미 깨끗함" if not dirty else "다른 대원이 청소 중"})
+	if tag == "훈련":
+		out.append({"id": "train", "label": "훈련 (%d분, 전투 HP +%d)" % [data.inum("train_minutes", 120), data.inum("train_hp_bonus", 5)], "enabled": free, "why": ""})
+	if tag == "의무":
+		var cs := cstate(n)
+		var need := not (cs.statuses as Array).is_empty() or float(cs.hp) < char_max_hp(n.character_id)
+		out.append({"id": "medical", "label": "치료·휴식", "enabled": free and need, "why": "다친 데 없음"})
+	var here_jobs := available_contracts().filter(func(c): return str(data.jobs[c].place) == fid)
+	if tag in ["행정", "출입"] or not here_jobs.is_empty():
+		out.append({"id": "jobs", "label": "업무·의뢰 맡기기", "enabled": free, "why": ""})
+	if tag in ["무기고", "작업"]:
+		out.append({"id": "facility", "label": "무기고 열기 (장착·강화)", "enabled": true, "why": ""})
+	if tag == "상점":
+		out.append({"id": "facility", "label": "PX 열기 (선물 구매)", "enabled": true, "why": ""})
+	return out
+
+
+## 지금 있는 방에서 행동: sleep / rest / eat — 그 방 자리로 가서 그 행동, 다음 일정 블록까지
+func issue_activity(npc_id: String, activity: String) -> Dictionary:
+	var n: NpcAgent = npcs.get(npc_id)
+	if n == null:
+		return _fail("없는 대원")
+	if not n.is_free() or n.state == NpcAgent.MOVING:
+		return _fail("%s 은(는) 지금 %s" % [n.name, n.state_name()])
+	var fid := n.facility
+	var seat := _pick_seat(n, fid, activity)
+	if activity == "sleep" and seat == "":
+		return _fail("%s 에는 잘 자리가 없습니다" % data.facility_name(fid))
+	if n.state == NpcAgent.CHATTING:
+		_end_chat_of(n, _minute)
+	n.command = {"type": "move", "target": fid, "activity": activity, "issuer": "player"}
+	n.activity = activity
+	if seat != "":
+		if not _go(n, fid, seat):
+			n.command = {}
+			return _fail(n.dest_reason)
+	else:
+		n.dest = fid
+		n.state = NpcAgent.STAYING
+		npc_state_changed.emit(n.id)
+	var what: String = {"sleep": "잠을 잡니다", "rest": "쉽니다", "eat": "식사합니다"}.get(activity, activity)
+	var msg := "%s 이(가) %s 에서 %s" % [n.name, data.facility_name(fid), what]
+	_log(msg)
+	return {"ok": true, "msg": msg}
+
+
+## 지시 그만두기 → 지금 일정으로 (진행 중인 작업·의뢰는 취소, 보상 없음)
+func cancel_command(npc_id: String) -> Dictionary:
+	var n: NpcAgent = npcs.get(npc_id)
+	if n == null or n.command.is_empty():
+		return _fail("그만둘 지시가 없습니다")
+	if n.state == NpcAgent.UNAVAILABLE:
+		return _fail("%s 은(는) 기지 밖에 있습니다" % n.name)
+	var c := n.command
+	if str(c.type) == "job":
+		var job := _job(str(c.uid))
+		if not job.is_empty():
+			jobs.erase(job)
+		claimed_contracts.erase(str(c.contract))
+	n.command = {}
+	n.busy = 0.0
+	n.running = false
+	_release_seat(n)
+	if n.state != NpcAgent.MOVING:
+		n.state = NpcAgent.STAYING
+	n.need_think = true
+	npc_state_changed.emit(n.id)
+	_log("%s: 지시 취소 — 일정대로 움직입니다" % n.name)
+	return {"ok": true, "msg": "%s: 지시 취소 — 일정대로 움직입니다" % n.name}
+
+
 ## 우클릭 → 청소 → 장소. {ok, msg, executor}. 위임 성향이 있으면 다른 대원이 대신 함
-func issue_clean(npc_id: String, fid: String) -> Dictionary:
+func issue_clean(npc_id: String, fid: String, direct: bool = false) -> Dictionary:
 	var n: NpcAgent = npcs.get(npc_id)
 	if n == null:
 		return _fail("없는 대원")
@@ -680,7 +820,7 @@ func issue_clean(npc_id: String, fid: String) -> Dictionary:
 	var exec := n
 	var msg := ""
 	var rules: Dictionary = data.schedules.get(npc_id, {}).get("delegation_rules", {})
-	if rules.get("can_delegate_cleaning", false) and rng.randf() < float(rules.get("chance", 1.0)):
+	if not direct and rules.get("can_delegate_cleaning", false) and rng.randf() < float(rules.get("chance", 1.0)):
 		var cand := _delegate_candidate(n, fid, rules)
 		if cand != null:
 			exec = cand
@@ -1021,6 +1161,8 @@ func _tick_body(n: NpcAgent) -> void:
 			rate = data.num("fatigue_train_per_hour", 7.0)
 		elif n.state == NpcAgent.TREATMENT:
 			rate = 0.0
+		elif n.state == NpcAgent.MOVING and n.running:
+			rate = data.num("fatigue_run_per_hour", 12.0)
 		cs.fatigue = float(cs.fatigue) + rate * per
 	cs.fatigue = clampf(float(cs.fatigue), 0.0, 100.0)
 
