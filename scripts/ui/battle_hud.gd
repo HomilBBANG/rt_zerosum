@@ -229,7 +229,7 @@ func _create_layout() -> void:
 		end_btn.add_theme_stylebox_override(st, sbx)
 	var end_wrap := MarginContainer.new()
 	end_wrap.name = "EndTurnWrap"
-	end_wrap.add_theme_constant_override("margin_right", 1)   # 왼쪽으로 1px
+	end_wrap.add_theme_constant_override("margin_right", 3)   # 왼쪽으로 3px
 	end_wrap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	end_wrap.add_child(end_btn)
 	hb.add_child(end_wrap)
@@ -271,8 +271,9 @@ func _create_layout() -> void:
 	slots_row.anchor_top = 1.0
 	slots_row.anchor_bottom = 1.0
 	slots_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	slots_row.offset_top = -137   # 무기 칸 위 1px 여유
-	slots_row.offset_bottom = -6   # 슬롯 줄 세로 중심 = 패널 세로 중심
+	# 하단 패널(-138..-8) 기준. 이름 글자의 아래 여백(글자 박스 안 빈 줄)만큼 4px 내려, 보이는 아이콘+글자가 위/아래 대칭
+	slots_row.offset_top = -134
+	slots_row.offset_bottom = -4
 	slots_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	slots_row.custom_minimum_size = Vector2(620, 0)   # 에디터에서 보이는 자리 (슬롯은 실행 중에 채움)
 	add_child(slots_row)
@@ -630,7 +631,7 @@ func _unhandled_input(event: InputEvent) -> void:
 const SLOT := 75.0          # 스킬·이동·필살기 칸 (58 → 30% 키움)
 const SLOT_GAP := 18.0
 const WEAPON_W := 44.0      # 무기 칸: 세로로 긴 칸 (패널 천장까지)
-const WEAPON_H := 112.0     # 무기 칸: 패널 천장 1px 아래까지
+const WEAPON_H := 110.0     # 무기 칸: 이름 포함 높이가 패널 안쪽을 거의 채움
 const WEAPON_SEP := 2       # 무기 사이 간격
 const CAP_H := 16.0
 
@@ -788,7 +789,7 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
 	box.custom_minimum_size.x = bsize.x + (1.0 if is_weapon else 4.0)   # 무기 칸 가로 간격 좁게
-	box.size_flags_vertical = Control.SIZE_SHRINK_END if is_weapon else Control.SIZE_SHRINK_CENTER   # 스킬·이동·필살기는 패널 세로 가운데
+	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER   # 아이콘+이름 덩어리를 패널 세로 가운데
 	var btn := Button.new()
 	btn.custom_minimum_size = bsize
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -862,11 +863,7 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cap.clip_text = true
 	cap.custom_minimum_size = Vector2(0, CAP_H)
-	if not is_weapon:
-		# 이름 높이만큼 위에도 빈 칸 → 버튼이 패널 세로 정가운데 (위/아래 대칭)
-		var top := Control.new()
-		top.custom_minimum_size.y = maxf(CAP_H, cap.get_combined_minimum_size().y)
-		box.add_child(top)
+	# 버튼 + 이름을 한 덩어리로 패널 세로 가운데 (위/아래 대칭)
 	box.add_child(btn)
 	box.add_child(cap)
 	parent.add_child(box)
@@ -888,6 +885,7 @@ func _weapon_icon_vertical(wid: String) -> Texture2D:
 		img.decompress()
 	img.clear_mipmaps()
 	img.rotate_90(COUNTERCLOCKWISE)
+	img.adjust_bcs(2.8, 1.1, 1.0)   # 무기 원화가 어두워 어두운 칸 바탕에서 보이게 밝게 보정
 	var out := ImageTexture.create_from_image(img)
 	_wicon_cache[wid] = out
 	return out
