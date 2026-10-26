@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://88i1oct4da3w"
-path="res://.godot/imported/walk_4x4_mask_l.png-e3747b6a7edc1d745d68543c6fd7c6ca.ctex"
+uid="uid://du3bovj32wpp7"
+path="res://.godot/imported/walk_5x2_mask_l.png-81fc62c29b587e5f5a98fa6cda9cba9b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/characters/kira/walk_4x4_mask_l.png"
-dest_files=["res://.godot/imported/walk_4x4_mask_l.png-e3747b6a7edc1d745d68543c6fd7c6ca.ctex"]
+source_file="res://assets/characters/kira/walk_5x2_mask_l.png"
+dest_files=["res://.godot/imported/walk_5x2_mask_l.png-81fc62c29b587e5f5a98fa6cda9cba9b.ctex"]
 
 [params]
 

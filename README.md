@@ -198,7 +198,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   속도·반복 등은 같은 이름 json(선택): `walk.json` = `{"fps": 10, "loop": true, "ground": [x, y], "figure_px": 키 픽셀, "weapon": false, "durations": [초, …]}`.
 - **끊기는 프레임 고치기** (시트 그림은 그대로): json 에 `"skip": [14, 15, 16]` = 그 칸 빼기, `"order": [1, 5, 13, …]` = 그 순서로 재생 (칸 번호는 왼쪽 위부터 1),
   `"align_feet": true` = 칸마다 발바닥을 같은 땅선에 맞춤 (그림마다 발 높이가 달라 위아래로 튈 때).
-  적용: 하나 walk `skip [14,15,16]` (14~16칸이 1~3칸 반복), 키라 walk `skip [1]` (걷는 중에 발이 idle 모양인 칸).
+  적용: 하나 walk `skip [14,15,16]` (14~16칸이 1~3칸 반복), 키라 walk 는 새 시트 `walk_5x2.png` (사용자 제공 10프레임, 빈 칸 지움).
 - 여러 동작을 한 장에: `sheet.png` + `sheet.json` = `{"cols": 8, "rows": 4, "anims": {"idle": {"row": 0, "count": 6, "fps": 8}, "walk": {"row": 1, "count": 8}, …}}`.
 - 프레임 낱장으로도 됨: `assets/characters/<id>/<동작>/0001.png, 0002.png …` (이름 순서대로 재생, 기본 12fps).
   **캔버스 크기·발 위치를 `base.png`(512×768, 발 접지점 `character.json` 의 `ground`)와 같게** 그리면 따로 설정할 것이 없습니다.
@@ -213,7 +213,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   ※ 채팅에 올린 움직이는 이미지는 첫 장면 한 장으로만 전달되므로, 시트 한 장으로 주거나 저장소에 넣어 커밋해 주세요.
 - 프레임마다 보여 줄 시간을 다르게: `anim.json` 의 `"durations": [2.4, 1.2]` (초, fps 대신).
 - **들어간 애니메이션** (사용자 제공 시트): 니키타 `idle_4x4`(8fps) · `walk_6x6`(15fps) · `hit_6x6`(버티는 동작, 24fps) · `attack_6x6`(가리키는 동작, 24fps) /
-  키라 `idle_4x4`(8fps) · `walk_4x4`(12fps) · `hit_4x4`(20fps) · `attack_4x4`(팔 휘두르기, 20fps) / 하나(`hero2`) `idle_4x4`(8fps) · `walk_4x4`(12fps) · `hit_4x4`(20fps) · `attack_4x4`(20fps).
+  키라 `idle_4x4`(8fps) · `walk_5x2`(10프레임, 12fps) · `hit_4x4`(20fps) · `attack_4x4`(팔 휘두르기, 20fps) / 하나(`hero2`) `idle_4x4`(8fps) · `walk_4x4`(12fps) · `hit_4x4`(20fps) · `attack_4x4`(20fps).
   단·이선·앨마 `idle_4x4` = **기본 그림으로 만든 숨쉬기**(`python3 tools/char_sprites.py breathe <캐릭터>` — 원화 픽셀만 살짝 늘여 상체가 오르내림, 발 고정). 직접 그린 시트로 바꾸면 그 파일을 덮어쓰면 됨.
   속도는 같은 이름 json(`walk.json` 등). 조명 마스크 시트(`*_mask_r/_l.png`)는 `python3 tools/char_sprites.py masks` 로 칸마다 만듦 — 없어도 동작.
 
