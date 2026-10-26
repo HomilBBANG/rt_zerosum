@@ -18,6 +18,8 @@ const BACK_Z := -3.0         # 방 뒷벽 안쪽 면
 const FRONT_Z := 1.4         # 방 앞(잘라 낸 단면)
 const WALL := 0.22           # 칸막이 벽 두께
 const STAND_Z := [-1.45, -0.75, -1.1, -0.45, -1.7, -0.95]   # 대원이 서는 깊이 (대원 순서별로 엇갈림)
+## 오브젝트 깊이 (침대·소파는 뒷벽 쪽, 의자는 책상 앞)
+const SEAT_Z := {"침대": -2.45, "의무침대": -2.05, "소파": -2.35, "의자": -1.55}
 
 var sim: BaseSim
 var camera: Camera3D
@@ -151,12 +153,71 @@ func _build_surroundings() -> void:
 			if d.facility_at(px) == "":
 				var y0: float = -float(f.order) * FLOOR_M
 				_box(out, Vector3(CELL_M, FLOOR_M, FRONT_Z - BACK_Z), Vector3((c + 0.5) * CELL_M, y0 + FLOOR_M * 0.5 - SLAB * 0.5, (FRONT_Z + BACK_Z) * 0.5), black, false)
-	# 층 사이 슬래브 (앞면이 방 사이 띠로 보임) + 맨 위 천장
+	# 층 사이 슬래브 (앞면이 방 사이 띠로 보임) + 맨 위 천장. 계단이 올라오는 자리는 뚫음
 	var slab := _mat(Color(0.20, 0.20, 0.25))
+	for fid in d.facility_order:
+		var b := room_box(fid)
+		_floor_box(out, b, b.y0 - SLAB * 0.5, SLAB, slab, arrival_hole(fid))
 	for f in d.floors:
-		var y0: float = -float(f.order) * FLOOR_M
-		_box(out, Vector3(bb.size.x, SLAB, FRONT_Z - BACK_Z), Vector3(bb.get_center().x, y0 - SLAB * 0.5, (FRONT_Z + BACK_Z) * 0.5), slab)
+		for c in range(floori(bb.position.x / CELL_M), ceili(bb.end.x / CELL_M)):
+			var px := Vector2((c + 0.5) * OutgameData.CELL_W, (f.order + 0.5) * OutgameData.FLOOR_H)
+			if d.facility_at(px) == "":
+				var y0: float = -float(f.order) * FLOOR_M
+				_box(out, Vector3(CELL_M, SLAB, FRONT_Z - BACK_Z), Vector3((c + 0.5) * CELL_M, y0 - SLAB * 0.5, (FRONT_Z + BACK_Z) * 0.5), slab)
 	_box(out, Vector3(bb.size.x, SLAB, FRONT_Z - BACK_Z), Vector3(bb.get_center().x, bb.end.y + SLAB * 0.5, (FRONT_Z + BACK_Z) * 0.5), slab)
+
+
+# ================================================================ 계단 (꺾인 계단: 층마다 방향이 바뀌고 앞뒤 깊이를 번갈아)
+## 아래층 order k 의 계단 한 구간이 놓이는 깊이 (k 홀수 = 뒤쪽, 짝수 = 앞쪽)
+static func flight_z(lower_order: int) -> float:
+	return -2.45 if lower_order % 2 == 1 else -1.5
+
+
+func stair_at(order: int, col: int) -> String:
+	for fid in sim.data.facility_order:
+		var f: Dictionary = sim.data.facilities[fid]
+		if f.tag == "계단" and int(f.order) == order and int(f.col) == col:
+			return fid
+	return ""
+
+
+## 이 계단 방에서 위층으로 올라가는 계단이 있는가
+func has_flight(fid: String) -> bool:
+	var f: Dictionary = sim.data.facilities[fid]
+	return f.tag == "계단" and stair_at(int(f.order) - 1, int(f.col)) != ""
+
+
+## 아래층 계단이 이 방 바닥으로 올라오는 구멍 {x0, x1, z0, z1} (없으면 {})
+func arrival_hole(fid: String) -> Dictionary:
+	var f: Dictionary = sim.data.facilities[fid]
+	if f.tag != "계단":
+		return {}
+	var below := stair_at(int(f.order) + 1, int(f.col))
+	if below == "":
+		return {}
+	var b := room_box(fid)
+	var w: float = b.x1 - b.x0
+	var z := flight_z(int(f.order) + 1)
+	if RoomRouteService.flight_left_to_right(int(f.order) + 1):   # 위 끝 = 오른쪽
+		return {"x0": b.x0 + w * 0.38, "x1": b.x1 - WALL, "z0": z - 0.55, "z1": z + 0.55}
+	return {"x0": b.x0 + WALL, "x1": b.x1 - w * 0.38, "z0": z - 0.55, "z1": z + 0.55}
+
+
+## 바닥/슬래브 상자 (구멍이 있으면 구멍을 뺀 조각들로)
+func _floor_box(parent: Node3D, b: Dictionary, yc: float, thick: float, mat: Material, hole: Dictionary) -> void:
+	var w: float = b.x1 - b.x0
+	var cx: float = (b.x0 + b.x1) * 0.5
+	if hole.is_empty():
+		_box(parent, Vector3(w, thick, FRONT_Z - BACK_Z), Vector3(cx, yc, (FRONT_Z + BACK_Z) * 0.5), mat)
+		return
+	var z0: float = hole.z0
+	var z1: float = hole.z1
+	_box(parent, Vector3(w, thick, FRONT_Z - z1), Vector3(cx, yc, (FRONT_Z + z1) * 0.5), mat)
+	_box(parent, Vector3(w, thick, z0 - BACK_Z), Vector3(cx, yc, (z0 + BACK_Z) * 0.5), mat)
+	if hole.x0 > b.x0 + 0.01:
+		_box(parent, Vector3(hole.x0 - b.x0, thick, z1 - z0), Vector3((b.x0 + hole.x0) * 0.5, yc, (z0 + z1) * 0.5), mat)
+	if hole.x1 < b.x1 - 0.01:
+		_box(parent, Vector3(b.x1 - hole.x1, thick, z1 - z0), Vector3((b.x1 + hole.x1) * 0.5, yc, (z0 + z1) * 0.5), mat)
 
 
 # ================================================================ 방
@@ -186,8 +247,9 @@ func rebuild_room(fid: String) -> void:
 	_box(n, Vector3(w, h, 0.3), Vector3(cx, y0 + h * 0.5, BACK_Z - 0.15), wall)
 	_box(n, Vector3(WALL, h, FRONT_Z - BACK_Z), Vector3(b.x0 + WALL * 0.5, y0 + h * 0.5, (FRONT_Z + BACK_Z) * 0.5), _mat(wall_col.darkened(0.15), light))
 	_box(n, Vector3(WALL, h, FRONT_Z - BACK_Z), Vector3(b.x1 - WALL * 0.5, y0 + h * 0.5, (FRONT_Z + BACK_Z) * 0.5), _mat(wall_col.darkened(0.15), light))
-	_box(n, Vector3(w, 0.06, FRONT_Z - BACK_Z), Vector3(cx, y0 + 0.03, (FRONT_Z + BACK_Z) * 0.5), floor_m)
-	_box(n, Vector3(w, 0.1, FRONT_Z - BACK_Z), Vector3(cx, b.y1 - 0.05, (FRONT_Z + BACK_Z) * 0.5), _mat(Color(0.30, 0.30, 0.36), light), false)
+	_floor_box(n, b, y0 + 0.03, 0.06, floor_m, arrival_hole(fid))
+	if not has_flight(fid):   # 계단이 위층으로 뚫고 올라가는 방은 천장 없음
+		_box(n, Vector3(w, 0.1, FRONT_Z - BACK_Z), Vector3(cx, b.y1 - 0.05, (FRONT_Z + BACK_Z) * 0.5), _mat(Color(0.30, 0.30, 0.36), light), false)
 	if not open:
 		# 잠긴 방: 단면 앞을 검은 판으로 막음 (자물쇠·가격은 2D 덮개가 그림)
 		_box(n, Vector3(w + 0.03, h + 0.02, 0.06), Vector3(cx, y0 + h * 0.5, FRONT_Z + 0.04), _glow(Color(0, 0, 0)), false)
@@ -196,11 +258,12 @@ func rebuild_room(fid: String) -> void:
 	_box(n, Vector3(w - WALL * 2, 0.12, 0.06), Vector3(cx, y0 + 1.0, BACK_Z + 0.03), _mat(wall_col.darkened(0.3), light, 0.012), false)
 	match str(f.tag):
 		"계단":
-			_stairs(n, b, light)
+			_stairs(n, fid, b, light)
 		"출입":
 			_gate(n, b, light)
 		_:
 			_furniture(n, f, b, light)
+	_objects(n, fid, b, light)
 	# 천장 조명 + 원색 스폿 (방 안에서만 닿도록 짧은 거리, 하드 섀도우)
 	if f.tag != "출입":
 		var lx := cx + w * 0.12
@@ -221,6 +284,42 @@ func rebuild_room(fid: String) -> void:
 		s.look_at(Vector3(lx + w * 0.08, y0, -2.4), Vector3.UP)
 	# 보조색 띠 조명 (바닥 쪽 벽 모서리, 단색 발광)
 	_box(n, Vector3(w - WALL * 2, 0.05, 0.05), Vector3(cx, y0 + 0.08, BACK_Z + 0.04), _glow((p.accent as Color).darkened(0.1)), false)
+
+
+## 오브젝트 시트의 침대·소파·의자·의무침대 (대원이 실제로 눕거나 앉는 자리)
+func _objects(n: Node3D, fid: String, b: Dictionary, light: String) -> void:
+	var p := LightingPresets.get_preset(light)
+	var metal := _mat(Color(0.45, 0.46, 0.52), light, 0.015)
+	for oid in sim.data.objects_in(fid):
+		var o: Dictionary = sim.data.objects[oid]
+		var x := to3d(Vector2(sim.data.object_x(oid), 0)).x
+		var h: float = o.height
+		var z: float = SEAT_Z.get(o.kind, -1.6)
+		var y: float = b.y0
+		match str(o.kind):
+			"침대":
+				_box(n, Vector3(1.9, 0.18, 0.9), Vector3(x, y + h, z), _mat(Color(0.88, 0.88, 0.92), light, 0.012))
+				_box(n, Vector3(1.95, 0.08, 0.95), Vector3(x, y + h - 0.13, z), metal)
+				_box(n, Vector3(0.38, 0.12, 0.6), Vector3(x - 0.7, y + h + 0.13, z), _mat(Color(0.95, 0.95, 1.0), light), false)
+				for sx in [-0.98, 0.98]:
+					_box(n, Vector3(0.07, h + 0.35, 0.07), Vector3(x + sx, y + (h + 0.35) * 0.5, z + 0.44), metal)
+			"의무침대":
+				_box(n, Vector3(1.65, 0.16, 0.8), Vector3(x, y + h, z), _mat(Color(0.96, 0.97, 1.0), light, 0.012))
+				for sx in [-0.72, 0.72]:
+					_box(n, Vector3(0.06, h, 0.06), Vector3(x + sx, y + h * 0.5, z + 0.35), metal)
+					_box(n, Vector3(0.06, h, 0.06), Vector3(x + sx, y + h * 0.5, z - 0.35), metal)
+				_box(n, Vector3(0.36, 0.1, 0.55), Vector3(x - 0.6, y + h + 0.12, z), _mat(Color(1, 1, 1), light), false)
+				_box(n, Vector3(0.04, 1.7, 0.04), Vector3(x - 0.95, y + 0.85, z - 0.3), metal, false)
+				_box(n, Vector3(0.16, 0.24, 0.06), Vector3(x - 0.95, y + 1.6, z - 0.3), _glow(Color(0.7, 0.95, 1.0)), false)
+			"소파":
+				var sofa := _mat((p.key as Color).darkened(0.25), light, 0.018)
+				_box(n, Vector3(1.0, h, 0.85), Vector3(x, y + h * 0.5, z), sofa)
+				_box(n, Vector3(1.0, 0.6, 0.25), Vector3(x, y + h + 0.3, z - 0.32), sofa)
+			"의자":
+				var seat := _mat(Color(0.30, 0.32, 0.38), light, 0.014)
+				_box(n, Vector3(0.5, 0.07, 0.5), Vector3(x, y + h, z), seat)
+				_box(n, Vector3(0.5, 0.55, 0.06), Vector3(x, y + h + 0.3, z + 0.25), seat)
+				_box(n, Vector3(0.06, h, 0.06), Vector3(x, y + h * 0.5, z), metal, false)
 
 
 func _furniture(n: Node3D, f: Dictionary, b: Dictionary, light: String) -> void:
@@ -247,41 +346,41 @@ func _furniture(n: Node3D, f: Dictionary, b: Dictionary, light: String) -> void:
 			var notes := [Color(1, 0.95, 0.7), Color(0.8, 1, 0.9), Color(1, 0.8, 0.85), Color(0.85, 0.9, 1)]
 			for i in 4:
 				_box(n, Vector3(0.5, 0.32, 0.02), Vector3(x0 + w * 0.46 - 0.32 + (i % 2) * 0.64, y + 2.3 - floori(i / 2.0) * 0.42, BZ + 0.07), _mat(notes[i], light), false)
+		"식당":
+			_box(n, Vector3(w * 0.55, 0.1, 0.9), Vector3(x0 + w * 0.38, y + 0.78, BZ + 0.75), wood)
+			for sx in [-1.0, 1.0]:
+				_box(n, Vector3(0.1, 0.74, 0.7), Vector3(x0 + w * 0.38 + sx * w * 0.24, y + 0.37, BZ + 0.75), metal)
+			_box(n, Vector3(w * 0.26, 1.05, 0.8), Vector3(x0 + w * 0.84, y + 0.53, BZ + 0.45), _mat(amb.darkened(0.45), light, 0.015))
+			_box(n, Vector3(w * 0.22, 0.08, 0.6), Vector3(x0 + w * 0.84, y + 1.1, BZ + 0.45), _glow(key.lightened(0.2)), false)
+			_box(n, Vector3(0.7, 1.9, 0.6), Vector3(x0 + w * 0.84, y + 0.95 + 1.1, BZ + 0.3), _mat(Color(0.85, 0.87, 0.9), light, 0.015))
+			# 식재료 상자 (보유 수량만큼 보이게는 2D 이름표로)
+			for i in 3:
+				_box(n, Vector3(0.5, 0.35, 0.4), Vector3(x0 + w * 0.66 + i * 0.12, y + 0.18 + i * 0.35, BZ + 0.3), _mat(Color(0.62, 0.48, 0.30), light, 0.015))
+		"상점":
+			for i in 3:
+				_box(n, Vector3(w * 0.7, 0.06, 0.5), Vector3(x0 + w * 0.5, y + 0.6 + i * 0.6, BZ + 0.26), wood)
+				for j in 4:
+					var cc: Color = [Color(1, 0.4, 0.4), Color(0.4, 0.8, 1), Color(1, 0.85, 0.3), Color(0.5, 1, 0.6)][(i + j) % 4]
+					_box(n, Vector3(0.22, 0.3, 0.22), Vector3(x0 + w * (0.22 + j * 0.18), y + 0.78 + i * 0.6, BZ + 0.26), _mat(cc, light, 0.01), false)
+			_box(n, Vector3(w * 0.6, 1.0, 0.5), Vector3(x0 + w * 0.5, y + 0.5, BZ + 1.4), _mat(amb.darkened(0.4), light, 0.015))
+			_box(n, Vector3(0.9, 0.35, 0.05), Vector3(x0 + w * 0.5, y + 2.6, BZ + 0.05), _glow(Color(1.0, 0.85, 0.3)), false)
+		"의무":
+			_box(n, Vector3(0.9, 1.8, 0.45), Vector3(x0 + w * 0.94 - 0.45, y + 0.9, BZ + 0.24), _mat(Color(0.92, 0.94, 0.96), light, 0.015))
+			_box(n, Vector3(0.6, 0.16, 0.04), Vector3(x0 + w * 0.5, y + 2.4, BZ + 0.05), _glow(Color(0.3, 1.0, 0.5)), false)
+			_box(n, Vector3(0.16, 0.6, 0.04), Vector3(x0 + w * 0.5, y + 2.4, BZ + 0.05), _glow(Color(0.3, 1.0, 0.5)), false)
 		"공용":
-			if str(f.id).contains("mess"):
-				_box(n, Vector3(w * 0.55, 0.1, 0.9), Vector3(x0 + w * 0.38, y + 0.78, BZ + 1.1), wood)
-				for sx in [-1.0, 1.0]:
-					_box(n, Vector3(0.1, 0.74, 0.7), Vector3(x0 + w * 0.38 + sx * w * 0.24, y + 0.37, BZ + 1.1), metal)
-				_box(n, Vector3(w * 0.5, 0.42, 0.3), Vector3(x0 + w * 0.38, y + 0.21, BZ + 1.85), wood)
-				_box(n, Vector3(w * 0.26, 1.05, 0.8), Vector3(x0 + w * 0.82, y + 0.53, BZ + 0.45), _mat(amb.darkened(0.45), light, 0.015))
-				_box(n, Vector3(w * 0.22, 0.08, 0.6), Vector3(x0 + w * 0.82, y + 1.1, BZ + 0.45), _glow(key.lightened(0.2)), false)
-			elif str(f.id).contains("storage"):
+			if str(f.id).contains("storage"):
 				for i in 6:
 					var hh := 0.7 + (i % 3) * 0.45
 					_box(n, Vector3(0.95, hh, 0.95), Vector3(x0 + w * (0.12 + i * 0.15), y + hh * 0.5, BZ + 0.6 + (i % 2) * 0.5), _mat(Color(0.62, 0.48, 0.30), light, 0.02))
 			else:
-				var sofa := _mat(key.darkened(0.25), light, 0.018)
-				var sx := x0 + w * 0.28
-				_box(n, Vector3(2.2, 0.45, 0.85), Vector3(sx, y + 0.28, BZ + 0.6), sofa)
-				_box(n, Vector3(2.2, 0.6, 0.25), Vector3(sx, y + 0.75, BZ + 0.25), sofa)
-				for ax in [-1.15, 1.15]:
-					_box(n, Vector3(0.25, 0.7, 0.85), Vector3(sx + ax, y + 0.35, BZ + 0.6), sofa)
 				_box(n, Vector3(1.1, 0.08, 0.6), Vector3(x0 + w * 0.62, y + 0.45, BZ + 1.3), wood)
 				_box(n, Vector3(0.12, 0.42, 0.12), Vector3(x0 + w * 0.62, y + 0.21, BZ + 1.3), metal)
 				_box(n, Vector3(1.2, 0.8, 0.08), Vector3(x0 + w * 0.78, y + 1.95, BZ + 0.04), _mat(Color(0.1, 0.1, 0.13), light, 0.012))
 				_box(n, Vector3(1.05, 0.66, 0.02), Vector3(x0 + w * 0.78, y + 1.95, BZ + 0.09), _glow(acc), false)
 		"생활":
-			for i in 2:
-				var bx := x0 + w * (0.22 + i * 0.36)
-				for lvl in 2:
-					var by := y + 0.45 + lvl * 1.1
-					_box(n, Vector3(1.9, 0.18, 0.9), Vector3(bx, by, BZ + 0.55), _mat(Color(0.88, 0.88, 0.92), light, 0.012))
-					_box(n, Vector3(1.95, 0.08, 0.95), Vector3(bx, by - 0.12, BZ + 0.55), metal)
-				for sx in [-0.98, 0.98]:
-					_box(n, Vector3(0.08, 2.0, 0.08), Vector3(bx + sx, y + 1.0, BZ + 0.98), metal)
-			for i in 3:
-				_box(n, Vector3(0.42, 1.9, 0.5), Vector3(x0 + w * 0.86 + (i - 1) * 0.44, y + 0.95, BZ + 0.27), _mat(amb.darkened(0.35), light, 0.012))
-		"작업":
+			pass   # 침대는 오브젝트 시트로
+		"작업", "무기고":
 			_box(n, Vector3(w * 0.45, 0.12, 0.8), Vector3(x0 + w * 0.32, y + 0.9, BZ + 0.5), wood)
 			for sx in [-1.0, 1.0]:
 				_box(n, Vector3(0.12, 0.85, 0.7), Vector3(x0 + w * 0.32 + sx * w * 0.2, y + 0.43, BZ + 0.5), metal)
@@ -290,6 +389,11 @@ func _furniture(n: Node3D, f: Dictionary, b: Dictionary, light: String) -> void:
 				_box(n, Vector3(0.07, 0.6, 0.05), Vector3(x0 + w * 0.16 + i * w * 0.05, y + 1.95, BZ + 0.08), _mat(Color(0.85, 0.85, 0.9), light), false)
 			_box(n, Vector3(1.1, 1.2, 0.9), Vector3(x0 + w * 0.78, y + 0.6, BZ + 0.5), _mat(Color(0.28, 0.29, 0.34), light, 0.02))
 			_box(n, Vector3(0.8, 0.1, 0.05), Vector3(x0 + w * 0.78, y + 0.95, BZ + 0.96), _glow(key), false)
+			# 무기 걸이 (소총 모양 막대들, 뒷벽 오른쪽 위)
+			for i in 5:
+				var r := _box(n, Vector3(0.09, 1.0, 0.06), Vector3(x0 + w * 0.64 + i * 0.26, y + 2.25, BZ + 0.08), _mat(Color(0.18, 0.18, 0.2), light, 0.01), false)
+				r.rotation.z = 0.25
+			_box(n, Vector3(1.5, 0.08, 0.1), Vector3(x0 + w * 0.76, y + 1.75, BZ + 0.08), wood, false)
 		"훈련":
 			var bag := CylinderMesh.new()
 			bag.top_radius = 0.28
@@ -315,16 +419,26 @@ func _furniture(n: Node3D, f: Dictionary, b: Dictionary, light: String) -> void:
 				t.rotation_degrees.z = -6.0 + i * 12.0
 
 
-func _stairs(n: Node3D, b: Dictionary, light: String) -> void:
-	var w: float = b.x1 - b.x0
-	var h: float = b.y1 - b.y0
-	var steps := 9
-	var step_mat := _mat(Color(0.5, 0.5, 0.56), light, 0.01)
+func _stairs(n: Node3D, fid: String, b: Dictionary, light: String) -> void:
+	if not has_flight(fid):
+		return
+	var order := int(sim.data.facilities[fid].order)
+	var ends := RoomRouteService.flight_ends(sim.data, fid)   # 아래 끝 / 위 끝 (px)
+	var xl: float = ends.x / OutgameData.CELL_W * CELL_M
+	var xh: float = ends.y / OutgameData.CELL_W * CELL_M
+	var z := flight_z(order)
+	var steps := 11
+	var step_mat := _mat(Color(0.52, 0.52, 0.58), light, 0.01)
+	var sw := absf(xh - xl) / steps
+	var dir := signf(xh - xl)
 	for i in steps:
-		var sh := (i + 1) * h / float(steps + 1)
-		_box(n, Vector3(w / steps, sh, 1.2), Vector3(b.x0 + (i + 0.5) * w / steps, b.y0 + sh * 0.5, BACK_Z + 0.62), step_mat)
-	var rail := _box(n, Vector3(w * 1.2, 0.07, 0.07), Vector3((b.x0 + b.x1) * 0.5, b.y0 + h * 0.62, BACK_Z + 1.3), _mat(Color(0.95, 0.8, 0.2), light), false)
-	rail.rotation.z = atan2(h * 0.85, w)
+		var top := (i + 1) * FLOOR_M / steps
+		_box(n, Vector3(sw + 0.01, 0.16, 1.0), Vector3(xl + dir * (i + 0.5) * sw, b.y0 + top - 0.08, z), step_mat)
+		_box(n, Vector3(sw + 0.01, top - 0.16, 0.06), Vector3(xl + dir * (i + 0.5) * sw, b.y0 + (top - 0.16) * 0.5, z + 0.5), _mat(Color(0.36, 0.36, 0.42), light), false)
+	# 난간 (계단 앞쪽, 노란 띠)
+	var len := sqrt(pow(xh - xl, 2) + FLOOR_M * FLOOR_M)
+	var rail := _box(n, Vector3(len, 0.07, 0.07), Vector3((xl + xh) * 0.5, b.y0 + FLOOR_M * 0.5 + 0.9, z + 0.52), _mat(Color(0.95, 0.8, 0.2), light), false)
+	rail.rotation.z = atan2(FLOOR_M, xh - xl)
 
 
 func _gate(n: Node3D, b: Dictionary, light: String) -> void:

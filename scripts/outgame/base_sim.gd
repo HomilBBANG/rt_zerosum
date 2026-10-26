@@ -2,7 +2,8 @@ class_name BaseSim
 extends RefCounted
 ## 아웃게임 기지 시뮬레이션 (화면과 분리 — 헤드리스 테스트 가능).
 ## 시계 · 시설 해금 · 대원 주간 일정 이동 · 대화/엿듣기/요청 · 일일 오염/청소/위임 · 업무/외부 의뢰 ·
-## 주간 결산 · 월 1회 장군 점검 · 훈련/제작/강화 · 저장/불러오기.
+## 주간 결산 · 월 1회 장군 점검 · 훈련/제작/강화 · 저장/불러오기 ·
+## 대원 몸 상태(체력·상태 이상·피로·친밀도) · 오브젝트(침대·소파·의자·의무침대) · 식재료 · PX 선물 · 의무실 · 전투 발생 규칙.
 ## 처리 순서 (매 게임 분): 날짜 전환(결산 → 월 전환 → 일일 오염) → 정각 → 점검 → 작업실 → 대원 → 대화.
 ## 날짜가 바뀌는 판단은 시계만 하고, UI 는 이 클래스의 함수만 호출한다 (03_IMPLEMENTATION_HANDOFF 4절).
 
@@ -16,6 +17,7 @@ signal job_completed(job: Dictionary)
 signal inspection_completed(record: Dictionary)
 signal statement_ready(statement: Dictionary)
 signal notice(text: String)
+signal battle_triggered(pending: Dictionary)
 
 const SAVE_VERSION := 1
 
@@ -43,6 +45,12 @@ var workshop: Dictionary = {}        # {kind: craft|enhance, recipe?, uid?, rema
 var counters: Dictionary = {"dirt": 0, "job": 0, "inv": 0, "chat": 0}
 var log_lines: Array = []
 var cleaning_log: Array = []         # [{minute, requested, executing, facility, result}]
+var chars: Dictionary = {}           # 전투 캐릭터 id → {hp, statuses, fatigue, affinity, talk_day} (기지·전투 공통 몸 상태)
+var seat_owner: Dictionary = {}      # 오브젝트 id → 대원 id
+var food: int = 0                    # 식재료 (1 = 한 끼)
+var gifts: Dictionary = {}           # PX 선물 id → 개수
+var pending_battle: Dictionary = {}  # 발생했지만 아직 끝나지 않은 전투 {rule, name, stage, minute, label, allow_skip}
+var battle_history: Array = []       # [{minute, label, stage, rule, winner}]
 var _minute: int = 0                 # 마지막으로 처리한 게임 분
 var _day: int = 0
 var _month: String = ""
@@ -67,6 +75,7 @@ func _new_game() -> void:
 		cleanliness[fid] = data.num("initial_cleanliness", 90.0)
 	_add_missing_npcs()
 	_init_inventory()
+	food = data.inum("food_start", 10)
 	_minute = clock.minute_int()
 	_day = clock.day_index(_minute)
 	_month = clock.month_key(_minute)
@@ -185,9 +194,11 @@ func _on_minute(m: int) -> void:
 	if clock.minute_of_day(m) % 60 == 0:
 		hour_changed.emit(m)
 	_check_inspection(m)
+	_check_battle_rules(m)
 	_tick_workshop()
 	for id in data.npc_order:
 		if npcs.has(id):
+			_tick_body(npcs[id])
 			_npc_minute(npcs[id], m)
 	_tick_chats(m)
 	_try_conversations(m)
@@ -274,9 +285,26 @@ func _npc_minute(n: NpcAgent, m: int) -> void:
 			if n.busy <= 0.0:
 				_finish_command(n)
 			return
+		NpcAgent.TREATMENT:
+			n.busy -= 1.0
+			if n.busy <= 0.0:
+				var cs := cstate(n)
+				cs.statuses = []
+				_log("%s 치료 완료 — 상태 이상 없음, 이제 의무실 침대에서 휴식" % n.name)
+				n.state = NpcAgent.RECOVERING
+				npc_state_changed.emit(n.id)
+			return
+		NpcAgent.RECOVERING:
+			if n.seat == "":
+				_claim_seat_here(n, "medical")
+			if float(cstate(n).hp) >= char_max_hp(n.character_id):
+				_log("%s 체력 회복 완료 (%d)" % [n.name, char_max_hp(n.character_id)])
+				_finish_command(n)
+			return
 	if not n.command.is_empty():
 		return   # 지시 장소로 이동 중
 	var mod := clock.minute_of_day(m)
+	_try_meal(n, m)
 	var changes: Dictionary = _changes.get(n.id, {}).get(clock.weekday(m), {})
 	if not (n.need_think or changes.has(mod)):
 		return
@@ -290,8 +318,9 @@ func _npc_minute(n: NpcAgent, m: int) -> void:
 	if want.facility == "":
 		return
 	n.activity = want.activity
-	if want.facility != n.dest:
-		_go(n, want.facility)
+	var seat := _pick_seat(n, want.facility, want.activity)
+	if want.facility != n.dest or seat != n.seat:
+		_go(n, want.facility, seat)
 	elif n.state != NpcAgent.MOVING:
 		n.state = NpcAgent.STAYING
 	npc_state_changed.emit(n.id)
@@ -307,13 +336,17 @@ func _slot_x(n: NpcAgent, fid: String) -> float:
 	return r.position.x + 44.0 + frac * (r.size.x - 88.0)
 
 
-func _go(n: NpcAgent, fid: String) -> bool:
+func _go(n: NpcAgent, fid: String, seat: String = "") -> bool:
 	var route := RoomRouteService.find_path(data, n.facility, fid, _is_open)
 	if route.is_empty():
 		n.dest_reason = "%s 로 가는 길 없음" % data.facility_name(fid)
 		return false
+	_release_seat(n)
+	if seat != "" and not seat_owner.has(seat):
+		seat_owner[seat] = n.id
+		n.seat = seat
 	n.dest = fid
-	n.dest_x = _slot_x(n, fid)
+	n.dest_x = data.object_x(n.seat) if n.seat != "" else _slot_x(n, fid)
 	n.path = RoomRouteService.waypoints(data, route, n.dest_x)
 	n.state = NpcAgent.MOVING
 	npc_state_changed.emit(n.id)
@@ -358,6 +391,12 @@ func _arrive(n: NpcAgent) -> void:
 			"train":
 				n.state = NpcAgent.TRAINING
 				n.busy = data.num("train_minutes", 120.0)
+			"medical":
+				if not (cstate(n).statuses as Array).is_empty():
+					n.state = NpcAgent.TREATMENT
+					n.busy = data.num("treat_minutes", 60.0)
+				else:
+					n.state = NpcAgent.RECOVERING
 			"job":
 				var j: Dictionary = data.jobs.get(str(c.contract), {})
 				n.busy = float(j.get("minutes", 60))
@@ -382,6 +421,10 @@ func begin_dialogue(npc_id: String) -> Dictionary:
 		n.resume_state = n.state
 		n.state = NpcAgent.PLAYER_DIALOGUE
 	npc_state_changed.emit(n.id)
+	var cs := cstate(n)
+	if int(cs.get("talk_day", -1)) != _day:   # 하루 첫 대화 → 친밀도 조금
+		cs.talk_day = _day
+		_add_affinity(n, data.num("affinity_talk", 1.0))
 	var req := active_request(npc_id)
 	var dlg: String = req.dialogue if not req.is_empty() else str(data.npcs.get(npc_id, {}).get("talk", ""))
 	return {"lines": data.dialogues.get(dlg, []), "request": req}
@@ -417,6 +460,8 @@ func accept_request(rid: String) -> Dictionary:
 	if request_state.has(rid):
 		return {"ok": false, "msg": "이미 수락한 요청입니다"}
 	request_state[rid] = "accepted"
+	if npcs.has(q.npc):
+		_add_affinity(npcs[q.npc], data.num("affinity_request", 5.0))
 	var eff: String = q.effect
 	var msg := "요청 수락"
 	if eff.begins_with("의뢰:"):
@@ -717,7 +762,8 @@ func _start_command(n: NpcAgent, cmd: Dictionary) -> void:
 	if n.state == NpcAgent.CHATTING:
 		_end_chat_of(n, _minute)
 	n.command = cmd
-	if not _go(n, str(cmd.target)):
+	var seat := _pick_seat(n, str(cmd.target), "medical") if str(cmd.type) == "medical" else ""
+	if not _go(n, str(cmd.target), seat):
 		n.command = {}
 		return
 	npc_state_changed.emit(n.id)
@@ -742,13 +788,14 @@ func _finish_command(n: NpcAgent) -> void:
 	n.busy = 0.0
 	n.state = NpcAgent.STAYING
 	n.dest = n.facility
+	_release_seat(n)
 	n.need_think = true   # 지시 완료 → 현재 요일·시각 일정으로 복귀
 	npc_state_changed.emit(n.id)
 
 
 # ================================================================ 작업실: 제작 · 강화
 func workshop_facility() -> String:
-	for fid in data.facilities_with_tag("작업"):
+	for fid in data.facilities_with_tag("무기고"):
 		if unlocked.has(fid):
 			return fid
 	return ""
@@ -769,9 +816,9 @@ func inv_item(uid: String) -> Dictionary:
 
 func start_craft(rid: String) -> Dictionary:
 	if workshop_facility() == "":
-		return _fail("작업실이 잠겨 있습니다")
+		return _fail("무기고가 잠겨 있습니다")
 	if not workshop.is_empty():
-		return _fail("작업실이 다른 작업 중입니다")
+		return _fail("무기고가 다른 작업 중입니다")
 	var r: Dictionary = data.recipes.get(rid, {})
 	if r.is_empty():
 		return _fail("없는 레시피")
@@ -782,9 +829,9 @@ func start_craft(rid: String) -> Dictionary:
 
 func start_enhance(uid: String) -> Dictionary:
 	if workshop_facility() == "":
-		return _fail("작업실이 잠겨 있습니다")
+		return _fail("무기고가 잠겨 있습니다")
 	if not workshop.is_empty():
-		return _fail("작업실이 다른 작업 중입니다")
+		return _fail("무기고가 다른 작업 중입니다")
 	var it := inv_item(uid)
 	if it.is_empty():
 		return _fail("없는 무기")
@@ -870,6 +917,301 @@ func apply_to_ally(copy: UnitData, base: UnitData) -> void:
 		copy.weapons = out
 
 
+# ================================================================ 몸 상태 · 오브젝트 · 식사
+## 대원 몸 상태 (전투 캐릭터 id 기준 — 전투와 기지가 같이 씀)
+func cstate_of(character_id: String) -> Dictionary:
+	if not chars.has(character_id):
+		chars[character_id] = {"hp": float(char_max_hp(character_id)), "statuses": [], "fatigue": data.num("fatigue_start", 20.0),
+			"affinity": data.num("affinity_start", 20.0), "talk_day": -1}
+	return chars[character_id]
+
+
+func cstate(n: NpcAgent) -> Dictionary:
+	return cstate_of(n.character_id)
+
+
+## 전투 최대 HP (훈련 반영)
+func char_max_hp(character_id: String) -> int:
+	var base_hp := 100
+	if battle != null:
+		var u: UnitData = GameData._find(battle.allies, character_id)
+		if u != null:
+			base_hp = u.max_hp
+	return base_hp + training_level(character_id) * data.inum("train_hp_bonus", 5)
+
+
+func _add_affinity(n: NpcAgent, v: float) -> void:
+	var cs := cstate(n)
+	cs.affinity = clampf(float(cs.affinity) + v, 0.0, 100.0)
+
+
+## 매 분: 잠은 오브젝트 위에서만 피로 회복(오브젝트마다 다름), 체력은 체력회복 오브젝트(의무침대)에서만, 깨어 있으면 피로 증가
+func _tick_body(n: NpcAgent) -> void:
+	var cs := cstate(n)
+	var per := 1.0 / 60.0
+	var o: Dictionary = data.objects.get(n.seat, {}) if n.seat != "" and n.state != NpcAgent.MOVING else {}
+	var asleep := (n.state == NpcAgent.STAYING and n.activity == "sleep") or n.state == NpcAgent.RECOVERING
+	if asleep:
+		if not o.is_empty():
+			cs.fatigue = float(cs.fatigue) - float(o.fatigue_rate) * per
+			if float(o.hp_rate) > 0.0:
+				cs.hp = minf(float(char_max_hp(n.character_id)), float(cs.hp) + float(o.hp_rate) * per)
+	else:
+		var rate := data.num("fatigue_awake_per_hour", 2.0)
+		if n.state in [NpcAgent.CLEANING, NpcAgent.ASSIGNED_WORK, NpcAgent.UNAVAILABLE]:
+			rate = data.num("fatigue_work_per_hour", 4.0)
+		elif n.state == NpcAgent.TRAINING:
+			rate = data.num("fatigue_train_per_hour", 7.0)
+		elif n.state == NpcAgent.TREATMENT:
+			rate = 0.0
+		cs.fatigue = float(cs.fatigue) + rate * per
+	cs.fatigue = clampf(float(cs.fatigue), 0.0, 100.0)
+
+
+## 활동에 맞는 빈 오브젝트 (없으면 "") — sleep: 회복력 높은 순, rest: 소파·의자·침대(앉기), eat·work: 의자, medical: 의무침대
+func _pick_seat(n: NpcAgent, fid: String, activity: String) -> String:
+	var kinds: Array = []
+	match activity:
+		"sleep":
+			kinds = ["침대", "의무침대", "소파", "의자"]
+		"rest":
+			kinds = ["소파", "의자", "침대"]
+		"eat", "work":
+			kinds = ["의자"]
+		"medical":
+			kinds = ["의무침대"]
+		_:
+			return ""
+	if n.seat != "" and data.objects.get(n.seat, {}).get("facility", "") == fid and data.objects[n.seat].kind in kinds:
+		return n.seat
+	var best := ""
+	var best_v := -INF
+	for oid in data.objects_in(fid):
+		var o: Dictionary = data.objects[oid]
+		if not o.kind in kinds or (seat_owner.has(oid) and seat_owner[oid] != n.id):
+			continue
+		var v: float = float(o.fatigue_rate) + float(o.hp_rate) - kinds.find(o.kind) * 0.01
+		if activity != "sleep":
+			v = -kinds.find(o.kind) - absf(float(o.x) - 0.5) * 0.1
+		if v > best_v:
+			best = oid
+			best_v = v
+	return best
+
+
+func _claim_seat_here(n: NpcAgent, activity: String) -> void:
+	var oid := _pick_seat(n, n.facility, activity)
+	if oid != "":
+		seat_owner[oid] = n.id
+		n.seat = oid
+		n.dest_x = data.object_x(oid)
+		n.pos = Vector2(n.dest_x, data.floor_line(n.facility))
+
+
+func _release_seat(n: NpcAgent) -> void:
+	if n.seat != "" and seat_owner.get(n.seat, "") == n.id:
+		seat_owner.erase(n.seat)
+	n.seat = ""
+
+
+## 화면 자세: {pose: stand|sit|lie, height(m), kind}
+func posture(n: NpcAgent) -> Dictionary:
+	if n.seat == "" or n.state == NpcAgent.MOVING or n.state == NpcAgent.PLAYER_DIALOGUE:
+		return {"pose": "stand", "height": 0.0, "kind": ""}
+	var o: Dictionary = data.objects.get(n.seat, {})
+	if o.is_empty():
+		return {"pose": "stand", "height": 0.0, "kind": ""}
+	var asleep := n.activity == "sleep" or n.state == NpcAgent.RECOVERING
+	var pose := "sit"
+	if asleep and o.kind in ["침대", "의무침대", "소파"]:
+		pose = "lie"
+	return {"pose": pose, "height": float(o.height), "kind": o.kind}
+
+
+## 식당에서 식사: 끼니마다 식재료 1 소모, 없으면 굶어서 피로 증가 (피로는 잠으로만 회복)
+func _try_meal(n: NpcAgent, m: int) -> void:
+	if n.activity != "eat" or n.state != NpcAgent.STAYING or data.facilities.get(n.facility, {}).get("tag", "") != "식당":
+		return
+	var key := "%d:%d" % [clock.day_index(m), floori(clock.minute_of_day(m) / 180.0)]
+	if n.meal_key == key:
+		return
+	n.meal_key = key
+	var cs := cstate(n)
+	if food > 0:
+		food -= 1
+	else:
+		cs.fatigue = clampf(float(cs.fatigue) + data.num("hungry_fatigue", 6.0), 0.0, 100.0)
+		_log("식재료가 없어 %s 이(가) 끼니를 걸렀습니다 (피로 +%d)" % [n.name, data.inum("hungry_fatigue", 6)])
+
+
+func mess_facility() -> String:
+	for fid in data.facilities_with_tag("식당"):
+		if unlocked.has(fid):
+			return fid
+	return ""
+
+
+func buy_food() -> Dictionary:
+	if mess_facility() == "":
+		return _fail("식당이 잠겨 있습니다")
+	var price := data.inum("food_pack_price", 20)
+	if ledger.cash < price:
+		return _fail("달러가 부족합니다 ($%d 더 필요)" % (price - ledger.cash))
+	counters.food = int(counters.get("food", 0)) + 1
+	var amount := data.inum("food_pack_amount", 12)
+	ledger.post("food:%d" % counters.food, _minute, clock.label(_minute), "food", -price, "food", "식재료 %d끼" % amount, week_now())
+	food += amount
+	_log("식재료 공급 +%d끼 (-$%d) → %d끼" % [amount, price, food])
+	return {"ok": true, "msg": "식재료 +%d끼 (남은 %d끼)" % [amount, food]}
+
+
+# ================================================================ PX · 선물
+func px_facility() -> String:
+	for fid in data.facilities_with_tag("상점"):
+		if unlocked.has(fid):
+			return fid
+	return ""
+
+
+func buy_gift(item_id: String) -> Dictionary:
+	var it: Dictionary = data.px_items.get(item_id, {})
+	if it.is_empty():
+		return _fail("없는 물건")
+	if px_facility() == "":
+		return _fail("PX 가 잠겨 있습니다")
+	if ledger.cash < int(it.price):
+		return _fail("달러가 부족합니다 ($%d 더 필요)" % (int(it.price) - ledger.cash))
+	counters.gift = int(counters.get("gift", 0)) + 1
+	ledger.post("px:%d" % counters.gift, _minute, clock.label(_minute), "px", -int(it.price), item_id, "PX %s" % it.name, week_now())
+	gifts[item_id] = int(gifts.get(item_id, 0)) + 1
+	return {"ok": true, "msg": "%s 구매 (보유 %d)" % [it.name, gifts[item_id]]}
+
+
+func give_gift(npc_id: String, item_id: String) -> Dictionary:
+	var n: NpcAgent = npcs.get(npc_id)
+	var it: Dictionary = data.px_items.get(item_id, {})
+	if n == null or it.is_empty():
+		return _fail("줄 수 없습니다")
+	if int(gifts.get(item_id, 0)) <= 0:
+		return _fail("%s 이(가) 없습니다 (PX 에서 구매)" % it.get("name", item_id))
+	gifts[item_id] = int(gifts[item_id]) - 1
+	var liked: bool = npc_id in (it.liked as Array)
+	var v := float(it.affinity) * (data.num("liked_gift_mult", 2.0) if liked else 1.0)
+	_add_affinity(n, v)
+	_log("%s 에게 %s 선물 — 친밀도 +%d%s" % [n.name, it.name, roundi(v), " (좋아함!)" if liked else ""])
+	return {"ok": true, "msg": "%s 친밀도 +%d%s" % [n.name, roundi(v), " — 좋아하는 선물!" if liked else ""], "liked": liked}
+
+
+# ================================================================ 의무실
+func infirmary_facility() -> String:
+	for fid in data.facilities_with_tag("의무"):
+		if unlocked.has(fid):
+			return fid
+	return ""
+
+
+## 우클릭 → 의무실로: 상태 이상이 있으면 치료(시간) 후, 의무침대에서 체력이 다 찰 때까지 휴식
+func issue_medical(npc_id: String) -> Dictionary:
+	var n: NpcAgent = npcs.get(npc_id)
+	if n == null:
+		return _fail("없는 대원")
+	var fid := infirmary_facility()
+	if fid == "":
+		return _fail("의무실이 잠겨 있습니다")
+	var cs := cstate(n)
+	if (cs.statuses as Array).is_empty() and float(cs.hp) >= char_max_hp(n.character_id):
+		return _fail("%s 은(는) 치료할 것이 없습니다 (체력 가득, 상태 이상 없음)" % n.name)
+	if not n.is_free():
+		return _fail("%s 은(는) 지금 다른 일을 하고 있습니다 (%s)" % [n.name, n.state_name()])
+	if not reachable(n.facility, fid):
+		return _fail("의무실까지 갈 수 있는 길이 없습니다")
+	_start_command(n, {"type": "medical", "target": fid, "issuer": "player"})
+	var msg := "%s → 의무실 (%s)" % [n.name, "치료 후 휴식" if not (cs.statuses as Array).is_empty() else "체력 회복 휴식"]
+	_log(msg)
+	return {"ok": true, "msg": msg}
+
+
+# ================================================================ 전투 발생 · 전투 연계
+func _check_battle_rules(m: int) -> void:
+	if not pending_battle.is_empty():
+		return
+	for r in data.battle_rules:
+		if BattleRules.fires_at(r, m, clock):
+			var stages: Array = r.get("stages", [])
+			var st: String = str(stages[rng.randi() % stages.size()]) if not stages.is_empty() else ""
+			pending_battle = {"rule": r.id, "name": r.name, "stage": st, "minute": m, "label": clock.label(m), "allow_skip": r.get("allow_skip", false)}
+			_log("전투 발생! %s (%s)" % [r.name, st])
+			battle_triggered.emit(pending_battle)
+			return
+
+
+## 다음 전투 발생 예정 {minute, rule} (없으면 {})
+func next_battle() -> Dictionary:
+	return BattleRules.next_of(data.battle_rules, _minute, clock)
+
+
+## 디버그: 첫 규칙으로 지금 전투 발생 (규칙이 없으면 첫 스테이지)
+func debug_trigger_battle() -> void:
+	if not pending_battle.is_empty():
+		return
+	var r: Dictionary = data.battle_rules[0] if not data.battle_rules.is_empty() else {"id": "debug", "name": "디버그 전투", "stages": []}
+	var stages: Array = r.get("stages", [])
+	pending_battle = {"rule": r.id, "name": r.name, "stage": str(stages[0]) if not stages.is_empty() else "", "minute": _minute,
+		"label": clock.label(_minute), "allow_skip": true}
+	_log("전투 발생! %s (디버그)" % r.name)
+	battle_triggered.emit(pending_battle)
+
+
+func skip_pending_battle() -> bool:
+	if pending_battle.is_empty() or not pending_battle.get("allow_skip", false):
+		return false
+	_log("전투를 넘김 (%s)" % pending_battle.name)
+	pending_battle = {}
+	return true
+
+
+## 전투에 들고 갈 몸 상태 {hp, statuses}
+func battle_entry(character_id: String) -> Dictionary:
+	var cs := cstate_of(character_id)
+	return {"hp": maxi(1, floori(float(cs.hp))), "statuses": (cs.statuses as Array).duplicate()}
+
+
+## 전투 결과 반영: 잃은 체력 그대로(쓰러지면 1 + 부상), 부정 상태 이상 유지, 참가자 피로 증가
+## result.allies = [{id, hp, alive, statuses}]
+func apply_battle_result(result: Dictionary) -> void:
+	var lines := PackedStringArray()
+	for a in result.get("allies", []):
+		var cid := str(a.get("id", ""))
+		if cid == "":
+			continue
+		var cs := cstate_of(cid)
+		var sts: Array = []
+		for sid in a.get("statuses", []):
+			if not StatusCatalog.get_def(str(sid)).get("positive", false):
+				sts.append(str(sid))
+		if not a.get("alive", true):
+			cs.hp = 1.0
+			if not "injured" in sts:
+				sts.append("injured")
+		else:
+			cs.hp = clampf(float(a.get("hp", cs.hp)), 1.0, float(char_max_hp(cid)))
+		cs.statuses = sts
+		cs.fatigue = clampf(float(cs.fatigue) + data.num("fatigue_battle", 20.0), 0.0, 100.0)
+		lines.append("%s HP %d/%d%s" % [_char_label(cid), floori(float(cs.hp)), char_max_hp(cid), " 부상" if "injured" in sts else ""])
+	var w := str(result.get("winner", ""))
+	battle_history.append({"minute": _minute, "label": clock.label(_minute), "stage": str(result.get("stage", pending_battle.get("stage", ""))),
+		"rule": str(pending_battle.get("rule", "")), "winner": w})
+	pending_battle = {}
+	_log("전투 결과: %s — %s" % ["승리" if w == "ally" else "패배", ", ".join(lines)])
+
+
+func _char_label(character_id: String) -> String:
+	for id in data.npc_order:
+		if data.npcs[id].character_id == character_id:
+			return data.npcs[id].name
+	return character_id
+
+
 # ================================================================ 경제 · 결산 · 점검
 func _settle(week: int) -> void:
 	var st := ledger.settle(week, data.inum("weekly_subsidy", 100), _minute, clock.label(_minute))
@@ -946,7 +1288,8 @@ func to_dict() -> Dictionary:
 		"cleanliness": cleanliness, "dirt": dirt, "npcs": nd, "chats": chats, "jobs": jobs, "claimed_contracts": claimed_contracts.keys(),
 		"opened_contracts": opened_contracts.keys(), "request_state": request_state, "conv_counts": conv_counts, "heard": heard,
 		"story_seen": story_seen, "inspections": inspections, "progression": progression, "inventory": inventory,
-		"workshop": workshop, "counters": counters, "log": log_lines.slice(maxi(0, log_lines.size() - 100)), "cleaning_log": cleaning_log}
+		"workshop": workshop, "counters": counters, "log": log_lines.slice(maxi(0, log_lines.size() - 100)), "cleaning_log": cleaning_log,
+		"chars": chars, "food": food, "gifts": gifts, "pending_battle": pending_battle, "battle_history": battle_history}
 
 
 static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) -> BaseSim:
@@ -988,8 +1331,22 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 		it.slot = int(it.slot)
 	s.workshop = d.get("workshop", {})
 	var cn: Dictionary = d.get("counters", {})
-	for k in s.counters:
+	for k in cn:
 		s.counters[k] = int(cn.get(k, 0))
+	s.chars = d.get("chars", {})
+	for k in s.chars:
+		var c: Dictionary = s.chars[k]
+		c.hp = float(c.get("hp", 0))
+		c.fatigue = float(c.get("fatigue", 0))
+		c.affinity = float(c.get("affinity", 0))
+		c.talk_day = int(c.get("talk_day", -1))
+		c.statuses = (c.get("statuses", []) as Array).map(func(x): return str(x))
+	s.food = int(d.get("food", p_data.inum("food_start", 10)))
+	s.gifts = d.get("gifts", {})
+	for k in s.gifts:
+		s.gifts[k] = int(s.gifts[k])
+	s.pending_battle = d.get("pending_battle", {})
+	s.battle_history = d.get("battle_history", [])
 	s.log_lines = d.get("log", [])
 	s.cleaning_log = d.get("cleaning_log", [])
 	s._add_missing_npcs()
@@ -997,6 +1354,19 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 	for id in nd:
 		if s.npcs.has(id):
 			s.npcs[id].from_dict(nd[id])
+	# 시설 배치가 바뀐 저장(없는 시설·오브젝트)은 시작 장소로 되돌림
+	for n in s.npcs.values():
+		if not p_data.facilities.has(n.facility):
+			n.facility = str(p_data.npcs[n.id].start)
+			n.pos = Vector2(s._slot_x(n, n.facility), p_data.floor_line(n.facility))
+			n.state = NpcAgent.STAYING
+			n.command = {}
+		if not p_data.facilities.has(n.dest):
+			n.dest = n.facility
+		if n.seat != "" and (not p_data.objects.has(n.seat) or s.seat_owner.has(n.seat)):
+			n.seat = ""
+		if n.seat != "":
+			s.seat_owner[n.seat] = n.id
 	# 진행 중이던 대원끼리 대화
 	for ch in d.get("chats", []):
 		ch.end = int(ch.end)

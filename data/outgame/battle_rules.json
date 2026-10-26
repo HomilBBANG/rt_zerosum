@@ -1,0 +1,29 @@
+{
+	"rules": [
+		{
+			"id": "raid_6h",
+			"name": "정기 습격 (예시)",
+			"enabled": true,
+			"mode": "interval",
+			"interval_minutes": 360,
+			"anchor": "06:00",
+			"weekdays": [
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6
+			],
+			"start_day": "",
+			"times": [],
+			"date": "",
+			"stages": [
+				"stage_01"
+			],
+			"allow_skip": false,
+			"note": "예시: 6시간마다(00·06·12·18시) 전투 발생"
+		}
+	]
+}

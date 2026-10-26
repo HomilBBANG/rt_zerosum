@@ -104,6 +104,10 @@ func _ready() -> void:
 	hud.refresh_log()
 	if Game.cli.has("base_skip"):
 		sim.skip(int(Game.cli.base_skip))
+	if Game.cli.has("base_battle_soon"):
+		var nb := sim.next_battle()
+		if not nb.is_empty():
+			sim.skip(maxi(0, int(nb.minute) - sim.clock.minute_int() - 10))
 	if Game.cli.has("base_ui"):
 		call_deferred("_cli_ui", str(Game.cli.base_ui))
 	Game.maybe_cli_capture(30)
@@ -196,7 +200,8 @@ func _process(delta: float) -> void:
 	if sim == null:
 		return
 	_move_camera(delta)
-	if not hud.modal_open() and speed > 0:
+	# 창이 열려 있거나 전투가 발생해 대기 중이면 기지 시계 정지
+	if not hud.modal_open() and speed > 0 and sim.pending_battle.is_empty():
 		sim.advance(delta * sim.data.num("minutes_per_second", 1.0) * speed)
 	_update_hover()
 	hud.refresh(delta)
@@ -417,6 +422,10 @@ func debug_skip(minutes: int) -> void:
 	hud.refresh_log()
 
 
+func debug_battle() -> void:
+	sim.debug_trigger_battle()
+
+
 func debug_dirt() -> void:
 	var cands := sim.data.facility_order.filter(func(f): return sim.is_unlocked(f) and sim.cleanable(f))
 	if not cands.is_empty():
@@ -436,7 +445,6 @@ func _cli_ui(spec: String) -> void:
 		"overhear":
 			if not sim.chats.is_empty():
 				hud.open_overhear(sim.chats[0].key)
-		"unlock": hud.open_unlock(p[1])
 		"facility": hud.open_facility(p[1])
 		"character": hud.open_character(p[1])
 		"contracts": hud.open_contracts("")
@@ -453,6 +461,15 @@ func _cli_ui(spec: String) -> void:
 			begin_clean_pick(p[1])
 		"debug":
 			hud.toggle_debug()
+		"battle_event":
+			sim.debug_trigger_battle()
+		"medical":   # 단을 다치게 하고 의무실로
+			sim.apply_battle_result({"winner": "ally", "allies": [{"id": "a_dan", "hp": 0, "alive": false, "statuses": []}, {"id": "a_kira", "hp": 12, "alive": true, "statuses": []}]})
+			sim.issue_medical("npc_dan")
+			sim.issue_medical("npc_kira")
+			sim.skip(30)
+		"unlock":
+			hud.open_unlock(p[1])
 		"unlockall":   # 모든 시설 해금 (3D 내부 확인용)
 			sim.ledger.cash += 10000
 			for fid in sim.data.facility_order:

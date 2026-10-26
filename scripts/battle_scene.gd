@@ -62,7 +62,12 @@ func _on_battle_ended(winner: String) -> void:
 	await get_tree().create_timer(1.4).timeout
 	if Game.cli.has("shot"):
 		return
-	Game.show_result({"winner": winner, "rounds": controller.round_no, "log": controller.log_lines.duplicate(), "mode": Game.mode})
+	var allies := []
+	for u in controller.slots.all_units():
+		if u.team == "ally":
+			allies.append({"id": u.data.id, "hp": u.hp, "alive": u.alive, "statuses": u.statuses.duplicate()})
+	Game.show_result({"winner": winner, "rounds": controller.round_no, "log": controller.log_lines.duplicate(), "mode": Game.mode,
+		"allies": allies, "stage": Game.stage_id})
 
 
 func set_preset(id: String) -> void:

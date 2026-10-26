@@ -88,6 +88,8 @@ func _ready() -> void:
 				if req.get("base", false):   # 일정 탭 "기지 테스트 플레이": 새 기지, 저장 안 함, 카메라는 그 대원
 					cli["editor_base"] = true
 					cli["base_focus"] = str(req.get("npc", ""))
+					if req.get("battle_soon", false):   # 전투 발생 탭: 다음 전투 10분 전부터
+						cli["base_battle_soon"] = true
 	else:
 		push_warning("data/balance.xlsx 를 읽지 못해 내장 테스트 데이터를 씁니다")
 		allies = TestRoster.build_provided_allies()
@@ -229,12 +231,15 @@ func build_roster() -> Array:
 	for f in formation:
 		var d := find_ally(f.unit_id)
 		if d != null:
-			if campaign and base != null:   # 기지 훈련·장비·강화 반영 (전투 규칙은 그대로, 수치만)
+			var entry := {"row": f.row, "index": f.index}
+			if campaign and base != null:   # 기지 훈련·장비·강화 + 남은 체력·상태 이상 반영 (전투 규칙은 그대로, 수치만)
 				var c := UnitData.new()
 				_derive_ally(c, d)
 				_ally_copies.append({"copy": c, "base": d})
+				entry.merge(base.battle_entry(d.id))
 				d = c
-			out.append({"data": d, "row": f.row, "index": f.index})
+			entry["data"] = d
+			out.append(entry)
 	for e in enemies:
 		out.append({"data": e, "row": e.default_row, "index": e.default_index})
 	return out
@@ -357,6 +362,9 @@ func go_formation() -> void:
 
 func show_result(result: Dictionary) -> void:
 	last_result = result
+	if campaign and base != null:   # 잃은 체력·상태 이상·피로를 기지로 (체력은 의무실에서만 회복)
+		base.apply_battle_result(result)
+		save_campaign()
 	get_tree().change_scene_to_file(SCENE_RESULT)
 
 

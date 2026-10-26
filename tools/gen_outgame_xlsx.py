@@ -41,6 +41,20 @@ SETTINGS = [
     ["chat_cooldown", 180, "대원이 다시 대화를 시작하기까지 게임 분 [임시]"],
     ["walk_speed", 90, "대원 걷는 속도: 게임 1분당 px (방 한 칸 = 240px) [임시]"],
     ["seed", 2048, "오염·점검 날짜 난수 시드 [임시]"],
+    ["fatigue_start", 20, "시작 피로도 0~100 (높을수록 피곤) [임시]"],
+    ["fatigue_awake_per_hour", 2, "깨어 있을 때 시간당 피로 증가 [임시]"],
+    ["fatigue_work_per_hour", 4, "업무·청소·지시 중 시간당 피로 증가 [임시]"],
+    ["fatigue_train_per_hour", 7, "훈련 중 시간당 피로 증가 [임시]"],
+    ["fatigue_battle", 20, "전투 한 번 참가 시 피로 증가 [임시]"],
+    ["hungry_fatigue", 6, "식사 시간에 식재료가 없으면 피로 증가 [임시]"],
+    ["food_start", 10, "시작 식재료 (1 = 한 끼) [임시]"],
+    ["food_pack_price", 20, "식재료 한 묶음 가격 USD [임시]"],
+    ["food_pack_amount", 12, "식재료 한 묶음 = N 끼 [임시]"],
+    ["treat_minutes", 60, "의무실 치료(상태 이상 제거)에 걸리는 게임 분 [임시]"],
+    ["affinity_start", 20, "시작 친밀도 0~100 [임시]"],
+    ["affinity_talk", 1, "하루 첫 직접 대화 시 친밀도 + [임시]"],
+    ["affinity_request", 5, "요청 수락 시 그 대원 친밀도 + [임시]"],
+    ["liked_gift_mult", 2, "좋아하는 선물이면 친밀도 × [임시]"],
 ]
 
 FLOORS = [
@@ -57,17 +71,49 @@ FAC = [
     ["f1_stair_w", "서쪽 계단", "f1", 1, 1, 0, "O", "계단", "X", "g1", ""],
     ["f1_office", "행정실", "f1", 2, 2, 0, "O", "행정", "O", "g3", "외부 의뢰 게시판 (더미 이름)"],
     ["f1_lounge", "공용실", "f1", 4, 2, 0, "O", "공용", "O", "g1", "청소 가능한 공용 구역 (더미)"],
-    ["f1_mess", "식당", "f1", 6, 2, 50, "X", "공용", "O", "g2", "잠금 방 (더미)"],
-    ["f1_stair_e", "동쪽 계단", "f1", 8, 1, 0, "O", "계단", "X", "g1", ""],
+    ["f1_mess", "식당", "f1", 6, 2, 50, "X", "식당", "O", "g2", "달러로 식재료 공급, 식사하면 피로 감소"],
+    ["f1_px", "PX", "f1", 8, 1, 40, "X", "상점", "O", "g4", "친밀도 선물 구매"],
+    ["f1_stair_e", "동쪽 계단", "f1", 9, 1, 0, "O", "계단", "X", "g1", ""],
     ["b1_stair_w", "서쪽 계단", "b1", 1, 1, 0, "O", "계단", "X", "g1", ""],
-    ["b1_quarters", "숙소", "b1", 2, 2, 0, "O", "생활", "O", "g4", "생활 구역 (더미)"],
-    ["b1_workshop", "작업실", "b1", 4, 2, 0, "O", "작업", "O", "g3", "무기 제작·강화 (더미)"],
-    ["b1_training", "훈련실", "b1", 6, 2, 90, "X", "훈련", "O", "g2", "대원 훈련 (더미)"],
-    ["b1_stair_e", "동쪽 계단", "b1", 8, 1, 0, "O", "계단", "X", "g1", ""],
+    ["b1_quarters", "숙소", "b1", 2, 2, 0, "O", "생활", "O", "g4", "침대 6 (잠자면 피로 회복)"],
+    ["b1_infirmary", "의무실", "b1", 4, 2, 0, "O", "의무", "O", "g1", "치료(상태 이상 제거)·휴식(체력 회복)"],
+    ["b1_workshop", "무기고", "b1", 6, 2, 0, "O", "무기고", "O", "g3", "무기 강화·제작·장착 (id 는 이전 이름 그대로)"],
+    ["b1_training", "훈련실", "b1", 8, 1, 90, "X", "훈련", "O", "g2", "대원 훈련 (더미)"],
+    ["b1_stair_e", "동쪽 계단", "b1", 9, 1, 0, "O", "계단", "X", "g1", ""],
     ["b2_stair_w", "서쪽 계단", "b2", 1, 1, 40, "X", "계단", "X", "g1", ""],
     ["b2_storage", "창고", "b2", 2, 3, 120, "X", "공용", "O", "g4", "잠금 방 (더미)"],
-    ["b2_sealed", "봉쇄 구역", "b2", 5, 3, 200, "X", "미정", "O", "g2", "잠금 방 (더미)"],
-    ["b2_stair_e", "동쪽 계단", "b2", 8, 1, 40, "X", "계단", "X", "g1", ""],
+    ["b2_sealed", "봉쇄 구역", "b2", 5, 4, 200, "X", "미정", "O", "g2", "잠금 방 (더미)"],
+    ["b2_stair_e", "동쪽 계단", "b2", 9, 1, 40, "X", "계단", "X", "g1", ""],
+]
+
+# 오브젝트: 앉거나 누울 수 있는 가구. 잠(수면)은 오브젝트 위에서만 피로가 회복되고, 체력은 의무침대에서만 회복
+OBJS = [
+    ["id", "시설", "종류", "위치", "높이", "피로회복", "체력회복", "설명"],
+    ["obj_bed_1", "b1_quarters", "침대", 0.17, 0.45, 12, 0, "2층 침대 아래"],
+    ["obj_bed_2", "b1_quarters", "침대", 0.17, 1.55, 11, 0, "2층 침대 위"],
+    ["obj_bed_3", "b1_quarters", "침대", 0.50, 0.45, 12, 0, ""],
+    ["obj_bed_4", "b1_quarters", "침대", 0.50, 1.55, 11, 0, ""],
+    ["obj_bed_5", "b1_quarters", "침대", 0.83, 0.45, 12, 0, ""],
+    ["obj_bed_6", "b1_quarters", "침대", 0.83, 1.55, 11, 0, ""],
+    ["obj_sofa_1", "f1_lounge", "소파", 0.16, 0.45, 7, 0, "공용실 소파 왼쪽"],
+    ["obj_sofa_2", "f1_lounge", "소파", 0.36, 0.45, 7, 0, "공용실 소파 오른쪽"],
+    ["obj_chair_o1", "f1_office", "의자", 0.24, 0.5, 3, 0, "행정실 책상 의자"],
+    ["obj_chair_o2", "f1_office", "의자", 0.68, 0.5, 3, 0, ""],
+    ["obj_chair_m1", "f1_mess", "의자", 0.22, 0.5, 3, 0, "식당 의자"],
+    ["obj_chair_m2", "f1_mess", "의자", 0.38, 0.5, 3, 0, ""],
+    ["obj_chair_m3", "f1_mess", "의자", 0.54, 0.5, 3, 0, ""],
+    ["obj_medbed_1", "b1_infirmary", "의무침대", 0.20, 0.6, 10, 8, "의무실 침대 (체력 회복)"],
+    ["obj_medbed_2", "b1_infirmary", "의무침대", 0.50, 0.6, 10, 8, ""],
+    ["obj_medbed_3", "b1_infirmary", "의무침대", 0.80, 0.6, 10, 8, ""],
+]
+
+PX = [
+    ["id", "이름", "가격", "친밀도", "좋아하는 대원", "설명"],
+    ["gift_coffee", "캔커피", 5, 3, "npc_nikita", "더미 선물"],
+    ["gift_choco", "초콜릿", 8, 5, "npc_alma, npc_hana", ""],
+    ["gift_gloves", "가죽 장갑", 20, 10, "npc_dan", ""],
+    ["gift_book", "문고본", 12, 7, "npc_ethan", ""],
+    ["gift_charm", "행운 부적", 15, 8, "npc_kira", ""],
 ]
 
 # 대원 = 전투 아군과 같은 인물 (character_id 로 연결). 이름·설정은 전투 프로토타입 그대로, 성격·관계는 미정
@@ -84,7 +130,7 @@ NPCS = [
 JOBS = [
     ["id", "이름", "종류", "보상", "소요(분)", "장소", "반복", "처음부터", "설명"],
     ["c_task_office", "서류 정리", "작업지시", 25, 120, "f1_office", "O", "O", "기지 안 업무 (더미)"],
-    ["c_task_workshop", "장비 정비", "작업지시", 30, 180, "b1_workshop", "O", "O", "기지 안 업무 (더미)"],
+    ["c_task_workshop", "장비 정비", "작업지시", 30, 180, "b1_workshop", "O", "O", "무기고에서 일함 (더미)"],
     ["c_ext_supply", "보급품 운반", "외부의뢰", 40, 240, "f1_gate", "X", "O", "정문으로 나가 일정 시간 뒤 복귀. 성공률·위험 미정 → 고정 완료 (더미)"],
     ["c_ext_escort", "민간인 호위", "외부의뢰", 60, 360, "f1_gate", "X", "X", "앨마의 요청을 수락하면 열림 (더미)"],
 ]
@@ -138,7 +184,9 @@ README = [
     ["층", "순서", "0 = 맨 위 (지상 1층). 화면에서 위→아래"],
     ["시설", "층 / 칸 / 폭", "시설 위치: 그 층의 왼쪽부터 칸 번호, 폭 = 차지하는 칸 수 (한 칸 240px). 자유 건설 없음 — 해금만"],
     ["시설", "해금비용 / 초기해금", "달러 해금 [확정]. 초기해금 O = 처음부터 열림 (지상 1층·지하 1층 기본 개방)"],
-    ["시설", "기능", "출입(외부 의뢰 출발) / 계단(층 이동, 같은 칸 위아래 계단끼리 연결) / 행정 / 공용 / 생활 / 작업(제작·강화) / 훈련 / 미정"],
+    ["시설", "기능", "출입(외부 의뢰 출발) / 계단(층 이동, 같은 칸 위아래 계단끼리 연결) / 행정 / 공용 / 생활 / 식당(식재료) / 상점(PX 선물) / 의무(치료·체력 회복) / 무기고(강화·제작·장착) / 훈련 / 미정"],
+    ["오브젝트", "", "침대·소파·의자·의무침대. 잠은 오브젝트 위에서만 피로 회복(피로회복/시간), 체력은 체력회복 > 0 인 오브젝트(의무침대)에서만. 위치 = 방 폭 비율, 높이 = 눕는/앉는 높이 m"],
+    ["PX", "", "친밀도 선물: 가격(USD)·친밀도. 좋아하는 대원이면 × liked_gift_mult"],
     ["시설", "청소", "O = 오염·청소 대상, 점검 점수에 들어감"],
     ["시설", "조명", "방 조명 색 g1~g4 (전투 조명 프리셋과 같은 색 조합)"],
     ["대원", "전투캐릭터", "밸런스 엑셀 캐릭터 시트 id — 훈련·장비 결과가 전투에 반영됨"],
@@ -162,7 +210,7 @@ def blk(day, s, e, fac, act, req=None, fb=""):
         b["fallback_facility_id"] = fb
     return b
 
-def week(npc, morning_fac, afternoon_fac, preferred, extra=None, weekend_fac="f1_lounge", delegate=None):
+def week(npc, morning_fac, afternoon_fac, preferred, extra=None, weekend_fac="f1_lounge", delegate=None, nap_fac="b1_quarters"):
     out = []
     for d in range(7):
         weekend = d >= 5
@@ -171,7 +219,8 @@ def week(npc, morning_fac, afternoon_fac, preferred, extra=None, weekend_fac="f1
         if weekend:
             out.append(blk(d, 8, 12, weekend_fac, "rest"))
             out.append(blk(d, 12, 13, "f1_mess", "eat", fb="f1_lounge"))
-            out.append(blk(d, 13, 17, weekend_fac, "rest"))
+            out.append(blk(d, 13, 15, nap_fac, "sleep"))   # 주말 낮잠 (소파·침대에서만 피로 회복)
+            out.append(blk(d, 15, 17, weekend_fac, "rest"))
         else:
             out.append(blk(d, 8, 12, morning_fac, "work"))
             out.append(blk(d, 12, 13, "f1_mess", "eat", fb="f1_lounge"))
@@ -197,11 +246,11 @@ def dan_extra(out):
     return res
 
 SCHEDULES = [
-    week("npc_dan", "f1_office", "b1_workshop", ["f1_lounge", "b1_quarters"], extra=dan_extra,
+    week("npc_dan", "f1_office", "b1_workshop", ["f1_lounge", "b1_quarters"], extra=dan_extra, nap_fac="f1_lounge",
          delegate={"can_delegate_cleaning": True, "delegate_to": ["npc_hana", "npc_kira"], "chance": 1.0, "self_if_none": True}),
     week("npc_kira", "f1_office", "f1_office", ["f1_office", "f1_lounge"]),
     week("npc_ethan", "b1_workshop", "b1_workshop", ["b1_workshop"], weekend_fac="b1_workshop"),
-    week("npc_hana", "b1_workshop", "f1_office", ["f1_lounge"]),
+    week("npc_hana", "b1_workshop", "f1_office", ["f1_lounge"], nap_fac="f1_lounge"),
     week("npc_alma", "b1_quarters", "f1_lounge", ["b1_quarters", "f1_lounge"], weekend_fac="b1_quarters"),
     week("npc_nikita", "f1_office", "f1_office", ["f1_office"]),
 ]
@@ -211,7 +260,7 @@ wb = Workbook()
 first = True
 for name, table, widths in [("설정", SETTINGS, [22, 14, 70]), ("층", FLOORS, None), ("시설", FAC, None), ("대원", NPCS, None),
                              ("의뢰", JOBS, None), ("대사", LINES, [18, 6, 12, 70]), ("대화이벤트", CONVS, None),
-                             ("요청", REQS, None), ("제작", RECIPES, None), ("읽어보기", README, [12, 22, 90])]:
+                             ("요청", REQS, None), ("제작", RECIPES, None), ("오브젝트", OBJS, None), ("PX", PX, None), ("읽어보기", README, [12, 22, 90])]:
     ws = wb.active if first else wb.create_sheet()
     first = False
     ws.title = name
@@ -238,10 +287,20 @@ for name, table, widths in [("설정", SETTINGS, [22, 14, 70]), ("층", FLOORS, 
     pick("조명", ["g1", "g2", "g3", "g4"])
     pick("층", [f[0] for f in FLOORS[1:]])
     pick("종류", ["작업지시", "외부의뢰"])
-    pick("기능", ["출입", "계단", "행정", "공용", "생활", "작업", "훈련", "미정"])
+    pick("기능", ["출입", "계단", "행정", "공용", "생활", "식당", "상점", "의무", "무기고", "훈련", "미정"])
+    if name == "오브젝트":
+        pick("종류", ["침대", "소파", "의자", "의무침대"])
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 wb.save(OUT)
 print("saved", OUT)
+RULES = {"rules": [
+    {"id": "raid_6h", "name": "정기 습격 (예시)", "enabled": True, "mode": "interval", "interval_minutes": 360, "anchor": "06:00",
+     "weekdays": [0, 1, 2, 3, 4, 5, 6], "start_day": "", "times": [], "date": "", "stages": ["stage_01"], "allow_skip": False,
+     "note": "예시: 6시간마다(00·06·12·18시) 전투 발생"},
+]}
+with open(os.path.join(ROOT, "data", "outgame", "battle_rules.json"), "w", encoding="utf-8") as f:
+    json.dump(RULES, f, ensure_ascii=False, indent="\t")
+print("saved data/outgame/battle_rules.json")
 os.makedirs(SCHED_DIR, exist_ok=True)
 for s in SCHEDULES:
     p = os.path.join(SCHED_DIR, s["npc_id"] + ".json")

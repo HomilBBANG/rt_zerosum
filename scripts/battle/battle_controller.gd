@@ -78,6 +78,11 @@ func start_battle() -> void:
 	for entry in _roster:
 		var u := UnitRuntime.create(entry.data, _next_instance_id, entry.row, entry.index)
 		_next_instance_id += 1
+		# 기지(아웃게임)에서 들고 온 몸 상태: 남은 체력·상태 이상 (없으면 최대 체력, 상태 없음)
+		if entry.has("hp"):
+			u.hp = clampi(int(entry.hp), 1, u.data.max_hp)
+		for sid in entry.get("statuses", []):
+			u.add_status(str(sid))
 		slots.add_unit(u)
 	_log("전투 준비: 아군 %d / 적군 %d (seed %d)" % [slots.living_units("ally").size(), slots.living_units("enemy").size(), seed_value])
 	battle_started.emit()

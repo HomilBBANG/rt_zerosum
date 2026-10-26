@@ -382,6 +382,13 @@
   {
    "weekday": 5,
    "start_minute": 780,
+   "end_minute": 900,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "sleep"
+  },
+  {
+   "weekday": 5,
+   "start_minute": 900,
    "end_minute": 1020,
    "target_facility_id": "f1_lounge",
    "activity_id": "rest"
@@ -441,6 +448,13 @@
   {
    "weekday": 6,
    "start_minute": 780,
+   "end_minute": 900,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "sleep"
+  },
+  {
+   "weekday": 6,
+   "start_minute": 900,
    "end_minute": 1020,
    "target_facility_id": "f1_lounge",
    "activity_id": "rest"

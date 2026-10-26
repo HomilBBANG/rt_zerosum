@@ -57,15 +57,38 @@ static func reachable(data: OutgameData, from: String, to: String, is_open: Call
 	return not find_path(data, from, to, is_open).is_empty()
 
 
-## 시설 경로 → 걸어갈 지점들 (층이 바뀌는 곳은 계단 가운데에서 수직 이동). 마지막 = 목적지 안의 end_x
+## 계단 한 층 구간(아래층 계단 방 order k → 위층 k-1)이 오르는 방향: k 가 홀수면 왼쪽→오른쪽, 짝수면 오른쪽→왼쪽 (꺾인 계단)
+static func flight_left_to_right(lower_order: int) -> bool:
+	return lower_order % 2 == 1
+
+
+## 아래층 계단 방 안에서 계단 아래 끝 / 위 끝 x (px)
+static func flight_ends(data: OutgameData, lower_fid: String) -> Vector2:
+	var r := data.facility_rect(lower_fid)
+	var l := r.position.x + 30.0
+	var rr := r.end.x - 30.0
+	return Vector2(l, rr) if flight_left_to_right(int(data.facilities[lower_fid].order)) else Vector2(rr, l)
+
+
+## 시설 경로 → 걸어갈 지점들. 층이 바뀌는 곳은 계단을 실제로 오르내림:
+## 아래층 계단 아래 끝(바닥) → 비스듬히 → 위층 바닥의 계단 위 끝. 마지막 = 목적지 안의 end_x
 static func waypoints(data: OutgameData, path: Array[String], end_x: float) -> PackedVector2Array:
 	var pts := PackedVector2Array()
 	for i in range(path.size() - 1):
 		var a := path[i]
 		var b := path[i + 1]
-		if data.facilities[a].order != data.facilities[b].order:
-			pts.append(Vector2(data.facility_center_x(a), data.floor_line(a)))
-			pts.append(Vector2(data.facility_center_x(b), data.floor_line(b)))
+		var oa := int(data.facilities[a].order)
+		var ob := int(data.facilities[b].order)
+		if oa == ob:
+			continue
+		var lower := a if oa > ob else b
+		var ends := flight_ends(data, lower)   # x = 아래 끝, y = 위 끝
+		if oa > ob:   # 올라감
+			pts.append(Vector2(ends.x, data.floor_line(a)))
+			pts.append(Vector2(ends.y, data.floor_line(b)))
+		else:         # 내려감
+			pts.append(Vector2(ends.y, data.floor_line(a)))
+			pts.append(Vector2(ends.x, data.floor_line(b)))
 	if not path.is_empty():
 		pts.append(Vector2(end_x, data.floor_line(path[-1])))
 	return pts

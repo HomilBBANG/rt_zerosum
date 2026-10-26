@@ -12,8 +12,10 @@ const ASSIGNED_WORK := "ASSIGNED_WORK"
 const CLEANING := "CLEANING"
 const TRAINING := "TRAINING"
 const UNAVAILABLE := "UNAVAILABLE"   # 외부 의뢰로 기지 밖
+const TREATMENT := "TREATMENT"       # 의무실에서 치료 중 (상태 이상 제거)
+const RECOVERING := "RECOVERING"     # 의무실 침대에서 휴식 (체력 회복)
 const STATE_NAMES := {IDLE: "대기", MOVING: "이동 중", STAYING: "머무는 중", CHATTING: "대화 중", PLAYER_DIALOGUE: "지휘관과 대화",
-	ASSIGNED_WORK: "업무 중", CLEANING: "청소 중", TRAINING: "훈련 중", UNAVAILABLE: "외부 의뢰 중"}
+	ASSIGNED_WORK: "업무 중", CLEANING: "청소 중", TRAINING: "훈련 중", UNAVAILABLE: "외부 의뢰 중", TREATMENT: "치료 중", RECOVERING: "의무실 휴식"}
 
 var id: String = ""
 var name: String = ""
@@ -35,6 +37,8 @@ var resume_state: String = ""      # 지휘관 대화가 끝나면 돌아갈 상
 var chat_key: String = ""
 var last_chat: int = -100000
 var need_think: bool = true        # 일정을 다시 볼 필요 (해금·지시 완료·대화 종료 등)
+var seat: String = ""              # 차지한 오브젝트 (침대·소파·의자·의무침대) id
+var meal_key: String = ""          # 마지막으로 식사한 끼 (중복 소모 방지)
 
 
 func is_free() -> bool:
@@ -42,7 +46,7 @@ func is_free() -> bool:
 
 
 func is_working() -> bool:
-	return state in [ASSIGNED_WORK, CLEANING, TRAINING, UNAVAILABLE]
+	return state in [ASSIGNED_WORK, CLEANING, TRAINING, UNAVAILABLE, TREATMENT, RECOVERING]
 
 
 func state_name() -> String:
@@ -51,7 +55,8 @@ func state_name() -> String:
 
 func to_dict() -> Dictionary:
 	return {"id": id, "pos": [pos.x, pos.y], "facing": facing, "facility": facility, "state": state, "activity": activity,
-		"dest": dest, "dest_x": dest_x, "command": command, "busy": busy, "resume_state": resume_state, "last_chat": last_chat}
+		"dest": dest, "dest_x": dest_x, "command": command, "busy": busy, "resume_state": resume_state, "last_chat": last_chat,
+		"seat": seat, "meal_key": meal_key}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -68,4 +73,6 @@ func from_dict(d: Dictionary) -> void:
 	resume_state = str(d.get("resume_state", ""))
 	last_chat = int(d.get("last_chat", -100000))
 	chat_key = ""
+	seat = str(d.get("seat", ""))
+	meal_key = str(d.get("meal_key", ""))
 	need_think = true

@@ -28,6 +28,11 @@ func run(p_check: Callable) -> void:
 	_test_inspection()
 	_test_progression()
 	_test_save_load()
+	_test_stairs_walk()
+	_test_fatigue_objects()
+	_test_hp_medical()
+	_test_food_px_affinity()
+	_test_battle_rules()
 
 
 func _sim() -> BaseSim:
@@ -87,16 +92,17 @@ func _test_routes() -> void:
 	var s := _sim()
 	var open := func(f): return s.is_unlocked(f)
 	var p := RoomRouteService.find_path(data, "f1_lounge", "b1_workshop", open)
-	_c(p == ["f1_lounge", "f1_office", "f1_stair_w", "b1_stair_w", "b1_quarters", "b1_workshop"], "공용실 → 작업실: 서쪽 계단으로 (%s)" % [p])
+	_c(p == ["f1_lounge", "f1_office", "f1_stair_w", "b1_stair_w", "b1_quarters", "b1_infirmary", "b1_workshop"], "공용실 → 무기고: 서쪽 계단으로 (%s)" % [p])
 	_c(RoomRouteService.find_path(data, "f1_lounge", "f1_stair_e", open).is_empty(), "식당이 잠겨 있으면 동쪽 계단 못 감")
-	s.try_unlock("f1_mess")
-	_c(not RoomRouteService.find_path(data, "f1_lounge", "f1_stair_e", open).is_empty(), "식당 해금 → 동쪽 계단 경로 생김")
 	s.ledger.cash = 1000
+	s.try_unlock("f1_mess")
+	s.try_unlock("f1_px")
+	_c(not RoomRouteService.find_path(data, "f1_lounge", "f1_stair_e", open).is_empty(), "식당·PX 해금 → 동쪽 계단 경로 생김")
 	s.try_unlock("b1_training")
 	var p2 := RoomRouteService.find_path(data, "b1_training", "f1_lounge", open)
-	_c(p2.size() == 5 and p2[1] == "b1_stair_e", "훈련실 → 공용실: 동쪽 계단으로 돌아감 (%s)" % [p2])
+	_c(p2.size() == 6 and p2[1] == "b1_stair_e", "훈련실 → 공용실: 동쪽 계단으로 돌아감 (%s)" % [p2])
 	var wp := RoomRouteService.waypoints(data, p, 500.0)
-	_c(wp.size() == 3 and is_equal_approx(wp[0].x, wp[1].x) and wp[1].y > wp[0].y, "층 이동은 계단 가운데에서 수직")
+	_c(wp.size() == 3 and wp[0].x > wp[1].x + 100.0 and wp[1].y > wp[0].y, "층 이동 = 계단을 비스듬히 내려감 (위 끝 → 아래 끝)")
 	# 7일 동안 대원이 잠긴 방에 들어가지 않음
 	var s2 := _sim()
 	var bad := []
@@ -386,3 +392,144 @@ func _test_save_load() -> void:
 	s.skip(1440 * 9)
 	t.skip(1440 * 9)
 	_c(t.ledger.cash == s.ledger.cash and t.dirt.size() == s.dirt.size() and t.clock.label() == s.clock.label(), "불러온 뒤 9일 더 진행해도 원본과 같은 결과 (난수 상태 복구)")
+
+
+func _test_stairs_walk() -> void:
+	print("[25] 계단을 실제로 오르내림 (비스듬히, 꺾인 계단)")
+	var s := _sim()
+	var dan: NpcAgent = s.npcs.npc_dan
+	var diag := 0
+	var prev := dan.pos
+	for i in 5 * 60 + 30:   # 13:00 오후 업무로 무기고(지하)까지
+		s.skip(1)
+		var d := dan.pos - prev
+		if absf(d.x) > 1.0 and absf(d.y) > 1.0:
+			diag += 1
+		prev = dan.pos
+	_c(diag >= 2, "층을 옮길 때 가로·세로가 같이 바뀜 = 계단 비스듬히 (%d분)" % diag)
+	_c(RoomRouteService.flight_left_to_right(1) != RoomRouteService.flight_left_to_right(2), "층마다 계단 방향이 바뀜 (꺾인 계단)")
+
+
+func _test_fatigue_objects() -> void:
+	print("[26] 피로: 깨어 있으면 증가, 침대·의자·소파에서 자야만 회복, 오브젝트마다 회복력 다름")
+	var s := _sim()
+	var kira: NpcAgent = s.npcs.npc_kira
+	var f0 := float(s.cstate(kira).fatigue)
+	s.skip(150)   # 10:30 업무
+	_c(float(s.cstate(kira).fatigue) > f0, "업무 중 피로 증가 (%.1f → %.1f)" % [f0, float(s.cstate(kira).fatigue)])
+	s.skip_to_next_day()
+	s.skip(3 * 60)   # 03:00 수면
+	_c(kira.seat != "" and s.data.objects[kira.seat].kind == "침대" and s.posture(kira).pose == "lie", "03:00 숙소 침대에 누워 잠 (%s)" % kira.seat)
+	var a := float(s.cstate(kira).fatigue)
+	s.skip(120)
+	_c(float(s.cstate(kira).fatigue) < a, "침대에서 자면 피로 회복 (%.1f → %.1f)" % [a, float(s.cstate(kira).fatigue)])
+	var beds := 0
+	for n in s.npcs.values():
+		if n.seat != "" and s.data.objects[n.seat].kind == "침대":
+			beds += 1
+	_c(beds == 6, "6명 모두 각자 침대 (같은 침대 둘 없음)")
+	# 오브젝트 없이 자면 회복 없음 / 침대(12) vs 의자(3)
+	var t := _sim()
+	var n: NpcAgent = t.npcs.npc_nikita
+	t._release_seat(n)
+	n.state = NpcAgent.STAYING
+	n.activity = "sleep"
+	t.cstate(n).fatigue = 50.0
+	for i in 60:
+		t._tick_body(n)
+	_c(is_equal_approx(float(t.cstate(n).fatigue), 50.0), "오브젝트 없이 자면 피로 그대로")
+	n.seat = "obj_chair_o1"
+	for i in 60:
+		t._tick_body(n)
+	var chair := 50.0 - float(t.cstate(n).fatigue)
+	t.cstate(n).fatigue = 50.0
+	n.seat = "obj_bed_1"
+	for i in 60:
+		t._tick_body(n)
+	var bed := 50.0 - float(t.cstate(n).fatigue)
+	_c(is_equal_approx(chair, 3.0) and is_equal_approx(bed, 12.0), "한 시간: 의자 -%.1f / 침대 -%.1f (오브젝트 시트 값)" % [chair, bed])
+
+
+func _test_hp_medical() -> void:
+	print("[27] 전투에서 잃은 체력은 기지로 그대로, 상태 이상은 의무실 치료, 체력은 의무실 휴식으로만")
+	var s := _sim()
+	var kmax := s.char_max_hp("a_kira")
+	s.apply_battle_result({"winner": "ally", "allies": [{"id": "a_kira", "hp": 10, "alive": true, "statuses": ["rallied"]},
+		{"id": "a_dan", "hp": 0, "alive": false, "statuses": []}]})
+	_c(int(s.cstate_of("a_kira").hp) == 10 and (s.cstate_of("a_kira").statuses as Array).is_empty(), "키라 HP 10/%d 유지, 긍정 상태(독려)는 사라짐" % kmax)
+	_c(int(s.cstate_of("a_dan").hp) == 1 and "injured" in s.cstate_of("a_dan").statuses, "쓰러진 단 = HP 1 + 부상")
+	_c(s.battle_entry("a_kira").hp == 10 and "injured" in s.battle_entry("a_dan").statuses, "다음 전투에 남은 체력·부상 그대로")
+	s.skip(180)
+	_c(int(s.cstate_of("a_kira").hp) == 10, "가만히 있으면 체력 회복 안 됨")
+	_c(not s.issue_medical("npc_nikita").ok, "치료할 게 없으면 의무실 지시 안 됨")
+	_c(s.issue_medical("npc_dan").ok, "단 → 의무실 (치료 후 휴식)")
+	s.skip(90)
+	_c((s.cstate_of("a_dan").statuses as Array).is_empty(), "치료 끝 → 부상 해제")
+	_c(s.npcs.npc_dan.state == NpcAgent.RECOVERING and s.posture(s.npcs.npc_dan).pose == "lie", "의무침대에 누워 휴식")
+	var h := float(s.cstate_of("a_dan").hp)
+	s.skip(60)
+	_c(float(s.cstate_of("a_dan").hp) > h + 7.0, "의무침대 휴식 1시간 = 체력 +8")
+	s.skip(8 * 60)
+	_c(int(s.cstate_of("a_dan").hp) == s.char_max_hp("a_dan") and s.npcs.npc_dan.command.is_empty(), "체력이 다 차면 일정으로 복귀")
+
+
+func _test_food_px_affinity() -> void:
+	print("[28] 식당 식재료 · PX 선물 · 친밀도")
+	var s := _sim()
+	_c(not s.buy_food().ok, "식당 잠김 → 식재료 공급 불가")
+	s.ledger.cash = 500
+	s.try_unlock("f1_mess")
+	var c0 := s.ledger.cash
+	var f0 := s.food
+	_c(s.buy_food().ok and s.ledger.cash == c0 - 20 and s.food == f0 + 12, "식재료 $20 → +12끼")
+	var before := s.food
+	s.skip(5 * 60)   # 점심 (식당)
+	_c(s.food < before, "점심에 식당에서 먹으면 식재료 줄어듦 (%d → %d)" % [before, s.food])
+	s.food = 0
+	var hungry := s.log_lines.size()
+	s.skip(7 * 60)   # 저녁 식사
+	_c(s.log_lines.slice(hungry).any(func(l): return str(l).contains("끼니를 걸렀습니다")), "식재료가 없으면 끼니를 거름 (피로 증가)")
+	_c(not s.buy_gift("gift_gloves").ok, "PX 잠김 → 구매 불가")
+	s.try_unlock("f1_px")
+	var dan: NpcAgent = s.npcs.npc_dan
+	var a0 := float(s.cstate(dan).affinity)
+	_c(s.buy_gift("gift_gloves").ok and int(s.gifts.gift_gloves) == 1, "PX 에서 가죽 장갑 구매")
+	var r := s.give_gift("npc_dan", "gift_gloves")
+	_c(r.ok and r.liked and is_equal_approx(float(s.cstate(dan).affinity), a0 + 20.0), "단이 좋아하는 선물 → 친밀도 +20 (×2)")
+	_c(not s.give_gift("npc_dan", "gift_gloves").ok, "선물이 없으면 못 줌")
+	var k0 := float(s.cstate(s.npcs.npc_kira).affinity)
+	s.begin_dialogue("npc_kira")
+	s.end_dialogue("npc_kira")
+	s.begin_dialogue("npc_kira")
+	s.end_dialogue("npc_kira")
+	_c(is_equal_approx(float(s.cstate(s.npcs.npc_kira).affinity), k0 + 1.0), "하루 첫 대화만 친밀도 +1")
+
+
+func _test_battle_rules() -> void:
+	print("[29] 전투 발생 규칙 (예시: 6시간마다)")
+	var s := _sim()
+	var nb := s.next_battle()
+	_c(not nb.is_empty() and s.clock.time_str(int(nb.minute)) == "12:00", "다음 전투 12:00 (06:00 기준 6시간 간격)")
+	var fired := []
+	s.battle_triggered.connect(func(p): fired.append(p.label))
+	s.skip(4 * 60)
+	_c(fired.size() == 1 and s.pending_battle.get("stage", "") == "stage_01", "12:00 전투 발생 → stage_01 (%s)" % [fired])
+	s.skip(7 * 60)
+	_c(fired.size() == 1, "전투가 끝나기 전에는 다음 전투 안 생김")
+	s.apply_battle_result({"winner": "ally", "allies": []})
+	_c(s.pending_battle.is_empty() and s.battle_history.size() == 1, "전투 결과 → 대기 전투 해제, 기록")
+	var count := []
+	s.battle_triggered.connect(func(_p):
+		count.append(1)
+		s.pending_battle = {})
+	s.skip(24 * 60)
+	_c(count.size() == 4, "하루 4번 (00·06·12·18시) (%d)" % count.size())
+	var clk := s.clock
+	var daily := {"enabled": true, "mode": "daily", "times": ["09:30", "21:00"], "weekdays": [0, 1, 2, 3, 4, 5, 6]}
+	_c(BattleRules.fires_at(daily, 9 * 60 + 30, clk) and not BattleRules.fires_at(daily, 9 * 60, clk), "매일 시각 규칙")
+	var once := {"enabled": true, "mode": "once", "date": "2048-04-09", "times": ["15:00"], "weekdays": [0, 1, 2, 3, 4, 5, 6]}
+	_c(BattleRules.next_fire(once, 0, clk) == 2 * 1440 + 900, "한 번 규칙 (4/9 15:00)")
+	var weekend := {"enabled": true, "mode": "interval", "interval_minutes": 360, "anchor": "06:00", "weekdays": [5, 6]}
+	_c(s.clock.weekday(BattleRules.next_fire(weekend, 0, clk)) >= 5, "요일 제한 (주말만)")
+	_c(BattleRules.describe(s.data.battle_rules[0]) == "06:00 기준 6시간마다", "규칙 설명 (%s)" % BattleRules.describe(s.data.battle_rules[0]))
+	_c(BattleRules.next_fire({"enabled": false, "mode": "interval"}, 0, clk) == -1, "꺼진 규칙은 발생 안 함")

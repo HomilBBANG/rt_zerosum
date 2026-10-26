@@ -203,6 +203,16 @@ func _build_animations() -> void:
 		_track(walk, "hip", [[0.0, Vector2(bones.hip.position)], [0.22, bones.hip.position + Vector2(0, -8) * px_k], [0.45, Vector2(bones.hip.position)],
 			[0.67, bones.hip.position + Vector2(0, -8) * px_k], [0.9, Vector2(bones.hip.position)]], "position")
 		lib.add_animation("walk", walk)
+		# sit: 기지 의자·소파에 앉기 (허벅지 앞으로 수평, 정강이 아래로) + 호흡
+		var sit := Animation.new()
+		sit.length = 2.6
+		sit.loop_mode = Animation.LOOP_LINEAR
+		for leg in ["l", "r"]:
+			_track(sit, "hip_" + leg, [[0.0, deg_to_rad(-82)], [2.6, deg_to_rad(-82)]])
+			_track(sit, "knee_" + leg, [[0.0, deg_to_rad(82)], [2.6, deg_to_rad(82)]])
+		_track(sit, "chest", [[0.0, 0.0], [1.3, deg_to_rad(-1.2)], [2.6, 0.0]])
+		_track(sit, "head", [[0.0, deg_to_rad(1.0)], [1.3, deg_to_rad(-1.0)], [2.6, deg_to_rad(1.0)]])
+		lib.add_animation("sit", sit)
 	anim.add_animation_library("", lib)
 
 
@@ -212,6 +222,13 @@ func play(name: String) -> void:
 		anim.play(name)
 		if name != "idle" and name != "death":
 			anim.animation_finished.connect(func(_n): anim.play("idle"), CONNECT_ONE_SHOT)
+
+
+## 발에서 골반(hip 본)까지 높이 / 전신 높이 (앉을 때 의자 높이에 골반을 맞추는 데 씀)
+func hip_ratio() -> float:
+	if not bones.has("hip") or not rig.has("figure_px"):
+		return 0.5
+	return (float(rig.ground[1]) - bones.hip.position.y) / float(rig.figure_px)
 
 
 func bone_count() -> int:
