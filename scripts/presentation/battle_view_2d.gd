@@ -8,6 +8,62 @@ const UNIT_SCRIPT := preload("res://scripts/presentation/unit_sprite_2d.gd")
 @onready var world: Node2D = $World
 @onready var bg: Sprite2D = $World/Background
 @onready var units_root: Node2D = $World/Units
+# ---------------------------------------------------------------- 카메라 (인스펙터에서 조절)
+## battle_2d.tscn 의 View 노드를 선택하면 인스펙터에 보인다. 값을 바꾸면 캐릭터 위치·크기, 3D 배경, 조명이 그 구도로 다시 맞춰진다.
+## 게임 실행 중에는 에디터 씬 트리의 "원격(Remote)" 탭 → View 를 골라 바꾸면 즉시 반영.
+@export_group("카메라")
+@export_range(10.0, 85.0, 0.5, "suffix:°") var cam_pitch_deg := 40.0:   ## 내려다보는 각도 (0 = 정면, 90 = 바로 위)
+	set(v):
+		cam_pitch_deg = v
+		_camera_changed()
+@export_range(5.0, 40.0, 0.1, "suffix:m") var cam_distance := 15.0:   ## 바라보는 점에서 카메라까지 거리 (클수록 작게 보임)
+	set(v):
+		cam_distance = v
+		_camera_changed()
+@export_range(10.0, 70.0, 0.5, "suffix:°") var cam_fov_deg := 32.0:   ## 세로 화각
+	set(v):
+		cam_fov_deg = v
+		_camera_changed()
+@export var cam_target := Vector3(0.0, 0.0, 0.6):   ## 카메라가 바라보는 바닥 위 점 (x 좌우, y 높이, z 앞뒤, m)
+	set(v):
+		cam_target = v
+		_camera_changed()
+@export var cam_screen_center := Vector2(640.0, 480.0):   ## 바라보는 점이 놓이는 화면 위치 (1280×720 기준 px) — y 를 키우면 구도가 위로
+	set(v):
+		cam_screen_center = v
+		_camera_changed()
+@export_group("")
+
+var _cam_live := false
+
+
+## 매니페스트 카메라(슬롯 배치·스프라이트 기준 키) + 인스펙터 값
+func _camera_dict() -> Dictionary:
+	var c: Dictionary = manifest.get("camera", {}).duplicate(true)
+	c.pitch_deg = cam_pitch_deg
+	c.dist = cam_distance
+	c.vfov_deg = cam_fov_deg
+	c.target = [cam_target.x, cam_target.y, cam_target.z]
+	c.cx = cam_screen_center.x
+	c.cy = cam_screen_center.y
+	return c
+
+
+func _camera_changed() -> void:
+	if not _cam_live:
+		return
+	set_camera(_camera_dict())
+	if bg3d != null:
+		bg3d.configure_as_background(cam)
+		bg3d.set_view(cam, bcam.position, bcam.zoom.x)
+	for id in sprites:
+		var s: UnitSprite2D = sprites[id]
+		s.position = unit_position(s.unit)
+		s.scale = Vector2.ONE * unit_scale(s.unit)
+	relight()
+	_rerender_bg()
+
+
 var back_bars: Node2D   # 발밑 체력 칸 층: 캐릭터·하이라이트 링보다 위 (월드 안 제일 위)
 @onready var markers_root: Node2D = $World/Markers
 @onready var clear_rect: ColorRect = $Clear
@@ -102,7 +158,7 @@ static func zone_for_slot(team: String, row: int) -> String:
 func _ready() -> void:
 	var f := FileAccess.open("res://assets/sprites/manifest.json", FileAccess.READ)
 	manifest = JSON.parse_string(f.get_as_text())
-	set_camera(manifest.get("camera", {}))
+	set_camera(_camera_dict())
 	# 배경은 2배 해상도(레티나 대응)로 생성되어 있으므로 화면 크기에 맞춰 축소
 	bg.scale = Vector2.ONE * (1280.0 / float(bg.texture.get_width()))
 	bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -118,6 +174,7 @@ func _ready() -> void:
 	back_bars.z_index = 100   # 캐릭터·하이라이트 링보다 위 (제일 위)
 	world.add_child(back_bars)
 	back_bars.draw.connect(_draw_back_bars)
+	_cam_live = true
 
 
 func setup(p_controller: BattleController, p_preset: Dictionary) -> void:

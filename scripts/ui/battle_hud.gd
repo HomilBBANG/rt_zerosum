@@ -453,6 +453,7 @@ func _on_battle_started() -> void:
 		root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_theme_constant_override("separation", 1)
 		var nm := _label(u.display_name(), 13, Color(1, 1, 1) if u.team == "ally" else Color(1, 0.75, 0.75))
+		nm.visible = false   # 캐릭터 위 이름 표시 안 함 (이름은 행동 순서 초상화 호버로)
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		root.add_child(nm)
 		# 체력 바 (3D 비교 모드용, 2D 뷰는 발밑에 직접 그림). 위치는 _process 에서 매 프레임 갱신
