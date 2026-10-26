@@ -1,0 +1,182 @@
+{
+ "image_size": [
+  768,
+  512
+ ],
+ "ground": [
+  380,
+  495
+ ],
+ "scale": 0.312,
+ "figure_px": 494,
+ "bones": [
+  {
+   "name": "hip",
+   "parent": "",
+   "pos": [
+    350,
+    410
+   ]
+  },
+  {
+   "name": "spine",
+   "parent": "hip",
+   "pos": [
+    360,
+    310
+   ]
+  },
+  {
+   "name": "chest",
+   "parent": "spine",
+   "pos": [
+    380,
+    210
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "chest",
+   "pos": [
+    490,
+    210
+   ]
+  },
+  {
+   "name": "shoulder_l",
+   "parent": "chest",
+   "pos": [
+    280,
+    225
+   ]
+  },
+  {
+   "name": "elbow_l",
+   "parent": "shoulder_l",
+   "pos": [
+    240,
+    300
+   ]
+  },
+  {
+   "name": "wrist_l",
+   "parent": "elbow_l",
+   "pos": [
+    210,
+    380
+   ]
+  },
+  {
+   "name": "shoulder_r",
+   "parent": "chest",
+   "pos": [
+    450,
+    225
+   ]
+  },
+  {
+   "name": "elbow_r",
+   "parent": "shoulder_r",
+   "pos": [
+    500,
+    300
+   ]
+  },
+  {
+   "name": "wrist_r",
+   "parent": "elbow_r",
+   "pos": [
+    530,
+    380
+   ]
+  },
+  {
+   "name": "hip_l",
+   "parent": "hip",
+   "pos": [
+    300,
+    425
+   ]
+  },
+  {
+   "name": "knee_l",
+   "parent": "hip_l",
+   "pos": [
+    280,
+    460
+   ]
+  },
+  {
+   "name": "ankle_l",
+   "parent": "knee_l",
+   "pos": [
+    270,
+    490
+   ]
+  },
+  {
+   "name": "hip_r",
+   "parent": "hip",
+   "pos": [
+    410,
+    425
+   ]
+  },
+  {
+   "name": "knee_r",
+   "parent": "hip_r",
+   "pos": [
+    430,
+    460
+   ]
+  },
+  {
+   "name": "ankle_r",
+   "parent": "knee_r",
+   "pos": [
+    440,
+    490
+   ]
+  }
+ ],
+ "parts": [
+  {
+   "name": "body",
+   "bone": "hip",
+   "tex": "body.png",
+   "origin": [
+    10,
+    1
+   ],
+   "size": [
+    522,
+    511
+   ],
+   "z": 1
+  },
+  {
+   "name": "head",
+   "bone": "head",
+   "tex": "head.png",
+   "origin": [
+    479,
+    1
+   ],
+   "size": [
+    277,
+    505
+   ],
+   "z": 9
+  }
+ ],
+ "weapon_bone": "wrist_r",
+ "head_bone": "head",
+ "eyes": [],
+ "head_rect": [
+  450,
+  0,
+  318,
+  350
+ ],
+ "silhouette": "silhouette.png"
+}

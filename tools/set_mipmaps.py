@@ -4,7 +4,7 @@
 사용: godot --headless --import 로 .import 파일이 생긴 뒤 실행 → 다시 --import."""
 import glob, os, re
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-pats = ["assets/sprites/*.png", "assets/characters/*/*.png", "assets/characters/*/*/*.png", "assets/textures/*.png"]
+pats = ["assets/sprites/*.png", "assets/sprites/rig_*/*.png", "assets/textures/*.png"]
 changed = 0
 for pat in pats:
     for png in glob.glob(os.path.join(ROOT, pat)):

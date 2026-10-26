@@ -1,0 +1,387 @@
+{
+ "image_size": [
+  512,
+  768
+ ],
+ "ground": [
+  270,
+  762
+ ],
+ "scale": 0.312,
+ "figure_px": 760,
+ "bones": [
+  {
+   "name": "hip",
+   "parent": "",
+   "pos": [
+    270,
+    300
+   ]
+  },
+  {
+   "name": "spine",
+   "parent": "hip",
+   "pos": [
+    270,
+    260
+   ]
+  },
+  {
+   "name": "chest",
+   "parent": "spine",
+   "pos": [
+    270,
+    210
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "chest",
+   "pos": [
+    270,
+    146
+   ]
+  },
+  {
+   "name": "shoulder_l",
+   "parent": "chest",
+   "pos": [
+    196,
+    186
+   ]
+  },
+  {
+   "name": "elbow_l",
+   "parent": "shoulder_l",
+   "pos": [
+    176,
+    302
+   ]
+  },
+  {
+   "name": "wrist_l",
+   "parent": "elbow_l",
+   "pos": [
+    165,
+    400
+   ]
+  },
+  {
+   "name": "shoulder_r",
+   "parent": "chest",
+   "pos": [
+    331,
+    195
+   ]
+  },
+  {
+   "name": "elbow_r",
+   "parent": "shoulder_r",
+   "pos": [
+    358,
+    302
+   ]
+  },
+  {
+   "name": "wrist_r",
+   "parent": "elbow_r",
+   "pos": [
+    386,
+    396
+   ]
+  },
+  {
+   "name": "hip_l",
+   "parent": "hip",
+   "pos": [
+    240,
+    316
+   ]
+  },
+  {
+   "name": "knee_l",
+   "parent": "hip_l",
+   "pos": [
+    210,
+    510
+   ]
+  },
+  {
+   "name": "ankle_l",
+   "parent": "knee_l",
+   "pos": [
+    161,
+    661
+   ]
+  },
+  {
+   "name": "hip_r",
+   "parent": "hip",
+   "pos": [
+    305,
+    316
+   ]
+  },
+  {
+   "name": "knee_r",
+   "parent": "hip_r",
+   "pos": [
+    330,
+    510
+   ]
+  },
+  {
+   "name": "ankle_r",
+   "parent": "knee_r",
+   "pos": [
+    356,
+    661
+   ]
+  }
+ ],
+ "parts": [
+  {
+   "name": "hair_back",
+   "bone": "head",
+   "tex": "hair_back.png",
+   "origin": [
+    183,
+    46
+   ],
+   "size": [
+    158,
+    147
+   ],
+   "z": 0
+  },
+  {
+   "name": "foot_l",
+   "bone": "ankle_l",
+   "tex": "foot_l.png",
+   "origin": [
+    110,
+    645
+   ],
+   "size": [
+    98,
+    118
+   ],
+   "z": 1
+  },
+  {
+   "name": "foot_r",
+   "bone": "ankle_r",
+   "tex": "foot_r.png",
+   "origin": [
+    313,
+    645
+   ],
+   "size": [
+    105,
+    119
+   ],
+   "z": 1
+  },
+  {
+   "name": "shin_l",
+   "bone": "knee_l",
+   "tex": "shin_l.png",
+   "origin": [
+    60,
+    499
+   ],
+   "size": [
+    216,
+    193
+   ],
+   "z": 2
+  },
+  {
+   "name": "shin_r",
+   "bone": "knee_r",
+   "tex": "shin_r.png",
+   "origin": [
+    268,
+    499
+   ],
+   "size": [
+    221,
+    208
+   ],
+   "z": 2
+  },
+  {
+   "name": "thigh_l",
+   "bone": "hip_l",
+   "tex": "thigh_l.png",
+   "origin": [
+    114,
+    299
+   ],
+   "size": [
+    162,
+    209
+   ],
+   "z": 3
+  },
+  {
+   "name": "thigh_r",
+   "bone": "hip_r",
+   "tex": "thigh_r.png",
+   "origin": [
+    268,
+    299
+   ],
+   "size": [
+    167,
+    209
+   ],
+   "z": 3
+  },
+  {
+   "name": "hips",
+   "bone": "hip",
+   "tex": "hips.png",
+   "origin": [
+    211,
+    278
+   ],
+   "size": [
+    122,
+    50
+   ],
+   "z": 4
+  },
+  {
+   "name": "torso",
+   "bone": "chest",
+   "tex": "torso.png",
+   "origin": [
+    208,
+    143
+   ],
+   "size": [
+    120,
+    155
+   ],
+   "z": 5
+  },
+  {
+   "name": "arm_upper_l",
+   "bone": "shoulder_l",
+   "tex": "arm_upper_l.png",
+   "origin": [
+    155,
+    173
+   ],
+   "size": [
+    68,
+    153
+   ],
+   "z": 6
+  },
+  {
+   "name": "arm_upper_r",
+   "bone": "shoulder_r",
+   "tex": "arm_upper_r.png",
+   "origin": [
+    313,
+    184
+   ],
+   "size": [
+    63,
+    142
+   ],
+   "z": 6
+  },
+  {
+   "name": "arm_lower_l",
+   "bone": "elbow_l",
+   "tex": "arm_lower_l.png",
+   "origin": [
+    153,
+    289
+   ],
+   "size": [
+    55,
+    117
+   ],
+   "z": 7
+  },
+  {
+   "name": "arm_lower_r",
+   "bone": "elbow_r",
+   "tex": "arm_lower_r.png",
+   "origin": [
+    333,
+    289
+   ],
+   "size": [
+    65,
+    114
+   ],
+   "z": 7
+  },
+  {
+   "name": "hand_l",
+   "bone": "wrist_l",
+   "tex": "hand_l.png",
+   "origin": [
+    143,
+    389
+   ],
+   "size": [
+    37,
+    54
+   ],
+   "z": 8
+  },
+  {
+   "name": "hand_r",
+   "bone": "wrist_r",
+   "tex": "hand_r.png",
+   "origin": [
+    378,
+    383
+   ],
+   "size": [
+    33,
+    54
+   ],
+   "z": 8
+  },
+  {
+   "name": "head",
+   "bone": "head",
+   "tex": "head.png",
+   "origin": [
+    183,
+    2
+   ],
+   "size": [
+    171,
+    166
+   ],
+   "z": 9
+  }
+ ],
+ "weapon_bone": "wrist_r",
+ "head_bone": "head",
+ "eyes": [
+  [
+   255,
+   92
+  ],
+  [
+   300,
+   102
+  ]
+ ],
+ "head_rect": [
+  170,
+  0,
+  190,
+  170
+ ],
+ "silhouette": "silhouette.png"
+}

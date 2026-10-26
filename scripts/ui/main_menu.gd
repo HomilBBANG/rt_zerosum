@@ -99,6 +99,9 @@ func _ready() -> void:
 	var s := _big_button("바로 전투 시작", Color(1.0, 0.5, 0.3))
 	s.pressed.connect(func(): Game.restart_count = 0; Game.start_battle())
 	btn_row.add_child(s)
+	var bb := _big_button("리그 벤치", Color(0.9, 0.8, 0.3))
+	bb.pressed.connect(func(): get_tree().change_scene_to_file(Game.SCENE_BENCH))
+	btn_row.add_child(bb)
 	var tt := _big_button("타이틀로", Color(0.6, 0.6, 0.65))
 	tt.custom_minimum_size.x = 140
 	tt.pressed.connect(func(): Game.go_title())
