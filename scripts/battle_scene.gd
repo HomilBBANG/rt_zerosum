@@ -26,6 +26,11 @@ func _ready() -> void:
 	controller.wait_for_intro = Game.ambush == "none" and Game.cli.get("coin", "0" if Game.cli.has("shot") else "1") == "1"
 	controller.initiative_decided.connect(_on_initiative)
 	controller.start_battle()
+	if Game.cli.get("status_demo", "0") == "1":   # 스크린샷용: 첫 아군에 상태 이상 예시
+		for u in controller.slots.living_units("ally"):
+			u.add_status("rallied")
+			u.add_status("injured")
+		hud._refresh_panel()
 	_run_cli()
 
 

@@ -36,6 +36,7 @@ static func resolve(action: ActionData, actor: UnitRuntime, target: UnitRuntime,
 			event.text = "%s → %s: %s HP %d 회복" % [actor.display_name(), target.display_name(), action.display_name, healed]
 		"ap_grant":
 			var granted := APComponent.grant(target, action.power)
+			target.add_status("rallied")
 			event.targets = [target]
 			event.results = [{"target": target, "kind": "ap", "amount": granted, "killed": false}]
 			event.text = "%s → %s: %s AP %d 부여" % [actor.display_name(), target.display_name(), action.display_name, granted]

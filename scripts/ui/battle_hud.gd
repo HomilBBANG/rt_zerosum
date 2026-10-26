@@ -25,7 +25,7 @@ var _last_busy := false
 var slot_tip: PanelContainer        # 슬롯 설명 말풍선 (호버)
 var slot_tip_label: Label
 var hint_label: Label
-var cancel_btn: Button
+var status_flow: HFlowContainer     # 현재 유닛 상태 이상 칩
 var end_btn: Button
 var log_box: RichTextLabel
 var log_panel: PanelContainer
@@ -150,7 +150,7 @@ func _build_ui() -> void:
 	popup_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(popup_root)
 
-	# 하단 명령 패널: 초상화 | 이름 + [무기 3칸 · 자리 이동 · 기본 스킬 3칸 · 필살기] | 취소·턴 종료
+	# 하단 명령 패널: 초상화 | 이름 + [무기 3칸 · 자리 이동 · 기본 스킬 3칸 · 필살기] | 상태 이상 | 턴 종료
 	bottom = PanelContainer.new()
 	bottom.add_theme_stylebox_override("panel", _panel_style(0.88))
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -190,16 +190,36 @@ func _build_ui() -> void:
 	var fill := Control.new()
 	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(fill)
-	var right := VBoxContainer.new()
-	right.custom_minimum_size.x = 150
-	right.add_theme_constant_override("separation", 8)
-	hb.add_child(right)
-	cancel_btn = _button("취소 (우클릭)", Color(0.5, 0.5, 0.55))
-	cancel_btn.pressed.connect(cancel_pending)
-	right.add_child(cancel_btn)
-	end_btn = _button("턴 종료", Color(0.9, 0.45, 0.3))
+	# 턴 종료: 맨 오른쪽, 모서리 둥근 정사각형 (취소는 같은 버튼을 다시 누르거나 우클릭)
+	end_btn = _button("턴\n종료", Color(0.9, 0.45, 0.3))
+	end_btn.custom_minimum_size = Vector2(84, 84)
+	end_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	end_btn.add_theme_font_override("font", _font_bold)
+	end_btn.add_theme_font_size_override("font_size", 17)
+	for st in ["normal", "hover", "pressed", "disabled"]:
+		var sbx: StyleBoxFlat = end_btn.get_theme_stylebox(st).duplicate()
+		sbx.set_corner_radius_all(14)
+		end_btn.add_theme_stylebox_override(st, sbx)
 	end_btn.pressed.connect(func(): cancel_pending(); controller.player_end_turn())
-	right.add_child(end_btn)
+	hb.add_child(end_btn)
+	# 상태 이상: 슬롯 줄과 턴 종료 사이 빈 칸 (긍정 녹색 / 부정 붉은색, 호버 시 설명)
+	var st_box := VBoxContainer.new()
+	st_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	st_box.anchor_left = 1.0
+	st_box.anchor_right = 1.0
+	st_box.anchor_top = 1.0
+	st_box.anchor_bottom = 1.0
+	st_box.offset_left = -330
+	st_box.offset_right = -124
+	st_box.offset_top = -130
+	st_box.offset_bottom = -16
+	st_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(st_box)
+	status_flow = HFlowContainer.new()
+	status_flow.add_theme_constant_override("h_separation", 6)
+	status_flow.add_theme_constant_override("v_separation", 6)
+	status_flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	st_box.add_child(status_flow)
 	# 슬롯 줄: 화면 가로 가운데, 하단 패널 안 (무기 칸은 패널 천장까지 세로로 길게)
 	slots_row = HBoxContainer.new()
 	slots_row.add_theme_constant_override("separation", 8)
@@ -446,7 +466,7 @@ func begin_action(action_id: String) -> void:
 			view.set_highlight(u, "target_ally" if u.team == controller.current.team else "target_ok")
 		elif u != controller.current:
 			view.set_highlight(u, "target_bad")
-	hint_label.text = "%s (AP %d): 대상을 클릭하세요. 강조되지 않은 대상은 선택할 수 없습니다." % [a.display_name, a.ap_cost]
+	hint_label.text = "%s (AP %d): 대상을 클릭하세요. AP 는 실행할 때 소모. 다시 누르거나 우클릭하면 취소." % [a.display_name, a.ap_cost]
 	_refresh_panel()
 
 
@@ -458,7 +478,7 @@ func begin_move() -> void:
 	view.clear_highlights()
 	view.set_highlight(controller.current, "current")
 	view.show_slot_markers(controller.get_move_options())
-	hint_label.text = "위치 변경 (AP 1): 빈 슬롯 = 이동, 아군 슬롯 = 자리 교환. 우클릭으로 취소."
+	hint_label.text = "자리 이동 (AP 1): 파란 표시 = 이동·교체 가능. 다시 누르거나 우클릭하면 취소."
 	_refresh_panel()
 
 
@@ -549,7 +569,11 @@ func _refresh_panel() -> void:
 			var wi: int = i
 			_add_slot(wbox, {"icon": _weapon_icon_vertical(str(w.id)), "caption": w.name, "enabled": is_player,
 				"mark": "equipped" if equipped else "", "tip": tip, "weapon": true,
-				"press": func(btn: Control): _open_equip_popup(btn, wi, wcost)})
+				"press": func(btn: Control):
+					if equip_popup.visible and equip_index == wi:
+						cancel_pending()   # 같은 무기를 다시 누르면 취소
+					else:
+						_open_equip_popup(btn, wi, wcost)})
 		else:
 			_add_slot(wbox, {"caption": slot_name, "weapon": true})
 	_add_gap()
@@ -559,7 +583,12 @@ func _refresh_panel() -> void:
 		var mv_tip := "%s  ·  AP %d\n이동·교체할 수 있는 자리 아래에 파란 표시가 생깁니다. 빈 자리 = 이동, 아군 = 자리 교체.%s" % [mv.name, mv.cost, "" if mv.enabled else "\n(%s)" % mv.reason]
 		_add_slot(slots_row, {"icon": load("res://assets/textures/ui_move.png"), "caption": "자리 이동", "cost": mv.cost,
 			"enabled": is_player and mv.enabled, "mark": "move_on" if pending_move else "", "tip": mv_tip,
-			"press": func(_b): _hide_equip(); begin_move()})
+			"press": func(_b):
+				if pending_move:
+					cancel_pending()   # 다시 누르면 취소
+				else:
+					_hide_equip()
+					begin_move()})
 	_add_gap()
 	# 기본 스킬 3칸 + 필살기
 	var skills: Array = []
@@ -583,7 +612,37 @@ func _refresh_panel() -> void:
 	else:
 		_add_slot(slots_row, {"caption": "필살기", "ult": true})
 	end_btn.disabled = not is_player
-	cancel_btn.disabled = not (pending_action != "" or pending_move or equip_popup.visible)
+	_refresh_statuses(u)
+
+
+## 현재 유닛의 상태 이상 칩: 긍정 녹색 / 부정 붉은색, 호버 시 설명
+func _refresh_statuses(u: UnitRuntime) -> void:
+	for c in status_flow.get_children():
+		c.queue_free()
+	if u.statuses.is_empty():
+		var none := _label("상태 이상 없음", 12, Color(0.55, 0.58, 0.62))
+		status_flow.add_child(none)
+		return
+	for sid in u.statuses:
+		var d := StatusCatalog.get_def(sid)
+		var good: bool = d.get("positive", false)
+		var chip := PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.12, 0.45, 0.22, 0.95) if good else Color(0.55, 0.12, 0.12, 0.95)
+		sb.border_color = Color(0.45, 1.0, 0.6) if good else Color(1.0, 0.45, 0.4)
+		sb.set_border_width_all(2)
+		sb.set_corner_radius_all(6)
+		sb.content_margin_left = 10
+		sb.content_margin_right = 10
+		sb.content_margin_top = 3
+		sb.content_margin_bottom = 3
+		chip.add_theme_stylebox_override("panel", sb)
+		chip.mouse_filter = Control.MOUSE_FILTER_STOP
+		chip.add_child(_label(d.get("name", sid), 13, Color(1, 1, 1)))
+		var tip := "%s  ·  %s\n%s" % [d.get("name", sid), "긍정" if good else "부정", d.get("desc", "")]
+		chip.mouse_entered.connect(_show_slot_tip.bind(chip, tip))
+		chip.mouse_exited.connect(func(): slot_tip.visible = false)
+		status_flow.add_child(chip)
 
 
 func _add_skill_slot(o: Dictionary, is_player: bool) -> void:
@@ -592,7 +651,12 @@ func _add_skill_slot(o: Dictionary, is_player: bool) -> void:
 	var icon_id := id if ResourceLoader.exists("res://assets/textures/ui_%s.png" % id) else ("ultimate" if o.kind == "ultimate" else "basic_attack")
 	_add_slot(slots_row, {"icon": load("res://assets/textures/ui_%s.png" % icon_id), "caption": o.name, "cost": o.cost,
 		"enabled": is_player and o.enabled, "mark": "selected" if pending_action == id else "", "tip": tip,
-		"ult": o.kind == "ultimate", "press": func(_b): _hide_equip(); begin_action(id)})
+		"ult": o.kind == "ultimate", "press": func(_b):
+			if pending_action == id:
+				cancel_pending()   # 다시 누르면 취소
+			else:
+				_hide_equip()
+				begin_action(id)})
 
 
 func _add_gap() -> void:
@@ -620,7 +684,7 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
 	box.custom_minimum_size.x = bsize.x + 8.0
-	box.size_flags_vertical = Control.SIZE_SHRINK_END
+	box.size_flags_vertical = Control.SIZE_SHRINK_END if is_weapon else Control.SIZE_SHRINK_CENTER   # 스킬·이동·필살기는 패널 세로 가운데
 	var btn := Button.new()
 	btn.custom_minimum_size = bsize
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -758,7 +822,6 @@ func _open_equip_popup(btn: Control, index: int, cost: int) -> void:
 	equip_popup.position = Vector2(r.position.x + r.size.x * 0.5 - equip_popup.size.x * 0.5, r.position.y - equip_popup.size.y - 6.0)
 	equip_popup.visible = true
 	slot_tip.visible = false
-	cancel_btn.disabled = false
 
 
 func _on_equip_pressed() -> void:

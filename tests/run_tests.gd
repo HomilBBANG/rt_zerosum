@@ -53,6 +53,7 @@ func _init() -> void:
 	_test_coin_is_seeded()
 	_test_large_units()
 	_test_equip_and_move_lock()
+	_test_rally_status()
 	print("== %d passed, %d failed ==" % [_passes, _fails])
 	quit(1 if _fails > 0 else 0)
 
@@ -360,4 +361,25 @@ func _test_equip_and_move_lock() -> void:
 			keys.append(o.key)
 		_check(not keys.has(locked.slot_key()), "이동 불가 유닛 자리는 후보에 없음")
 		_check(not bc.slots.move_or_swap(bc.current, locked.slot_key()).ok, "이동 불가 유닛과 교환 거부")
+		locked.move_locked = false
+		locked.add_status("injured")
+		var keys2 := []
+		for o in bc.get_move_options():
+			keys2.append(o.key)
+		_check(not keys2.has(locked.slot_key()), "부상(상태 이상) 유닛 자리도 후보에 없음")
+	bc.queue_free()
+
+
+func _test_rally_status() -> void:
+	print("[13] 독려 → 대상에 긍정 상태 '독려', 그 유닛의 턴이 끝나면 사라짐")
+	var bc := _make("ally")
+	bc.start_battle()
+	var actor := _unit(bc, "하늘")
+	var target := _unit(bc, "지호")
+	var ev := ActionResolver.resolve(bc.actions["rally"], actor, target, bc.rng)
+	_check(target.statuses.has("rallied"), "독려 상태 부여")
+	_check(StatusCatalog.get_def("rallied").positive and not StatusCatalog.get_def("injured").positive, "독려 = 긍정, 부상 = 부정")
+	bc.current = target
+	bc._end_actor("테스트")
+	_check(not target.statuses.has("rallied"), "대상의 턴 종료 후 해제")
 	bc.queue_free()

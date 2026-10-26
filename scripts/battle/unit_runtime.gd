@@ -15,6 +15,8 @@ var alive: bool = true
 var actions_this_turn: int = 0
 ## 부상·상태이상 등으로 자리를 옮길 수 없음 (자리 이동·교환 대상에서 빠짐). 상태이상 시스템이 생기면 여기서 판단
 var move_locked: bool = false
+## 상태 이상 id 목록 (정의는 StatusCatalog)
+var statuses: Array[String] = []
 
 
 static func create(p_data: UnitData, p_instance_id: int, p_row: int, p_index: int) -> UnitRuntime:
@@ -35,6 +37,7 @@ func reset() -> void:
 	alive = true
 	actions_this_turn = 0
 	move_locked = false
+	statuses.clear()
 
 
 func slot_key() -> String:
@@ -59,7 +62,21 @@ func is_large() -> bool:
 
 ## 자리 이동·교환이 가능한가 (큰 몸집·부상·상태이상이면 불가)
 func can_be_moved() -> bool:
-	return alive and not is_large() and not move_locked
+	if not alive or is_large() or move_locked:
+		return false
+	for sid in statuses:
+		if StatusCatalog.get_def(sid).get("blocks_move", false):
+			return false
+	return true
+
+
+func add_status(id: String) -> void:
+	if not statuses.has(id):
+		statuses.append(id)
+
+
+func remove_status(id: String) -> void:
+	statuses.erase(id)
 
 
 func current_weapon() -> Dictionary:

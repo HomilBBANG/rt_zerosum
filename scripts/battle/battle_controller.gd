@@ -184,6 +184,9 @@ func _end_actor(reason: String) -> void:
 	_set_state(State.ACTOR_END)
 	var u := current
 	_log("%s 턴 종료 (%s, 이월 AP %d)" % [u.display_name(), reason, u.ap])
+	for sid in u.statuses.duplicate():
+		if StatusCatalog.get_def(sid).get("expires", "") == "own_turn_end":
+			u.remove_status(sid)
 	actor_ended.emit(u, reason)
 	_next_actor()
 
