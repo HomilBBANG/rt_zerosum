@@ -172,16 +172,16 @@ func _build_ui() -> void:
 	hb.add_child(pf)
 	# 이름·수치·안내: 초상화 오른쪽 좁은 칸 (슬롯 줄은 화면 가운데에 따로)
 	var info := VBoxContainer.new()
-	info.custom_minimum_size.x = 196
+	info.custom_minimum_size.x = 168
 	info.add_theme_constant_override("separation", 2)
 	hb.add_child(info)
-	name_label = _label("-", 18, Color(1, 1, 1))
+	name_label = _label("-", 17, Color(1, 1, 1))
 	name_label.clip_text = true
-	name_label.custom_minimum_size.x = 196
+	name_label.custom_minimum_size.x = 168
 	info.add_child(name_label)
 	stat_label = _label("", 12, Color(0.8, 0.85, 0.9))
 	stat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	stat_label.custom_minimum_size.x = 196
+	stat_label.custom_minimum_size.x = 168
 	info.add_child(stat_label)
 	hint_label = _label("", 12, Color(1, 0.95, 0.7))   # 안내 문구는 표시하지 않음 (사용자 요청)
 	hint_label.visible = false
@@ -209,7 +209,7 @@ func _build_ui() -> void:
 	var st_box := PanelContainer.new()
 	var st_style := StyleBoxFlat.new()
 	st_style.bg_color = Color(0.04, 0.06, 0.12, 0.9)
-	st_style.border_color = Color(0.25, 0.55, 1.0, 1.0)   # 불투명 파란 외곽선 창
+	st_style.border_color = Color(0.36, 0.45, 0.62, 1.0)   # 불투명 파란 외곽선 창 (채도 낮춤)
 	st_style.set_border_width_all(2)
 	st_style.set_corner_radius_all(6)
 	st_style.set_content_margin_all(6)
@@ -233,14 +233,14 @@ func _build_ui() -> void:
 	st_scroll.add_child(status_flow)
 	# 슬롯 줄: 화면 가로 가운데, 하단 패널 안 (무기 칸은 패널 천장까지 세로로 길게)
 	slots_row = HBoxContainer.new()
-	slots_row.add_theme_constant_override("separation", 8)
+	slots_row.add_theme_constant_override("separation", 6)
 	slots_row.anchor_left = 0.5
 	slots_row.anchor_right = 0.5
 	slots_row.anchor_top = 1.0
 	slots_row.anchor_bottom = 1.0
 	slots_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	slots_row.offset_top = -137   # 무기 칸 위 1px 여유
-	slots_row.offset_bottom = -12
+	slots_row.offset_bottom = -6   # 슬롯 줄 세로 중심 = 패널 세로 중심
 	add_child(slots_row)
 	# 무기 장착 팝업 (불투명 검은 버튼) + 슬롯 설명 말풍선
 	equip_popup = _button("장착하기  AP -1", Color(0.85, 0.85, 0.85))
@@ -544,11 +544,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 # ---------------------------------------------------------------- 갱신
-const SLOT := 58.0
+const SLOT := 75.0          # 스킬·이동·필살기 칸 (58 → 30% 키움)
 const SLOT_GAP := 18.0
 const WEAPON_W := 44.0      # 무기 칸: 세로로 긴 칸 (패널 천장까지)
-const WEAPON_H := 103.0
-const WEAPON_SEP := 4       # 무기 사이 간격 (다른 슬롯 8 의 절반)
+const WEAPON_H := 112.0     # 무기 칸: 패널 천장 1px 아래까지
+const WEAPON_SEP := 2       # 무기 사이 간격
+const CAP_H := 16.0
 
 
 func _refresh_panel() -> void:
@@ -703,7 +704,7 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	var bsize := Vector2(WEAPON_W, WEAPON_H) if is_weapon else Vector2(SLOT, SLOT)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
-	box.custom_minimum_size.x = bsize.x + 8.0
+	box.custom_minimum_size.x = bsize.x + (1.0 if is_weapon else 4.0)   # 무기 칸 가로 간격 좁게
 	box.size_flags_vertical = Control.SIZE_SHRINK_END if is_weapon else Control.SIZE_SHRINK_CENTER   # 스킬·이동·필살기는 패널 세로 가운데
 	var btn := Button.new()
 	btn.custom_minimum_size = bsize
@@ -774,11 +775,16 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	if tip != "":
 		btn.mouse_entered.connect(_show_slot_tip.bind(btn, tip))
 		btn.mouse_exited.connect(func(): slot_tip.visible = false)
-	box.add_child(btn)
-	var cap := _label(d.get("caption", ""), 12, Color(0.9, 0.9, 0.92) if usable else Color(0.55, 0.55, 0.58))
+	var cap := _label(d.get("caption", ""), 11 if is_weapon else 12, Color(0.9, 0.9, 0.92) if usable else Color(0.55, 0.55, 0.58))
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cap.custom_minimum_size.x = bsize.x + 8.0
 	cap.clip_text = true
+	cap.custom_minimum_size = Vector2(0, CAP_H)
+	if not is_weapon:
+		# 이름 높이만큼 위에도 빈 칸 → 버튼이 패널 세로 정가운데 (위/아래 대칭)
+		var top := Control.new()
+		top.custom_minimum_size.y = maxf(CAP_H, cap.get_combined_minimum_size().y)
+		box.add_child(top)
+	box.add_child(btn)
 	box.add_child(cap)
 	parent.add_child(box)
 

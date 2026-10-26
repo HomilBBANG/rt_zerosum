@@ -10,7 +10,12 @@ W = (245, 245, 245, 255)
 
 
 def save(img, name):
-    img.resize((128, 128), Image.LANCZOS).save(os.path.join(ROOT, "assets", "textures", f"ui_{name}.png"))
+    # 글리프를 정가운데로 (위/아래·좌/우 여백 대칭)
+    b = img.split()[3].getbbox()
+    g = img.crop(b)
+    out = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    out.paste(g, ((S - g.width) // 2, (S - g.height) // 2))
+    out.resize((128, 128), Image.LANCZOS).save(os.path.join(ROOT, "assets", "textures", f"ui_{name}.png"))
 
 
 def canvas():
