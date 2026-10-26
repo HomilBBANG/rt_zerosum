@@ -5,7 +5,7 @@ extends Node2D
 ##   character.json · base.png(정지 그림) · base_mask_l/_r.png
 ##   애니메이션 (셋 중 아무거나, 위에서부터 찾음):
 ##     ① 스프라이트 시트 한 장: <애니메이션>_<칸 수>.png (한 줄) 또는 <애니메이션>_<열>x<행>.png — 예: walk_8.png, attack_4x2.png
-##        (+ 선택 <애니메이션>.json: {"cols", "rows", "count", "fps", "loop", "ground", "figure_px", "hip_y", "weapon", "durations"})
+##        (+ 선택 <애니메이션>.json: {"cols", "rows", "count", "skip": [칸 번호…], "order": [칸 번호…], "fps", "loop", "ground", "figure_px", "hip_y", "weapon", "durations"})
 ##     ② 여러 애니메이션을 한 장에: sheet.png + sheet.json {"cols": 8, "rows": 4, "anims": {"idle": {"row": 0, "count": 6, "fps": 8}, …}}
 ##     ③ 폴더: <애니메이션>/0001.png, 0002.png … (+ 선택 anim.json, 프레임별 _mask_l/_r.png)
 ##   시트 칸은 모두 같은 크기. 발 위치·키를 안 적으면 첫 칸 그림에서 자동 (그림 맨 아래 가운데 = 발, 높이 = 키).
@@ -193,7 +193,14 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 				mimg[suf] = mi
 	var first_used := Rect2i()
 	var lowest := 0
+	var skip: Array = (opt.get("skip", []) as Array).map(func(v): return int(v))   # 뺄 칸 번호 (1부터, 그 동작 안에서)
+	var cells: Array = []
 	for i in range(start, mini(start + count, cols * rows)):
+		if not skip.has(i - start + 1):
+			cells.append(i)
+	if opt.has("order"):   # 재생 순서 (칸 번호, 1부터) — 시트 그림은 그대로 두고 이어지는 순서만 바꿈
+		cells = (opt.order as Array).map(func(v): return start + int(v) - 1).filter(func(i): return i >= start and i < cols * rows)
+	for i in cells:
 		var r := Rect2i((i % cols) * cw, (i / cols) * ch, cw, ch)
 		var cell := img.get_region(r)
 		var used := cell.get_used_rect()
