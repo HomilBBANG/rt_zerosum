@@ -278,7 +278,11 @@ func _status_card(npc_id: String) -> VBoxContainer:
 	v.add_child(_gauge("체력", float(cs.hp), mx, HP_COL, "%d / %d" % [floori(float(cs.hp)), mx]))
 	var fat := float(cs.fatigue)
 	v.add_child(_gauge("피로도", fat, 100.0, FATIGUE_COL, "%d%s" % [roundi(fat), "  (지침)" if fat >= 80 else ""]))
-	v.add_child(_gauge("친밀도", float(cs.affinity), 100.0, AFFINITY_COL))
+	var nxt := sim.next_affinity_need(npc_id)
+	var aff_txt := "%d  · 다음 대화 %d" % [roundi(float(cs.affinity)), nxt] if nxt >= 0 else "%d  · 대화 모두 해금" % roundi(float(cs.affinity))
+	if not sim.pending_affinity_talk(npc_id).is_empty():
+		aff_txt += "  ♥ 새 대화"
+	v.add_child(_gauge("친밀도", float(cs.affinity), 100.0, AFFINITY_COL, aff_txt))
 	var sts: Array = cs.statuses
 	if not sts.is_empty():
 		var names := PackedStringArray()
@@ -464,6 +468,8 @@ func open_dialogue(npc_id: String) -> void:
 		return
 	var req: Dictionary = d.request
 	var title := "%s와(과) 대화" % sim.data.npc_name(npc_id) if req.is_empty() else "%s의 요청 !" % sim.data.npc_name(npc_id)
+	if req.is_empty() and int(d.get("affinity_need", -1)) >= 0:
+		title += "  ♥ 친밀도 %d 대화%s" % [d.affinity_need, " (새로 해금)" if d.get("new_talk", false) else ""]
 	var win := _window(title, 640, func(): sim.end_dialogue(npc_id))
 	var body: VBoxContainer = win.body
 	var row := _hbox(12)
@@ -536,7 +542,9 @@ func _gift_row(npc_id: String) -> HBoxContainer:
 	h.add_child(_label("선물하기", 14, AFFINITY_COL))
 	for g in owned:
 		var it: Dictionary = sim.data.px_items[g]
-		var b := _button("%s ×%d" % [it.name, int(sim.gifts[g])], AFFINITY_COL.darkened(0.2), 13)
+		var taste := sim.data.gift_taste(g, npc_id)
+		var b := _button("%s ×%d  +%d%s" % [it.name, int(sim.gifts[g]), sim.data.gift_value(g, npc_id), "" if taste == "보통" else " " + taste],
+			AFFINITY_COL.darkened(0.2) if taste != "별로" else Color(0.6, 0.6, 0.65), 13)
 		b.pressed.connect(func():
 			var r := sim.give_gift(npc_id, g)
 			show_toast(r.msg, AFFINITY_COL if r.ok else BAD)
@@ -677,14 +685,19 @@ func _armory_section(body: VBoxContainer) -> void:
 
 
 func _px_section(body: VBoxContainer, fid: String) -> void:
-	body.add_child(_label("친밀도 선물 — 대원을 클릭한 대화창에서 '선물하기'. 좋아하는 선물은 친밀도 ×%d" % sim.data.inum("liked_gift_mult", 2), 14, AFFINITY_COL))
+	body.add_child(_label("친밀도 선물 — 대원을 클릭한 대화창에서 '선물하기'. 대원마다 좋아하는 선물과 오르는 친밀도가 다름", 14, AFFINITY_COL))
 	for g in sim.data.px_order:
 		var it: Dictionary = sim.data.px_items[g]
 		var row := _hbox(10)
 		body.add_child(row)
-		var l := _label("%s — $%d · 친밀도 +%d · 보유 %d" % [it.name, it.price, it.affinity, int(sim.gifts.get(g, 0))], 15)
-		l.custom_minimum_size.x = 400
-		row.add_child(l)
+		var col := _vbox(0)
+		col.custom_minimum_size.x = 470
+		row.add_child(col)
+		col.add_child(_label("%s — $%d · 기본 친밀도 +%d · 보유 %d" % [it.name, it.price, it.base, int(sim.gifts.get(g, 0))], 15))
+		var fans := sim.data.npc_order.filter(func(nid): return sim.data.gift_value(g, nid) > int(it.base))
+		fans.sort_custom(func(a, b): return sim.data.gift_value(g, a) > sim.data.gift_value(g, b))
+		var fan_txt := ", ".join(fans.map(func(nid): return "%s +%d" % [sim.data.npc_name(nid), sim.data.gift_value(g, nid)]))
+		col.add_child(_label("  ♥ " + (fan_txt if fan_txt != "" else "좋아하는 대원 없음"), 13, AFFINITY_COL.darkened(0.1)))
 		var b := _button("구매", Color(0.45, 0.9, 0.6), 14, 70)
 		b.disabled = sim.ledger.cash < int(it.price)
 		b.pressed.connect(func():

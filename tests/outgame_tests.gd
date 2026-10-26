@@ -495,7 +495,20 @@ func _test_food_px_affinity() -> void:
 	var a0 := float(s.cstate(dan).affinity)
 	_c(s.buy_gift("gift_gloves").ok and int(s.gifts.gift_gloves) == 1, "PX 에서 가죽 장갑 구매")
 	var r := s.give_gift("npc_dan", "gift_gloves")
-	_c(r.ok and r.liked and is_equal_approx(float(s.cstate(dan).affinity), a0 + 20.0), "단이 좋아하는 선물 → 친밀도 +20 (×2)")
+	_c(r.ok and r.liked and is_equal_approx(float(s.cstate(dan).affinity), a0 + 16.0), "단이 제일 좋아하는 가죽 장갑 → 친밀도 +16 (%s)" % r.get("taste", ""))
+	var d := s.data
+	_c(d.gift_value("gift_gloves", "npc_kira") == 10 and d.gift_value("gift_gloves", "npc_hana") == 5, "같은 선물도 대원마다 상승량 다름 (키라 +10, 하나 기본 +5)")
+	_c(d.gift_value("gift_coffee", "npc_nikita") == 8 and d.gift_taste("gift_coffee", "npc_nikita") == "아주 좋아함", "니키타는 캔커피를 아주 좋아함 (+8)")
+	_c(d.gift_taste("gift_coffee", "npc_alma") == "별로" and d.gift_value("gift_coffee", "npc_alma") == 1, "앨마는 캔커피가 별로 (+1)")
+	var favs := {}
+	for nid in d.npc_order:
+		var best := ""
+		for g in d.px_order:
+			if best == "" or d.gift_value(g, nid) > d.gift_value(best, nid):
+				best = g
+		favs[nid] = best
+	_c(favs.npc_dan == "gift_gloves" and favs.npc_kira == "gift_charm" and favs.npc_ethan == "gift_book" and favs.npc_hana == "gift_choco" and favs.npc_nikita == "gift_coffee",
+		"대원마다 제일 좋아하는 선물이 다름 (%s)" % favs)
 	_c(not s.give_gift("npc_dan", "gift_gloves").ok, "선물이 없으면 못 줌")
 	var k0 := float(s.cstate(s.npcs.npc_kira).affinity)
 	s.begin_dialogue("npc_kira")
@@ -503,6 +516,29 @@ func _test_food_px_affinity() -> void:
 	s.begin_dialogue("npc_kira")
 	s.end_dialogue("npc_kira")
 	_c(is_equal_approx(float(s.cstate(s.npcs.npc_kira).affinity), k0 + 1.0), "하루 첫 대화만 친밀도 +1")
+	# 친밀도 대화: 단 친밀도 20 + 장갑 16 (+대화 1) → 30 단계 해금
+	var s2 := _sim()
+	var dl := s2.begin_dialogue("npc_dan")
+	s2.end_dialogue("npc_dan")
+	_c(int(dl.affinity_need) == -1 and s2.pending_affinity_talk("npc_dan").is_empty(), "친밀도 21 → 해금된 친밀도 대화 없음 (기본 대사)")
+	_c(s2.next_affinity_need("npc_dan") == 30, "다음 대화 기준 30")
+	s2._add_affinity(s2.npcs.npc_dan, 10.0)
+	_c(s2.log_lines.back().contains("새 대화 해금") and s2.pending_affinity_talk("npc_dan").get("need", 0) == 30, "친밀도 30 도달 → 새 대화 해금 알림·♥")
+	dl = s2.begin_dialogue("npc_dan")
+	s2.end_dialogue("npc_dan")
+	_c(dl.new_talk and int(dl.affinity_need) == 30 and str(dl.lines[0].text).contains("친밀도 30"), "클릭 대화 → 친밀도 30 대화 (%s)" % [dl.lines[0].text if not dl.lines.is_empty() else ""])
+	_c(s2.pending_affinity_talk("npc_dan").is_empty(), "본 대화는 ♥ 사라짐")
+	s2._add_affinity(s2.npcs.npc_dan, 45.0)   # 76 → 50·70 한꺼번에
+	dl = s2.begin_dialogue("npc_dan")
+	s2.end_dialogue("npc_dan")
+	_c(int(dl.affinity_need) == 50 and s2.pending_affinity_talk("npc_dan").get("need", 0) == 70, "여러 단계 해금 → 낮은 단계부터 차례로")
+	s2.begin_dialogue("npc_dan")
+	s2.end_dialogue("npc_dan")
+	dl = s2.begin_dialogue("npc_dan")
+	s2.end_dialogue("npc_dan")
+	_c(not dl.new_talk and int(dl.affinity_need) == 70, "다 봤으면 해금된 가장 높은 단계 대화 반복")
+	var s3 := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s2.to_dict())))
+	_c(s3.pending_affinity_talk("npc_dan").is_empty() and s3.next_affinity_need("npc_dan") == 90, "저장/불러오기 후 본 대화·친밀도 유지")
 
 
 func _test_battle_rules() -> void:

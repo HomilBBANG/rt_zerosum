@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cl
 ```
 
 **업데이트**: 프로젝트 폴더에서 `git pull` 만 하면 됩니다 → 그다음 평소처럼 `play.command` / `play.sh` / `play.bat` 실행.
-새 원화·리그가 들어온 커밋이면 실행 스크립트가 알아서 리소스를 다시 임포트합니다(커밋이 바뀐 첫 실행에만, 최대 1~2분).
+새 원화·애니메이션이 들어온 커밋이면 실행 스크립트가 알아서 리소스를 다시 임포트합니다(커밋이 바뀐 첫 실행에만, 최대 1~2분).
 ```bash
 cd ~/Game/zerosum && git pull
 ```
@@ -49,7 +49,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 - **기지 화면**: 배경은 **3D 단면 건물**(방마다 원색 스폿 조명·하드 섀도우, 셀 셰이딩), 건물 바깥은 **검정**.
   카메라는 **정면처럼 반듯한 직교 뷰**(원근 없음 — 방마다 같은 크기 사각형, 한 칸 ≈ 정사각형)이고 **방 안만 위에서 살짝(18°) 내려다보는** 구도라 바닥이 보입니다.
-  처음엔 대원들이 있는 지상 1층·지하 1층을 크게(화면 세로 9m) 보여 줍니다. 대원은 2D 리그를 그 위에 덧그림.
+  처음엔 대원들이 있는 지상 1층·지하 1층을 크게(화면 세로 9m) 보여 줍니다. 대원은 2D 캐릭터 스프라이트(프레임 애니메이션)를 그 위에 덧그림.
   3개 층 (지상 1층·지하 1층 기본 개방, 지하 2층(임시) 잠금). `WASD` 이동 · `F11` 전체 화면.
   **확대/축소**: 마우스 휠(커서 위치 기준) · Mac 트랙패드 핀치 또는 두 손가락 위아래 · `Q`/`E` 누르고 있기 · `-`/`+` · 오른쪽 아래 `－ 100% ＋` 버튼 · `0` = 기본.
   범위 45%~250% (화면 세로 20m~3.6m): 최대 확대는 대원 원화(전신 약 760px)가 QHD 화면에서 원화보다 커지지 않는 한계, 최대 축소는 기지 전체가 보이는 정도. 3D 배경은 늘 QHD 로 다시 그려 어느 배율에서도 선명.
@@ -69,7 +69,9 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - **체력·피로도·친밀도** (대원 좌클릭 → 카드): 체력(붉은) · 피로도(보라) · **친밀도(파스텔 노랑, 아웃게임에서만)** · 상태 이상.
   - 전투에서 잃은 체력은 기지로 그대로 돌아옵니다(쓰러지면 HP 1 + 부상). **상태 이상은 의무실 치료, 체력은 의무실 침대 휴식으로만 회복** — 우클릭 → `의무실로`.
   - 피로는 활동·전투로 오르고 **침대·소파·의자에서 잠을 잘 때만** 내려갑니다. 오브젝트마다 회복력이 다름(침대 > 의무침대 > 소파 > 의자). 대원은 침대에 눕고 의자·소파에 앉습니다.
-  - 친밀도: 하루 첫 대화 +1, 요청 수락 +5, **PX(상점)** 에서 산 선물을 카드의 `선물하기`로 (좋아하는 선물은 ×2).
+  - 친밀도: 하루 첫 대화 +1, 요청 수락 +5, **PX(상점)** 에서 산 선물을 카드의 `선물하기`로. **대원마다 좋아하는 선물과 오르는 양이 다름**
+    (단 가죽 장갑 +16 · 키라 행운 부적 +14 · 이선 문고본 +13 · 하나 초콜릿 +12 · 앨마 초콜릿 +9 · 니키타 캔커피 +8 …, 엑셀 `PX` 시트의 대원 열).
+  - **친밀도 대화**: 친밀도 30·50·70·90 이 되면 새 대화가 해금되고 머리 위에 **♥**. 클릭해 대화하면 그 단계 대화가 나오고, 다 봤으면 해금된 가장 높은 단계 대화 (엑셀 `친밀도대화` 시트).
 - **식당**: 시설 창에서 달러로 식재료 공급($20 → 12끼). 끼니마다 1끼 소모, 없으면 굶어서 피로 +.
 - **저장**: 날짜가 바뀔 때·출전할 때·`저장` 버튼·타이틀로 갈 때 자동 저장 (`user://outgame_save.json`). 타이틀 `이어하기`로 불러옴.
 - **디버그 `F1`**: +1시간 · 다음 날/주/달 · 오염 추가 · 점검 지금 · 달러 +100 · 전투 발생 · 대원별 상태·목적지·이유 · 이번 달 점검 예정 시각.
@@ -88,6 +90,8 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![대원 카드](docs/screenshots/outgame/character_card.png)
 ![의무실](docs/screenshots/outgame/infirmary.png)
 ![PX](docs/screenshots/outgame/px_shop.png)
+![친밀도 새 대화 ♥](docs/screenshots/outgame/affinity_heart.png)
+![친밀도 대화](docs/screenshots/outgame/affinity_talk.png)
 ![무기고](docs/screenshots/outgame/armory.png)
 
 ## 밸런스 데이터 (엑셀) · AI 에디터 · 스테이지 에디터
@@ -163,15 +167,14 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - 아군(사람 6인): 단(돌격병 185cm, 전방)·키라(돌격병 175cm, 전방)·이선(소총수 178cm, 중앙)·하나(돌격소총수 176.8cm, 중앙)·앨마(의무병 166cm, 후방)·니키타(저격수 168cm, 후방)
 - 적(괴물, 적으로만 등장): 구울(2.4m) — **전방+중앙 두 칸 차지** (`UnitData.row_span = 2`), 늑대(4m) — 후방 한 칸
   두 칸 괴물은 살아 있는 동안 전방을 막고(근접은 괴물부터), 자리 이동·교환을 하지 않으며, 두 칸의 가운데에 선다.
-도형으로 생성한 12인(`build_allies/build_enemies`)은 규칙 테스트와 리그 벤치에서만 씁니다.
-새 캐릭터 추가: 원화를 `assets/source/` 에 두고(검정 배경 원화는 먼저 `python3 tools/remove_black_bg.py 입력 출력` 으로 투명화) `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
-`python3 tools/rig_cutter.py <id>` → 임포트 후 `tools/set_mipmaps.py` → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.
-캐릭터 키는 `rig.json` 의 `figure_px`(원화 정수리~발 픽셀)를 화면 230px = 175cm 기준으로 환산해 2D·3D 모두에 반영됩니다.
+도형으로 생성한 12인(`build_allies/build_enemies`)은 규칙 테스트에서만 씁니다.
+새 캐릭터 추가: `assets/characters/<id>/` 폴더(아래 '캐릭터 스프라이트 애니메이션') → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.
+캐릭터 키는 `character.json` 의 `figure_px`(원화 정수리~발 픽셀)를 화면 230px = 175cm 기준으로 환산해 2D·3D 모두에 반영됩니다.
 
 ## 배경 3D + 캐릭터 2D (하이브리드, 기본)
 2D 전투의 배경은 3D 방(창·문 밖 스폿라이트, 하드 섀도우, 셀 셰이더)을 2D 가상 카메라와 **같은 투영**으로 렌더한 텍스처입니다
 (`BattleView3D.configure_as_background` / `set_view`, QHD 해상도로 카메라가 움직이거나 위치·프리셋이 바뀔 때만 다시 렌더).
-캐릭터는 2D 리그 그대로이고, 자기 위치에 실제로 닿는 빛(원뿔 범위, 창·문 개구부 통과, 문짝 가림)을 `light_probe` 로 계산해 명암을 정합니다.
+캐릭터는 2D 스프라이트 그대로이고, 자기 위치에 실제로 닿는 빛(원뿔 범위, 창·문 개구부 통과, 문짝 가림)을 `light_probe` 로 계산해 명암을 정합니다.
 - 빛 쪽 얼굴·몸을 그 광원색으로 밝히고 반대편은 셀 그림자.
 - 빛이 뒤(벽의 창·문)에서 오면 **빛 쪽 가장자리에 같은 색 림**을 더함(반대 방향 마스크의 림 구역 사용). 반대편 림은 그쪽에서 실제 빛이 올 때만.
 - 보이지 않는 그림자 대리 물체로 캐릭터 그림자가 바닥에 드리워집니다.
@@ -183,11 +186,21 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 화면 가장자리 캐릭터도 정확히 중앙에 올 수 있습니다. 배경 밖은 보이지 않게 제한합니다. 값은 `battle_view_2d.gd` 의 `CAM_*` 상수.
 스크린샷 CLI 는 기본으로 인트로를 건너뛰며 `--intro=1`(재생), `--intro=hold`(전체 구도에서 멈춤)로 바꿀 수 있습니다.
 
-## Skeleton2D 리그 (2D 확정 후 비용 테스트)
-사용자 제공 원화 1장을 `tools/rig_cutter.py` 로 17개 파츠 + 16개 본 + 파츠별 구역 마스크로 잘라 `assets/sprites/rig_<id>/` 에 두고,
-`RiggedUnit2D` 가 rig.json 으로 Bone2D 트리와 애니메이션(idle/attack/hit/heal/death)을 만든다. 아군 '라온' 슬롯이 이 캐릭터다.
-비용 측정 결과와 파이프라인은 `docs/skeleton2d_cost.md`, 벤치는 메뉴의 "리그 벤치" 또는
-`++ --scene=bench --count=48 --rig=1` (B 본 표시, Tab 평면↔리그, +/- 인원).
+## 캐릭터 스프라이트 애니메이션 (Skeleton2D 리그는 제거)
+![전투 — 기본 그림](docs/screenshots/battle_sprites.png)
+
+캐릭터(전투·기지 공통)는 **직접 뽑은 스프라이트 프레임**으로 움직입니다. 폴더: `assets/characters/<id>/`
+(`dan` 단 · `kira` 키라 · `ethan` 이선 · `hero2` 하나 · `alma` 앨마 · `nikita_army` 니키타 · `ghoul` 구울 · `wolf` 늑대 · `slime`).
+- `base.png` = 기본 한 장 (지금은 예전 리그를 쉬는 자세로 합친 원화). **애니메이션 프레임이 없는 동작은 이 그림이 그대로 서 있거나 미끄러지듯 이동**합니다.
+- 프레임 넣기: `assets/characters/<id>/<동작>/0001.png, 0002.png …` (이름 순서대로 재생, 기본 12fps).
+  **캔버스 크기·발 위치를 `base.png`(512×768, 발 접지점 `character.json` 의 `ground`)와 같게** 그리면 따로 설정할 것이 없습니다.
+  다르면 그 폴더에 `anim.json`: `{"fps": 12, "loop": true, "ground": [x, y], "figure_px": 정수리~발 픽셀, "hip_y": 골반 y, "weapon": false}`.
+- 동작 이름: 기지 `idle`(서 있기) · `walk`(이동) · `sit`(의자·소파, 골반 높이 = `hip_y`) · `sleep`(누워 자기, 눕혀 그린 그림·접지점 = 침대에 닿는 몸 가운데) ·
+  `work`(업무·치료) · `clean`(청소, 없으면 work) · `train`(훈련, 없으면 work) · `talk`(대화) / 전투 `idle` · `attack` · `hit` · `heal` · `death`(마지막 프레임 유지).
+  attack·hit·heal 은 한 번 재생 후 idle. 프레임이 없으면: 앉기 → 의자 앞에 서 있음, 자기 → 기본 그림을 눕힘, 전투 동작 → 간단한 앞뒤 이동·흔들림.
+- 무기: 전투에서 손 위치(`character.json` 의 `hand`)에 무기 그림을 붙입니다. 무기를 직접 그린 동작은 `anim.json` 에 `"weapon": false` (attack·hit·heal·idle 외 동작은 기본으로 숨김).
+- 조명(셀 명암) 마스크: 프레임만 넣어도 동작합니다(마스크 없이 고른 조명). 방향 있는 명암을 원하면 `python3 tools/char_sprites.py masks` → 프레임마다 `_mask_l/_r.png` 생성.
+- 새 프레임은 게임을 다시 켜면 바로 반영 (임포트 기다릴 필요 없음).
 
 ## 규칙 테스트 (헤드리스)
 ```
@@ -212,20 +225,21 @@ CLI 인자(`++` 뒤): `--scene=battle|formation|result|menu|title|base --mode=2d
 scenes/            title, main_menu(전투 테스트), formation, battle_2d, battle_3d, battle_hud, result, outgame/base_hub
 scripts/battle/    규칙 계층 (표현 비의존): unit_data, action_data, unit_runtime, slot_manager,
                    turn_scheduler, ap_component, target_validator, action_resolver, enemy_ai, battle_controller
-scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d + unit_sprite_2d + rigged_unit_2d + slot_marker_2d,
+scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d + unit_sprite_2d + character_sprite_2d(프레임 애니메이션) + slot_marker_2d,
                    battle_view_3d + unit_model_3d, lighting_presets
 scripts/ui/        battle_hud, title, main_menu, formation, result
 scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정·단면 좌표), world_clock, room_route_service, npc_schedule_resolver,
                    npc_agent, economy_ledger, base_sim(해금·이동·대화·위생·의뢰·결산·점검·제작·저장) / base_hub(씬)
-scripts/outgame/view/  base_view_3d(3D 단면 건물·조명·카메라), base_overlay(이름표·자물쇠·오염·말풍선 — 화면 좌표), npc_view(대원 리그), outgame_hud(HUD·창)
-addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor (Godot 에디터 상단 탭)
+scripts/outgame/view/  base_view_3d(3D 단면 건물·조명·카메라), base_overlay(이름표·자물쇠·오염·말풍선 — 화면 좌표), npc_view(대원 스프라이트), outgame_hud(HUD·창)
+addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor (Godot 에디터 상단 탭)
 data/              balance.xlsx(전투), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_zoned_lighting (2D 배경, v0.3), cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
-assets/sprites/    생성된 캐릭터/무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + manifest.json
+assets/characters/ 캐릭터별 base·프레임 애니메이션·마스크·character.json (전투·기지 공통)
+assets/sprites/    무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + 옛 테스트 캐릭터 + manifest.json
 assets/textures/   배경 플레이트 + 마스크, 3D 얼굴 데칼
 setup/             install_windows.ps1, install.sh (기기 설치), play.bat / play.sh / play.command (루트, 실행)
-tools/             gen_sprites.py (원화·마스크 생성기), rig_cutter.py (원화→리그 파츠), render_shots.sh,
+tools/             gen_sprites.py (원화·마스크 생성기), char_sprites.py (애니메이션 프레임 조명 마스크), render_shots.sh,
                    gen_balance_xlsx.py / gen_outgame_xlsx.py (엑셀·일정 초기 생성 — 이미 있으면 덮어쓰지 않음)
 tests/             run_tests.gd, outgame_tests.gd
 docs/              design/ (기획서 사본, outgame/ = 아웃게임 기획 01~04 + 구현 현황 05), screenshots/, 2D_vs_3D_comparison.md

@@ -583,16 +583,13 @@ func _silhouette(sprite_id: String) -> Dictionary:
 	if _sil_cache.has(sprite_id):
 		return _sil_cache[sprite_id]
 	var info := {}
-	var dir := "res://assets/sprites/rig_%s/" % sprite_id
-	var f := FileAccess.open(dir + "rig.json", FileAccess.READ)
-	if f != null:
-		var rig: Variant = JSON.parse_string(f.get_as_text())
-		if rig is Dictionary and rig.has("silhouette") and rig.has("figure_px"):
-			info = {
-				"tex": load(dir + str(rig.silhouette)),
-				"image_size": Vector2(float(rig.image_size[0]), float(rig.image_size[1])),
-				"ground": Vector2(float(rig.ground[0]), float(rig.ground[1])),
-				"figure_px": float(rig.figure_px),
-			}
+	var ch := CharacterSprite2D.info_of(sprite_id)
+	if ch.has("silhouette") and ch.has("figure_px"):
+		info = {
+			"tex": CharacterSprite2D._tex(CharacterSprite2D.dir_of(sprite_id).path_join(str(ch.silhouette))),
+			"image_size": Vector2(float(ch.image_size[0]), float(ch.image_size[1])),
+			"ground": Vector2(float(ch.ground[0]), float(ch.ground[1])),
+			"figure_px": float(ch.figure_px),
+		}
 	_sil_cache[sprite_id] = info
 	return info

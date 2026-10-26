@@ -468,6 +468,14 @@ func _cli_ui(spec: String) -> void:
 			sim.issue_medical("npc_dan")
 			sim.issue_medical("npc_kira")
 			sim.skip(30)
+		"affinity":   # PX 해금·선물 구매 → 단에게 장갑 (친밀도 30 대화 해금 ♥). affinity:talk = 대화창까지
+			sim.ledger.cash += 300
+			sim.try_unlock("f1_px")
+			for g in ["gift_gloves", "gift_coffee", "gift_choco", "gift_book"]:
+				sim.buy_gift(g)
+			sim.give_gift("npc_dan", "gift_gloves")
+			if p.size() > 1 and p[1] == "talk":
+				hud.open_dialogue("npc_dan")
 		"unlock":
 			hud.open_unlock(p[1])
 		"unlockall":   # 모든 시설 해금 (3D 내부 확인용)

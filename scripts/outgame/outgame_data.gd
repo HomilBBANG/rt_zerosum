@@ -34,8 +34,9 @@ var recipes: Dictionary = {}        # id → {id, name, item, minutes, desc}
 var recipe_order: Array[String] = []
 var objects: Dictionary = {}        # id → {id, facility, kind, x(방 폭 비율), height(m), fatigue_rate, hp_rate, desc}
 var object_order: Array[String] = []
-var px_items: Dictionary = {}       # id → {id, name, price, affinity, liked: [npc id], desc}
+var px_items: Dictionary = {}       # id → {id, name, price, base, values: {npc id: 친밀도 상승량}, desc}
 var px_order: Array[String] = []
+var affinity_talks: Dictionary = {}  # npc id → [{id, need, dialogue}] (need 오름차순)
 var battle_rules: Array = []        # [{id, name, enabled, mode, interval_minutes, anchor, weekdays, start_day, times, date, stages, allow_skip, note}]
 var schedules: Dictionary = {}      # npc id → {npc_id, preferred_facility_ids, weekly_schedule, delegation_rules}
 var warnings: PackedStringArray = []
@@ -107,9 +108,20 @@ func _parse(sheets: Dictionary) -> void:
 			"fatigue_rate": GameData._f(r, "피로회복", 0.0), "hp_rate": GameData._f(r, "체력회복", 0.0), "desc": r.get("설명", "")}
 		object_order.append(r.id)
 	for r in GameData._table(sheets.get("PX", [])):
-		px_items[r.id] = {"id": r.id, "name": r.get("이름", r.id), "price": GameData._i(r, "가격"), "affinity": GameData._i(r, "친밀도"),
-			"liked": GameData._list(r, "좋아하는 대원"), "desc": r.get("설명", "")}
+		var base := GameData._i(r, "기본", GameData._i(r, "친밀도", 1))
+		var vals := {}
+		for nid in npc_order:   # 열 이름 = 대원 이름 (또는 대원 id). 빈 칸이면 기본
+			var cell := str(r.get(npcs[nid].name, r.get(nid, ""))).strip_edges()
+			vals[nid] = int(float(cell)) if cell.is_valid_float() else base
+		px_items[r.id] = {"id": r.id, "name": r.get("이름", r.id), "price": GameData._i(r, "가격"), "base": base, "values": vals, "desc": r.get("설명", "")}
 		px_order.append(r.id)
+	for r in GameData._table(sheets.get("친밀도대화", [])):
+		var nid := str(r.get("대원", ""))
+		if not affinity_talks.has(nid):
+			affinity_talks[nid] = []
+		affinity_talks[nid].append({"id": r.id, "need": GameData._i(r, "친밀도", 0), "dialogue": str(r.get("대사", ""))})
+	for nid in affinity_talks:
+		(affinity_talks[nid] as Array).sort_custom(func(a, b): return int(a.need) < int(b.need))
 	for r in GameData._table(sheets.get("제작", [])):
 		recipes[r.id] = {"id": r.id, "name": r.get("이름", r.id), "item": r.get("결과무기", ""),
 			"minutes": maxi(1, GameData._i(r, "소요(분)", 60)), "desc": r.get("설명", "")}
@@ -137,6 +149,12 @@ func _validate() -> void:
 	for id in object_order:
 		if not facilities.has(objects[id].facility):
 			warnings.append("오브젝트 %s: 시설 시트에 없는 '%s'" % [id, objects[id].facility])
+	for nid in affinity_talks:
+		if not npcs.has(nid):
+			warnings.append("친밀도대화: 없는 대원 %s" % nid)
+		for t in affinity_talks[nid]:
+			if not dialogues.has(t.dialogue):
+				warnings.append("친밀도대화 %s: 없는 대사 %s" % [t.id, t.dialogue])
 	for r in battle_rules:
 		for st in r.get("stages", []):
 			if str(st) == "":
@@ -233,6 +251,23 @@ func facilities_with_tag(tag: String) -> Array[String]:
 		if facilities[id].tag == tag:
 			out.append(id)
 	return out
+
+
+## PX 선물을 이 대원에게 줄 때 오르는 친밀도
+func gift_value(item_id: String, npc_id: String) -> int:
+	var it: Dictionary = px_items.get(item_id, {})
+	return int(it.get("values", {}).get(npc_id, it.get("base", 0)))
+
+
+## 선호: "아주 좋아함"(기본 2배 이상) / "좋아함" / "보통" / "별로"
+func gift_taste(item_id: String, npc_id: String) -> String:
+	var base := int(px_items.get(item_id, {}).get("base", 0))
+	var v := gift_value(item_id, npc_id)
+	if v >= base * 2 and v > base:
+		return "아주 좋아함"
+	if v > base:
+		return "좋아함"
+	return "별로" if v < base else "보통"
 
 
 func objects_in(fid: String) -> Array[String]:

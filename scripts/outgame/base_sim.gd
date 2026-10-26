@@ -426,8 +426,60 @@ func begin_dialogue(npc_id: String) -> Dictionary:
 		cs.talk_day = _day
 		_add_affinity(n, data.num("affinity_talk", 1.0))
 	var req := active_request(npc_id)
-	var dlg: String = req.dialogue if not req.is_empty() else str(data.npcs.get(npc_id, {}).get("talk", ""))
-	return {"lines": data.dialogues.get(dlg, []), "request": req}
+	if not req.is_empty():
+		return {"lines": data.dialogues.get(req.dialogue, []), "request": req, "affinity_need": -1, "new_talk": false}
+	# 친밀도 대화: 해금됐지만 안 본 대화부터, 다 봤으면 해금된 가장 높은 단계, 없으면 기본 대사
+	var dlg := str(data.npcs.get(npc_id, {}).get("talk", ""))
+	var need := -1
+	var fresh := false
+	var t := pending_affinity_talk(npc_id)
+	if not t.is_empty():
+		fresh = true
+		var seen: Array = cs.get("seen_talks", [])
+		seen.append(t.id)
+		cs.seen_talks = seen
+	else:
+		var un := unlocked_affinity_talks(npc_id)
+		t = un.back() if not un.is_empty() else {}
+	if not t.is_empty():
+		dlg = t.dialogue
+		need = int(t.need)
+		if fresh:
+			_log("%s 친밀도 %d 대화를 봤습니다" % [n.name, need])
+			npc_state_changed.emit(n.id)
+	return {"lines": data.dialogues.get(dlg, []), "request": {}, "affinity_need": need, "new_talk": fresh}
+
+
+## 친밀도로 해금된 대화 (낮은 단계부터)
+func unlocked_affinity_talks(npc_id: String) -> Array:
+	var n: NpcAgent = npcs.get(npc_id)
+	if n == null:
+		return []
+	var a := float(cstate(n).affinity)
+	return (data.affinity_talks.get(npc_id, []) as Array).filter(func(t): return a >= float(t.need))
+
+
+## 해금됐지만 아직 안 본 가장 낮은 단계의 친밀도 대화 (머리 위 ♥), 없으면 {}
+func pending_affinity_talk(npc_id: String) -> Dictionary:
+	var n: NpcAgent = npcs.get(npc_id)
+	if n == null:
+		return {}
+	var seen: Array = cstate(n).get("seen_talks", [])
+	for t in unlocked_affinity_talks(npc_id):
+		if not seen.has(t.id):
+			return t
+	return {}
+
+
+## 다음 친밀도 대화 기준 (없으면 -1)
+func next_affinity_need(npc_id: String) -> int:
+	var n: NpcAgent = npcs.get(npc_id)
+	if n == null:
+		return -1
+	for t in data.affinity_talks.get(npc_id, []):
+		if float(cstate(n).affinity) < float(t.need):
+			return int(t.need)
+	return -1
 
 
 func end_dialogue(npc_id: String) -> void:
@@ -922,7 +974,7 @@ func apply_to_ally(copy: UnitData, base: UnitData) -> void:
 func cstate_of(character_id: String) -> Dictionary:
 	if not chars.has(character_id):
 		chars[character_id] = {"hp": float(char_max_hp(character_id)), "statuses": [], "fatigue": data.num("fatigue_start", 20.0),
-			"affinity": data.num("affinity_start", 20.0), "talk_day": -1}
+			"affinity": data.num("affinity_start", 20.0), "talk_day": -1, "seen_talks": []}
 	return chars[character_id]
 
 
@@ -942,7 +994,12 @@ func char_max_hp(character_id: String) -> int:
 
 func _add_affinity(n: NpcAgent, v: float) -> void:
 	var cs := cstate(n)
-	cs.affinity = clampf(float(cs.affinity) + v, 0.0, 100.0)
+	var before := float(cs.affinity)
+	cs.affinity = clampf(before + v, 0.0, 100.0)
+	for t in data.affinity_talks.get(n.id, []):
+		if before < float(t.need) and float(cs.affinity) >= float(t.need):
+			_log("%s 친밀도 %d — 새 대화 해금! (클릭해서 대화)" % [n.name, int(t.need)])
+			npc_state_changed.emit(n.id)
 
 
 ## 매 분: 잠은 오브젝트 위에서만 피로 회복(오브젝트마다 다름), 체력은 체력회복 오브젝트(의무침대)에서만, 깨어 있으면 피로 증가
@@ -1095,11 +1152,13 @@ func give_gift(npc_id: String, item_id: String) -> Dictionary:
 	if int(gifts.get(item_id, 0)) <= 0:
 		return _fail("%s 이(가) 없습니다 (PX 에서 구매)" % it.get("name", item_id))
 	gifts[item_id] = int(gifts[item_id]) - 1
-	var liked: bool = npc_id in (it.liked as Array)
-	var v := float(it.affinity) * (data.num("liked_gift_mult", 2.0) if liked else 1.0)
-	_add_affinity(n, v)
-	_log("%s 에게 %s 선물 — 친밀도 +%d%s" % [n.name, it.name, roundi(v), " (좋아함!)" if liked else ""])
-	return {"ok": true, "msg": "%s 친밀도 +%d%s" % [n.name, roundi(v), " — 좋아하는 선물!" if liked else ""], "liked": liked}
+	var v := data.gift_value(item_id, npc_id)
+	var taste := data.gift_taste(item_id, npc_id)
+	var liked := taste == "좋아함" or taste == "아주 좋아함"
+	_add_affinity(n, float(v))
+	var tail: String = {"아주 좋아함": " — 아주 좋아해요!", "좋아함": " — 좋아해요", "별로": " — 별로인 듯"}.get(taste, "")
+	_log("%s 에게 %s 선물 — 친밀도 +%d (%s)" % [n.name, it.name, v, taste])
+	return {"ok": true, "msg": "%s 친밀도 +%d%s" % [n.name, v, tail], "liked": liked, "taste": taste, "value": v}
 
 
 # ================================================================ 의무실

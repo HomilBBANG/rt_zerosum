@@ -1,12 +1,13 @@
 class_name UnitSprite2D
 extends Node2D
-## 2D 유닛: 원화 스프라이트 + 구역 마스크 셰이더 + 무기 레이어 + 클릭 영역 + 하이라이트.
+## 2D 유닛: 캐릭터 프레임 애니메이션(CharacterSprite2D, assets/characters/<id>) 또는 옛 평면 스프라이트
+## + 구역 마스크 셰이더 + 무기 레이어 + 클릭 영역 + 하이라이트.
+## 공격·피격·회복·쓰러짐 애니메이션 프레임이 없으면 간단한 이동·흔들림 트윈으로 대신한다.
 
 signal clicked(unit: UnitRuntime)
 
 const SHADER := preload("res://shaders/cel_character.gdshader")
 const OUTLINE_SHADER := preload("res://shaders/outline_group.gdshader")
-const RIG_SCRIPT := preload("res://scripts/presentation/rigged_unit_2d.gd")
 const BASE_SCALE := 0.5
 
 
@@ -25,12 +26,8 @@ var _bob_t: float = 0.0
 var _flash: float = 0.0
 var _dead_alpha: float = 1.0
 var ui_accent: Color = Color(1, 0.9, 0.4)
-var rig: RiggedUnit2D = null
-var rig_height: float = 232.0
-
-
-func is_rigged() -> bool:
-	return rig != null
+var chr: CharacterSprite2D = null
+var chr_height: float = 232.0
 
 
 ## 좌우 반전 여부: 적은 왼쪽(아군)을 보게 뒤집는다. 원화가 이미 왼쪽을 보면(art_faces_left, 예: 구울) 반대로.
@@ -61,8 +58,8 @@ func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
 	if is_mirrored():
 		flip.scale.x = -1.0
 	flip.scale *= BASE_SCALE
-	if UnitArt.has_rig(unit.data.sprite_id):
-		_build_rigged(meta)
+	if CharacterSprite2D.exists(unit.data.sprite_id):
+		_build_character()
 		return
 	body = Sprite2D.new()
 	body.name = "Body"
@@ -101,15 +98,15 @@ func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
 	_update_light_masks()
 	z_index = 10
 
-## Skeleton2D 리그 경로: 파츠별 셰이더/마스크, 무기는 손 본에 부착
-func _build_rigged(_meta: Dictionary) -> void:
-	rig = RIG_SCRIPT.new()
-	rig.name = "Rig"
-	flip.add_child(rig)
-	rig.scale = Vector2.ONE / BASE_SCALE
-	rig.build(UnitArt.rig_dir(unit.data.sprite_id), false, unit.data.height_cm)
-	rig_height = -rig.head_top_local().y + 6.0
-	mat = rig.mats[0]
+## 캐릭터 프레임 애니메이션 경로: 셰이더 하나, 무기는 손 위치(character.json hand)에
+func _build_character() -> void:
+	chr = CharacterSprite2D.new()
+	chr.name = "Character"
+	flip.add_child(chr)
+	chr.scale = Vector2.ONE / BASE_SCALE
+	chr.build(unit.data.sprite_id, unit.data.height_cm)
+	chr_height = -chr.head_top_local().y + 6.0
+	mat = chr.mat
 	weapon = Sprite2D.new()
 	weapon.name = "Weapon"
 	weapon.centered = false
@@ -117,18 +114,16 @@ func _build_rigged(_meta: Dictionary) -> void:
 	wmat.shader = SHADER
 	weapon.material = wmat
 	weapon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	rig.attach_weapon(weapon)
-	# 무기 원화는 캐릭터 키 460px 기준 → 리그 원화 픽셀계로 (키 230px 화면 = 리그 scale)
-	weapon.scale = Vector2.ONE * (0.5 / rig.scale_factor)
-	weapon.z_index = 9
+	weapon.scale = Vector2.ONE * 0.5   # 무기 원화는 캐릭터 키 460px 기준 → 화면 키 230px
+	chr.attach_weapon(weapon)
 	refresh_weapon()
 	area = Area2D.new()
 	area.input_pickable = true
 	var shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
-	rect.size = Vector2(110.0, rig_height)
+	rect.size = Vector2(110.0, chr_height)
 	shape.shape = rect
-	shape.position = Vector2(0, -rig_height * 0.5)
+	shape.position = Vector2(0, -chr_height * 0.5)
 	area.add_child(shape)
 	area.input_event.connect(_on_area_input)
 	add_child(area)
@@ -137,10 +132,6 @@ func _build_rigged(_meta: Dictionary) -> void:
 
 
 func _all_mats() -> Array:
-	if rig != null:
-		var arr: Array = rig.mats.duplicate()
-		arr.append(wmat)
-		return arr
 	return [mat, wmat]
 
 
@@ -170,8 +161,8 @@ func _update_light_masks() -> void:
 		tex_from_right = not tex_from_right
 	var suffix := "_mask_r" if tex_from_right else "_mask_l"
 	var opposite := "_mask_l" if tex_from_right else "_mask_r"
-	if rig != null:
-		rig.set_light_direction(tex_from_right)   # 적은 좌우 반전 → 반전된 방향의 마스크
+	if chr != null:
+		chr.set_light_direction(tex_from_right)   # 적은 좌우 반전 → 반전된 방향의 마스크
 	else:
 		mat.set_shader_parameter("zone_mask", load("res://assets/sprites/%s%s.png" % [unit.data.sprite_id, suffix]))
 		mat.set_shader_parameter("near_rim_mask", load("res://assets/sprites/%s%s.png" % [unit.data.sprite_id, opposite]))
@@ -302,7 +293,7 @@ func _process(delta: float) -> void:
 		return
 	_bob_t += delta * (2.2 if highlight_kind == "current" else 1.4)
 	var amp := 2.5 if highlight_kind == "current" else 1.5
-	if rig == null:
+	if chr == null:
 		flip.position.y = sin(_bob_t + float(unit.instance_id)) * amp
 	if _flash > 0.0:
 		_flash = maxf(0.0, _flash - delta * 4.0)
@@ -311,8 +302,8 @@ func _process(delta: float) -> void:
 
 
 func head_screen_offset() -> Vector2:
-	if rig != null:
-		return Vector2(0, -rig_height - 6)
+	if chr != null:
+		return Vector2(0, -chr_height - 6)
 	var meta: Dictionary = manifest.units.get(unit.data.sprite_id, {})
 	var h: float = float(meta.get("height", 460)) * BASE_SCALE
 	return Vector2(0, -h - 6)
@@ -326,8 +317,12 @@ func _on_area_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void
 
 # ---------------------------------------------------------------- 연출
 func play_attack(toward_right: bool, ranged: bool) -> Tween:
-	if rig != null:
-		rig.play("attack")
+	if chr != null and chr.has_anim("attack"):
+		chr.play("attack")
+		var d := CharacterSprite2D.anim_data(chr.cid, "attack")
+		var at := create_tween()
+		at.tween_interval(0.55 * (d.frames as Array).size() / maxf(1.0, float(d.fps)))   # 프레임 중간쯤 피해 판정
+		return at
 	var tw := create_tween()
 	var dir := 1.0 if toward_right else -1.0
 	if ranged:
@@ -341,8 +336,8 @@ func play_attack(toward_right: bool, ranged: bool) -> Tween:
 
 func play_hit() -> void:
 	_flash = 1.0
-	if rig != null:
-		rig.play("hit")
+	if chr != null and chr.has_anim("hit"):
+		chr.play("hit")
 		return
 	var tw := create_tween()
 	tw.tween_property(flip, "rotation", -0.12 if unit.team == "ally" else 0.12, 0.06)
@@ -350,8 +345,8 @@ func play_hit() -> void:
 
 
 func play_heal() -> void:
-	if rig != null:
-		rig.play("heal")
+	if chr != null and chr.has_anim("heal"):
+		chr.play("heal")
 		return
 	var tw := create_tween()
 	tw.tween_property(flip, "scale", flip.scale * 1.06, 0.12)
@@ -359,8 +354,8 @@ func play_heal() -> void:
 
 
 func play_death() -> void:
-	if rig != null:
-		rig.play("death")
+	if chr != null and chr.has_anim("death"):
+		chr.play("death")
 		var tw2 := create_tween()
 		tw2.tween_property(flip, "modulate", Color(0.55, 0.55, 0.6, 1.0), 0.8)   # 어둡게만, 투명하게 하지 않음
 		z_index = 5
