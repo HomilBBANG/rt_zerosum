@@ -185,20 +185,27 @@ vec2 rot(vec2 v, float a) {
 	return vec2(v.x * cos(a) - v.y * sin(a), v.x * sin(a) + v.y * cos(a));
 }
 
-// 실루엣 가장자리 띠: dir 쪽으로 옮긴 원판 안의 '그림 밖' 비율 (12점 나선 표본 = 흐린 실루엣) → 문턱값으로 띠.
-// 표본을 원판에 흩어 평균하므로 띠 안쪽 경계가 실루엣을 부드럽게 따라감 (계단 없음)
+// 실루엣 가장자리 띠: 빛 반대쪽(위로 살짝)으로 rim_px*0.8 옮긴 작은 원판(반지름 rim_px*0.3) 안의 '그림 밖' 비율 → 문턱값으로 띠.
+// 원판이 항상 이 픽셀보다 위·바깥쪽에 있어 아래를 향한 가장자리(머리카락 끝·코트 밑단·턱 아래)에는 림이 생기지 않음.
+// 12점 나선 표본을 평균하므로 띠 안쪽 경계가 실루엣을 부드럽게 따라감 (계단 없음)
 float edge_rim(sampler2D tex, vec2 uv, vec2 dir, vec2 px) {
-	float r = rim_px * 0.55;
-	vec2 c = uv + dir * r * px;
+	float q = rim_px * 0.3;
+	vec2 c = uv + dir * rim_px * 0.8 * px;
 	float out_a = 0.0;
 	for (int i = 0; i < 12; i++) {
 		float fi = float(i) + 0.5;
-		float rr = r * sqrt(fi / 12.0);
+		float rr = q * sqrt(fi / 12.0);
 		float an = fi * 2.39996;
 		out_a += 1.0 - texture(tex, c + vec2(cos(an), sin(an)) * rr * px).a;
 	}
 	out_a /= 12.0;
-	return smoothstep(0.10, 0.30, out_a);
+	// 바깥이 정말 트인 곳인지: 같은 방향으로 더 멀리(1.8·2.6·3.4배)도 비어 있어야 함
+	// → 그림 안쪽의 작은 틈(목 옆, 코트 밑단과 부츠 사이)에는 림이 생기지 않음
+	float open_a = 0.0;
+	for (int k = 0; k < 3; k++) {
+		open_a += 1.0 - texture(tex, uv + dir * rim_px * (1.8 + 0.8 * float(k)) * px).a;
+	}
+	return smoothstep(0.10, 0.30, out_a) * smoothstep(0.55, 0.95, open_a / 3.0);
 }
 
 void fragment() {
@@ -216,7 +223,7 @@ void fragment() {
 	float l = lum(o);
 	o = clamp(mix(vec3(l), o, saturation), 0.0, 1.0);
 	if (rim_from_alpha) {
-		vec2 away = normalize(vec2(light_from_right ? -1.0 : 1.0, -0.25));   // 빛 반대쪽 (살짝 위 — 어깨·모자 윗선도)
+		vec2 away = normalize(vec2(light_from_right ? -1.0 : 1.0, -0.4));   // 빛 반대쪽 + 위 (어깨·모자 윗선엔 들고, 아래를 향한 가장자리엔 안 듦)
 		if (use_rim) {
 			o = mix(o, accent_color.rgb, edge_rim(TEXTURE, UV, away, TEXTURE_PIXEL_SIZE) * max(accent_mix, neon_rim * neon));
 		}
