@@ -227,7 +227,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 1. 투명 배경 전신 그림 한 장 → `python3 tools/char_sprites.py new <id> 그림.png` → `assets/characters/<id>/` (기본 그림·조명 마스크·초상화·그림자·character.json, 키 760px·발·머리·손 위치 자동).
 2. 실행할 때 `--test_char=<id>` (+ `--test_slot=a_kira` 등, 기본 니키타 자리)를 붙이면 그 자리 캐릭터만 새 그림으로 전투·기지에 나옴 (데이터는 그대로).
    예: `godot --path . ++ --scene=battle --test_char=test` / `++ --scene=base --test_char=test`. 계속 쓰려면 엑셀 `캐릭터`·`대원` 시트 `스프라이트` 열에 `<id>`.
-- 지금 들어 있는 시험 캐릭터: `test` (의무병 코트, 사용자 제공).
+- 지금 들어 있는 시험 캐릭터: `test` (의무병 코트·주머니에 손, 사용자 제공). 흰 배경(불투명) 그림이면 `new` 가 가장자리에서 이어진 흰 바탕만 자동으로 지움 (외곽선 안쪽 흰 옷은 그대로).
 
 ![시험 캐릭터 — 기지(왼쪽)와 원본](docs/screenshots/test_char_compare.png)
 

@@ -232,9 +232,40 @@ def cmd_breathe(cid, frames=16):
     print(cid, name, frames, "프레임 (숨쉬기)")
 
 
+def remove_white_bg(im):
+    """흰 배경(불투명) 제거: 그림 가장자리에서 이어진 거의 흰 픽셀만 투명 (외곽선 안쪽의 흰 옷은 그대로) + 경계 부드럽게"""
+    import numpy as np
+    from scipy import ndimage
+    a = np.array(im.convert("RGBA")).astype(np.float32)
+    rgb = a[..., :3]
+    near = (rgb.min(-1) >= 248) & ((rgb.max(-1) - rgb.min(-1)) <= 6)
+    lab, _n = ndimage.label(near)
+    edge = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
+    bg = np.isin(lab, list(edge))
+    ring = ndimage.binary_dilation(bg, iterations=2) & ~bg
+    alpha = np.where(bg, 0.0, 255.0)
+    lum = rgb.mean(-1)
+    ra = np.clip((255.0 - lum) / 255.0 * 1.6, 0.0, 1.0)            # 흰 바탕과 섞인 외곽선 → 반투명
+    alpha = np.where(ring, np.maximum(ra * 255.0, np.where(lum < 200, 255.0, 0.0)), alpha)
+    k = np.clip(alpha / 255.0, 1e-3, 1.0)[..., None]
+    un = np.clip((rgb - (1.0 - k) * 255.0) / k, 0, 255)            # 흰색 섞임 빼기
+    rgb = np.where(ring[..., None], un, rgb)
+    solid = alpha > 20
+    lab2, n2 = ndimage.label(solid)
+    if n2 > 1:   # 떨어져 남은 작은 점 지우기
+        sizes = ndimage.sum(solid, lab2, range(1, n2 + 1))
+        small = np.isin(lab2, [i + 1 for i, v in enumerate(sizes) if v < max(60, sizes.max() * 0.0005)])
+        alpha = np.where(small, 0.0, alpha)
+    out = np.dstack([rgb, alpha]).astype(np.uint8)
+    return Image.fromarray(out, "RGBA")
+
+
 def cmd_new(cid, src, fig_px=760):
     import numpy as np
     im = Image.open(src).convert("RGBA")
+    if np.array(im)[..., 3].min() > 250:   # 투명 배경이 아니면 흰 배경 제거
+        im = remove_white_bg(im)
+        print("흰 배경 제거")
     a = np.array(im)[..., 3]
     ys, xs = np.where(a > 40)
     if len(ys) == 0:
