@@ -7,7 +7,7 @@ assets/characters/<id>/
   silhouette.png      3D 배경의 그림자용 실루엣
   portrait.png        초상화 (HUD)
   <애니메이션>/0001.png, 0002.png …   ← 사용자가 뽑은 프레임 (idle, walk, sit, sleep, work, attack, hit, heal, death …)
-  <애니메이션>/anim.json  (선택) {"fps": 12, "loop": true, "ground": [x, y], "figure_px": 760, "hip_y": 400, "weapon": false}
+  <애니메이션>/anim.json  (선택) {"fps": 12, "loop": true, "durations": [초, 초, …], "ground": [x, y], "figure_px": 760, "hip_y": 400, "weapon": false}
 
 사용:
   python3 tools/char_sprites.py masks            프레임마다 조명 마스크(<프레임>_mask_l/_r.png)가 없으면 만든다

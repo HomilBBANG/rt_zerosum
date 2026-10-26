@@ -185,8 +185,27 @@ func _process(delta: float) -> void:
 	var n := (_a.get("frames", []) as Array).size()
 	if n <= 1 or _done:
 		return
-	_t += delta * float(_a.fps)
-	var i := floori(_t)
+	var i := 0
+	var durs: Array = _a.get("durations", [])
+	if not durs.is_empty():
+		# anim.json "durations": 프레임마다 보여 줄 초 (목록이 짧으면 반복)
+		_t += delta
+		var total := 0.0
+		for k in n:
+			total += maxf(0.01, float(durs[k % durs.size()]))
+		if _t >= total and not _a.loop:
+			i = n
+		else:
+			var tt := fmod(_t, total)
+			var acc := 0.0
+			for k in n:
+				acc += maxf(0.01, float(durs[k % durs.size()]))
+				if tt < acc:
+					i = k
+					break
+	else:
+		_t += delta * float(_a.fps)
+		i = floori(_t)
 	if i >= n:
 		if _a.loop:
 			i = i % n
