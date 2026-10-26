@@ -75,7 +75,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ESCAPE: Game.go_menu()
 
 
-## CLI 자동 진행 (스크린샷/검증용): --autoplay=aim|move|fight:N
+## CLI 자동 진행 (스크린샷/검증용): --autoplay=aim|move|fight:N|slot:i:press|hover
 func _run_cli() -> void:
 	var auto: String = Game.cli.get("autoplay", "")
 	if auto != "":
@@ -95,6 +95,16 @@ func _run_cli() -> void:
 				break
 			if auto == "move":
 				hud.begin_move()
+				break
+			if auto.begins_with("slot"):
+				# --autoplay=slot:<번호>:press|hover — 하단 슬롯 클릭/호버 (0~2 무기, 3 이동, 4~6 스킬, 7 필살기)
+				await get_tree().process_frame
+				var b := hud.debug_slot_button(int(auto.get_slice(":", 1)))
+				if b != null:
+					if auto.get_slice(":", 2) == "hover":
+						b.mouse_entered.emit()
+					else:
+						b.pressed.emit()
 				break
 			if auto.begins_with("fight"):
 				if steps >= max_steps:

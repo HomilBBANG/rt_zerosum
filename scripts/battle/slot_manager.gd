@@ -79,8 +79,8 @@ func move_or_swap(unit: UnitRuntime, target_key: String) -> Dictionary:
 	if target_key == unit.slot_key():
 		return {"ok": false, "reason": "현재 위치입니다."}
 	var other: UnitRuntime = _slots.get(target_key, null)
-	if unit.is_large() or (other != null and other.is_large()):
-		return {"ok": false, "reason": "큰 몸집은 자리를 옮기거나 바꿀 수 없습니다."}
+	if not unit.can_be_moved() or (other != null and not other.can_be_moved()):
+		return {"ok": false, "reason": "자리를 옮기거나 바꿀 수 없는 상태입니다."}
 	var from_key := unit.slot_key()
 	if other == null:
 		_slots.erase(from_key)

@@ -301,14 +301,14 @@ func get_target_block_reason(action_id: String, target: UnitRuntime) -> String:
 ## 이동 가능한 슬롯 목록 [{key, kind: "move"|"swap", other}]
 func get_move_options() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	if current == null or current.is_large():
+	if current == null or not current.can_be_moved():
 		return out
 	for key in slots.team_slot_keys(current.team):
 		if key == current.slot_key():
 			continue
 		var other := slots.unit_at(key)
-		if other != null and other.is_large():
-			continue
+		if other != null and not other.can_be_moved():
+			continue   # 부상·상태이상·큰 몸집: 표시하지 않음
 		out.append({"key": key, "kind": "move" if other == null else "swap", "other": other})
 	return out
 
@@ -382,6 +382,34 @@ func player_change_weapon() -> bool:
 	current.actions_this_turn += 1
 	current.weapon_index = (current.weapon_index + 1) % current.data.weapons.size()
 	_log("%s 무기 변경 → %s" % [current.display_name(), current.current_weapon().name])
+	ap_changed.emit(current)
+	weapon_changed.emit(current)
+	_after_action()
+	return true
+
+
+## 무기 슬롯 index(0 주무기, 1·2 보조무기)를 장착. AP 는 무기 변경 비용(1).
+func player_equip_weapon(index: int) -> bool:
+	if not is_player_turn():
+		command_rejected.emit("지금은 명령할 수 없습니다.")
+		return false
+	var wp: ActionData = actions.get("weapon", null)
+	if wp == null:
+		return false
+	if index < 0 or index >= current.data.weapons.size():
+		command_rejected.emit("빈 무기 칸입니다.")
+		return false
+	if index == current.weapon_index:
+		command_rejected.emit("이미 장착 중입니다.")
+		return false
+	if not APComponent.can_pay(current, wp.ap_cost):
+		command_rejected.emit("AP가 부족합니다. (필요 %d)" % wp.ap_cost)
+		return false
+	_set_state(State.ACTION_RESOLVE)
+	APComponent.pay(current, wp.ap_cost)
+	current.actions_this_turn += 1
+	current.weapon_index = index
+	_log("%s 무기 장착 → %s" % [current.display_name(), current.current_weapon().name])
 	ap_changed.emit(current)
 	weapon_changed.emit(current)
 	_after_action()

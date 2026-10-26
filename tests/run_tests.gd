@@ -52,6 +52,7 @@ func _init() -> void:
 	_test_restart_resets()
 	_test_coin_is_seeded()
 	_test_large_units()
+	_test_equip_and_move_lock()
 	print("== %d passed, %d failed ==" % [_passes, _fails])
 	quit(1 if _fails > 0 else 0)
 
@@ -333,4 +334,30 @@ func _test_large_units() -> void:
 	ghoul.alive = false
 	bc.slots.remove_dead_from_slots()
 	_check(bc.slots.unit_at("enemy:0:1") == null and bc.slots.unit_at("enemy:1:1") == null, "사망 시 두 칸 모두 비움")
+	bc.queue_free()
+
+
+func _test_equip_and_move_lock() -> void:
+	print("[12] 무기 칸 장착 (AP 1) / 이동 불가 상태는 이동·교환 후보에서 제외")
+	var bc := _make("ally")
+	bc.start_battle()
+	var cur := bc.current
+	_check(cur.team == "ally" and cur.data.weapons.size() >= 2, "아군 차례, 무기 2개 이상")
+	var ap0 := cur.ap
+	_check(not bc.player_equip_weapon(0) and cur.ap == ap0, "장착 중인 무기 재장착 거부, AP 유지")
+	_check(not bc.player_equip_weapon(2) and cur.ap == ap0, "빈 무기 칸 거부, AP 유지")
+	_check(bc.player_equip_weapon(1) and cur.weapon_index == 1 and cur.ap == ap0 - 1, "보조무기1 장착, AP -1")
+	var others := bc.slots.living_units("ally")
+	var locked: UnitRuntime = null
+	for u in others:
+		if u != bc.current:
+			locked = u
+			break
+	if bc.is_player_turn() and locked != null:
+		locked.move_locked = true
+		var keys := []
+		for o in bc.get_move_options():
+			keys.append(o.key)
+		_check(not keys.has(locked.slot_key()), "이동 불가 유닛 자리는 후보에 없음")
+		_check(not bc.slots.move_or_swap(bc.current, locked.slot_key()).ok, "이동 불가 유닛과 교환 거부")
 	bc.queue_free()

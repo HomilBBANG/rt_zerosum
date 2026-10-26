@@ -13,6 +13,8 @@ var weapon_index: int = 0
 var alive: bool = true
 ## 이번 턴 누적 행동 수 (디버그/AI 용)
 var actions_this_turn: int = 0
+## 부상·상태이상 등으로 자리를 옮길 수 없음 (자리 이동·교환 대상에서 빠짐). 상태이상 시스템이 생기면 여기서 판단
+var move_locked: bool = false
 
 
 static func create(p_data: UnitData, p_instance_id: int, p_row: int, p_index: int) -> UnitRuntime:
@@ -32,6 +34,7 @@ func reset() -> void:
 	weapon_index = 0
 	alive = true
 	actions_this_turn = 0
+	move_locked = false
 
 
 func slot_key() -> String:
@@ -52,6 +55,11 @@ func occupies_row(r: int) -> bool:
 
 func is_large() -> bool:
 	return data.row_span > 1
+
+
+## 자리 이동·교환이 가능한가 (큰 몸집·부상·상태이상이면 불가)
+func can_be_moved() -> bool:
+	return alive and not is_large() and not move_locked
 
 
 func current_weapon() -> Dictionary:

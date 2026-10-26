@@ -300,11 +300,15 @@ func draws_back_bars() -> bool:
 	return true
 
 
-## 발밑 체력 칸: 외곽선 없는 짧은 평행사변형 여러 개 (아군 3칸, 적 10칸). 체력 비율만큼 칸이 차고, 걸친 칸은 일부만 참.
+## 발밑 체력·AP 칸: 외곽선 없는 짧은 평행사변형 여러 개.
+## 체력(붉은색) = 아군 3칸 / 적 10칸, 체력 비율만큼 차고 걸친 칸은 일부만 참.
+## AP(파란색) = 체력 바로 아래, 최대 AP 수만큼 칸, 현재 AP 만큼 참.
 const HP_SEGMENTS_ALLY := 3
 const HP_SEGMENTS_ENEMY := 10
 const HP_COLOR := Color(0.95, 0.16, 0.14)
 const HP_EMPTY := Color(0.25, 0.04, 0.04, 0.7)
+const AP_COLOR := Color(0.25, 0.6, 1.0)
+const AP_EMPTY := Color(0.04, 0.1, 0.25, 0.7)
 
 
 func _draw_back_bars() -> void:
@@ -312,22 +316,28 @@ func _draw_back_bars() -> void:
 		var s: UnitSprite2D = sprites[id]
 		var u: UnitRuntime = s.unit
 		var k := s.scale.y
-		var n := HP_SEGMENTS_ALLY if u.team == "ally" else HP_SEGMENTS_ENEMY
-		var seg_w := (15.0 if n <= 3 else 8.0) * k
-		var gap := 3.0 * k
-		var h := maxf(6.0, 8.0 * k)
-		var skew := h * 0.6   # 윗변을 오른쪽으로 밀어 기울임
-		var total := n * seg_w + (n - 1) * gap + skew
-		var x0 := s.position.x - total * 0.5
-		var y := s.position.y + 17.0 * k
 		var a := 1.0 if u.alive else 0.35
-		var filled := clampf(float(u.hp) / float(maxi(u.data.max_hp, 1)), 0.0, 1.0) * n
-		for i in n:
-			var x := x0 + i * (seg_w + gap)
-			back_bars.draw_colored_polygon(_para(x, y, seg_w, h, skew), Color(HP_EMPTY, HP_EMPTY.a * a))
-			var f := clampf(filled - i, 0.0, 1.0)
-			if f > 0.0:
-				back_bars.draw_colored_polygon(_para(x, y, seg_w * f, h, skew), Color(HP_COLOR, a))
+		var h := maxf(6.0, 8.0 * k)
+		var y := s.position.y + 17.0 * k
+		var n := HP_SEGMENTS_ALLY if u.team == "ally" else HP_SEGMENTS_ENEMY
+		var hp_frac := clampf(float(u.hp) / float(maxi(u.data.max_hp, 1)), 0.0, 1.0)
+		_draw_segments(s.position.x, y, n, (15.0 if n <= 3 else 8.0) * k, h, 3.0 * k, hp_frac * n, HP_COLOR, HP_EMPTY, a)
+		if u.alive:
+			var ah := maxf(4.0, 5.0 * k)
+			_draw_segments(s.position.x, y + h + 3.0 * k, u.data.max_ap, 7.0 * k, ah, 2.5 * k, float(u.ap), AP_COLOR, AP_EMPTY, a)
+
+
+## 가운데 cx 에 n 칸, filled 칸만큼 채움 (소수면 마지막 칸 일부)
+func _draw_segments(cx: float, y: float, n: int, seg_w: float, h: float, gap: float, filled: float, col: Color, empty: Color, a: float) -> void:
+	var skew := h * 0.6   # 윗변을 오른쪽으로 밀어 기울임
+	var total := n * seg_w + (n - 1) * gap + skew
+	var x0 := cx - total * 0.5
+	for i in n:
+		var x := x0 + i * (seg_w + gap)
+		back_bars.draw_colored_polygon(_para(x, y, seg_w, h, skew), Color(empty, empty.a * a))
+		var f := clampf(filled - i, 0.0, 1.0)
+		if f > 0.0:
+			back_bars.draw_colored_polygon(_para(x, y, seg_w * f, h, skew), Color(col, a))
 
 
 ## 아래변 왼쪽이 (x, y+h) 인 평행사변형

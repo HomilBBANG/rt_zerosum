@@ -1,6 +1,6 @@
 class_name SlotMarker2D
 extends Node2D
-## 이동(빈 슬롯) / 교환(점유 슬롯) 마커
+## 이동(빈 슬롯) / 교체(점유 슬롯) 마커: 이동·교체 가능한 자리의 발밑에 파란색으로 표시
 
 signal clicked(key: String)
 
@@ -34,7 +34,7 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var pulse := 0.5 + 0.5 * sin(_t * 5.0)
-	var col := Color(0.4, 0.9, 1.0) if kind == "move" else Color(1.0, 0.8, 0.3)
+	var col := Color(0.3, 0.55, 1.0)   # 이동·교체 모두 파란색 (아이콘으로 구분)
 	if _hover:
 		col = col.lightened(0.3)
 	var pts := PackedVector2Array()
