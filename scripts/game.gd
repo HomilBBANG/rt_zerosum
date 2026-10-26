@@ -55,6 +55,10 @@ func _ready() -> void:
 	actions = TestRoster.build_actions()
 	reset_formation()
 	_parse_cli()
+	if cli.has("export_hud"):   # HUD 레이아웃을 scenes/battle_hud.tscn 으로 저장 (tools/export_hud_scene.gd)
+		var err: int = load("res://tools/export_hud_scene.gd").run()
+		get_tree().quit(0 if err == OK else 1)
+		return
 	if cli.has("mode"):
 		mode = cli.mode
 	if cli.has("preset"):

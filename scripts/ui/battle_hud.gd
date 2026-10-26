@@ -51,7 +51,10 @@ func _ready() -> void:
 	_font_bold = load("res://assets/fonts/Pretendard-Bold.ttf")
 	var f := FileAccess.open("res://assets/sprites/manifest.json", FileAccess.READ)
 	manifest = JSON.parse_string(f.get_as_text())
-	_build_ui()
+	# 레이아웃: scenes/battle_hud.tscn 에 저장된 노드를 쓴다 (Godot 에디터에서 위치 편집 가능). 없으면 코드로 생성
+	if find_child("Bottom", true, false) == null:
+		_create_layout()
+	_bind_layout()
 
 
 func setup(p_controller: BattleController, p_view: BattleViewBase, p_preset: Dictionary) -> void:
@@ -104,9 +107,15 @@ func _label(text: String, size: int = 16, color: Color = Color(0.95, 0.95, 0.95)
 	return l
 
 
-func _build_ui() -> void:
+## 레이아웃 노드 생성. scenes/battle_hud.tscn 에 노드가 이미 있으면(에디터에서 편집한 레이아웃) 호출하지 않는다.
+## tools/export_hud_scene.gd 가 이 함수로 만든 노드를 그대로 battle_hud.tscn 에 저장한다.
+func _create_layout() -> void:
+	if _font == null:
+		_font = load("res://assets/fonts/Pretendard-Medium.ttf")
+		_font_bold = load("res://assets/fonts/Pretendard-Bold.ttf")
 	# 상단 바: 배경 없이 라운드 + 행동 순서 초상화 (동전 결과·"행동 순서" 글자는 표시하지 않음)
 	top_bar = PanelContainer.new()
+	top_bar.name = "TopBar"
 	top_bar.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	top_bar.offset_left = 16
@@ -115,26 +124,33 @@ func _build_ui() -> void:
 	top_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(top_bar)
 	var top_h := HBoxContainer.new()
+	top_h.name = "TopRow"
 	top_h.add_theme_constant_override("separation", 18)
 	top_h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_bar.add_child(top_h)
 	round_label = _label("라운드 1", 22, Color(1, 0.92, 0.5))
+	round_label.name = "RoundLabel"
 	round_label.add_theme_font_override("font", _font_bold)
 	top_h.add_child(round_label)
 	# 행동 순서: 화면 상단 중앙 (내용 폭이 바뀌어도 가운데 유지)
 	timeline = HBoxContainer.new()
+	timeline.name = "Timeline"
 	timeline.add_theme_constant_override("separation", 6)
 	timeline.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	timeline.anchor_left = 0.5
 	timeline.anchor_right = 0.5
 	timeline.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	timeline.offset_top = 8
+	timeline.alignment = BoxContainer.ALIGNMENT_CENTER
+	timeline.custom_minimum_size = Vector2(380, 52)   # 에디터에서 보이는 자리 (초상화는 실행 중에 채움)
 	add_child(timeline)
 	hover_label = _label("", 14)
+	hover_label.name = "HoverName"
 	hover_label.visible = false
 	hover_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	preset_label = _label("", 13, Color(0.75, 0.8, 0.85))
+	preset_label.name = "PresetLabel"
 	preset_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	preset_label.position = Vector2(16, 70)
 	add_child(preset_label)
@@ -142,16 +158,19 @@ func _build_ui() -> void:
 
 	# 유닛 위 HP/AP
 	floating_root = Control.new()
+	floating_root.name = "Floating"
 	floating_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	floating_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(floating_root)
 	popup_root = Control.new()
+	popup_root.name = "Popups"
 	popup_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	popup_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(popup_root)
 
 	# 하단 명령 패널: 초상화 | 이름 + [무기 3칸 · 자리 이동 · 기본 스킬 3칸 · 필살기] | 상태 이상 | 턴 종료
 	bottom = PanelContainer.new()
+	bottom.name = "Bottom"
 	bottom.add_theme_stylebox_override("panel", _panel_style(0.88))
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_left = 12
@@ -160,37 +179,46 @@ func _build_ui() -> void:
 	bottom.offset_bottom = -8
 	add_child(bottom)
 	var hb := HBoxContainer.new()
+	hb.name = "BottomRow"
 	hb.add_theme_constant_override("separation", 14)
 	bottom.add_child(hb)
 	portrait = TextureRect.new()
+	portrait.name = "Portrait"
 	portrait.custom_minimum_size = Vector2(104, 104)
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var pf := PanelContainer.new()
+	pf.name = "PortraitFrame"
 	pf.add_theme_stylebox_override("panel", _panel_style(0.6, Color(1, 1, 1, 0.3)))
 	pf.add_child(portrait)
 	hb.add_child(pf)
 	# 이름·수치·안내: 초상화 오른쪽 좁은 칸 (슬롯 줄은 화면 가운데에 따로)
 	var info := VBoxContainer.new()
+	info.name = "Info"
 	info.custom_minimum_size.x = 168
 	info.add_theme_constant_override("separation", 2)
 	hb.add_child(info)
 	name_label = _label("-", 17, Color(1, 1, 1))
+	name_label.name = "NameLabel"
 	name_label.clip_text = true
 	name_label.custom_minimum_size.x = 168
 	info.add_child(name_label)
 	stat_label = _label("", 12, Color(0.8, 0.85, 0.9))
+	stat_label.name = "StatLabel"
 	stat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	stat_label.custom_minimum_size.x = 168
 	info.add_child(stat_label)
 	hint_label = _label("", 12, Color(1, 0.95, 0.7))   # 안내 문구는 표시하지 않음 (사용자 요청)
+	hint_label.name = "HintLabel"
 	hint_label.visible = false
 	info.add_child(hint_label)
 	var fill := Control.new()
 	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fill.name = "Spacer"
 	hb.add_child(fill)
 	# 턴 종료: 맨 오른쪽, 모서리 둥근 정사각형 (취소는 같은 버튼을 다시 누르거나 우클릭)
 	end_btn = _button("턴\n종료", Color(0.9, 0.45, 0.3))
+	end_btn.name = "EndTurn"
 	end_btn.custom_minimum_size = Vector2(84, 84)
 	end_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	end_btn.add_theme_font_override("font", _font_bold)
@@ -199,14 +227,15 @@ func _build_ui() -> void:
 		var sbx: StyleBoxFlat = end_btn.get_theme_stylebox(st).duplicate()
 		sbx.set_corner_radius_all(14)
 		end_btn.add_theme_stylebox_override(st, sbx)
-	end_btn.pressed.connect(func(): cancel_pending(); controller.player_end_turn())
 	var end_wrap := MarginContainer.new()
+	end_wrap.name = "EndTurnWrap"
 	end_wrap.add_theme_constant_override("margin_right", 1)   # 왼쪽으로 1px
 	end_wrap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	end_wrap.add_child(end_btn)
 	hb.add_child(end_wrap)
 	# 상태 이상: 슬롯 줄과 턴 종료 사이 빈 칸 (긍정 녹색 / 부정 붉은색, 호버 시 설명)
 	var st_box := PanelContainer.new()
+	st_box.name = "StatusWindow"
 	var st_style := StyleBoxFlat.new()
 	st_style.bg_color = Color(0.04, 0.06, 0.12, 0.9)
 	st_style.border_color = Color(0.36, 0.45, 0.62, 1.0)   # 불투명 파란 외곽선 창 (채도 낮춤)
@@ -225,14 +254,17 @@ func _build_ui() -> void:
 	st_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(st_box)
 	var st_scroll := ScrollContainer.new()
+	st_scroll.name = "StatusScroll"
 	st_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	st_box.add_child(st_scroll)
 	status_flow = VBoxContainer.new()   # 상태 이상 한 줄씩
+	status_flow.name = "StatusList"
 	status_flow.add_theme_constant_override("separation", 4)
 	status_flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	st_scroll.add_child(status_flow)
 	# 슬롯 줄: 화면 가로 가운데, 하단 패널 안 (무기 칸은 패널 천장까지 세로로 길게)
 	slots_row = HBoxContainer.new()
+	slots_row.name = "SlotsRow"
 	slots_row.add_theme_constant_override("separation", 6)
 	slots_row.anchor_left = 0.5
 	slots_row.anchor_right = 0.5
@@ -241,9 +273,12 @@ func _build_ui() -> void:
 	slots_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	slots_row.offset_top = -137   # 무기 칸 위 1px 여유
 	slots_row.offset_bottom = -6   # 슬롯 줄 세로 중심 = 패널 세로 중심
+	slots_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	slots_row.custom_minimum_size = Vector2(620, 0)   # 에디터에서 보이는 자리 (슬롯은 실행 중에 채움)
 	add_child(slots_row)
 	# 무기 장착 팝업 (불투명 검은 버튼) + 슬롯 설명 말풍선
 	equip_popup = _button("장착하기  AP -1", Color(0.85, 0.85, 0.85))
+	equip_popup.name = "EquipPopup"
 	var ep: StyleBoxFlat = equip_popup.get_theme_stylebox("normal").duplicate()
 	ep.bg_color = Color(0.02, 0.02, 0.03, 1.0)
 	ep.border_color = Color(1, 1, 1, 0.5)
@@ -254,13 +289,14 @@ func _build_ui() -> void:
 	equip_popup.add_theme_color_override("font_disabled_color", Color(1, 0.85, 0.3))
 	equip_popup.custom_minimum_size = Vector2(124, 32)
 	equip_popup.visible = false
-	equip_popup.pressed.connect(_on_equip_pressed)
 	add_child(equip_popup)
 	slot_tip = PanelContainer.new()
+	slot_tip.name = "SlotTip"
 	slot_tip.add_theme_stylebox_override("panel", _panel_style(0.95, Color(1, 1, 1, 0.3)))
 	slot_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot_tip.visible = false
 	slot_tip_label = _label("", 14)
+	slot_tip_label.name = "SlotTipLabel"
 	slot_tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	slot_tip_label.custom_minimum_size.x = 250
 	slot_tip.add_child(slot_tip_label)
@@ -268,6 +304,7 @@ func _build_ui() -> void:
 
 	# 로그 (2단): 1단 = 우측 상단 아이콘만, 2단 = 아이콘 아래 기록 창. 아이콘 클릭(또는 L)으로 전환
 	log_btn = Button.new()
+	log_btn.name = "LogButton"
 	log_btn.icon = load("res://assets/textures/ui_log.png")
 	log_btn.expand_icon = true
 	log_btn.toggle_mode = true
@@ -285,9 +322,9 @@ func _build_ui() -> void:
 	log_btn.offset_right = -16
 	log_btn.offset_top = 10
 	log_btn.offset_bottom = 46
-	log_btn.toggled.connect(func(on): log_panel.visible = on)
 	add_child(log_btn)
 	log_panel = PanelContainer.new()
+	log_panel.name = "LogPanel"
 	log_panel.add_theme_stylebox_override("panel", _panel_style(0.6))
 	log_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	log_panel.offset_left = -404
@@ -297,10 +334,8 @@ func _build_ui() -> void:
 	log_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	log_panel.visible = false
 	add_child(log_panel)
-	if Game.cli.get("log", "0") == "1":   # 스크린샷용: 2단(기록 창)으로 시작
-		log_btn.set_pressed_no_signal(true)
-		log_panel.visible = true
 	log_box = RichTextLabel.new()
+	log_box.name = "LogText"
 	log_box.scroll_following = true
 	log_box.add_theme_font_override("normal_font", _font)
 	log_box.add_theme_font_size_override("normal_font_size", 13)
@@ -308,6 +343,7 @@ func _build_ui() -> void:
 	log_panel.add_child(log_box)
 
 	debug_panel = PanelContainer.new()
+	debug_panel.name = "DebugPanel"
 	debug_panel.add_theme_stylebox_override("panel", _panel_style(0.85, Color(1, 0.8, 0.2, 0.5)))
 	debug_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	debug_panel.position = Vector2(12, 84)
@@ -315,21 +351,67 @@ func _build_ui() -> void:
 	debug_panel.visible = false
 	add_child(debug_panel)
 	debug_label = _label("", 12, Color(1, 0.95, 0.8))
+	debug_label.name = "DebugLabel"
 	debug_panel.add_child(debug_label)
 
 	toast = PanelContainer.new()
+	toast.name = "Toast"
 	toast.add_theme_stylebox_override("panel", _panel_style(0.92, Color(1, 0.4, 0.3, 0.8)))
 	toast.visible = false
 	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(toast)
 	toast_label = _label("", 14, Color(1, 0.9, 0.85))
+	toast_label.name = "ToastLabel"
 	toast.add_child(toast_label)
 
 	result_banner = _label("", 54, Color(1, 0.95, 0.6))
+	result_banner.name = "ResultBanner"
 	result_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	result_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_banner.visible = false
 	add_child(result_banner)
+
+
+## 씬(또는 코드로 만든) 레이아웃 노드를 이름으로 찾아 변수·신호에 연결
+func _bind_layout() -> void:
+	top_bar = _n("TopBar")
+	round_label = _n("RoundLabel")
+	timeline = _n("Timeline")
+	hover_label = _n("HoverName")
+	preset_label = _n("PresetLabel")
+	floating_root = _n("Floating")
+	popup_root = _n("Popups")
+	bottom = _n("Bottom")
+	portrait = _n("Portrait")
+	name_label = _n("NameLabel")
+	stat_label = _n("StatLabel")
+	hint_label = _n("HintLabel")
+	end_btn = _n("EndTurn")
+	status_flow = _n("StatusList")
+	slots_row = _n("SlotsRow")
+	equip_popup = _n("EquipPopup")
+	slot_tip = _n("SlotTip")
+	slot_tip_label = _n("SlotTipLabel")
+	log_btn = _n("LogButton")
+	log_panel = _n("LogPanel")
+	log_box = _n("LogText")
+	debug_panel = _n("DebugPanel")
+	debug_label = _n("DebugLabel")
+	toast = _n("Toast")
+	toast_label = _n("ToastLabel")
+	result_banner = _n("ResultBanner")
+	end_btn.pressed.connect(func(): cancel_pending(); controller.player_end_turn())
+	equip_popup.pressed.connect(_on_equip_pressed)
+	log_btn.toggled.connect(func(on): log_panel.visible = on)
+	if Game.cli.get("log", "0") == "1":   # 스크린샷용: 2단(기록 창)으로 시작
+		log_btn.set_pressed_no_signal(true)
+		log_panel.visible = true
+
+
+func _n(node_name: String) -> Node:
+	var n := find_child(node_name, true, false)
+	assert(n != null, "HUD 레이아웃에 %s 노드가 없습니다 (scenes/battle_hud.tscn)" % node_name)
+	return n
 
 
 func _button(text: String, color: Color) -> Button:
