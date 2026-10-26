@@ -24,6 +24,8 @@ var hint_label: Label
 var cancel_btn: Button
 var end_btn: Button
 var log_box: RichTextLabel
+var log_panel: PanelContainer
+var log_btn: Button
 var debug_panel: PanelContainer
 var debug_label: Label
 var toast: PanelContainer
@@ -115,11 +117,15 @@ func _build_ui() -> void:
 	round_label = _label("라운드 1", 22, Color(1, 0.92, 0.5))
 	round_label.add_theme_font_override("font", _font_bold)
 	top_h.add_child(round_label)
+	# 행동 순서: 화면 상단 중앙 (내용 폭이 바뀌어도 가운데 유지)
 	timeline = HBoxContainer.new()
 	timeline.add_theme_constant_override("separation", 6)
-	timeline.alignment = BoxContainer.ALIGNMENT_BEGIN
 	timeline.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	top_h.add_child(timeline)
+	timeline.anchor_left = 0.5
+	timeline.anchor_right = 0.5
+	timeline.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	timeline.offset_top = 8
+	add_child(timeline)
 	hover_label = _label("", 14)
 	hover_label.visible = false
 	hover_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -192,16 +198,40 @@ func _build_ui() -> void:
 	end_btn.pressed.connect(func(): cancel_pending(); controller.player_end_turn())
 	right.add_child(end_btn)
 
-	# 로그 / 디버그
-	var log_panel := PanelContainer.new()
+	# 로그 (2단): 1단 = 우측 상단 아이콘만, 2단 = 아이콘 아래 기록 창. 아이콘 클릭(또는 L)으로 전환
+	log_btn = Button.new()
+	log_btn.icon = load("res://assets/textures/ui_log.png")
+	log_btn.expand_icon = true
+	log_btn.toggle_mode = true
+	log_btn.focus_mode = Control.FOCUS_NONE
+	var lb_style := _panel_style(0.55)
+	lb_style.set_content_margin_all(6)
+	log_btn.add_theme_stylebox_override("normal", lb_style)
+	var lb_hover := _panel_style(0.75, Color(1, 1, 1, 0.35))
+	lb_hover.set_content_margin_all(6)
+	log_btn.add_theme_stylebox_override("hover", lb_hover)
+	log_btn.add_theme_stylebox_override("pressed", lb_hover)
+	log_btn.add_theme_stylebox_override("hover_pressed", lb_hover)
+	log_btn.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	log_btn.offset_left = -52
+	log_btn.offset_right = -16
+	log_btn.offset_top = 10
+	log_btn.offset_bottom = 46
+	log_btn.toggled.connect(func(on): log_panel.visible = on)
+	add_child(log_btn)
+	log_panel = PanelContainer.new()
 	log_panel.add_theme_stylebox_override("panel", _panel_style(0.6))
 	log_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	log_panel.offset_left = -400
-	log_panel.offset_right = -12
-	log_panel.offset_top = 84
-	log_panel.offset_bottom = 176
+	log_panel.offset_left = -404
+	log_panel.offset_right = -16
+	log_panel.offset_top = 52
+	log_panel.offset_bottom = 144
 	log_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	log_panel.visible = false
 	add_child(log_panel)
+	if Game.cli.get("log", "0") == "1":   # 스크린샷용: 2단(기록 창)으로 시작
+		log_btn.set_pressed_no_signal(true)
+		log_panel.visible = true
 	log_box = RichTextLabel.new()
 	log_box.scroll_following = true
 	log_box.add_theme_font_override("normal_font", _font)
@@ -591,8 +621,8 @@ func _process(delta: float) -> void:
 	for id in floating:
 		var e: Dictionary = floating[id]
 		var pos: Vector2 = view.get_unit_screen_pos(e.unit) - Vector2(e.root.size.x * 0.5, 40)
-		# 키 큰 괴물(4m)은 머리 위 표시가 상단 바·전투 기록에 가리지 않게 그 아래로 내림
-		var min_y := 186.0 if pos.x + e.root.size.x > 1280.0 - 400.0 else 104.0
+		# 키 큰 괴물(4m)은 머리 위 표시가 상단 HUD·펼친 전투 기록에 가리지 않게 그 아래로 내림
+		var min_y := 152.0 if log_panel.visible and pos.x + e.root.size.x > 1280.0 - 404.0 else 104.0
 		pos.y = maxf(pos.y, min_y)
 		e.root.position = pos
 		var r: Rect2 = view.get_unit_back_bar_rect(e.unit)
@@ -623,3 +653,8 @@ func _row_text(u: UnitRuntime) -> String:
 	for r in range(u.row, u.row + u.data.row_span):
 		names.append(SlotManager.ROW_NAMES[r])
 	return "·".join(names)
+
+
+## 로그 1단(아이콘만) ↔ 2단(기록 창) 전환
+func toggle_log() -> void:
+	log_btn.button_pressed = not log_btn.button_pressed

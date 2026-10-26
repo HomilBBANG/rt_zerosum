@@ -1,6 +1,6 @@
 extends Node
 ## 전투 씬 공통 스크립트 (battle_2d.tscn / battle_3d.tscn 양쪽에서 사용).
-## 컨트롤러 생성 → 뷰/HUD 연결 → 전투 시작 → 결과 전환. 단축키: 1~4 조명 프리셋, F1 디버그, F2 HUD, F3 림 라인, R 재시작, Esc 메뉴.
+## 컨트롤러 생성 → 뷰/HUD 연결 → 전투 시작 → 결과 전환. 단축키: 1~4 조명 프리셋, L 전투 기록, F1 디버그, F2 HUD, F3 림 라인, R 재시작, Esc 메뉴.
 
 @onready var view: BattleViewBase = $View
 @onready var hud: BattleHUD = $HUD
@@ -38,7 +38,7 @@ func _on_initiative(_first: String, _reason: String) -> void:
 	var coin := CoinFlip.new()
 	add_child(coin)
 	coin.finished.connect(controller.begin_rounds)
-	coin.play(controller.coin_face)
+	coin.play(controller.coin_face, "아군 선공" if controller.first_team == "ally" else "적 선공")
 
 
 func _on_battle_ended(winner: String) -> void:
@@ -63,6 +63,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_3: set_preset("g3")
 			KEY_4: set_preset("g4")
 			KEY_F1: hud.toggle_debug()
+			KEY_L: hud.toggle_log()
 			KEY_F3:
 				Game.rim_enabled = not Game.rim_enabled
 				view.apply_preset(preset)
