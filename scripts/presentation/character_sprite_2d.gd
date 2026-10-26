@@ -356,7 +356,7 @@ func _show(i: int) -> void:
 	if _a.get("align_feet", false):
 		gy = float(_a.feet_y[i])
 	body.position = -Vector2(float(g[0]), gy) * s
-	mat.set_shader_parameter("rim_px", 20.0 * float(_a.figure_px) / 760.0)   # 림 두께: 키 760px 그림 기준 20px
+	mat.set_shader_parameter("rim_px", 14.0 * float(_a.figure_px) / 760.0)   # 림 두께: 키 760px 그림 기준 14px
 	weapon_holder.visible = bool(_a.get("weapon", true))
 	_apply_mask()
 
