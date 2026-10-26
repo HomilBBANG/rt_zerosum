@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bptug1bk54yyb"
-path="res://.godot/imported/attack_4x4.png-2b6bc507df82c8a529e2c7daddc2ad5e.ctex"
+uid="uid://dos5rwbocgsfy"
+path="res://.godot/imported/idle_4x4_eye.png-c4e20835c58ba7c17a1574a5758aa0e4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/characters/kira/attack_4x4.png"
-dest_files=["res://.godot/imported/attack_4x4.png-2b6bc507df82c8a529e2c7daddc2ad5e.ctex"]
+source_file="res://assets/characters/nikita_army/idle_4x4_eye.png"
+dest_files=["res://.godot/imported/idle_4x4_eye.png-c4e20835c58ba7c17a1574a5758aa0e4.ctex"]
 
 [params]
 
@@ -23,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

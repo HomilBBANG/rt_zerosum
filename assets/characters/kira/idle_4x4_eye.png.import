@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bwvwibqxw4wwp"
-path="res://.godot/imported/attack_4x4_line.png-e4661162d981e3aa03f06e54110379c5.ctex"
+uid="uid://bno2e7ffqlybx"
+path="res://.godot/imported/idle_4x4_eye.png-58bb9b4abfe3986ef963deb3aeff19b6.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/characters/kira/attack_4x4_line.png"
-dest_files=["res://.godot/imported/attack_4x4_line.png-e4661162d981e3aa03f06e54110379c5.ctex"]
+source_file="res://assets/characters/kira/idle_4x4_eye.png"
+dest_files=["res://.godot/imported/idle_4x4_eye.png-58bb9b4abfe3986ef963deb3aeff19b6.ctex"]
 
 [params]
 

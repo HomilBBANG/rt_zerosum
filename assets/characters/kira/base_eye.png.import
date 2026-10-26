@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dwwxtbs17a7n4"
-path="res://.godot/imported/walk_5x2_line.png-3b30791090c5d754148c18d360745e1e.ctex"
+uid="uid://d0rgeoqig27ph"
+path="res://.godot/imported/base_eye.png-6c4244924a90a564d30b94f3b914b325.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/characters/kira/walk_5x2_line.png"
-dest_files=["res://.godot/imported/walk_5x2_line.png-3b30791090c5d754148c18d360745e1e.ctex"]
+source_file="res://assets/characters/kira/base_eye.png"
+dest_files=["res://.godot/imported/base_eye.png-6c4244924a90a564d30b94f3b914b325.ctex"]
 
 [params]
 

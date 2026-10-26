@@ -114,8 +114,15 @@ def eye_mask(im, head=None, boxes=None):
     order = [i + 1 for i in np.argsort(sizes)[::-1] if sizes[i] >= 12]
     pick = order if boxes else order[:2]
     m = np.isin(lab, pick)
+    # 눈동자가 검은 그림: 흰자에 붙은 어두운 덩어리(동공·검은 홍채·눈 테두리)도 원화 그대로 — 눈마다 상자(+6px) 안에서만
     dark = (al > 200) & ((r + g + b) / 3 <= 70)
-    m |= dark & ndimage.binary_dilation(m, iterations=3)   # 동공·눈 테두리(어두운 픽셀)도 원화 그대로
+    near = ndimage.binary_dilation(m, iterations=2)
+    box = np.zeros_like(m)
+    for sl in ndimage.find_objects(ndimage.label(m)[0]):
+        ys, xs = sl
+        box[max(0, ys.start - 6):ys.stop + 6, max(0, xs.start - 6):xs.stop + 6] = True
+    dl, _dn = ndimage.label(dark & box)
+    m |= np.isin(dl, np.unique(dl[near & (dl > 0)]))
     m = ndimage.binary_fill_holes(m)
     out = Image.fromarray((m * 255).astype(np.uint8))
     return out.filter(ImageFilter.GaussianBlur(0.7))
@@ -300,10 +307,10 @@ def cmd_breathe(cid, frames=16):
     rows = int(math.ceil(frames / cols))
     sheet = Image.new("RGBA", (w * cols, h * rows), (0, 0, 0, 0))
     masks = {}
-    for suf in ("_mask_r", "_mask_l"):
+    for suf in ("_mask_r", "_mask_l", "_line", "_eye"):   # 조명 마스크·선화·눈 마스크도 같은 움직임으로
         mp = os.path.join(cdir, "base" + suf + ".png")
         if os.path.exists(mp):
-            masks[suf] = (np.array(Image.open(mp).convert("L")).astype(np.float32), Image.new("L", (w * cols, h * rows), 85))
+            masks[suf] = (np.array(Image.open(mp).convert("L")).astype(np.float32), Image.new("L", (w * cols, h * rows), 85 if "_mask_" in suf else 0))
     for i in range(frames):
         ph = 2 * math.pi * i / frames
         dy = -amp_y * (0.5 - 0.5 * math.cos(ph))          # 0 → 위로 → 0
@@ -315,8 +322,8 @@ def cmd_breathe(cid, frames=16):
             out[..., c] = map_coordinates(im[..., c], [sy, sx], order=1, mode="constant", cval=0.0)
         sheet.paste(Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)), ((i % cols) * w, (i // cols) * h))
         for suf, (m, ms) in masks.items():   # 기본 그림 조명 마스크도 같은 움직임으로 (눈동자 구역 등 그대로)
-            mw = map_coordinates(m, [sy, sx], order=0, mode="nearest")
-            ms.paste(Image.fromarray(mw.astype(np.uint8)), ((i % cols) * w, (i // cols) * h))
+            mw = map_coordinates(m, [sy, sx], order=0 if "_mask_" in suf else 1, mode="nearest")
+            ms.paste(Image.fromarray(np.clip(mw, 0, 255).astype(np.uint8)), ((i % cols) * w, (i // cols) * h))
     name = "idle_%dx%d.png" % (cols, rows)
     sheet.save(os.path.join(cdir, name), optimize=True)
     json.dump({"fps": 8, "ground": info["ground"], "figure_px": fig, "hip_y": hip},
