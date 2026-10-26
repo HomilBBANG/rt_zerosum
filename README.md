@@ -209,7 +209,8 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - (선택) 움직이는 GIF·WebP → 프레임 변환: `python3 tools/char_sprites.py import nikita_army hit 파일.webp` (조명 마스크까지 만듦).
   ※ 채팅에 올린 움직이는 이미지는 첫 장면 한 장으로만 전달되므로, 시트 한 장으로 주거나 저장소에 넣어 커밋해 주세요.
 - 프레임마다 보여 줄 시간을 다르게: `anim.json` 의 `"durations": [2.4, 1.2]` (초, fps 대신).
-- **들어간 애니메이션** (사용자 제공 시트): 니키타 `idle_4x4`(8fps) · `walk_6x6`(15fps) · `hit_6x6`(버티는 동작, 24fps) · `attack_6x6`(가리키는 동작, 24fps), 키라 `idle_4x4`(8fps).
+- **들어간 애니메이션** (사용자 제공 시트): 니키타 `idle_4x4`(8fps) · `walk_6x6`(15fps) · `hit_6x6`(버티는 동작, 24fps) · `attack_6x6`(가리키는 동작, 24fps) /
+  키라 `idle_4x4`(8fps) · `walk_4x4`(12fps) · `hit_4x4`(20fps) · `attack_4x4`(팔 휘두르기, 20fps) / 하나(`hero2`) `walk_4x4`(12fps) · `hit_4x4`(20fps).
   속도는 같은 이름 json(`walk.json` 등). 조명 마스크 시트(`*_mask_r/_l.png`)는 `python3 tools/char_sprites.py masks` 로 칸마다 만듦 — 없어도 동작.
 
 ## 규칙 테스트 (헤드리스)
