@@ -238,7 +238,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![키라·니키타 새 그림 — 원본과 기지 화면](docs/screenshots/kira_nikita_new.png)
 ![키라 최종 그림 — 원본·기지 화면·얼굴](docs/screenshots/kira_final.png)
-![하나 새 그림 — 원본·기지 화면·얼굴(노란 눈 원본 색)](docs/screenshots/hana_new.png)
+![하나 최종 그림 — 원본·기지 화면·얼굴(노란 눈 원본 색, 오른쪽 눈 아래 점)](docs/screenshots/hana_new.png)
 
 ### 네온 칠 (전 캐릭터 기본)
 모든 캐릭터를 **선화는 원화 그대로, 면은 조명색으로 쨍하게** 칠합니다 (레퍼런스: `docs/screenshots/ref_neon.png`).
