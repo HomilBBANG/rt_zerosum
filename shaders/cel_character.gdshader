@@ -37,13 +37,19 @@ uniform float saturation : hint_range(0.0, 2.0) = 1.18;
 uniform bool use_rim = true;
 uniform vec4 eye_color : source_color = vec4(0.3, 0.6, 1.0, 1.0);
 uniform bool paint_eyes = true;   // false: 눈동자를 칠하지 않고 주변광 구역처럼 (원화 눈 색)
+// 외곽 림 (빛 반대쪽 가장자리 선): 마스크의 림 구역 대신 그림 실루엣(알파)을 빛 방향으로 밀어 그 차이만큼 칠함
+// → 실루엣 윤곽을 그대로 따라가 계단 없이 매끄럽고, 다리 사이 같은 안쪽 가장자리에도 생김. 두께 = rim_px (원화 px)
+uniform bool rim_from_alpha = true;
+uniform bool light_from_right = true;   // 텍스처 기준 빛 방향 (스크립트가 넣음)
+uniform float rim_px : hint_range(0.0, 60.0) = 20.0;
+uniform float neon_rim : hint_range(0.0, 1.0) = 0.92;   // 네온 칠일 때 림 세기 (accent_mix 보다 크면 이것)
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
 uniform int debug_view = 0;   // 1: 원화 그대로 출력 (디버그)
 
 // ── 네온 칠 (character.json "style": "neon") ── 레퍼런스: 면은 조명색으로 쨍하게 덮고 선화만 원화 그대로.
 //   원화 밝기 → 조명색 명도로 옮김 (검정 옷도 바닥 밝기 neon_floor 로 들어 올려 깊은 조명색이 됨, 흰 옷은 밝은 조명색)
 //   원화 고유색은 neon_keep 만큼만 남김 (빨간 머리·적십자가 '조명 받은 빨강'으로 읽히게)
-uniform float neon : hint_range(0.0, 1.0) = 0.0;          // 0 = 기존 칠, 1 = 네온 칠
+uniform float neon : hint_range(0.0, 1.0) = 1.0;          // 0 = 기존 칠, 1 = 네온 칠 (기본)
 uniform float neon_floor : hint_range(0.0, 0.5) = 0.19;    // 가장 어두운 면의 밝기 (선화는 이보다 어두워서 묻히지 않음)
 uniform float neon_keep : hint_range(0.0, 1.0) = 0.45;     // 원화 고유색(채도) 남기는 양
 uniform float neon_white : hint_range(0.0, 1.0) = 0.38;    // 밝은 면을 흰빛 쪽으로 (흰 코트가 '빛나는 흰색'으로 남게)
@@ -109,7 +115,7 @@ vec3 neon_dark_hue() {
 vec3 neon_fill(vec3 src, vec3 light, float gain) {
 	float L = lum(src);
 	float v = mix(neon_floor, 1.0, L) * gain;
-	vec3 hue = hue_of(hue_lerp(hue_of(neon_dark_hue()), hue_of(light), smoothstep(0.10, 0.55, L)));
+	vec3 hue = hue_of(hue_lerp(hue_of(neon_dark_hue()), hue_of(light), smoothstep(0.06, 0.45, L)));
 	vec3 c = hue * v;
 	c += (src - vec3(L)) * neon_keep;                          // 원화 고유색 조금
 	c = mix(c, vec3(v), smoothstep(0.55, 1.0, L) * neon_white); // 밝은 면은 흰빛 섞인 조명색
@@ -164,11 +170,35 @@ vec3 shade2(vec3 base, vec3 src, vec2 uv, float gt) {
 	if (!use_zone_mask) {
 		return mix(shade_any(base, src, 0.33, gt), shade_any(base, src, 0.7, gt), 0.35);
 	}
-	vec3 c = shade_any(base, src, texture(zone_mask, uv).r, gt);
-	if (use_near_rim && texture(near_rim_mask, uv).r >= 0.83) {
+	float z = texture(zone_mask, uv).r;
+	if (rim_from_alpha && z >= 0.83) {
+		z = 0.0;   // 마스크 림 구역은 그림자 면으로 (림은 edge_rim 이 그림)
+	}
+	vec3 c = shade_any(base, src, z, gt);
+	if (!rim_from_alpha && use_near_rim && texture(near_rim_mask, uv).r >= 0.83) {
 		c = mix(c, near_rim_color.rgb, near_rim_mix);
 	}
 	return c;
+}
+
+vec2 rot(vec2 v, float a) {
+	return vec2(v.x * cos(a) - v.y * sin(a), v.x * sin(a) + v.y * cos(a));
+}
+
+// 실루엣 가장자리 띠: dir 쪽으로 옮긴 원판 안의 '그림 밖' 비율 (12점 나선 표본 = 흐린 실루엣) → 문턱값으로 띠.
+// 표본을 원판에 흩어 평균하므로 띠 안쪽 경계가 실루엣을 부드럽게 따라감 (계단 없음)
+float edge_rim(sampler2D tex, vec2 uv, vec2 dir, vec2 px) {
+	float r = rim_px * 0.55;
+	vec2 c = uv + dir * r * px;
+	float out_a = 0.0;
+	for (int i = 0; i < 12; i++) {
+		float fi = float(i) + 0.5;
+		float rr = r * sqrt(fi / 12.0);
+		float an = fi * 2.39996;
+		out_a += 1.0 - texture(tex, c + vec2(cos(an), sin(an)) * rr * px).a;
+	}
+	out_a /= 12.0;
+	return smoothstep(0.10, 0.30, out_a);
 }
 
 void fragment() {
@@ -185,6 +215,15 @@ void fragment() {
 	o *= 0.25;
 	float l = lum(o);
 	o = clamp(mix(vec3(l), o, saturation), 0.0, 1.0);
+	if (rim_from_alpha) {
+		vec2 away = normalize(vec2(light_from_right ? -1.0 : 1.0, -0.25));   // 빛 반대쪽 (살짝 위 — 어깨·모자 윗선도)
+		if (use_rim) {
+			o = mix(o, accent_color.rgb, edge_rim(TEXTURE, UV, away, TEXTURE_PIXEL_SIZE) * max(accent_mix, neon_rim * neon));
+		}
+		if (use_near_rim) {
+			o = mix(o, near_rim_color.rgb, edge_rim(TEXTURE, UV, vec2(-away.x, away.y), TEXTURE_PIXEL_SIZE) * near_rim_mix);
+		}
+	}
 	if (use_line_mask) {
 		o = mix(o, min(o, orig), texture(line_mask, UV).r * line_keep);   // 어두운 선은 원화 그대로, 선 옆 밝은 테두리는 조명 받은 색 유지
 	}

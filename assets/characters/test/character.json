@@ -23,6 +23,5 @@
  "eyes": [],
  "fps": 12,
  "silhouette": "silhouette.png",
- "style": "neon",
- "neon_gradient": 1.0
+ "neon_gradient": 0.0
 }

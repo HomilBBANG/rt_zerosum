@@ -237,17 +237,18 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![시험 캐릭터 — 기지(왼쪽)와 원본](docs/screenshots/test_char_compare.png)
 
-### 네온 칠 (캐릭터별 선택)
-`character.json` 에 `"style": "neon"` 을 넣으면 그 캐릭터는 **선화는 원화 그대로, 면은 조명색으로 쨍하게** 칠합니다 (레퍼런스: `docs/screenshots/ref_neon.png`).
+### 네온 칠 (전 캐릭터 기본)
+모든 캐릭터를 **선화는 원화 그대로, 면은 조명색으로 쨍하게** 칠합니다 (레퍼런스: `docs/screenshots/ref_neon.png`).
 - 원화 밝기 → 조명색 명도. 검정 옷도 바닥 밝기(`neon_floor`)까지 올라가 깊은 보라·남색이 되고, 흰 코트는 흰빛 섞인 조명색. 선은 그보다 어두운 원화 색이라 묻히지 않음.
-- `"neon_gradient": 1` → 몸 위(빛 쪽)에서 아래로 조명 색상이 푸른 보라 쪽으로 넘어가는 그라데이션 (주황→빨강→분홍, 분홍→보라, 초록→청록).
-- 실행 옵션으로 비교: `--char_style=neon|classic`, `--char_gradient=0|1` (모든 캐릭터에 강제). 세기는 셰이더 `neon_*` 값.
+- **외곽 림**(빛 반대쪽 가장자리의 보조광 선): 셰이더가 그림 실루엣에서 직접 그림 — 두께 `rim_px`(원화 키 760px 기준 20px), 실루엣을 따라 매끄럽게(계단 없음), 다리 사이 같은 안쪽 가장자리에도 생김.
+- `character.json` `"style": "classic"` → 예전 셀 칠. `"neon_gradient": 1` → 몸 위(빛 쪽)에서 아래로 조명 색상이 푸른 보라 쪽으로 넘어가는 그라데이션 (기본 끔).
+- 실행 옵션으로 비교: `--char_style=neon|classic`, `--char_gradient=0|1` (모든 캐릭터에 강제). 세기는 셰이더 `neon_*`·`rim_px` 값.
 - 기지 확대 촬영: `--base_focus=npc_nikita --base_zoom=3.6 --base_focus_y=0.9`.
-- 지금은 시험 캐릭터 `test` 만 네온 + 그라데이션.
 
-![원본·기존 칠·네온·네온+그라데이션 (기지, 주황 조명 방)](docs/screenshots/neon_base.png)
+![외곽 림: 전(왼쪽)·후 — 굵고 매끄럽게](docs/screenshots/neon_rim.png)
+![전투 아군 — 예전 셀 칠(위)·네온(아래)](docs/screenshots/neon_battle_all.png)
+![원본·기존 칠·네온·네온+그라데이션 (림 바꾸기 전)](docs/screenshots/neon_base.png)
 ![얼굴 확대 — 선화 유지](docs/screenshots/neon_lines.png)
-![전투 — 기존·네온·그라데이션 (G1, G4)](docs/screenshots/neon_battle.png)
 
 ## 규칙 테스트 (헤드리스)
 ```

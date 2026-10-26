@@ -161,6 +161,8 @@ func _update_light_masks() -> void:
 		tex_from_right = not tex_from_right
 	var suffix := "_mask_r" if tex_from_right else "_mask_l"
 	var opposite := "_mask_l" if tex_from_right else "_mask_r"
+	for m in _all_mats():
+		m.set_shader_parameter("light_from_right", tex_from_right)   # 실루엣 림 방향
 	if chr != null:
 		chr.set_light_direction(tex_from_right)   # 적은 좌우 반전 → 반전된 방향의 마스크
 	else:

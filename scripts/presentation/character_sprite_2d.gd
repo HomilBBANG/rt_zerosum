@@ -356,6 +356,7 @@ func _show(i: int) -> void:
 	if _a.get("align_feet", false):
 		gy = float(_a.feet_y[i])
 	body.position = -Vector2(float(g[0]), gy) * s
+	mat.set_shader_parameter("rim_px", 20.0 * float(_a.figure_px) / 760.0)   # 림 두께: 키 760px 그림 기준 20px
 	weapon_holder.visible = bool(_a.get("weapon", true))
 	_apply_mask()
 
@@ -376,9 +377,9 @@ func _apply_mask() -> void:
 		mat.set_shader_parameter("near_rim_mask", ml if _tex_from_right else mr)
 
 
-## character.json "style": "neon" → 네온 칠 (면은 조명색으로 쨍하게, 선화는 원화 그대로). "neon_gradient": 0~1 → 몸 위아래로 주조명색→림색 그라데이션
+## character.json "style": 기본 "neon" (면은 조명색으로 쨍하게, 선화는 원화 그대로), "classic" = 예전 셀 칠. "neon_gradient": 0~1 → 몸 위(빛 쪽)→아래로 조명 색상 회전 그라데이션
 func _apply_style() -> void:
-	var style := str(style_override.get("style", info.get("style", "classic")))
+	var style := str(style_override.get("style", info.get("style", "neon")))
 	var grad := float(style_override.get("neon_gradient", info.get("neon_gradient", 0.0)))
 	mat.set_shader_parameter("neon", 1.0 if style == "neon" else 0.0)
 	mat.set_shader_parameter("neon_gradient", grad if style == "neon" else 0.0)
@@ -388,6 +389,7 @@ func _apply_style() -> void:
 func set_light_direction(tex_from_right: bool) -> void:
 	_tex_from_right = tex_from_right
 	mat.set_shader_parameter("grad_dir", Vector2(-0.35 if tex_from_right else 0.35, 1.0))   # 빛 쪽 위에서 반대쪽 아래로
+	mat.set_shader_parameter("light_from_right", tex_from_right)
 	_apply_mask()
 
 
