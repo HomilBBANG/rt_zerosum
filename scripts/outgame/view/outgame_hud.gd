@@ -26,6 +26,7 @@ var log_panel: PanelContainer
 var log_label: RichTextLabel
 var debug_panel: PanelContainer
 var debug_label: Label
+var zoom_label: Label
 var _modals: Array[Control] = []
 var _queue: Array[Callable] = []
 var _toast_t := 0.0
@@ -43,6 +44,7 @@ func setup(p_hub: Node, p_sim: BaseSim) -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 	_build_top()
 	_build_log()
+	_build_zoom()
 	_build_debug()
 	toast = _label("", 20, GOLD, true)
 	toast.set_anchors_and_offsets_preset(PRESET_CENTER_TOP)
@@ -175,9 +177,31 @@ func _build_log() -> void:
 	log_label.scroll_following = true
 	log_label.mouse_filter = MOUSE_FILTER_PASS
 	log_panel.add_child(log_label)
-	var hint := _label("좌클릭 대원: 대화 · 우클릭 대원: 지시 · 말풍선: 엿듣기 · 검은 방: 해금 · WASD 이동 · 휠 확대 · F1 디버그", 12, Color(0.8, 0.88, 0.95), true)
+	var hint := _label("좌클릭 대원: 대화 · 우클릭: 지시 · 말풍선: 엿듣기 · 검은 방: 해금 · WASD 이동 · 휠/핀치/Q·E 확대 · F1", 12, Color(0.8, 0.88, 0.95), true)
 	hint.position = Vector2(500, 696)
 	add_child(hint)
+
+
+## 오른쪽 아래 확대/축소: − 배율 + (휠·핀치·Q/E·+/- 키도 됨, 0 = 기본)
+func _build_zoom() -> void:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", _panel_style(Color(0.04, 0.05, 0.08, 0.8), Color(0.25, 0.32, 0.4)))
+	add_child(p)
+	var h := _hbox(6)
+	p.add_child(h)
+	var minus := _button("－", Color(0.45, 0.7, 0.9), 18, 40)
+	minus.tooltip_text = "축소 (휠 아래 · Q · -)"
+	minus.pressed.connect(func(): hub.zoom_step(-1))
+	h.add_child(minus)
+	zoom_label = _label("100%", 15, Color(0.9, 0.95, 1.0))
+	zoom_label.custom_minimum_size.x = 56
+	zoom_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	h.add_child(zoom_label)
+	var plus := _button("＋", Color(0.45, 0.7, 0.9), 18, 40)
+	plus.tooltip_text = "확대 (휠 위 · E · +)"
+	plus.pressed.connect(func(): hub.zoom_step(1))
+	h.add_child(plus)
+	p.position = Vector2(1280 - 10 - p.get_combined_minimum_size().x, 640)
 
 
 func _build_debug() -> void:
@@ -218,6 +242,7 @@ func refresh(delta: float) -> void:
 	for i in speed_buttons.size():
 		speed_buttons[i].modulate = Color(1, 1, 0.5) if [0, 1, 4, 16][i] == hub.speed else Color(1, 1, 1)
 	cash_label.text = "$%d" % sim.ledger.cash
+	zoom_label.text = "%d%%" % hub.zoom_percent()
 	var left := sim.minutes_to_settlement()
 	var ins := sim.inspection_this_month()
 	var ins_text := "이번 달 장군 점검: %s" % ("완료 (%s, %d점)" % [ins.grade, roundi(float(ins.score))] if ins.get("done", false) else "예정 (날짜 모름)")

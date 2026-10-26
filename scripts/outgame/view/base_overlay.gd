@@ -114,6 +114,7 @@ func _draw_floor_labels() -> void:
 		var at := proj(Vector3(bb.position.x - 0.6, y0 + 0.2, BaseView3D.FRONT_Z + 0.3))
 		var w := _bold.get_string_size(f.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
 		var r := Rect2(at - Vector2(w + 18, 24), Vector2(w + 14, 24))
+		r.position.x = maxf(r.position.x, 8.0)   # 축소해도 화면 밖으로 안 나가게
 		draw_rect(r, Color(0.95, 0.85, 0.2))
 		draw_rect(r, OUTLINE, false, 2.0)
 		draw_string(_bold, r.position + Vector2(7, 18), f.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, OUTLINE)

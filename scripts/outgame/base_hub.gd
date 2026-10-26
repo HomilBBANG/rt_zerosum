@@ -6,13 +6,19 @@ extends Node2D
 
 const RENDER_SIZE := Vector2i(2560, 1440)   # QHD 로 렌더해 1280×720 논리 화면에 깐다
 const SCREEN := Vector2(1280, 720)
+## 확대 한계 (화면 세로에 들어가는 높이, m). 3D 배경은 늘 QHD 로 다시 그려 어느 배율에서도 선명하므로, 한계는 대원 원화 해상도:
+## 원화 전신 ≈ 760px, 가장 큰 대원 1.85m 가 QHD 세로 1440px 화면에서 원화보다 커지지 않는 값 = 1.85 × 1440 / 760 ≈ 3.5 → 3.6.
+## 축소 한계는 기지 전체(가로 9칸 32.4m → 16:9 세로 18.2m)가 여유 있게 들어오는 20m.
+const ZOOM_MIN := 3.6
+const ZOOM_MAX := 20.0
+const ZOOM_DEFAULT := 9.0
 
 @export_group("카메라")
 @export_range(0.0, 45.0, 0.5, "suffix:°") var cam_pitch_deg := 18.0:   ## 방 안을 내려다보는 각도 (0 = 완전 정면, 바닥 안 보임). 18° 에서 한 칸이 정사각형
 	set(v):
 		cam_pitch_deg = v
 		_cam_dirty = true
-@export_range(3.0, 30.0, 0.1, "suffix:m") var cam_size := 9.0:   ## 화면 세로에 들어가는 높이 (작을수록 확대, 휠로 바뀜). 9 ≈ 두 층 반
+@export_range(3.6, 20.0, 0.1, "suffix:m") var cam_size := 9.0:   ## 화면 세로에 들어가는 높이 (작을수록 확대, 휠·핀치·Q/E 로 바뀜). 9 ≈ 두 층 반
 	set(v):
 		cam_size = v
 		_cam_dirty = true
@@ -35,6 +41,8 @@ var speed: int = 1                 # 0 = 정지, 1 / 4 / 16 배
 var _pick_npc: String = ""         # 청소 장소 고르는 중인 대원
 var _hover_npc: String = ""
 var _cam_dirty := true
+var _zoom_goal := ZOOM_DEFAULT      # 부드럽게 따라가는 목표 확대
+var _zoom_anchor := SCREEN * 0.5    # 확대해도 제자리에 남는 화면 점 (마우스 위치)
 
 
 func _ready() -> void:
@@ -59,6 +67,8 @@ func _ready() -> void:
 		var foot := v3d.to3d(sim.npcs[Game.cli.base_focus].pos)
 		cam_target = Vector3(foot.x, foot.y + 1.2, -0.6)
 		cam_size = 5.0
+	cam_size = clampf(cam_size, ZOOM_MIN, ZOOM_MAX)
+	_zoom_goal = cam_size
 	_apply_camera()
 	var layer := CanvasLayer.new()
 	layer.layer = 0
@@ -203,6 +213,12 @@ func _move_camera(delta: float) -> void:
 			dir.y += 1
 		if Input.is_physical_key_pressed(KEY_S):
 			dir.y -= 1
+		# Q / E 누르고 있으면 계속 축소 / 확대 (화면 가운데 기준)
+		if Input.is_physical_key_pressed(KEY_E):
+			_zoom(exp(1.6 * delta), SCREEN * 0.5)
+		if Input.is_physical_key_pressed(KEY_Q):
+			_zoom(exp(-1.6 * delta), SCREEN * 0.5)
+	_update_zoom(delta)
 	if dir != Vector2.ZERO:
 		var k := cam_speed * delta * cam_size / 8.0
 		var bb := v3d.base_bounds()
@@ -271,22 +287,63 @@ func _unhandled_input(event: InputEvent) -> void:
 				hud.toggle_debug()
 			KEY_SPACE:
 				speed = 1 if speed == 0 else 0
+			KEY_EQUAL, KEY_KP_ADD:
+				zoom_step(1)
+			KEY_MINUS, KEY_KP_SUBTRACT:
+				zoom_step(-1)
+			KEY_0, KEY_KP_0:
+				_zoom_goal = ZOOM_DEFAULT
+				_zoom_anchor = SCREEN * 0.5
 	if hud.modal_open():
+		return
+	# Mac 트랙패드: 핀치 = 확대/축소, 두 손가락 위아래 = 휠과 같음
+	if event is InputEventMagnifyGesture:
+		_zoom(event.factor, event.position)
+		return
+	if event is InputEventPanGesture:
+		_zoom(pow(1.06, -event.delta.y), event.position)
 		return
 	if event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
-				_zoom(1.1)
+				_zoom(1.15 * maxf(1.0, event.factor), event.position)
 			MOUSE_BUTTON_WHEEL_DOWN:
-				_zoom(1.0 / 1.1)
+				_zoom(1.0 / (1.15 * maxf(1.0, event.factor)), event.position)
 			MOUSE_BUTTON_LEFT:
 				_left_click(_world_mouse())
 			MOUSE_BUTTON_RIGHT:
 				_right_click(_world_mouse(), event.position)
 
 
-func _zoom(k: float) -> void:
-	cam_size = clampf(cam_size / k, 3.5, 16.0)
+## k > 1 = 확대. anchor = 확대해도 그대로 남을 화면 점 (마우스 위치)
+func _zoom(k: float, anchor: Vector2 = SCREEN * 0.5) -> void:
+	_zoom_goal = clampf(_zoom_goal / k, ZOOM_MIN, ZOOM_MAX)
+	_zoom_anchor = anchor
+
+
+## HUD 버튼·+/- 키: 한 단계 확대(+1)/축소(-1)
+func zoom_step(dir: int) -> void:
+	_zoom(1.25 if dir > 0 else 1.0 / 1.25, SCREEN * 0.5)
+
+
+## 기본(9m) 대비 확대 %
+func zoom_percent() -> int:
+	return roundi(ZOOM_DEFAULT / _zoom_goal * 100.0)
+
+
+## 확대 목표로 부드럽게 다가가며, 기준점(마우스 아래 지점)이 화면에서 움직이지 않게 카메라를 옮긴다
+func _update_zoom(delta: float) -> void:
+	if is_equal_approx(cam_size, _zoom_goal):
+		return
+	var nz := lerpf(cam_size, _zoom_goal, 1.0 - exp(-14.0 * delta))
+	if absf(nz - _zoom_goal) < 0.005:
+		nz = _zoom_goal
+	var d := _zoom_anchor - SCREEN * 0.5
+	var ds := (cam_size - nz) / SCREEN.y   # 화면 1px 당 m 변화
+	var bb := v3d.base_bounds()
+	var t := cam_target + Vector3(d.x * ds, -d.y * ds / cos(deg_to_rad(cam_pitch_deg)), 0.0)
+	cam_target = Vector3(clampf(t.x, bb.position.x, bb.end.x), clampf(t.y, bb.position.y, bb.end.y), t.z)
+	cam_size = nz
 
 
 func _left_click(p: Vector2) -> void:
