@@ -20,6 +20,10 @@ extends Resource
 @export var height_cm: float = 175.0       # 키: 화면 크기에 반영 (230px = 175cm)
 ## 차지하는 열 수: 1 = 한 칸, 2 = default_row 부터 뒤로 두 칸 (예: 전방+중앙). 큰 몸집 괴물용, 이동·교환 불가.
 @export var row_span: int = 1
+## 적 AI 그래프 id (data/ai/<id>.json, AI 에디터) — 몬스터 시트 "AI" 열
+@export var ai_id: String = "default"
+## 주는 피해 배율 (스테이지 적공격배율)
+@export var damage_mult: float = 1.0
 ## 기본 배치 (row 0=전방,1=중앙,2=후방 / index 0,1)
 @export var default_row: int = 0
 @export var default_index: int = 0

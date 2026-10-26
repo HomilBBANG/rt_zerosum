@@ -200,7 +200,7 @@ func _run_enemy_turn() -> void:
 		if state == State.RESULT:
 			_enemy_turn_running = false
 			return
-		var decision := EnemyAI.decide(current, actions, slots)
+		var decision := EnemyAI.decide(current, actions, slots, rng)
 		if decision.is_empty():
 			break
 		var ok := _execute(current, decision.action, decision.target)

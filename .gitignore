@@ -7,3 +7,6 @@ __pycache__/
 /_engine/
 # 설치 스크립트가 옮겨 둔 기존 파일
 /_backup_before_install_*/
+
+# 엑셀이 열려 있는 동안 만드는 잠금 파일
+~$*

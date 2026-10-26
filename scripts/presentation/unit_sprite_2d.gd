@@ -146,7 +146,7 @@ func _all_mats() -> Array:
 
 func refresh_weapon() -> void:
 	var w := unit.current_weapon()
-	var wid: String = w.get("id", "")
+	var wid: String = str(w.get("sprite", w.get("id", "")))   # 아이템 시트 "스프라이트" (없으면 id)
 	var path := "res://assets/sprites/w_%s.png" % wid
 	if wid == "" or not ResourceLoader.exists(path):
 		weapon.visible = false
@@ -176,7 +176,7 @@ func _update_light_masks() -> void:
 		mat.set_shader_parameter("zone_mask", load("res://assets/sprites/%s%s.png" % [unit.data.sprite_id, suffix]))
 		mat.set_shader_parameter("near_rim_mask", load("res://assets/sprites/%s%s.png" % [unit.data.sprite_id, opposite]))
 	if weapon.visible:
-		var wid: String = unit.current_weapon().get("id", "")
+		var wid: String = str(unit.current_weapon().get("sprite", unit.current_weapon().get("id", "")))
 		wmat.set_shader_parameter("zone_mask", load("res://assets/sprites/w_%s%s.png" % [wid, suffix]))
 		wmat.set_shader_parameter("near_rim_mask", load("res://assets/sprites/w_%s%s.png" % [wid, opposite]))
 

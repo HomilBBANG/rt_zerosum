@@ -1,0 +1,148 @@
+{
+	"nodes": [
+		{
+			"id": "start",
+			"type": "start",
+			"params": {},
+			"pos": [
+				40,
+				220
+			]
+		},
+		{
+			"id": "turns",
+			"type": "cond_actions_lt",
+			"params": {
+				"n": 2
+			},
+			"pos": [
+				240,
+				200
+			]
+		},
+		{
+			"id": "hurt",
+			"type": "cond_ally_hp_lte",
+			"params": {
+				"pct": 50
+			},
+			"pos": [
+				520,
+				60
+			]
+		},
+		{
+			"id": "heal",
+			"type": "act_skill",
+			"params": {
+				"skill": "heal",
+				"target": "hp_pct_low"
+			},
+			"pos": [
+				800,
+				20
+			]
+		},
+		{
+			"id": "ult",
+			"type": "act_skill",
+			"params": {
+				"skill": "ultimate",
+				"target": "kill"
+			},
+			"pos": [
+				1080,
+				200
+			]
+		},
+		{
+			"id": "heavy",
+			"type": "act_skill",
+			"params": {
+				"skill": "heavy_attack",
+				"target": "hp_low"
+			},
+			"pos": [
+				1360,
+				200
+			]
+		},
+		{
+			"id": "basic",
+			"type": "act_skill",
+			"params": {
+				"skill": "basic_attack",
+				"target": "hp_low"
+			},
+			"pos": [
+				1640,
+				200
+			]
+		},
+		{
+			"id": "end",
+			"type": "act_end",
+			"params": {},
+			"pos": [
+				1920,
+				220
+			]
+		},
+		{
+			"id": "end2",
+			"type": "act_end",
+			"params": {},
+			"pos": [
+				520,
+				420
+			]
+		}
+	],
+	"connections": [
+		{
+			"from": "start",
+			"port": 0,
+			"to": "turns"
+		},
+		{
+			"from": "turns",
+			"port": 0,
+			"to": "hurt"
+		},
+		{
+			"from": "turns",
+			"port": 1,
+			"to": "end2"
+		},
+		{
+			"from": "hurt",
+			"port": 0,
+			"to": "heal"
+		},
+		{
+			"from": "hurt",
+			"port": 1,
+			"to": "ult"
+		},
+		{
+			"from": "heal",
+			"port": 0,
+			"to": "ult"
+		},
+		{
+			"from": "ult",
+			"port": 0,
+			"to": "heavy"
+		},
+		{
+			"from": "heavy",
+			"port": 0,
+			"to": "basic"
+		},
+		{
+			"from": "basic",
+			"port": 0,
+			"to": "end"
+		}
+	]
+}

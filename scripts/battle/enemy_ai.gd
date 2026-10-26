@@ -7,7 +7,18 @@ const MAX_ACTIONS_PER_TURN := 2
 
 
 ## 반환: {"action": ActionData, "target": UnitRuntime} 또는 빈 Dictionary(턴 종료)
-static func decide(actor: UnitRuntime, actions: Dictionary, slots: SlotManager) -> Dictionary:
+## 유닛의 AI 그래프(data/ai/<ai_id>.json, AI 에디터)가 있으면 그것으로, 없으면 아래 기본 규칙으로.
+static func decide(actor: UnitRuntime, actions: Dictionary, slots: SlotManager, rng: RandomNumberGenerator = null) -> Dictionary:
+	var g := AIGraph.load_graph(actor.data.ai_id)
+	if not g.is_empty():
+		var r: Variant = AIGraph.decide(g, actor, actions, slots, rng)
+		if r != null:
+			return r
+	return decide_builtin(actor, actions, slots)
+
+
+## 기본 규칙 (그래프가 없을 때)
+static func decide_builtin(actor: UnitRuntime, actions: Dictionary, slots: SlotManager) -> Dictionary:
 	if actor.actions_this_turn >= MAX_ACTIONS_PER_TURN:
 		return {}
 	var candidates: Array[ActionData] = []

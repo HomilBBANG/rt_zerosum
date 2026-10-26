@@ -4,7 +4,7 @@
 
 ## 0. 현재 구현 반영 (변경될 때마다 갱신)
 > 아래는 원 기획 이후 사용자 결정으로 바뀐 내용. 상세 결정 이력은 `00_decision_log_v1_0.md`, 아트 규격은 `../ui_art_spec.md`.
-> 마지막 갱신: 2026-10-26 (하단 슬롯 위/아래 대칭, 무기 아이콘 밝기 보정)
+> 마지막 갱신: 2026-10-26 (밸런스 엑셀, AI 노드 에디터, 스테이지 에디터)
 
 - **표현**: 캐릭터 2D(Skeleton2D 컷아웃 리그, 원화 기반) + 배경 3D(실광원·그림자). 3D 캐릭터 전환 기능은 제거.
 - **카메라**: 뒤로 물러나 40° 내려다보는 원근, 전투 내내 전체 구도 고정(차례 줌 없음). `battle_2d.tscn` → View 노드 인스펙터에서 각도·거리·화각·바라보는 점·화면 위치 조절.
@@ -22,6 +22,10 @@
 - **상태 이상(프로토타입)**: 독려(긍정 — 독려 받은 유닛의 다음 턴 끝까지), 부상(부정 — 자리 이동·교체 불가, 아직 거는 스킬 없음). 창에 한 줄씩, 긍정 녹색/부정 붉은색, 호버 시 설명.
 - **HUD 배치 편집**: `scenes/battle_hud.tscn` 을 Godot 에디터에서 직접 편집.
 - **글꼴**: Pretendard.
+- **밸런스 데이터**: `data/balance.xlsx` (캐릭터·몬스터·아이템·스킬·스테이지 시트). 저장 즉시 게임에 반영(진행 중 전투 수치 포함). 아이템 = 무기(사거리·위력보너스·스프라이트).
+- **적 AI**: 노드 그래프(`data/ai/*.json`, AI 에디터). 시작 → 조건(예/아니오) → 스킬 사용(대상 규칙, 실패 시 다음) → 턴 종료. 몬스터 시트 AI 열로 지정.
+  기본 `default` = 행동 2회, 우리 편 HP 50% 이하면 회복, 처치 가능하면 필살기(실제 피해로 판정), 아니면 강공격 → 기본 공격(HP 최저). `aggressive` = 행동 3회, HP 비율 최저 대상.
+- **스테이지**: 엑셀 스테이지 시트(조명·선공·적 HP/공격 배율·시드) + 스테이지 에디터 배치(`data/stages/*.json`). 메뉴에서 스테이지 선택. 현재 `stage_01 첫 조우`.
 
 ## 1. 범위 및 완료 기준
 - 플레이 가능한 1개 전투 씬, 편성 화면, 결과 화면. 최소 3회 연속 전투 재시작 가능.
@@ -107,7 +111,7 @@ res://
   data/actions/*.tres
   shaders/cel_zoned_lighting.gdshader
 ```
-- `UnitData`: id, team, level, speed, range_type, max_hp, max_ap, ap_recovery, skill_ids, weapon_ids.
+- `UnitData`: id, team, level, speed, range_type, max_hp, max_ap, ap_recovery, skill_ids, weapon_ids. (현재: 엑셀에서 생성, + row_span·ai_id·damage_mult)
 - `UnitRuntime`: current_hp, current_ap, slot, alive, equipped_weapon.
 - `ActionData`: id, kind, ap_cost, target_rule, effect_payload.
 - 행동은 모두 공통 `can_execute → pay_ap → resolve → emit_event` 경로로 처리. 스킬별 로직을 UI에 하드코딩하지 않음.

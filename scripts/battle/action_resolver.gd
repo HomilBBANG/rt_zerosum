@@ -6,6 +6,8 @@ extends RefCounted
 static func compute_damage(action: ActionData, actor: UnitRuntime, target: UnitRuntime, rng: RandomNumberGenerator) -> int:
 	var weapon := actor.current_weapon()
 	var base: int = action.power + int(weapon.get("power_bonus", 0)) + int(actor.data.level / 2)
+	if not is_equal_approx(actor.data.damage_mult, 1.0):
+		base = int(roundf(base * actor.data.damage_mult))
 	var variance := rng.randi_range(-1, 1) if rng != null else 0
 	return maxi(1, base - target.data.defense + variance)
 

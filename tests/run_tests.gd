@@ -54,6 +54,7 @@ func _init() -> void:
 	_test_large_units()
 	_test_equip_and_move_lock()
 	_test_rally_status()
+	_test_balance_data_and_ai_graph()
 	print("== %d passed, %d failed ==" % [_passes, _fails])
 	quit(1 if _fails > 0 else 0)
 
@@ -382,4 +383,54 @@ func _test_rally_status() -> void:
 	bc.current = target
 	bc._end_actor("테스트")
 	_check(not target.statuses.has("rallied"), "대상의 턴 종료 후 해제")
+	bc.queue_free()
+
+
+func _test_balance_data_and_ai_graph() -> void:
+	print("[14] 밸런스 엑셀 읽기 · 스테이지 배치 · 즉시 반영 · AI 그래프")
+	var d := GameData.load_from()
+	_check(d != null, "data/balance.xlsx 읽기")
+	if d == null:
+		return
+	_check(d.allies.size() == 6 and d.actions.size() >= 7, "캐릭터 6 · 스킬 7 이상")
+	_check(d.monsters.has("ghoul") and d.monsters.ghoul.row_span == 2 and d.monsters.wolf.ai_id == "aggressive", "몬스터 차지칸·AI 열")
+	var kira := GameData._find(d.allies, "a_kira")
+	_check(kira != null and kira.weapons[0].sprite == "knife" and kira.weapons.size() == 2, "아이템 시트 → 무기 (스프라이트 포함)")
+	var es := d.build_stage_enemies("stage_01")
+	_check(es.size() == 2 and es[0].default_row == 0 and es[0].default_index == 1 and es[0].row_span == 2, "스테이지 배치: 구울 전방·중앙")
+	# 즉시 반영: 같은 객체가 갱신되는지
+	var newer := GameData.load_from()
+	GameData._find(newer.allies, "a_kira").max_hp = 77
+	newer.monsters.ghoul.max_hp = 200
+	newer.stages.stage_01.hp_mult = 1.5
+	d.apply_from(newer)
+	_check(kira.max_hp == 77, "엑셀 다시 읽기 → 기존 캐릭터 객체 제자리 갱신")
+	_check(es[0].max_hp == 300, "스테이지 적: 몬스터 HP × 스테이지 배율 다시 계산")
+	# AI 그래프 = 기본 규칙과 같은 판단 (default 그래프)
+	var g := AIGraph.load_graph("default")
+	_check(not g.is_empty(), "data/ai/default.json 읽기")
+	var bc := BattleController.new()
+	bc.enemy_delay = 0.0
+	var fresh := GameData.load_from()
+	var roster := TestRoster.default_roster(fresh.allies, fresh.build_stage_enemies("stage_01"))
+	bc.setup(fresh.actions, roster, 7, "ally")
+	root.add_child(bc)
+	bc.start_battle()
+	var ghoul: UnitRuntime = null
+	for u in bc.slots.all_units():
+		if u.data.sprite_id == "ghoul":
+			ghoul = u
+	var by_graph: Variant = AIGraph.decide(g, ghoul, bc.actions, bc.slots, bc.rng)
+	# 기본 규칙은 필살기 처치 판정을 '위력만'으로 하지만, 그래프는 실제 피해(무기·레벨 포함)로 판정 → 처치 가능한 니키타(HP 24)를 필살기로
+	var ok: bool = by_graph is Dictionary and not by_graph.is_empty()
+	if ok:
+		var t: UnitRuntime = by_graph.target
+		ok = by_graph.action.id == "ultimate" and t.hp <= ActionResolver.compute_damage(by_graph.action, ghoul, t, null)
+	_check(ok, "default 그래프: 처치 가능한 대상에 필살기 (%s)" % (by_graph.target.display_name() if by_graph is Dictionary and not by_graph.is_empty() else "-"))
+	ghoul.ap = 3   # 필살기(4) 불가 → 강공격, HP 최저 대상
+	var g2: Variant = AIGraph.decide(g, ghoul, bc.actions, bc.slots, bc.rng)
+	var by_rule := EnemyAI.decide_builtin(ghoul, bc.actions, bc.slots)
+	_check(g2 is Dictionary and g2.action == by_rule.action and g2.target == by_rule.target, "AP 3: 그래프 = 기본 규칙 (%s → %s)" % [by_rule.action.id, by_rule.target.display_name()])
+	ghoul.actions_this_turn = 2
+	_check((AIGraph.decide(g, ghoul, bc.actions, bc.slots, bc.rng) as Dictionary).is_empty(), "행동 2회 후 턴 종료")
 	bc.queue_free()

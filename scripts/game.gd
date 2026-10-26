@@ -20,6 +20,14 @@ var restart_count: int = 0
 var rim_enabled: bool = true      # 캐릭터 림 라인: 사용 확정(2026-10-25). F3 토글·CLI --rim=0 은 비교·디버그용
 var last_result: Dictionary = {}
 var cli: Dictionary = {}
+## 밸런스 데이터 (data/balance.xlsx). 실행 중 파일이 저장되면 다시 읽어 즉시 반영 → data_reloaded
+var data: GameData = null
+var stage_id: String = ""
+signal data_reloaded(warnings: PackedStringArray)
+var _balance_mtime: int = 0
+var _poll_t: float = 0.0
+const SCENE_AI_EDITOR := "res://scenes/ai_editor.tscn"
+const SCENE_STAGE_EDITOR := "res://scenes/stage_editor.tscn"
 
 
 ## 렌더 해상도: 창(=렌더 버퍼)을 QHD(2560×1440 픽셀)로 고정. 게임 좌표는 1280×720 그대로이고
@@ -49,12 +57,22 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _ready() -> void:
 	call_deferred("_fit_window")
-	# 게임 기본 편성: 사용자 제공 캐릭터만 (생성 원화 12인은 테스트·벤치 전용)
-	allies = TestRoster.build_provided_allies()
-	enemies = TestRoster.build_provided_enemies()
-	actions = TestRoster.build_actions()
-	reset_formation()
 	_parse_cli()
+	# 게임 기본: 밸런스 엑셀의 캐릭터·스킬·몬스터·스테이지 (읽지 못하면 코드 내장 테스트 데이터)
+	data = GameData.load_from()
+	if data != null:
+		_balance_mtime = FileAccess.get_modified_time(GameData.BALANCE_PATH)
+		allies = data.allies
+		actions = data.actions
+		for w in data.warnings:
+			push_warning("balance.xlsx: " + w)
+		set_stage(str(cli.get("stage", data.stage_order[0] if not data.stage_order.is_empty() else "")))
+	else:
+		push_warning("data/balance.xlsx 를 읽지 못해 내장 테스트 데이터를 씁니다")
+		allies = TestRoster.build_provided_allies()
+		enemies = TestRoster.build_provided_enemies()
+		actions = TestRoster.build_actions()
+	reset_formation()
 	if cli.has("export_hud"):   # HUD 레이아웃을 scenes/battle_hud.tscn 으로 저장 (tools/export_hud_scene.gd)
 		var err: int = load("res://tools/export_hud_scene.gd").run()
 		get_tree().quit(0 if err == OK else 1)
@@ -93,6 +111,10 @@ func _cli_jump() -> void:
 			pass
 		"bench":
 			get_tree().change_scene_to_file(SCENE_BENCH)
+		"ai_editor":
+			get_tree().change_scene_to_file(SCENE_AI_EDITOR)
+		"stage_editor":
+			get_tree().change_scene_to_file(SCENE_STAGE_EDITOR)
 		"result":
 			last_result = {"winner": cli.get("winner", "ally"), "rounds": 4, "mode": mode,
 				"log": PackedStringArray(["(CLI 미리보기) 전투 로그 예시", "라운드 4 시작: 라온 → 저격수 → ...", "라온 → 지휘관: 필살기 21 피해 (전투 불능)", "전투 종료: 아군 승리"])}
@@ -112,8 +134,44 @@ func find_ally(id: String) -> UnitData:
 
 
 ## 컨트롤러용 로스터: 편성 반영 아군 + 기본 적군
+## 스테이지 선택: 엑셀 스테이지 시트의 조명·선공·시드를 기본값으로, 적은 배치 파일에서
+func set_stage(id: String) -> void:
+	if data == null or not data.stages.has(id):
+		return
+	stage_id = id
+	var st: Dictionary = data.stages[id]
+	preset = st.preset
+	ambush = st.ambush
+	seed_value = st.seed
+	enemies = data.build_stage_enemies(id)
+
+
+## 실행 중 엑셀 저장 감지 (1초마다 수정 시각 확인)
+func _process(delta: float) -> void:
+	if data == null:
+		return
+	_poll_t += delta
+	if _poll_t < 1.0:
+		return
+	_poll_t = 0.0
+	var t := FileAccess.get_modified_time(GameData.BALANCE_PATH)
+	if t == 0 or t == _balance_mtime:
+		return
+	var newer := GameData.load_from()
+	if newer == null:
+		return   # 저장 중이면 다음 확인 때 다시
+	_balance_mtime = t
+	data.apply_from(newer)
+	for w in data.warnings:
+		push_warning("balance.xlsx: " + w)
+	print("[balance] data/balance.xlsx 다시 읽음")
+	data_reloaded.emit(data.warnings)
+
+
 func build_roster() -> Array:
 	var out: Array = []
+	if data != null and stage_id != "":
+		enemies = data.build_stage_enemies(stage_id)   # 스테이지 에디터에서 바꾼 배치를 매 전투 반영
 	for f in formation:
 		var d := find_ally(f.unit_id)
 		if d != null:

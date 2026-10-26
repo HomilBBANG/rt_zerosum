@@ -20,6 +20,7 @@ func _ready() -> void:
 	view.setup(controller, preset)
 	hud.setup(controller, view, preset)
 	controller.battle_ended.connect(_on_battle_ended)
+	Game.data_reloaded.connect(_on_data_reloaded)
 	if Game.cli.get("hud", "1") == "0":
 		hud.visible = false
 	# 일반 전투(동전)는 선공 동전 연출이 끝난 뒤 첫 라운드 시작. 스크린샷 자동화는 --coin=1 일 때만 연출
@@ -44,6 +45,17 @@ func _on_initiative(_first: String, _reason: String) -> void:
 	add_child(coin)
 	coin.finished.connect(controller.begin_rounds)
 	coin.play(controller.coin_face, "아군 선공" if controller.first_team == "ally" else "적 선공")
+
+
+## 밸런스 엑셀이 저장되면 진행 중인 전투에도 바로 반영 (최대 HP·AP 가 줄면 현재 값도 맞춤)
+func _on_data_reloaded(warnings: PackedStringArray) -> void:
+	for u in controller.slots.all_units():
+		u.hp = mini(u.hp, u.data.max_hp)
+		u.ap = mini(u.ap, u.data.max_ap)
+	hud._refresh_panel()
+	hud._refresh_floating()
+	hud._refresh_timeline()
+	hud.show_toast("밸런스 데이터 적용 (balance.xlsx)" + ("" if warnings.is_empty() else "  ⚠ " + warnings[0]))
 
 
 func _on_battle_ended(winner: String) -> void:

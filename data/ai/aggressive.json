@@ -1,0 +1,110 @@
+{
+	"nodes": [
+		{
+			"id": "start",
+			"type": "start",
+			"params": {},
+			"pos": [
+				40,
+				220
+			]
+		},
+		{
+			"id": "turns",
+			"type": "cond_actions_lt",
+			"params": {
+				"n": 3
+			},
+			"pos": [
+				240,
+				200
+			]
+		},
+		{
+			"id": "ult",
+			"type": "act_skill",
+			"params": {
+				"skill": "ultimate",
+				"target": "kill"
+			},
+			"pos": [
+				520,
+				180
+			]
+		},
+		{
+			"id": "heavy",
+			"type": "act_skill",
+			"params": {
+				"skill": "heavy_attack",
+				"target": "hp_pct_low"
+			},
+			"pos": [
+				800,
+				180
+			]
+		},
+		{
+			"id": "basic",
+			"type": "act_skill",
+			"params": {
+				"skill": "basic_attack",
+				"target": "hp_pct_low"
+			},
+			"pos": [
+				1080,
+				180
+			]
+		},
+		{
+			"id": "end",
+			"type": "act_end",
+			"params": {},
+			"pos": [
+				1360,
+				220
+			]
+		},
+		{
+			"id": "end2",
+			"type": "act_end",
+			"params": {},
+			"pos": [
+				520,
+				420
+			]
+		}
+	],
+	"connections": [
+		{
+			"from": "start",
+			"port": 0,
+			"to": "turns"
+		},
+		{
+			"from": "turns",
+			"port": 0,
+			"to": "ult"
+		},
+		{
+			"from": "turns",
+			"port": 1,
+			"to": "end2"
+		},
+		{
+			"from": "ult",
+			"port": 0,
+			"to": "heavy"
+		},
+		{
+			"from": "heavy",
+			"port": 0,
+			"to": "basic"
+		},
+		{
+			"from": "basic",
+			"port": 0,
+			"to": "end"
+		}
+	]
+}

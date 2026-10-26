@@ -39,6 +39,25 @@ func _ready() -> void:
 	sp.custom_minimum_size.y = 10
 	box.add_child(sp)
 
+	# 스테이지 (엑셀 스테이지 시트 + 스테이지 에디터 배치)
+	if Game.data != null and not Game.data.stage_order.is_empty():
+		var st_row := HBoxContainer.new()
+		st_row.add_theme_constant_override("separation", 10)
+		box.add_child(st_row)
+		st_row.add_child(_label("스테이지", 16))
+		var st_opt := OptionButton.new()
+		st_opt.add_theme_font_override("font", _font)
+		for id in Game.data.stage_order:
+			st_opt.add_item("%s  (%s)" % [Game.data.stages[id].name, id])
+			if id == Game.stage_id:
+				st_opt.select(st_opt.item_count - 1)
+		st_opt.item_selected.connect(func(i):
+			Game.set_stage(Game.data.stage_order[i])
+			preset_opt.select(LightingPresets.ORDER.find(Game.preset))
+			ambush_opt.select(["none", "ally", "enemy"].find(Game.ambush))
+			seed_edit.text = str(Game.seed_value))
+		st_row.add_child(st_opt)
+
 	var opt_row := HBoxContainer.new()
 	opt_row.add_theme_constant_override("separation", 10)
 	box.add_child(opt_row)
@@ -83,7 +102,16 @@ func _ready() -> void:
 	var bb := _big_button("리그 벤치", Color(0.9, 0.8, 0.3))
 	bb.pressed.connect(func(): get_tree().change_scene_to_file(Game.SCENE_BENCH))
 	btn_row.add_child(bb)
-	box.add_child(_label("전투 중: 1~4 조명 프리셋 전환 · F1 디버그 패널 · R 재시작 · Space 턴 종료", 13, Color(0.8, 0.9, 0.9)))
+	var tool_row := HBoxContainer.new()
+	tool_row.add_theme_constant_override("separation", 12)
+	box.add_child(tool_row)
+	var ai_b := _big_button("AI 에디터", Color(0.55, 0.7, 1.0))
+	ai_b.pressed.connect(func(): get_tree().change_scene_to_file(Game.SCENE_AI_EDITOR))
+	tool_row.add_child(ai_b)
+	var st_b := _big_button("스테이지 에디터", Color(0.55, 0.7, 1.0))
+	st_b.pressed.connect(func(): get_tree().change_scene_to_file(Game.SCENE_STAGE_EDITOR))
+	tool_row.add_child(st_b)
+	box.add_child(_label("밸런스: data/balance.xlsx (저장하면 즉시 반영) · 전투 중: 1~4 조명 프리셋 전환 · F1 디버그 패널 · R 재시작 · Space 턴 종료", 13, Color(0.8, 0.9, 0.9)))
 	if Game.cli.get("scene", "menu") == "menu":
 		Game.maybe_cli_capture()
 

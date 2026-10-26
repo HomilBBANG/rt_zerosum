@@ -663,7 +663,7 @@ func _refresh_panel() -> void:
 			var equipped := i == u.weapon_index
 			var tip := "%s  ·  %s  ·  위력 %+d%s\n%s" % [w.name, "원거리" if w.range_type == "ranged" else "근접", int(w.power_bonus), "  (장착 중)" if equipped else "", slot_name]
 			var wi: int = i
-			_add_slot(wbox, {"icon": _weapon_icon_vertical(str(w.id)), "caption": w.name, "enabled": is_player,
+			_add_slot(wbox, {"icon": _weapon_icon_vertical(str(w.get("sprite", w.id))), "caption": w.name, "enabled": is_player,
 				"mark": "equipped" if equipped else "", "tip": tip, "weapon": true,
 				"press": func(btn: Control):
 					if equip_popup.visible and equip_index == wi:

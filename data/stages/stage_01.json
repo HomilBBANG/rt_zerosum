@@ -1,0 +1,6 @@
+{
+	"enemies": [
+		{"monster": "ghoul", "row": 0, "index": 1},
+		{"monster": "wolf", "row": 2, "index": 0}
+	]
+}
