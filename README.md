@@ -95,7 +95,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![무기고](docs/screenshots/outgame/armory.png)
 
 ## 밸런스 데이터 (엑셀) · AI 에디터 · 스테이지 에디터
-에디터 네 개는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` 이 있습니다.
+에디터 다섯 개는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`, `addons/rtz_rig_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` · `리깅` 이 있습니다.
 **밸런스 수치는 `data/balance.xlsx`** 한 파일에 시트별로 있습니다: `캐릭터` · `몬스터` · `아이템` · `스킬` · `스테이지` (+ 열 설명 `읽어보기`).
 - 엑셀(또는 Numbers·LibreOffice)로 열어 고치고 **저장하면 1초 안에 게임이 다시 읽어 바로 적용** — 진행 중인 전투의 HP·AP·위력·이름까지.
   캐릭터 추가·편성·적 배치처럼 전투 구성이 바뀌는 것은 다음 전투(R 재시작)부터.
@@ -171,7 +171,6 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 새 캐릭터 추가: 원화를 `assets/source/` 에 두고(검정 배경 원화는 먼저 `python3 tools/remove_black_bg.py 입력 출력` 으로 투명화) `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
 `python3 tools/rig_cutter.py <id>` → 임포트 후 `tools/set_mipmaps.py` → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.
 캐릭터 키는 `rig.json` 의 `figure_px`(원화 정수리~발 픽셀)를 화면 230px = 175cm 기준으로 환산해 2D·3D 모두에 반영됩니다.
-**사용자가 부위별로 나눈 파츠 시트**(원본 전신 + 파츠, 투명 배경)로 만들 때는 `python3 tools/rig_from_parts.py <id>` (설정은 파일 안 `CONFIGS`, 키라 = `assets/source/kira_parts_sheet.png`).
 
 ## 배경 3D + 캐릭터 2D (하이브리드, 기본)
 2D 전투의 배경은 3D 방(창·문 밖 스폿라이트, 하드 섀도우, 셀 셰이더)을 2D 가상 카메라와 **같은 투영**으로 렌더한 텍스처입니다
@@ -193,13 +192,24 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 `RiggedUnit2D` 가 rig.json 으로 Bone2D 트리와 애니메이션(idle/attack/hit/heal/death)을 만든다. 아군 '라온' 슬롯이 이 캐릭터다.
 비용 측정 결과와 파이프라인은 `docs/skeleton2d_cost.md`, 벤치는 메뉴의 "리그 벤치" 또는
 `++ --scene=bench --count=48 --rig=1` (B 본 표시, Tab 평면↔리그, +/- 인원).
-**키라 = 사용자 파츠로 만든 리그** (2026-10-26): 시트(왼쪽 원본 + 오른쪽 머리·뒷머리·포니테일·몸통·반바지·위팔·아래팔·손·허벅지·정강이·부츠)를
-`tools/rig_from_parts.py` 가 관절끼리 이어 원본 자세로 조립 (몸통 소매는 겨드랑이에서 잘라 팔 파츠가 대신, 포니테일은 좌우 반전, 이음매의 원통 안쪽은 지움).
-**눈동자가 움직임**: 머리 파츠에서 홍채를 떼어 눈 테두리(소켓) 안에서만 보이게 잘라 그리고(셰이더), 몇 초마다 좌우·위아래로 시선을 옮김.
-`RiggedUnit2D.look_at_dir(방향)` 으로 시선 고정, `free_look()` 으로 다시 둘러보기.
 
-![키라 파츠 리그](docs/screenshots/kira_parts_rig.png)
+### 리깅 탭 (직접 리깅하기)
+Godot 에디터 상단 **`리깅`** 탭에서 캐릭터 리그를 직접 만듭니다. 저장하면 게임이 쓰는 `assets/sprites/rig_<id>/` 가 바로 바뀝니다 (`rig.json` + 파츠 PNG + 조명 마스크 + 실루엣 + 초상화).
 
+![리깅 탭](docs/screenshots/rig_editor.png)
+
+1. **캐릭터 고르기** (위 목록, 기존 리그 그대로 열림) 또는 id 입력 → `새 캐릭터`. 기존 캐릭터 이름(`kira`, `dan` …)을 고르면 그 캐릭터를 고쳐 씁니다.
+2. **`파츠 가져오기…`** — 셋 중 아무거나:
+   - **레이어별 PNG 여러 장, 모두 같은 캔버스 크기** (포토샵·클립 스튜디오의 '레이어를 파일로 내보내기') → 그린 자리 그대로 조립됨. **가장 편한 방법.**
+   - 크기가 제각각인 PNG 여러 장 → 옆으로 늘어놓음 → 끌어서 배치.
+   - 파츠를 펼쳐 놓은 **시트 한 장** → 떨어진 조각마다 파츠(`part_01`…), 가장 큰 조각(원본 전신)은 **반투명 참고 그림**으로 깔림 → 그 위에 맞춰 배치.
+   - 파일 이름이 파츠 이름: `head`, `hair_back`, `torso`, `hips`, `arm_upper_l`, `arm_lower_l`, `hand_l`, `thigh_l`, `shin_l`, `foot_l`, `_r` … (`_l` = 화면 왼쪽). 이름으로 뼈가 자동 연결됨.
+3. **[파츠] 모드**: 클릭 = 선택, 끌기 = 이동, 방향키 1px (Shift 10px). 왼쪽 목록 `앞으로 ▲ / 뒤로 ▼` = 그리는 순서(위가 앞). 이름·뼈는 아래 속성 칸에서.
+4. **[뼈] 모드**: `기본 뼈대` = 게임 애니메이션이 쓰는 16개 뼈(hip·spine·chest·head·shoulder/elbow/wrist·hip/knee/ankle _l/_r)를 사람 비율로 깔아 줌 → **관절(분홍 점)을 그림의 관절 위치로 끌기** (Shift+끌기 = 자식 뼈도 함께, Ctrl+클릭 = 자식 뼈 추가). 하늘색 십자 = 발 위치(키 기준).
+5. **[포즈] 모드**: 관절을 끌어 돌려 봄 (저장 안 됨) — 팔·다리가 관절에서 자연스럽게 도는지, 겹침 순서가 맞는지 확인.
+6. **저장 (Ctrl+S)** → 오른쪽 **미리보기**가 게임과 같은 코드로 idle·walk·attack·hit·heal·death·sit 재생. `전투에서 보기` / `기지에서 보기` 로 바로 실행. `되돌리기` = Ctrl+Z.
+- **눈동자**: 홍채(눈동자) 파츠를 따로 그려 넣고 속성에서 `눈동자` 체크 → 붙을 파츠(머리) · 자를 모양(흰자 파츠 = 눈 테두리 모양) · 움직임 px. 게임에서 흰자 안에서만 보이며 몇 초마다 시선이 움직입니다.
+- 조명(셀 명암) 마스크는 저장할 때 자동으로 만듭니다.
 ## 규칙 테스트 (헤드리스)
 ```
 godot --headless --path . --import          # 최초 1회 (클래스 캐시 생성)
@@ -236,7 +246,7 @@ shaders/           cel_zoned_lighting (2D 배경, v0.3), cel_character (2D 캐�
 assets/sprites/    생성된 캐릭터/무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + manifest.json, rig_<id>/ = 캐릭터 리그
 assets/textures/   배경 플레이트 + 마스크, 3D 얼굴 데칼
 setup/             install_windows.ps1, install.sh (기기 설치), play.bat / play.sh / play.command (루트, 실행)
-tools/             gen_sprites.py (원화·마스크 생성기), rig_cutter.py (원화→리그 파츠), rig_from_parts.py (사용자 파츠 시트→리그), render_shots.sh,
+tools/             gen_sprites.py (원화·마스크 생성기), rig_cutter.py (원화→리그 파츠), render_shots.sh,
                    gen_balance_xlsx.py / gen_outgame_xlsx.py (엑셀·일정 초기 생성 — 이미 있으면 덮어쓰지 않음)
 tests/             run_tests.gd, outgame_tests.gd
 docs/              design/ (기획서 사본, outgame/ = 아웃게임 기획 01~04 + 구현 현황 05), screenshots/, 2D_vs_3D_comparison.md

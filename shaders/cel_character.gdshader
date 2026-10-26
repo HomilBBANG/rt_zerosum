@@ -11,6 +11,8 @@ shader_type canvas_item;
 render_mode unshaded;
 
 uniform sampler2D zone_mask : filter_nearest, repeat_disable;
+// false: 조명 마스크가 없는 파츠 → 주변광 + 약한 주조명을 고르게 섞음 (리깅 탭에서 저장하면 마스크가 생김)
+uniform bool use_zone_mask = true;
 // 반대 방향 마스크: 그 림(255) 구역이 '빛 쪽' 가장자리에 해당 → 빛 쪽 몸을 밝히면서 같은 쪽 가장자리에 림을 더할 때 사용
 uniform sampler2D near_rim_mask : filter_nearest, repeat_disable;
 uniform bool use_near_rim = false;
@@ -74,6 +76,9 @@ vec3 shade(vec3 base, float zone) {
 }
 
 vec3 shade2(vec3 base, vec2 uv) {
+	if (!use_zone_mask) {
+		return mix(shade(base, 0.33), shade(base, 0.7), 0.35);
+	}
 	vec3 c = shade(base, texture(zone_mask, uv).r);
 	if (use_near_rim && texture(near_rim_mask, uv).r >= 0.83) {
 		c = mix(c, near_rim_color.rgb, near_rim_mix);

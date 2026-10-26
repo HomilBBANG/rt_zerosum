@@ -1,3 +1,4 @@
+@tool
 class_name RiggedUnit2D
 extends Node2D
 ## Skeleton2D 컷아웃 리그: rig.json(본 트리 + 파츠 + 피벗)로 Bone2D 계층을 만들고
@@ -20,6 +21,8 @@ var weapon_bone: Bone2D
 var light_from_right := true
 var mirrored := false
 var px_k: float = 1.0   # 원본(1475px 키) 기준으로 작성한 이동량을 축소 원화 픽셀로 환산
+var raw_load := false   # true: PNG 를 직접 읽음 (Godot 에디터 '리깅' 탭 미리보기 — 임포트 전·후 상관없이 방금 저장한 그림)
+var _tex_cache: Dictionary = {}
 var irises: Array = []  # [{sprite, rest, origin, clip_origin, range, mat}]
 var look := Vector2.ZERO          # 지금 시선 (-1~1)
 var look_target := Vector2.ZERO
@@ -70,9 +73,11 @@ func build(p_rig_dir: String, p_mirrored: bool = false, height_cm: float = 175.0
 		var s := Sprite2D.new()
 		s.name = p.name
 		s.centered = false
-		s.texture = load(rig_dir.path_join(p.tex))
+		s.texture = _tex(rig_dir.path_join(p.tex))
 		s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-		var bone: Bone2D = bones[p.bone]
+		var bone: Bone2D = bones.get(p.bone, bones.values()[0] if not bones.is_empty() else null)
+		if bone == null:
+			continue
 		s.position = Vector2(p.origin[0], p.origin[1]) - pos_of[p.bone]
 		s.z_index = int(p.z)
 		s.z_as_relative = true
@@ -92,7 +97,7 @@ func build(p_rig_dir: String, p_mirrored: bool = false, height_cm: float = 175.0
 		var s := Sprite2D.new()
 		s.name = p.name
 		s.centered = false
-		s.texture = load(rig_dir.path_join(p.tex))
+		s.texture = _tex(rig_dir.path_join(p.tex))
 		s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		var rest := Vector2(p.origin[0], p.origin[1]) - Vector2(host[1].origin[0], host[1].origin[1])
 		s.position = rest
@@ -104,7 +109,7 @@ func build(p_rig_dir: String, p_mirrored: bool = false, height_cm: float = 175.0
 		parts.append(s)
 		part_names.append(p.name)
 		if p.has("clip_mask"):
-			var mask: Texture2D = load(rig_dir.path_join(p.clip_mask))
+			var mask: Texture2D = _tex(rig_dir.path_join(p.clip_mask), false)
 			m.set_shader_parameter("use_clip", true)
 			m.set_shader_parameter("clip_mask", mask)
 			m.set_shader_parameter("clip_size", mask.get_size())
@@ -169,8 +174,27 @@ func _update_masks() -> void:
 	var suffix := "_mask_r.png" if tex_from_right else "_mask_l.png"
 	var opposite := "_mask_l.png" if tex_from_right else "_mask_r.png"
 	for i in parts.size():
-		mats[i].set_shader_parameter("zone_mask", load(rig_dir.path_join(part_names[i] + suffix)))
-		mats[i].set_shader_parameter("near_rim_mask", load(rig_dir.path_join(part_names[i] + opposite)))
+		var zm := _tex(rig_dir.path_join(part_names[i] + suffix), false)
+		mats[i].set_shader_parameter("use_zone_mask", zm != null)   # 조명 마스크가 없으면 고른 조명
+		mats[i].set_shader_parameter("zone_mask", zm)
+		mats[i].set_shader_parameter("near_rim_mask", _tex(rig_dir.path_join(part_names[i] + opposite), false))
+
+
+func _tex(path: String, mip: bool = true) -> Texture2D:
+	if _tex_cache.has(path):
+		return _tex_cache[path]
+	var t: Texture2D = null
+	if raw_load or not ResourceLoader.exists(path):
+		if FileAccess.file_exists(path):
+			var img := Image.load_from_file(ProjectSettings.globalize_path(path))
+			if img != null and not img.is_empty():
+				if mip:
+					img.generate_mipmaps()
+				t = ImageTexture.create_from_image(img)
+	else:
+		t = load(path)
+	_tex_cache[path] = t
+	return t
 
 
 func set_param(key: String, value: Variant) -> void:
@@ -200,11 +224,17 @@ func _bone_path(bname: String) -> NodePath:
 
 
 func _track(a: Animation, bname: String, keys: Array, prop: String = "rotation") -> void:
+	if not bones.has(bname):
+		return   # 리깅 탭에서 만든 리그에 그 뼈가 없으면 그 트랙만 건너뜀
 	var t := a.add_track(Animation.TYPE_VALUE)
 	a.track_set_path(t, NodePath(String(skeleton.get_path_to(bones[bname])) + ":" + prop))
 	a.track_set_interpolation_type(t, Animation.INTERPOLATION_CUBIC)
 	for k in keys:
 		a.track_insert_key(t, k[0], k[1])
+
+
+func _hip_pos() -> Vector2:
+	return bones.hip.position if bones.has("hip") else Vector2.ZERO
 
 
 func _build_animations() -> void:
@@ -224,7 +254,7 @@ func _build_animations() -> void:
 	_track(idle, "shoulder_r", [[0.0, deg_to_rad(1.5)], [1.3, deg_to_rad(-1.5)], [2.6, deg_to_rad(1.5)]])
 	_track(idle, "elbow_l", [[0.0, 0.0], [1.3, deg_to_rad(2.0)], [2.6, 0.0]])
 	_track(idle, "elbow_r", [[0.0, 0.0], [1.3, deg_to_rad(-2.0)], [2.6, 0.0]])
-	_track(idle, "hip", [[0.0, Vector2(bones.hip.position)], [1.3, bones.hip.position + Vector2(0, 6) * px_k], [2.6, Vector2(bones.hip.position)]], "position")
+	_track(idle, "hip", [[0.0, Vector2(_hip_pos())], [1.3, _hip_pos() + Vector2(0, 6) * px_k], [2.6, Vector2(_hip_pos())]], "position")
 	lib.add_animation("idle", idle)
 	# attack: 오른팔 들어 올려 조준/휘두르기 + 상체 전진
 	var atk := Animation.new()
@@ -254,7 +284,7 @@ func _build_animations() -> void:
 	# death: 무릎 꿇고 쓰러짐
 	var die := Animation.new()
 	die.length = 0.8
-	_track(die, "hip", [[0.0, Vector2(bones.hip.position)], [0.8, bones.hip.position + Vector2(0, 260) * px_k]], "position")
+	_track(die, "hip", [[0.0, Vector2(_hip_pos())], [0.8, _hip_pos() + Vector2(0, 260) * px_k]], "position")
 	_track(die, "hip_l", [[0.0, 0.0], [0.8, deg_to_rad(-35)]])
 	_track(die, "hip_r", [[0.0, 0.0], [0.8, deg_to_rad(35)]])
 	_track(die, "knee_l", [[0.0, 0.0], [0.8, deg_to_rad(70)]])
@@ -275,8 +305,8 @@ func _build_animations() -> void:
 		_track(walk, "knee_r", [[0.0, 0.0], [0.45, 0.0], [0.67, deg_to_rad(-28)], [0.9, 0.0]])
 		_track(walk, "shoulder_l", [[0.0, deg_to_rad(14)], [0.45, deg_to_rad(-14)], [0.9, deg_to_rad(14)]])
 		_track(walk, "shoulder_r", [[0.0, deg_to_rad(-14)], [0.45, deg_to_rad(14)], [0.9, deg_to_rad(-14)]])
-		_track(walk, "hip", [[0.0, Vector2(bones.hip.position)], [0.22, bones.hip.position + Vector2(0, -8) * px_k], [0.45, Vector2(bones.hip.position)],
-			[0.67, bones.hip.position + Vector2(0, -8) * px_k], [0.9, Vector2(bones.hip.position)]], "position")
+		_track(walk, "hip", [[0.0, Vector2(_hip_pos())], [0.22, _hip_pos() + Vector2(0, -8) * px_k], [0.45, Vector2(_hip_pos())],
+			[0.67, _hip_pos() + Vector2(0, -8) * px_k], [0.9, Vector2(_hip_pos())]], "position")
 		lib.add_animation("walk", walk)
 		# sit: 기지 의자·소파에 앉기 (허벅지 앞으로 수평, 정강이 아래로) + 호흡
 		var sit := Animation.new()
@@ -303,7 +333,7 @@ func play(name: String) -> void:
 func hip_ratio() -> float:
 	if not bones.has("hip") or not rig.has("figure_px"):
 		return 0.5
-	return (float(rig.ground[1]) - bones.hip.position.y) / float(rig.figure_px)
+	return (float(rig.ground[1]) - _hip_pos().y) / float(rig.figure_px)
 
 
 func bone_count() -> int:
