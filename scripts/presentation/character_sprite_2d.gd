@@ -86,7 +86,7 @@ static func anim_data(id: String, anim: String) -> Dictionary:
 	if _cache.has(key):
 		return _cache[key]
 	var inf := info_of(id)
-	var d := {"frames": [], "masks_r": [], "masks_l": [], "fps": float(inf.get("fps", 12)), "loop": not anim in ONE_SHOT and not anim in HOLD,
+	var d := {"frames": [], "masks_r": [], "masks_l": [], "lines": [], "fps": float(inf.get("fps", 12)), "loop": not anim in ONE_SHOT and not anim in HOLD,
 		"ground": inf.get("ground", [256, 760]), "figure_px": float(inf.get("figure_px", 760)), "hip_y": float(inf.get("hip_y", 400)),
 		"weapon": anim in ["", "idle", "attack", "hit", "heal"], "hand": inf.get("hand", null)}
 	var dir := dir_of(id)
@@ -124,6 +124,7 @@ static func anim_data(id: String, anim: String) -> Dictionary:
 		d.frames.append(t)
 		d.masks_r.append(_mask(dir.path_join(nm + "_mask_r.png")))
 		d.masks_l.append(_mask(dir.path_join(nm + "_mask_l.png")))
+		d.lines.append(_mask(dir.path_join(nm + "_line.png")))   # 선화 마스크 (있으면 선은 원화 그대로)
 	_cache[key] = d
 	return d
 
@@ -186,7 +187,7 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 		count = int(opt.get("count", cols * rows - start))
 	# 조명 마스크 시트 (tools/char_sprites.py masks 로 만듦, 같은 칸 배치) — 없으면 고른 조명
 	var mimg := {}
-	for suf in ["_mask_r", "_mask_l"]:
+	for suf in ["_mask_r", "_mask_l", "_line"]:
 		var mp: String = path.get_basename() + str(suf) + ".png"
 		if FileAccess.file_exists(mp):
 			var mi := Image.load_from_file(ProjectSettings.globalize_path(mp))
@@ -215,6 +216,7 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 		d.get_or_add("feet_y", []).append(used.end.y)
 		d.masks_r.append(ImageTexture.create_from_image(mimg["_mask_r"].get_region(r)) if mimg.has("_mask_r") else null)
 		d.masks_l.append(ImageTexture.create_from_image(mimg["_mask_l"].get_region(r)) if mimg.has("_mask_l") else null)
+		d.lines.append(ImageTexture.create_from_image(mimg["_line"].get_region(r)) if mimg.has("_line") else null)
 	if (d.frames as Array).is_empty():
 		return
 	# 발 위치·키: 적혀 있으면 그대로, 아니면 첫 칸 그림에서
@@ -361,6 +363,10 @@ func _apply_mask() -> void:
 	var mr: Variant = (_a.masks_r as Array)[_frame]
 	var ml: Variant = (_a.masks_l as Array)[_frame]
 	var has := mr != null and ml != null
+	var ln: Variant = (_a.get("lines", []) as Array)[_frame] if _frame < (_a.get("lines", []) as Array).size() else null
+	mat.set_shader_parameter("use_line_mask", ln != null)
+	if ln != null:
+		mat.set_shader_parameter("line_mask", ln)
 	mat.set_shader_parameter("use_zone_mask", has)
 	if has:
 		mat.set_shader_parameter("zone_mask", mr if _tex_from_right else ml)

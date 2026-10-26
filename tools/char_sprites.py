@@ -14,6 +14,7 @@ assets/characters/<id>/
   python3 tools/char_sprites.py masks dan        한 캐릭터만
   python3 tools/char_sprites.py new <캐릭터 id> <전신 그림.png>   새 캐릭터 폴더 (투명 배경 전신 한 장 → base.png·조명 마스크·초상화·그림자·character.json)
       키 760px 로 맞추고 발 = 그림 맨 아래 가운데, 머리·골반·손 위치는 그림에서 추정 (character.json 에서 고칠 수 있음)
+  python3 tools/char_sprites.py lines [캐릭터]    선화 마스크(<그림>_line.png) — 게임이 선은 원화 그대로, 면에만 조명 (new 는 자동)
   python3 tools/char_sprites.py breathe <캐릭터> [칸 수=16]   기본 그림(base.png)으로 숨쉬기 idle 시트를 만든다 (idle_4x4.png)
       그림을 다시 그리지 않고 원화 픽셀만 살짝 늘이고 흔듦: 골반 위 상체가 숨 쉬듯 오르내리고 좌우로 조금, 발은 고정
   python3 tools/char_sprites.py import <캐릭터> <동작> <파일…> [--grid 4x2] [--fps 12] [--hold 0.35]
@@ -34,6 +35,56 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 from gen_sprites import build_zone_mask  # noqa: E402
 
 CHAR_DIR = os.path.join(ROOT, "assets", "characters")
+
+
+def line_mask(im, size=7, lo=18.0, hi=55.0):
+    """원화 선화 마스크 (L, 255 = 선): 주변보다 가늘게 어두운 획(블랙 탑햇). 흰 바탕에 올려 바깥 외곽선도 잡고,
+    넓게 어두운 면(검은 옷)은 선으로 치지 않는다. 셰이더가 이 픽셀은 조명 없이 원화 색 그대로 그림."""
+    import numpy as np
+    from scipy import ndimage
+    a = np.array(im.convert("RGBA")).astype(np.float32)
+    al = a[..., 3:4] / 255.0
+    gray = (a[..., :3] * al + 255.0 * (1.0 - al)).mean(-1)
+    th = ndimage.grey_closing(gray, size=(size, size)) - gray
+    m = np.clip((th - lo) / (hi - lo), 0.0, 1.0)
+    m *= (a[..., 3] > 10)
+    return Image.fromarray((m * 255).astype(np.uint8), "L")
+
+
+def cmd_lines(only=None):
+    """기본 그림·프레임·시트마다 선화 마스크(<이름>_line.png). 시트는 칸마다 (선이 칸 경계를 넘지 않게)"""
+    n = 0
+    for cid in sorted(os.listdir(CHAR_DIR)):
+        cdir = os.path.join(CHAR_DIR, cid)
+        if not os.path.isdir(cdir) or (only and cid != only):
+            continue
+        for fn in sorted(os.listdir(cdir)):
+            path = os.path.join(cdir, fn)
+            if not fn.endswith(".png") or "_mask_" in fn or fn.endswith("_line.png") or fn in ("silhouette.png", "portrait.png"):
+                continue
+            m = SHEET_RE.match(fn)
+            im = Image.open(path).convert("RGBA")
+            if m:
+                cols, rows = int(m.group(2)), int(m.group(3) or 1)
+                cw, ch = im.width // cols, im.height // rows
+                out = Image.new("L", im.size, 0)
+                for r in range(rows):
+                    for c in range(cols):
+                        box = (c * cw, r * ch, (c + 1) * cw, (r + 1) * ch)
+                        out.paste(line_mask(im.crop(box)), box[:2])
+            else:
+                out = line_mask(im)
+            out.save(path[:-4] + "_line.png")
+            n += 1
+        for anim in sorted(os.listdir(cdir)):
+            adir = os.path.join(cdir, anim)
+            if not os.path.isdir(adir):
+                continue
+            for fn in sorted(os.listdir(adir)):
+                if fn.endswith(".png") and "_mask_" not in fn and not fn.endswith("_line.png"):
+                    line_mask(Image.open(os.path.join(adir, fn))).save(os.path.join(adir, fn[:-4] + "_line.png"))
+                    n += 1
+    print("선화 마스크:", n)
 
 
 def make_masks(im, k=0.5):
@@ -87,7 +138,7 @@ def cmd_masks(only=None):
             if not os.path.isdir(adir):
                 continue
             for fn in sorted(os.listdir(adir)):
-                if not fn.endswith(".png") or "_mask_" in fn:
+                if not fn.endswith(".png") or "_mask_" in fn or fn.endswith("_line.png"):
                     continue
                 stem = fn[:-4]
                 r_path = os.path.join(adir, stem + "_mask_r.png")
@@ -311,6 +362,7 @@ def cmd_new(cid, src, fig_px=760):
     cx = head[0] + head[2] // 2
     base.crop((cx - side // 2, max(0, top - 4), cx + side // 2, max(0, top - 4) + side)).save(os.path.join(cdir, "portrait.png"))
     json.dump(info, open(os.path.join(cdir, "character.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    line_mask(base).save(os.path.join(cdir, "base_line.png"))
     print(cid, "base", (w, h), "ground", info["ground"], "head", head, "hand", info["hand"])
 
 
@@ -318,6 +370,8 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
         cmd_masks(args[1] if len(args) > 1 else None)
+    elif args[:1] == ["lines"]:
+        cmd_lines(args[1] if len(args) > 1 else None)
     elif args[:1] == ["new"] and len(args) >= 3:
         cmd_new(args[1], args[2])
     elif args[:1] == ["breathe"] and len(args) >= 2:

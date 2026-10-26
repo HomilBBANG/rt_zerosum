@@ -13,6 +13,10 @@ render_mode unshaded;
 uniform sampler2D zone_mask : filter_nearest, repeat_disable;
 // false: 조명 마스크가 없는 프레임 (사용자가 막 넣은 애니메이션 등) → 주변광 + 약한 주조명을 고르게 섞음. tools/char_sprites.py masks 로 마스크를 만들면 true
 uniform bool use_zone_mask = true;
+// 선화 마스크 (tools/char_sprites.py lines): 1 = 선 → 조명 없이 원화 색 그대로 (선화 유지, 면에만 조명)
+uniform sampler2D line_mask : filter_linear, repeat_disable;
+uniform bool use_line_mask = false;
+uniform float line_keep : hint_range(0.0, 1.0) = 1.0;
 // 반대 방향 마스크: 그 림(255) 구역이 '빛 쪽' 가장자리에 해당 → 빛 쪽 몸을 밝히면서 같은 쪽 가장자리에 림을 더할 때 사용
 uniform sampler2D near_rim_mask : filter_nearest, repeat_disable;
 uniform bool use_near_rim = false;
@@ -83,6 +87,7 @@ vec3 shade2(vec3 base, vec2 uv) {
 
 void fragment() {
 	// 텍스처색 × COLOR(이미 텍스처색 × 모듈레이트) = 원화색을 두 번 곱한 진한 톤 (확정된 룩)
+	vec3 orig = COLOR.rgb;   // 원화 색 (텍스처 × 모듈레이트 한 번) — 선화는 이 색 그대로
 	vec4 base = texture(TEXTURE, UV) * COLOR;
 	vec2 d = fwidth(UV) * 0.25;
 	vec3 o = shade2(base.rgb, UV + vec2(-d.x, -d.y))
@@ -92,6 +97,9 @@ void fragment() {
 	o *= 0.25;
 	float l = lum(o);
 	o = clamp(mix(vec3(l), o, saturation), 0.0, 1.0);
+	if (use_line_mask) {
+		o = mix(o, min(o, orig), texture(line_mask, UV).r * line_keep);   // 어두운 선은 원화 그대로, 선 옆 밝은 테두리는 조명 받은 색 유지
+	}
 	o = mix(o, flash_color.rgb, flash_color.a);
 	if (debug_view == 1) {
 		o = base.rgb;

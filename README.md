@@ -223,6 +223,12 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   단·이선·앨마 `idle_4x4` = **기본 그림으로 만든 숨쉬기**(`python3 tools/char_sprites.py breathe <캐릭터>` — 원화 픽셀만 살짝 늘여 상체가 오르내림, 발 고정). 직접 그린 시트로 바꾸면 그 파일을 덮어쓰면 됨.
   속도는 같은 이름 json(`walk.json` 등). 조명 마스크 시트(`*_mask_r/_l.png`)는 `python3 tools/char_sprites.py masks` 로 칸마다 만듦 — 없어도 동작.
 
+### 선화 유지 (조명은 면에만)
+캐릭터 그림마다 **선화 마스크**(`<그림>_line.png`, `python3 tools/char_sprites.py lines`, `new` 는 자동)를 두면 셰이더가 **선은 원화 색 그대로** 두고 면에만 조명을 입힙니다.
+선 = 주변보다 가늘게 어두운 획(외곽선·주름·눈·머리카락 선), 넓게 어두운 면(검은 옷)은 선이 아니라 조명을 받음. 선 옆 밝은 테두리는 조명색 유지(어두운 쪽만 원화로).
+
+![선화 유지 전(왼쪽)·후](docs/screenshots/lineart_keep.png)
+
 ### 새 캐릭터 그림 시험하기
 1. 투명 배경 전신 그림 한 장 → `python3 tools/char_sprites.py new <id> 그림.png` → `assets/characters/<id>/` (기본 그림·조명 마스크·초상화·그림자·character.json, 키 760px·발·머리·손 위치 자동).
 2. 실행할 때 `--test_char=<id>` (+ `--test_slot=a_kira` 등, 기본 니키타 자리)를 붙이면 그 자리 캐릭터만 새 그림으로 전투·기지에 나옴 (데이터는 그대로).
