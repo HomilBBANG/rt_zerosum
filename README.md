@@ -49,7 +49,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 - **기지 화면**: 배경은 **3D 단면 건물**(방마다 원색 스폿 조명·하드 섀도우, 셀 셰이딩), 건물 바깥은 **검정**.
   카메라는 **정면처럼 반듯한 직교 뷰**(원근 없음 — 방마다 같은 크기 사각형, 한 칸 ≈ 정사각형)이고 **방 안만 위에서 살짝(18°) 내려다보는** 구도라 바닥이 보입니다.
-  처음엔 대원들이 있는 지상 1층·지하 1층을 크게(화면 세로 9m) 보여 줍니다. 대원은 2D 캐릭터 스프라이트(프레임 애니메이션)를 그 위에 덧그림.
+  처음엔 대원들이 있는 지상 1층·지하 1층을 크게(화면 세로 9m) 보여 줍니다. 대원은 2D 리그(Skeleton2D)를 그 위에 덧그림.
   3개 층 (지상 1층·지하 1층 기본 개방, 지하 2층(임시) 잠금). `WASD` 이동 · `F11` 전체 화면.
   **확대/축소**: 마우스 휠(커서 위치 기준) · Mac 트랙패드 핀치 또는 두 손가락 위아래 · `Q`/`E` 누르고 있기 · `-`/`+` · 오른쪽 아래 `－ 100% ＋` 버튼 · `0` = 기본.
   범위 45%~250% (화면 세로 20m~3.6m): 최대 확대는 대원 원화(전신 약 760px)가 QHD 화면에서 원화보다 커지지 않는 한계, 최대 축소는 기지 전체가 보이는 정도. 3D 배경은 늘 QHD 로 다시 그려 어느 배율에서도 선명.
@@ -168,8 +168,10 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - 적(괴물, 적으로만 등장): 구울(2.4m) — **전방+중앙 두 칸 차지** (`UnitData.row_span = 2`), 늑대(4m) — 후방 한 칸
   두 칸 괴물은 살아 있는 동안 전방을 막고(근접은 괴물부터), 자리 이동·교환을 하지 않으며, 두 칸의 가운데에 선다.
 도형으로 생성한 12인(`build_allies/build_enemies`)은 규칙 테스트에서만 씁니다.
-새 캐릭터 추가: `assets/characters/<id>/` 폴더(아래 '캐릭터 스프라이트 애니메이션') → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.
-캐릭터 키는 `character.json` 의 `figure_px`(원화 정수리~발 픽셀)를 화면 230px = 175cm 기준으로 환산해 2D·3D 모두에 반영됩니다.
+새 캐릭터 추가: 원화를 `assets/source/` 에 두고(검정 배경 원화는 먼저 `python3 tools/remove_black_bg.py 입력 출력` 으로 투명화) `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
+`python3 tools/rig_cutter.py <id>` → 임포트 후 `tools/set_mipmaps.py` → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.
+캐릭터 키는 `rig.json` 의 `figure_px`(원화 정수리~발 픽셀)를 화면 230px = 175cm 기준으로 환산해 2D·3D 모두에 반영됩니다.
+**사용자가 부위별로 나눈 파츠 시트**(원본 전신 + 파츠, 투명 배경)로 만들 때는 `python3 tools/rig_from_parts.py <id>` (설정은 파일 안 `CONFIGS`, 키라 = `assets/source/kira_parts_sheet.png`).
 
 ## 배경 3D + 캐릭터 2D (하이브리드, 기본)
 2D 전투의 배경은 3D 방(창·문 밖 스폿라이트, 하드 섀도우, 셀 셰이더)을 2D 가상 카메라와 **같은 투영**으로 렌더한 텍스처입니다
@@ -186,26 +188,17 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 화면 가장자리 캐릭터도 정확히 중앙에 올 수 있습니다. 배경 밖은 보이지 않게 제한합니다. 값은 `battle_view_2d.gd` 의 `CAM_*` 상수.
 스크린샷 CLI 는 기본으로 인트로를 건너뛰며 `--intro=1`(재생), `--intro=hold`(전체 구도에서 멈춤)로 바꿀 수 있습니다.
 
-## 캐릭터 스프라이트 애니메이션 (Skeleton2D 리그는 제거)
-![전투 — 기본 그림](docs/screenshots/battle_sprites.png)
+## Skeleton2D 리그 (2D 확정 후 비용 테스트)
+사용자 제공 원화 1장을 `tools/rig_cutter.py` 로 17개 파츠 + 16개 본 + 파츠별 구역 마스크로 잘라 `assets/sprites/rig_<id>/` 에 두고,
+`RiggedUnit2D` 가 rig.json 으로 Bone2D 트리와 애니메이션(idle/attack/hit/heal/death)을 만든다. 아군 '라온' 슬롯이 이 캐릭터다.
+비용 측정 결과와 파이프라인은 `docs/skeleton2d_cost.md`, 벤치는 메뉴의 "리그 벤치" 또는
+`++ --scene=bench --count=48 --rig=1` (B 본 표시, Tab 평면↔리그, +/- 인원).
+**키라 = 사용자 파츠로 만든 리그** (2026-10-26): 시트(왼쪽 원본 + 오른쪽 머리·뒷머리·포니테일·몸통·반바지·위팔·아래팔·손·허벅지·정강이·부츠)를
+`tools/rig_from_parts.py` 가 관절끼리 이어 원본 자세로 조립 (몸통 소매는 겨드랑이에서 잘라 팔 파츠가 대신, 포니테일은 좌우 반전, 이음매의 원통 안쪽은 지움).
+**눈동자가 움직임**: 머리 파츠에서 홍채를 떼어 눈 테두리(소켓) 안에서만 보이게 잘라 그리고(셰이더), 몇 초마다 좌우·위아래로 시선을 옮김.
+`RiggedUnit2D.look_at_dir(방향)` 으로 시선 고정, `free_look()` 으로 다시 둘러보기.
 
-캐릭터(전투·기지 공통)는 **직접 뽑은 스프라이트 프레임**으로 움직입니다. 폴더: `assets/characters/<id>/`
-(`dan` 단 · `kira` 키라 · `ethan` 이선 · `hero2` 하나 · `alma` 앨마 · `nikita_army` 니키타 · `ghoul` 구울 · `wolf` 늑대 · `slime`).
-- `base.png` = 기본 한 장 (지금은 예전 리그를 쉬는 자세로 합친 원화). **애니메이션 프레임이 없는 동작은 이 그림이 그대로 서 있거나 미끄러지듯 이동**합니다.
-- 프레임 넣기: `assets/characters/<id>/<동작>/0001.png, 0002.png …` (이름 순서대로 재생, 기본 12fps).
-  **캔버스 크기·발 위치를 `base.png`(512×768, 발 접지점 `character.json` 의 `ground`)와 같게** 그리면 따로 설정할 것이 없습니다.
-  다르면 그 폴더에 `anim.json`: `{"fps": 12, "loop": true, "ground": [x, y], "figure_px": 정수리~발 픽셀, "hip_y": 골반 y, "weapon": false}`.
-- 동작 이름: 기지 `idle`(서 있기) · `walk`(이동) · `sit`(의자·소파, 골반 높이 = `hip_y`) · `sleep`(누워 자기, 눕혀 그린 그림·접지점 = 침대에 닿는 몸 가운데) ·
-  `work`(업무·치료) · `clean`(청소, 없으면 work) · `train`(훈련, 없으면 work) · `talk`(대화) / 전투 `idle` · `attack` · `hit` · `heal` · `death`(마지막 프레임 유지).
-  attack·hit·heal 은 한 번 재생 후 idle. 프레임이 없으면: 앉기 → 의자 앞에 서 있음, 자기 → 기본 그림을 눕힘, 전투 동작 → 간단한 앞뒤 이동·흔들림.
-- 무기: 전투에서 손 위치(`character.json` 의 `hand`)에 무기 그림을 붙입니다. 무기를 직접 그린 동작은 `anim.json` 에 `"weapon": false` (attack·hit·heal·idle 외 동작은 기본으로 숨김).
-- 조명(셀 명암) 마스크: 프레임만 넣어도 동작합니다(마스크 없이 고른 조명). 방향 있는 명암을 원하면 `python3 tools/char_sprites.py masks` → 프레임마다 `_mask_l/_r.png` 생성.
-- 새 프레임은 게임을 다시 켜면 바로 반영 (임포트 기다릴 필요 없음).
-- **움직이는 GIF·WebP / 스프라이트 시트 / PNG 여러 장 → 프레임 자동 변환**: `python3 tools/char_sprites.py import nikita_army hit 파일.webp`
-  (시트는 `--grid 4x2`, 속도 `--fps 12`). 첫 프레임의 발·키를 기본 그림에 맞춘 같은 이동·배율을 모든 프레임에 적용하고 조명 마스크까지 만듭니다.
-  ※ 채팅에 올린 움직이는 이미지는 첫 장면 한 장으로만 전달되므로, 원본 파일은 저장소(예: `assets/characters/nikita_army/_src/`)에 넣어 커밋하거나 스프라이트 시트 한 장으로 주세요.
-- 프레임마다 보여 줄 시간을 다르게: `anim.json` 의 `"durations": [2.4, 1.2]` (초, fps 대신).
-- **들어간 애니메이션**: 니키타 `idle` 2프레임 (사용자 제공, 2.4초·1.2초 반복) — 전투·기지 대기 모두.
+![키라 파츠 리그](docs/screenshots/kira_parts_rig.png)
 
 ## 규칙 테스트 (헤드리스)
 ```
@@ -230,7 +223,7 @@ CLI 인자(`++` 뒤): `--scene=battle|formation|result|menu|title|base --mode=2d
 scenes/            title, main_menu(전투 테스트), formation, battle_2d, battle_3d, battle_hud, result, outgame/base_hub
 scripts/battle/    규칙 계층 (표현 비의존): unit_data, action_data, unit_runtime, slot_manager,
                    turn_scheduler, ap_component, target_validator, action_resolver, enemy_ai, battle_controller
-scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d + unit_sprite_2d + character_sprite_2d(프레임 애니메이션) + slot_marker_2d,
+scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d + unit_sprite_2d + rigged_unit_2d + slot_marker_2d,
                    battle_view_3d + unit_model_3d, lighting_presets
 scripts/ui/        battle_hud, title, main_menu, formation, result
 scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정·단면 좌표), world_clock, room_route_service, npc_schedule_resolver,
@@ -240,11 +233,10 @@ addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_bat
 data/              balance.xlsx(전투), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_zoned_lighting (2D 배경, v0.3), cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
-assets/characters/ 캐릭터별 base·프레임 애니메이션·마스크·character.json (전투·기지 공통)
-assets/sprites/    무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + 옛 테스트 캐릭터 + manifest.json
+assets/sprites/    생성된 캐릭터/무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + manifest.json, rig_<id>/ = 캐릭터 리그
 assets/textures/   배경 플레이트 + 마스크, 3D 얼굴 데칼
 setup/             install_windows.ps1, install.sh (기기 설치), play.bat / play.sh / play.command (루트, 실행)
-tools/             gen_sprites.py (원화·마스크 생성기), char_sprites.py (애니메이션 프레임 조명 마스크), render_shots.sh,
+tools/             gen_sprites.py (원화·마스크 생성기), rig_cutter.py (원화→리그 파츠), rig_from_parts.py (사용자 파츠 시트→리그), render_shots.sh,
                    gen_balance_xlsx.py / gen_outgame_xlsx.py (엑셀·일정 초기 생성 — 이미 있으면 덮어쓰지 않음)
 tests/             run_tests.gd, outgame_tests.gd
 docs/              design/ (기획서 사본, outgame/ = 아웃게임 기획 01~04 + 구현 현황 05), screenshots/, 2D_vs_3D_comparison.md

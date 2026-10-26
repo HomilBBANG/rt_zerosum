@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c3j0vg1eret6h"
-path="res://.godot/imported/_debug_mask_r.png-c3af50aa432658d8ff127fc2be959849.ctex"
+uid="uid://b0c6kaufq0hfc"
+path="res://.godot/imported/eye_socket_r.png-d8405ec6fcf1bfce53fca865149b0d81.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/rig_kira/_debug_mask_r.png"
-dest_files=["res://.godot/imported/_debug_mask_r.png-c3af50aa432658d8ff127fc2be959849.ctex"]
+source_file="res://assets/sprites/rig_kira/eye_socket_r.png"
+dest_files=["res://.godot/imported/eye_socket_r.png-d8405ec6fcf1bfce53fca865149b0d81.ctex"]
 
 [params]
 
@@ -23,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

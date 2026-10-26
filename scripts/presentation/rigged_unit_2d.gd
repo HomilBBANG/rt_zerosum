@@ -3,6 +3,7 @@ extends Node2D
 ## Skeleton2D 컷아웃 리그: rig.json(본 트리 + 파츠 + 피벗)로 Bone2D 계층을 만들고
 ## 파츠 Sprite2D 를 본 아래에 붙인다. 모든 파츠는 cel_zoned_lighting 셰이더 + 구역 마스크를 쓴다.
 ## 애니메이션(idle/attack/hit/heal/death)은 코드로 만든 Animation 리소스 (본 회전 키).
+## 눈동자: rig.json 파츠에 "attach"(붙을 파츠) + "clip_mask"(눈 테두리) 가 있으면 홍채 파츠 — 눈 테두리 안에서 이리저리 봄 (가끔 시선 이동).
 
 const SHADER := preload("res://shaders/cel_character.gdshader")
 
@@ -19,6 +20,11 @@ var weapon_bone: Bone2D
 var light_from_right := true
 var mirrored := false
 var px_k: float = 1.0   # 원본(1475px 키) 기준으로 작성한 이동량을 축소 원화 픽셀로 환산
+var irises: Array = []  # [{sprite, rest, origin, clip_origin, range, mat}]
+var look := Vector2.ZERO          # 지금 시선 (-1~1)
+var look_target := Vector2.ZERO
+var look_hold: Vector2 = Vector2(INF, INF)   # 고정 시선 (INF = 자유롭게 둘러봄)
+var _look_t := 0.0
 
 
 ## height_cm: 캐릭터 키. rig.json 의 figure_px(정수리~발 픽셀)를 230px = 175cm 기준 화면 키로 맞춘다.
@@ -57,8 +63,9 @@ func build(p_rig_dir: String, p_mirrored: bool = false, height_cm: float = 175.0
 		bone.rest = bone.transform
 		bones[b.name] = bone
 	# 파츠 Sprite2D (z 순서는 본 트리와 무관하게 전역 z_index 로)
-	var sorted: Array = rig.parts.duplicate()
+	var sorted: Array = rig.parts.filter(func(p): return not p.has("attach"))
 	sorted.sort_custom(func(a, b): return a.z < b.z)
+	var by_name := {}
 	for p in sorted:
 		var s := Sprite2D.new()
 		s.name = p.name
@@ -76,10 +83,78 @@ func build(p_rig_dir: String, p_mirrored: bool = false, height_cm: float = 175.0
 		bone.add_child(s)
 		parts.append(s)
 		part_names.append(p.name)
+		by_name[p.name] = [s, p]
+	# 눈동자: 붙을 파츠의 자식 (그 위에 그려짐), 눈 테두리 마스크로 자름
+	for p in rig.parts.filter(func(q): return q.has("attach")):
+		var host: Array = by_name.get(p.attach, [])
+		if host.is_empty():
+			continue
+		var s := Sprite2D.new()
+		s.name = p.name
+		s.centered = false
+		s.texture = load(rig_dir.path_join(p.tex))
+		s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		var rest := Vector2(p.origin[0], p.origin[1]) - Vector2(host[1].origin[0], host[1].origin[1])
+		s.position = rest
+		var m := ShaderMaterial.new()
+		m.shader = SHADER
+		s.material = m
+		host[0].add_child(s)
+		mats.append(m)
+		parts.append(s)
+		part_names.append(p.name)
+		if p.has("clip_mask"):
+			var mask: Texture2D = load(rig_dir.path_join(p.clip_mask))
+			m.set_shader_parameter("use_clip", true)
+			m.set_shader_parameter("clip_mask", mask)
+			m.set_shader_parameter("clip_size", mask.get_size())
+			var rng: Array = p.get("eye_range", [3, 1])
+			irises.append({"sprite": s, "rest": rest, "origin": Vector2(p.origin[0], p.origin[1]),
+				"clip_origin": Vector2(p.clip_origin[0], p.clip_origin[1]), "range": Vector2(float(rng[0]), float(rng[1])), "mat": m})
+	_apply_look()
 	weapon_bone = bones.get(rig.get("weapon_bone", "wrist_r"), null)
 	_update_masks()
 	_build_animations()
 	anim.play("idle")
+
+
+# ---------------------------------------------------------------- 눈동자
+## 시선 고정 (-1~1, 화면 기준 x 오른쪽·y 아래). free_look() 으로 다시 둘러보기
+func look_at_dir(dir: Vector2) -> void:
+	look_hold = dir.clamp(Vector2(-1, -1), Vector2(1, 1))
+
+
+func free_look() -> void:
+	look_hold = Vector2(INF, INF)
+
+
+func _process(delta: float) -> void:
+	if irises.is_empty():
+		return
+	if look_hold.x != INF:
+		look_target = look_hold
+	else:
+		_look_t -= delta
+		if _look_t <= 0.0:
+			# 가끔 시선 이동: 정면 40%, 좌우 위주, 위아래는 조금
+			_look_t = randf_range(0.9, 3.2)
+			if randf() < 0.4:
+				look_target = Vector2.ZERO
+			else:
+				look_target = Vector2(randf_range(-1.0, 1.0), randf_range(-0.6, 0.8))
+	var prev := look
+	look = look.move_toward(look_target, delta * 9.0)   # 빠르게 휙 (사카드)
+	if look != prev:
+		_apply_look()
+
+
+func _apply_look() -> void:
+	for e in irises:
+		var off := Vector2(look.x * e.range.x, look.y * e.range.y)
+		if mirrored:
+			off.x = -off.x
+		e.sprite.position = e.rest + off
+		e.mat.set_shader_parameter("clip_offset", e.origin + off - e.clip_origin)
 
 
 func set_light_direction(from_right: bool) -> void:

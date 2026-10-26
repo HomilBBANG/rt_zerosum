@@ -32,6 +32,11 @@ uniform bool use_rim = true;
 uniform vec4 eye_color : source_color = vec4(0.3, 0.6, 1.0, 1.0);
 uniform bool paint_eyes = true;   // false: 눈동자를 칠하지 않고 주변광 구역처럼 (원화 눈 색)
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
+// 눈동자(홍채) 파츠: 눈 테두리(소켓) 마스크 안에서만 보이게. 마스크 좌표 = 이 그림 픽셀 + clip_offset (리그 원화 픽셀)
+uniform bool use_clip = false;
+uniform sampler2D clip_mask : filter_linear, repeat_disable;
+uniform vec2 clip_offset = vec2(0.0);
+uniform vec2 clip_size = vec2(1.0);
 uniform int debug_view = 0;   // 1: 원화 그대로 출력 (디버그)
 
 float lum(vec3 c) {
@@ -91,5 +96,11 @@ void fragment() {
 	if (debug_view == 1) {
 		o = base.rgb;
 	}
-	COLOR = vec4(o, base.a);
+	float alpha = base.a;
+	if (use_clip) {
+		vec2 suv = (UV / TEXTURE_PIXEL_SIZE + clip_offset) / clip_size;
+		float inside = step(0.0, suv.x) * step(0.0, suv.y) * step(suv.x, 1.0) * step(suv.y, 1.0);
+		alpha *= texture(clip_mask, suv).r * inside;
+	}
+	COLOR = vec4(o, alpha);
 }

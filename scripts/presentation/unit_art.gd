@@ -13,6 +13,8 @@ static func has_rig(sprite_id: String) -> bool:
 
 
 static func portrait(sprite_id: String, manifest: Dictionary) -> Texture2D:
+	if has_rig(sprite_id) and ResourceLoader.exists(rig_dir(sprite_id).path_join("portrait.png")):
+		return load(rig_dir(sprite_id).path_join("portrait.png"))   # 파츠 시트로 만든 리그: 눈동자를 합친 초상화
 	if has_rig(sprite_id):
 		var tex: Texture2D = load(rig_dir(sprite_id).path_join("head.png"))
 		var at := AtlasTexture.new()
