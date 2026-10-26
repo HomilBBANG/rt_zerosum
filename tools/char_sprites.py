@@ -113,20 +113,13 @@ def eye_mask(im, head=None, boxes=None):
     sizes = ndimage.sum(cand, lab, range(1, n + 1))
     order = [i + 1 for i in np.argsort(sizes)[::-1] if sizes[i] >= 12]
     pick = order if boxes else order[:2]
-    m = np.isin(lab, pick)
-    # 눈동자가 검은 그림: 흰자에 붙은 어두운 덩어리(동공·검은 홍채·눈 테두리)도 원화 그대로 — 눈마다 상자(+6px) 안에서만
+    m = np.isin(lab, pick)   # 흰자·밝은 홍채
     dark = (al > 200) & ((r + g + b) / 3 <= 70)
-    near = ndimage.binary_dilation(m, iterations=2)
-    box = np.zeros_like(m)
-    for sl in ndimage.find_objects(ndimage.label(m)[0]):
-        ys, xs = sl
-        box[max(0, ys.start - 6):ys.stop + 6, max(0, xs.start - 6):xs.stop + 6] = True
-    dl, _dn = ndimage.label(dark & box)
-    m |= np.isin(dl, np.unique(dl[near & (dl > 0)]))
-    # 홍채 색이 노랑·갈색 등이어도: 눈마다 볼록 껍질 안에서 피부색과 다른 픽셀은 눈으로
+    # 눈마다 흰자의 볼록 껍질 (+여유) 안에서만 넓힘 → 옆 머리카락·눈썹으로 번지지 않게
     from PIL import ImageDraw
     from scipy.spatial import ConvexHull
     lab2, n2 = ndimage.label(m)
+    hulls = np.zeros_like(m)
     for k in range(1, n2 + 1):
         ys, xs = np.nonzero(lab2 == k)
         if len(xs) < 8:
@@ -137,13 +130,17 @@ def eye_mask(im, head=None, boxes=None):
             continue
         poly = Image.new("L", im.size, 0)
         ImageDraw.Draw(poly).polygon([(int(xs[v]), int(ys[v])) for v in hull.vertices], fill=255)
-        inside = np.asarray(poly) > 0
+        inside = ndimage.binary_dilation(np.asarray(poly) > 0, iterations=3)
+        hulls |= inside
+        # 홍채 색이 노랑·갈색·초록이어도: 껍질 안에서 주변 피부색과 다른 픽셀은 눈
         ring = ndimage.binary_dilation(inside, iterations=5) & ~ndimage.binary_dilation(inside, iterations=1) & (al > 200) & ~dark
-        if ring.sum() < 10:
-            continue
-        skin = np.median(a[..., :3][ring], 0)
-        diff = np.abs(a[..., :3] - skin).sum(-1)
-        m |= inside & (al > 200) & (diff > 70)
+        if ring.sum() >= 10:
+            skin = np.median(a[..., :3][ring], 0)
+            m |= inside & (al > 200) & (np.abs(a[..., :3] - skin).sum(-1) > 70)
+    # 검은 눈동자·동공·눈 테두리: 흰자에 붙은 어두운 덩어리 중 껍질(+5px) 안 부분만
+    near = ndimage.binary_dilation(m, iterations=2)
+    dl, _dn = ndimage.label(dark & ndimage.binary_dilation(hulls, iterations=5))
+    m |= np.isin(dl, np.unique(dl[near & (dl > 0)])) & (dl > 0)
     m = ndimage.binary_fill_holes(m)
     out = Image.fromarray((m * 255).astype(np.uint8))
     return out.filter(ImageFilter.GaussianBlur(0.7))
