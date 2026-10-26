@@ -10,7 +10,7 @@ assets/characters/<id>/
   <애니메이션>/anim.json  (선택) {"fps": 12, "loop": true, "durations": [초, 초, …], "ground": [x, y], "figure_px": 760, "hip_y": 400, "weapon": false}
 
 사용:
-  python3 tools/char_sprites.py masks            프레임마다 조명 마스크(<프레임>_mask_l/_r.png)가 없으면 만든다
+  python3 tools/char_sprites.py masks            프레임·시트마다 조명 마스크(<프레임>_mask_l/_r.png, <시트>_mask_l/_r.png)가 없으면 만든다
   python3 tools/char_sprites.py masks dan        한 캐릭터만
   python3 tools/char_sprites.py import <캐릭터> <동작> <파일…> [--grid 4x2] [--fps 12] [--hold 0.35]
       움직이는 GIF·WebP(APNG) → 프레임마다, 스프라이트 시트 → --grid 열x행 칸마다, PNG 여러 장 → 그 순서대로
@@ -20,6 +20,7 @@ assets/characters/<id>/
 """
 import json
 import os
+import re
 import sys
 
 from PIL import Image
@@ -39,12 +40,44 @@ def make_masks(im, k=0.5):
             build_zone_mask(im, [], "left", rim=rim, smooth=smooth))
 
 
+SHEET_RE = re.compile(r"^([a-z]+)_(\d+)(?:x(\d+))?\.png$")
+
+
+def sheet_masks(path, cols, rows):
+    """스프라이트 시트 → 칸마다 조명 마스크를 만들어 같은 배치의 <시트>_mask_r/_l.png"""
+    im = Image.open(path).convert("RGBA")
+    cw, ch = im.width // cols, im.height // rows
+    k = ch / 1536.0 * 2.2   # 원화 키에 비례한 림 두께·경계 부드럽기 (칸 높이 기준)
+    out_r = Image.new("L", im.size, 85)
+    out_l = Image.new("L", im.size, 85)
+    for r in range(rows):
+        for c in range(cols):
+            box = (c * cw, r * ch, (c + 1) * cw, (r + 1) * ch)
+            cell = im.crop(box)
+            if cell.split()[3].getbbox() is None:
+                continue
+            mr, ml = make_masks(cell, k)
+            out_r.paste(mr, box[:2])
+            out_l.paste(ml, box[:2])
+    base = path[:-4]
+    out_r.save(base + "_mask_r.png")
+    out_l.save(base + "_mask_l.png")
+
+
 def cmd_masks(only=None):
     n = 0
     for cid in sorted(os.listdir(CHAR_DIR)):
         cdir = os.path.join(CHAR_DIR, cid)
         if not os.path.isdir(cdir) or (only and cid != only):
             continue
+        for fn in sorted(os.listdir(cdir)):
+            m = SHEET_RE.match(fn)
+            if not m or os.path.exists(os.path.join(cdir, fn[:-4] + "_mask_r.png")):
+                continue
+            cols, rows = int(m.group(2)), int(m.group(3) or 1)
+            sheet_masks(os.path.join(cdir, fn), cols, rows)
+            n += 1
+            print("mask sheet", cid, fn)
         for anim in sorted(os.listdir(cdir)):
             adir = os.path.join(cdir, anim)
             if not os.path.isdir(adir):

@@ -204,12 +204,13 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   `work`(업무·치료) · `clean`(청소, 없으면 work) · `train`(훈련, 없으면 work) · `talk`(대화) / 전투 `idle` · `attack` · `hit` · `heal` · `death`(마지막 프레임 유지).
   attack·hit·heal 은 한 번 재생 후 idle. 프레임이 없으면: 앉기 → 의자 앞에 서 있음, 자기 → 기본 그림을 눕힘, 전투 동작 → 간단한 앞뒤 이동·흔들림.
 - 무기: 전투에서 손 위치(`character.json` 의 `hand`)에 무기 그림을 붙입니다. 무기를 직접 그린 동작은 `anim.json` 에 `"weapon": false` (attack·hit·heal·idle 외 동작은 기본으로 숨김).
-- 조명(셀 명암) 마스크: 프레임만 넣어도 동작합니다(마스크 없이 고른 조명). 방향 있는 명암을 원하면 `python3 tools/char_sprites.py masks` → 프레임마다 `_mask_l/_r.png` 생성.
+- 조명(셀 명암) 마스크: 프레임·시트만 넣어도 동작합니다(마스크 없이 고른 조명). 방향 있는 명암을 원하면 `python3 tools/char_sprites.py masks` → 프레임·시트마다 `_mask_l/_r.png` 생성 (시트를 주시면 제가 만들어 둡니다).
 - 새 프레임은 게임을 다시 켜면 바로 반영 (임포트 기다릴 필요 없음).
 - (선택) 움직이는 GIF·WebP → 프레임 변환: `python3 tools/char_sprites.py import nikita_army hit 파일.webp` (조명 마스크까지 만듦).
   ※ 채팅에 올린 움직이는 이미지는 첫 장면 한 장으로만 전달되므로, 시트 한 장으로 주거나 저장소에 넣어 커밋해 주세요.
 - 프레임마다 보여 줄 시간을 다르게: `anim.json` 의 `"durations": [2.4, 1.2]` (초, fps 대신).
-- **들어간 애니메이션**: 아직 없음 (모든 캐릭터가 기본 그림 한 장).
+- **들어간 애니메이션** (사용자 제공 시트): 니키타 `idle_4x4`(8fps) · `walk_6x6`(15fps) · `hit_6x6`(버티는 동작, 24fps) · `attack_6x6`(가리키는 동작, 24fps), 키라 `idle_4x4`(8fps).
+  속도는 같은 이름 json(`walk.json` 등). 조명 마스크 시트(`*_mask_r/_l.png`)는 `python3 tools/char_sprites.py masks` 로 칸마다 만듦 — 없어도 동작.
 
 ## 규칙 테스트 (헤드리스)
 ```

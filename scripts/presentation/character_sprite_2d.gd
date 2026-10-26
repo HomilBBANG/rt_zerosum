@@ -183,10 +183,19 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 	var ch := img.get_height() / maxi(1, rows)
 	if count <= 0:
 		count = int(opt.get("count", cols * rows - start))
+	# 조명 마스크 시트 (tools/char_sprites.py masks 로 만듦, 같은 칸 배치) — 없으면 고른 조명
+	var mimg := {}
+	for suf in ["_mask_r", "_mask_l"]:
+		var mp: String = path.get_basename() + str(suf) + ".png"
+		if FileAccess.file_exists(mp):
+			var mi := Image.load_from_file(ProjectSettings.globalize_path(mp))
+			if mi != null and not mi.is_empty() and mi.get_size() == img.get_size():
+				mimg[suf] = mi
 	var first_used := Rect2i()
 	var lowest := 0
 	for i in range(start, mini(start + count, cols * rows)):
-		var cell := img.get_region(Rect2i((i % cols) * cw, (i / cols) * ch, cw, ch))
+		var r := Rect2i((i % cols) * cw, (i / cols) * ch, cw, ch)
+		var cell := img.get_region(r)
 		var used := cell.get_used_rect()
 		if used.size.x <= 0:
 			continue   # 빈 칸
@@ -195,8 +204,8 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 		lowest = maxi(lowest, used.end.y)
 		cell.generate_mipmaps()
 		d.frames.append(ImageTexture.create_from_image(cell))
-		d.masks_r.append(null)
-		d.masks_l.append(null)
+		d.masks_r.append(ImageTexture.create_from_image(mimg["_mask_r"].get_region(r)) if mimg.has("_mask_r") else null)
+		d.masks_l.append(ImageTexture.create_from_image(mimg["_mask_l"].get_region(r)) if mimg.has("_mask_l") else null)
 	if (d.frames as Array).is_empty():
 		return
 	# 발 위치·키: 적혀 있으면 그대로, 아니면 첫 칸 그림에서
