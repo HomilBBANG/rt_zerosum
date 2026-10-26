@@ -237,6 +237,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![시험 캐릭터 — 기지(왼쪽)와 원본](docs/screenshots/test_char_compare.png)
 
 ![키라·니키타 새 그림 — 원본과 기지 화면](docs/screenshots/kira_nikita_new.png)
+![키라 최종 그림 — 원본·기지 화면·얼굴](docs/screenshots/kira_final.png)
 ![하나 새 그림 — 원본·기지 화면·얼굴(노란 눈 원본 색)](docs/screenshots/hana_new.png)
 
 ### 네온 칠 (전 캐릭터 기본)
