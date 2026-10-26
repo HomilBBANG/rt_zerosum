@@ -2,6 +2,8 @@ class_name BaseView3D
 extends Node3D
 ## 기지 배경 3D: 시설 데이터(층·칸·폭)로 단면 건물을 만들고, 앞을 잘라 낸 방들을 위에서 살짝 내려다보는 원근 카메라로 본다.
 ## 셀 셰이더(cel_3d) + 방마다 원색 스폿 조명(전투 조명 프리셋 g1~g4) + 하드 섀도우. 잠긴 방은 앞을 검은 판으로 막는다.
+## 카메라는 직교(원근 없음) + 살짝 내려다봄: 방 단면은 모두 같은 크기의 반듯한 사각형(한 칸 ≈ 정사각형), 방 안은 위에서 바닥이 보인다.
+## 건물 바깥은 검정 (배경 없음).
 ## 대원(2D 리그)·이름표·말풍선은 BaseHub 가 이 카메라로 화면 좌표를 투영해 그 위에 그린다.
 ## 좌표: 시뮬레이션의 2D px (x 오른쪽, y 아래) → 3D m (x 오른쪽, y 위, z 화면 쪽). 칸 240px = CELL_M, 층 220px = FLOOR_M.
 
@@ -9,7 +11,7 @@ const CEL := preload("res://shaders/cel_3d.gdshader")
 const OUTLINE := preload("res://shaders/outline_3d.gdshader")
 const UNLIT := preload("res://shaders/unlit_3d.gdshader")
 
-const CELL_M := 3.0          # 한 칸 폭 (m)
+const CELL_M := 3.6          # 한 칸 폭 (m) — 층 높이 3.8m × cos(18°) ≈ 3.6m 라 기본 각도에서 한 칸이 정사각형으로 보임
 const FLOOR_M := 3.8         # 층 높이 (바닥~바닥, m)
 const SLAB := 0.35           # 층 사이 슬래브 두께
 const BACK_Z := -3.0         # 방 뒷벽 안쪽 면
@@ -27,25 +29,22 @@ var _mats: Dictionary = {}    # key → ShaderMaterial (색·조명 프리셋별
 func build(p_sim: BaseSim) -> void:
 	sim = p_sim
 	camera = Camera3D.new()
-	camera.fov = 35.0
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.size = 8.0
 	camera.near = 0.3
-	camera.far = 260.0
+	camera.far = 80.0
 	add_child(camera)
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color(0.98, 0.55, 0.36)
+	e.background_color = Color(0, 0, 0)
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_DISABLED
 	e.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	env.environment = e
 	add_child(env)
 	fill = DirectionalLight3D.new()
 	fill.light_energy = 0.5
-	fill.shadow_enabled = true
-	fill.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	fill.directional_shadow_max_distance = 90.0
-	fill.shadow_bias = 0.05
-	fill.shadow_normal_bias = 1.2
+	fill.shadow_enabled = false   # 채움광은 그림자 없이 (가까이 보면 그림자 경계가 계단처럼 깨짐) — 그림자는 방 스폿 조명이 만듦
 	add_child(fill)
 	fill.rotation_degrees = Vector3(-24.0, -22.0, 0.0)   # 앞 위에서 비스듬히 → 천장이 뒷벽 위쪽에 단단한 그림자 띠
 	_build_surroundings()
@@ -143,70 +142,21 @@ func _build_surroundings() -> void:
 	out.name = "Surroundings"
 	add_child(out)
 	var bb := base_bounds()
-	var earth := _mat(Color(0.42, 0.25, 0.20))
-	var earth_dark := _mat(Color(0.30, 0.18, 0.15))
-	var grass := _mat(Color(0.48, 0.70, 0.25))
-	var concrete := _mat(Color(0.46, 0.47, 0.54))
-	var L := bb.position.x - 60.0
-	var R := bb.end.x + 60.0
-	var bottom := bb.position.y - 6.0
-	# 지면 위: 풀밭 (건물 앞뒤로 넓게)
-	var gl := bb.position.x - 0.4
-	var gr := bb.end.x + 0.4
-	_box(out, Vector3(gl - L, 0.3, 80.0), Vector3((L + gl) * 0.5, -0.15, FRONT_Z - 40.0 + 0.5), grass)
-	_box(out, Vector3(R - gr, 0.3, 80.0), Vector3((R + gr) * 0.5, -0.15, FRONT_Z - 40.0 + 0.5), grass)
-	_box(out, Vector3(gr - gl, 0.3, 80.0 - (FRONT_Z - BACK_Z + 2.0)), Vector3(bb.get_center().x, -0.15, BACK_Z - 1.2 - (80.0 - (FRONT_Z - BACK_Z + 2.0)) * 0.5), grass)
-	# 지하 단면: 건물 왼쪽·오른쪽·아래 흙 (앞면 = 잘라 낸 면)
-	var depth := FRONT_Z - (BACK_Z - 1.2)
-	var zc := (FRONT_Z + BACK_Z - 1.2) * 0.5
-	_box(out, Vector3(bb.position.x - 0.4 - L, -bottom, depth), Vector3((L + bb.position.x - 0.4) * 0.5, bottom * 0.5, zc), earth)
-	_box(out, Vector3(R - bb.end.x - 0.4, -bottom, depth), Vector3((R + bb.end.x + 0.4) * 0.5, bottom * 0.5, zc), earth)
-	_box(out, Vector3(bb.size.x + 0.8, bb.position.y + 0.0 - bottom - 0.4, depth), Vector3(bb.get_center().x, (bottom + bb.position.y - 0.4) * 0.5, zc), earth)
-	# 흙 속 돌
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	for i in 46:
-		var x := rng.randf_range(L + 20, R - 20)
-		var y := rng.randf_range(bottom + 0.5, -0.8)
-		if x > bb.position.x - 1.0 and x < bb.end.x + 1.0 and y > bb.position.y - 1.0:
-			continue
-		var s := rng.randf_range(0.4, 1.1)
-		_box(out, Vector3(s * 1.6, s * 0.7, 0.2), Vector3(x, y, FRONT_Z + 0.05), earth_dark, false)
-	# 지면 띠 (흙 위 잔디 단면)
-	_box(out, Vector3(gl - L, 0.35, 0.2), Vector3((L + gl) * 0.5, -0.17, FRONT_Z + 0.06), grass, false)
-	_box(out, Vector3(R - gr, 0.35, 0.2), Vector3((R + gr) * 0.5, -0.17, FRONT_Z + 0.06), grass, false)
-	# 건물 외곽: 지붕·외벽 (콘크리트), 지하 콘크리트 틀
-	_box(out, Vector3(bb.size.x + 1.2, 0.5, FRONT_Z - BACK_Z + 1.0), Vector3(bb.get_center().x, bb.end.y + 0.25, (FRONT_Z + BACK_Z - 1.0) * 0.5), _mat(Color(0.52, 0.50, 0.58), "", 0.03))
-	# 옥상 난간
-	_box(out, Vector3(bb.size.x + 1.2, 0.35, 0.18), Vector3(bb.get_center().x, bb.end.y + 0.67, FRONT_Z + 0.35), _mat(Color(0.95, 0.80, 0.25), "", 0.02))
-	_box(out, Vector3(bb.size.x + 0.4, bb.size.y + 0.6, 0.4), Vector3(bb.get_center().x, bb.get_center().y, BACK_Z - 0.75), concrete)
-	_box(out, Vector3(0.4, bb.size.y + 0.6, FRONT_Z - BACK_Z + 1.0), Vector3(bb.position.x - 0.2, bb.get_center().y, (FRONT_Z + BACK_Z - 1.0) * 0.5), concrete)
-	_box(out, Vector3(0.4, bb.size.y + 0.6, FRONT_Z - BACK_Z + 1.0), Vector3(bb.end.x + 0.2, bb.get_center().y, (FRONT_Z + BACK_Z - 1.0) * 0.5), concrete)
-	# 방이 없는 칸 = 흙으로 채움
+	var black := _glow(Color(0, 0, 0))
+	# 방이 없는 칸 = 검정
 	var d := sim.data
 	for f in d.floors:
 		for c in range(floori(bb.position.x / CELL_M), ceili(bb.end.x / CELL_M)):
 			var px := Vector2((c + 0.5) * OutgameData.CELL_W, (f.order + 0.5) * OutgameData.FLOOR_H)
 			if d.facility_at(px) == "":
 				var y0: float = -float(f.order) * FLOOR_M
-				_box(out, Vector3(CELL_M, FLOOR_M, FRONT_Z - BACK_Z), Vector3((c + 0.5) * CELL_M, y0 + FLOOR_M * 0.5 - SLAB * 0.5, (FRONT_Z + BACK_Z) * 0.5),
-					earth if f.order > 0 else concrete)
-	# 층 사이 슬래브 (앞면이 단면 띠로 보임)
+				_box(out, Vector3(CELL_M, FLOOR_M, FRONT_Z - BACK_Z), Vector3((c + 0.5) * CELL_M, y0 + FLOOR_M * 0.5 - SLAB * 0.5, (FRONT_Z + BACK_Z) * 0.5), black, false)
+	# 층 사이 슬래브 (앞면이 방 사이 띠로 보임) + 맨 위 천장
+	var slab := _mat(Color(0.20, 0.20, 0.25))
 	for f in d.floors:
 		var y0: float = -float(f.order) * FLOOR_M
-		_box(out, Vector3(bb.size.x, SLAB, FRONT_Z - BACK_Z), Vector3(bb.get_center().x, y0 - SLAB * 0.5, (FRONT_Z + BACK_Z) * 0.5), _mat(Color(0.24, 0.24, 0.30)))
-	# 먼 언덕 실루엣 (하늘 앞, 단색 발광 면)
-	var hill := _glow(Color(0.55, 0.28, 0.45))
-	for i in 10:
-		var hx := L + 10 + i * (R - L - 20) / 9.0
-		var hh := 14.0 + 5.0 * absf(sin(i * 1.7))
-		var m := _box(out, Vector3(hh, hh, 1), Vector3(hx, -hh * 0.45, -75.0), hill, false)
-		m.rotation_degrees.z = 45.0
-	var hill2 := _glow(Color(0.72, 0.36, 0.48))
-	for i in 7:
-		var hx := L + 30 + i * (R - L - 40) / 6.0
-		var m := _box(out, Vector3(34, 34, 1), Vector3(hx, -16.0, -120.0), hill2, false)
-		m.rotation_degrees.z = 45.0
+		_box(out, Vector3(bb.size.x, SLAB, FRONT_Z - BACK_Z), Vector3(bb.get_center().x, y0 - SLAB * 0.5, (FRONT_Z + BACK_Z) * 0.5), slab)
+	_box(out, Vector3(bb.size.x, SLAB, FRONT_Z - BACK_Z), Vector3(bb.get_center().x, bb.end.y + SLAB * 0.5, (FRONT_Z + BACK_Z) * 0.5), slab)
 
 
 # ================================================================ 방
@@ -395,9 +345,9 @@ func _gate(n: Node3D, b: Dictionary, light: String) -> void:
 
 
 # ================================================================ 카메라
-## target = 바라보는 점 (m), 위에서 pitch 만큼 내려다봄
-func set_camera(target: Vector3, dist: float, pitch_deg: float, fov_deg: float) -> void:
+## target = 화면 가운데 점 (m), 직교 카메라가 위에서 pitch 만큼 내려다봄. size = 화면 세로에 들어가는 높이 (m, 작을수록 확대)
+func set_camera(target: Vector3, size: float, pitch_deg: float) -> void:
 	var p := deg_to_rad(pitch_deg)
-	camera.fov = fov_deg
-	camera.position = target + Vector3(0.0, sin(p), cos(p)) * dist
+	camera.size = size
+	camera.position = target + Vector3(0.0, sin(p), cos(p)) * 30.0
 	camera.look_at(target, Vector3.UP)

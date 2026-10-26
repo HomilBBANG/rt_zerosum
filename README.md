@@ -44,12 +44,13 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 기획: `docs/design/outgame/01~04` (사용자 제공), 구현 현황·수용 기준 대응표: `docs/design/outgame/05_IMPLEMENTATION_STATUS.md`.
 
 ![기지](docs/screenshots/outgame/base.png)
-![기지 가까이](docs/screenshots/outgame/base_closeup.png)
+![기지 전체 (휠로 축소)](docs/screenshots/outgame/base_closeup.png)
 
-- **기지 화면**: **3D 배경** 단면 건물을 **위에서 살짝(15°) 내려다보는 원근 카메라**로 봄 (방마다 원색 스폿 조명·하드 섀도우, 셀 셰이딩). 대원은 2D 리그를 그 위에 원근 크기로.
-  3개 층 (지상 1층·지하 1층 기본 개방, 지하 2층(임시) 잠금). `WASD` 이동 · 휠 거리 · `F11` 전체 화면.
-  카메라 각도·화각·거리는 `scenes/outgame/base_hub.tscn` 루트 노드 인스펙터 **카메라** 그룹 (실행 중 원격 탭에서도 즉시 반영).
-  검은 방 = 잠긴 시설 → 클릭해 **달러로 해금** (자유 건설 없음). 열린 방 클릭 = 시설 정보 (작업실: 무기 제작·강화).
+- **기지 화면**: 배경은 **3D 단면 건물**(방마다 원색 스폿 조명·하드 섀도우, 셀 셰이딩), 건물 바깥은 **검정**.
+  카메라는 **정면처럼 반듯한 직교 뷰**(원근 없음 — 방마다 같은 크기 사각형, 한 칸 ≈ 정사각형)이고 **방 안만 위에서 살짝(18°) 내려다보는** 구도라 바닥이 보입니다.
+  처음엔 대원들이 있는 지상 1층·지하 1층을 크게(화면 세로 9m) 보여 줍니다. 대원은 2D 리그를 그 위에 덧그림.
+  3개 층 (지상 1층·지하 1층 기본 개방, 지하 2층(임시) 잠금). `WASD` 이동 · 휠 확대/축소 · `F11` 전체 화면.
+  카메라 각도·확대(화면 세로 m)는 `scenes/outgame/base_hub.tscn` 루트 노드 인스펙터 **카메라** 그룹 (실행 중 원격 탭에서도 즉시 반영).
 - **시간**: 2048-04-07 (화) 08:00 시작, 현실 1초 = 게임 1분 [임시]. 위쪽 `정지/1x/4x/16x`, `Space` 정지/재개. 창이 열려 있으면 시계가 멈춤.
 - **대원 6명** (전투 아군과 같은 인물): 주간 일정대로 방을 오가며 생활 (수면·식사·업무·잡담…).
   - **좌클릭** = 직접 대화. 머리 위 **`!`** 가 있으면 요청 대화 → 수락.
@@ -182,7 +183,7 @@ GODOT=/path/to/godot tools/render_shots.sh docs/screenshots      # Xvfb + Mesa �
 ```
 CLI 인자(`++` 뒤): `--scene=battle|formation|result|menu|title|base --mode=2d|3d --preset=g1..g4 --shot=경로 --autoplay=aim|move|fight:N --hud=0`.
 디버그: `--charview=1`(캐릭터 원화를 조명 없이 출력), `--outline=0`(외곽선 끔), `--rim=0`(림 끔).
-기지: `--scene=base --base_skip=분 --base_cam=x,y,거리(m) --base_ui=dialogue:npc_alma|overhear|unlock:f1_mess|facility:b1_workshop|character:npc_kira|contracts|context:npc_dan|clean:npc_kira|debug|sortie|unlockall`.
+기지: `--scene=base --base_skip=분 --base_cam=x,y,화면높이(m) --base_ui=dialogue:npc_alma|overhear|unlock:f1_mess|facility:b1_workshop|character:npc_kira|contracts|context:npc_dan|clean:npc_kira|debug|sortie|unlockall`.
 
 ## 폴더
 ```

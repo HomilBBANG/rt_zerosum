@@ -1,6 +1,6 @@
 extends Node2D
 ## 아웃게임 기지 화면 (scenes/outgame/base_hub.tscn).
-## 배경 = 3D 단면 건물(BaseView3D, 위에서 살짝 내려다보는 원근 카메라) → 화면 뒤 층에 렌더.
+## 배경 = 3D 단면 건물(BaseView3D) → 화면 뒤 층에 렌더. 카메라는 직교(정면처럼 반듯, 방마다 같은 크기 사각형) + 살짝 내려다봐 방 안 바닥이 보임.
 ## 그 위 화면 층: 방 이름표·자물쇠·오염(BaseOverlay under) → 대원 2D 리그(NpcView) → 말풍선(BaseOverlay over) → HUD.
 ## WASD 로 카메라 이동, 휠로 거리. 규칙은 Game.base(BaseSim). 클릭 우선순위 [임시]: UI > 말풍선 > 대원 > 시설.
 
@@ -8,23 +8,19 @@ const RENDER_SIZE := Vector2i(2560, 1440)   # QHD 로 렌더해 1280×720 논리
 const SCREEN := Vector2(1280, 720)
 
 @export_group("카메라")
-@export_range(0.0, 60.0, 0.5, "suffix:°") var cam_pitch_deg := 15.0:   ## 내려다보는 각도 (0 = 정면)
+@export_range(0.0, 45.0, 0.5, "suffix:°") var cam_pitch_deg := 18.0:   ## 방 안을 내려다보는 각도 (0 = 완전 정면, 바닥 안 보임). 18° 에서 한 칸이 정사각형
 	set(v):
 		cam_pitch_deg = v
 		_cam_dirty = true
-@export_range(15.0, 70.0, 0.5, "suffix:°") var cam_fov_deg := 34.0:   ## 세로 화각
+@export_range(3.0, 30.0, 0.1, "suffix:m") var cam_size := 9.0:   ## 화면 세로에 들어가는 높이 (작을수록 확대, 휠로 바뀜). 9 ≈ 두 층 반
 	set(v):
-		cam_fov_deg = v
-		_cam_dirty = true
-@export_range(8.0, 80.0, 0.5, "suffix:m") var cam_distance := 36.0:   ## 바라보는 점까지 거리 (휠로 바뀜)
-	set(v):
-		cam_distance = v
+		cam_size = v
 		_cam_dirty = true
 @export var cam_target := Vector3(12.6, -3.6, -0.6):   ## 바라보는 점 (m, WASD 로 바뀜)
 	set(v):
 		cam_target = v
 		_cam_dirty = true
-@export_range(1.0, 30.0, 0.5, "suffix:m/s") var cam_speed := 12.0   ## WASD 이동 속도 (거리 30m 기준)
+@export_range(1.0, 30.0, 0.5, "suffix:m/s") var cam_speed := 9.0   ## WASD 이동 속도 (화면 높이 8m 기준)
 @export_group("")
 
 var sim: BaseSim
@@ -51,16 +47,18 @@ func _ready() -> void:
 	RenderingServer.set_default_clear_color(Color(0.1, 0.06, 0.08))
 	_make_3d()
 	var bb := v3d.base_bounds()
-	cam_target = Vector3(bb.get_center().x - 0.6, bb.get_center().y - 0.2, -0.6)
-	if Game.cli.has("base_cam"):   # x,y,거리 (m)
+	# 처음엔 지상 1층·지하 1층 가운데(대원들이 있는 곳)를 크게
+	var start := v3d.to3d(Vector2(sim.data.facility_center_x("f1_lounge") if sim.data.facilities.has("f1_lounge") else bb.get_center().x / BaseView3D.CELL_M * OutgameData.CELL_W, OutgameData.FLOOR_H))
+	cam_target = Vector3(start.x - BaseView3D.CELL_M * 0.5, start.y + 0.3, -0.6)
+	if Game.cli.has("base_cam"):   # x,y,화면 높이 (m)
 		var p: PackedStringArray = str(Game.cli.base_cam).split(",")
 		cam_target = Vector3(float(p[0]), float(p[1]), -0.6)
 		if p.size() > 2:
-			cam_distance = float(p[2])
+			cam_size = float(p[2])
 	if sim.npcs.has(str(Game.cli.get("base_focus", ""))):
 		var foot := v3d.to3d(sim.npcs[Game.cli.base_focus].pos)
 		cam_target = Vector3(foot.x, foot.y + 1.2, -0.6)
-		cam_distance = 14.0
+		cam_size = 5.0
 	_apply_camera()
 	var layer := CanvasLayer.new()
 	layer.layer = 0
@@ -107,7 +105,7 @@ func _make_3d() -> void:
 	vp.size = RENDER_SIZE
 	vp.own_world_3d = true
 	vp.msaa_3d = Viewport.MSAA_4X
-	vp.positional_shadow_atlas_size = 4096
+	vp.positional_shadow_atlas_size = 8192   # 방 스폿 조명마다 2048² (가까이 봐도 그림자 경계가 깔끔하게)
 	for q in 4:
 		vp.set_positional_shadow_atlas_quadrant_subdiv(q, Viewport.SHADOW_ATLAS_QUADRANT_SUBDIV_4)
 	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
@@ -137,7 +135,7 @@ func project(p: Vector3) -> Vector2:
 func _apply_camera() -> void:
 	if v3d == null:
 		return
-	v3d.set_camera(cam_target, cam_distance, cam_pitch_deg, cam_fov_deg)
+	v3d.set_camera(cam_target, cam_size, cam_pitch_deg)
 	_cam_dirty = false
 	_rerender()
 
@@ -206,8 +204,8 @@ func _move_camera(delta: float) -> void:
 		if Input.is_physical_key_pressed(KEY_S):
 			dir.y -= 1
 	if dir != Vector2.ZERO:
-		var k := cam_speed * delta * cam_distance / 30.0
-		var bb := v3d.base_bounds().grow(4.0)
+		var k := cam_speed * delta * cam_size / 8.0
+		var bb := v3d.base_bounds()
 		var t := cam_target + Vector3(dir.x, dir.y, 0.0) * k
 		cam_target = Vector3(clampf(t.x, bb.position.x, bb.end.x), clampf(t.y, bb.position.y, bb.end.y), t.z)
 	if _cam_dirty:
@@ -288,7 +286,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _zoom(k: float) -> void:
-	cam_distance = clampf(cam_distance / k, 8.0, 48.0)
+	cam_size = clampf(cam_size / k, 3.5, 16.0)
 
 
 func _left_click(p: Vector2) -> void:
