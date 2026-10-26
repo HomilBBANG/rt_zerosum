@@ -361,7 +361,13 @@ def cmd_new(cid, src, fig_px=760):
     side = int(max(head[2], head[3]) * 1.15)
     cx = head[0] + head[2] // 2
     base.crop((cx - side // 2, max(0, top - 4), cx + side // 2, max(0, top - 4) + side)).save(os.path.join(cdir, "portrait.png"))
-    json.dump(info, open(os.path.join(cdir, "character.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    old = os.path.join(cdir, "character.json")
+    if os.path.exists(old):   # 다시 만들 때 칠 방식 설정은 유지
+        prev = json.load(open(old, encoding="utf-8"))
+        for k in ("style", "neon_gradient"):
+            if k in prev:
+                info[k] = prev[k]
+    json.dump(info, open(old, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     line_mask(base).save(os.path.join(cdir, "base_line.png"))
     print(cid, "base", (w, h), "ground", info["ground"], "head", head, "hand", info["hand"])
 

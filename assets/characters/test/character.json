@@ -4,23 +4,25 @@
   768
  ],
  "ground": [
-  262,
+  268,
   761
  ],
  "figure_px": 759,
  "head_rect": [
-  157,
+  160,
   2,
-  180,
+  187,
   151
  ],
  "hip_y": 358,
  "hand": [
-  378,
+  385,
   479,
   70
  ],
  "eyes": [],
  "fps": 12,
- "silhouette": "silhouette.png"
+ "silhouette": "silhouette.png",
+ "style": "neon",
+ "neon_gradient": 1.0
 }

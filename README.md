@@ -233,9 +233,21 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 1. 투명 배경 전신 그림 한 장 → `python3 tools/char_sprites.py new <id> 그림.png` → `assets/characters/<id>/` (기본 그림·조명 마스크·초상화·그림자·character.json, 키 760px·발·머리·손 위치 자동).
 2. 실행할 때 `--test_char=<id>` (+ `--test_slot=a_kira` 등, 기본 니키타 자리)를 붙이면 그 자리 캐릭터만 새 그림으로 전투·기지에 나옴 (데이터는 그대로).
    예: `godot --path . ++ --scene=battle --test_char=test` / `++ --scene=base --test_char=test`. 계속 쓰려면 엑셀 `캐릭터`·`대원` 시트 `스프라이트` 열에 `<id>`.
-- 지금 들어 있는 시험 캐릭터: `test` (의무병 코트·주머니에 손, 사용자 제공). 흰 배경(불투명) 그림이면 `new` 가 가장자리에서 이어진 흰 바탕만 자동으로 지움 (외곽선 안쪽 흰 옷은 그대로).
+- 지금 들어 있는 시험 캐릭터: `test` (빨간 머리 의무병, 흰 코트·주머니에 손, 사용자 제공, 네온 칠). 흰 배경(불투명) 그림이면 `new` 가 가장자리에서 이어진 흰 바탕만 자동으로 지움 (외곽선 안쪽 흰 옷은 그대로).
 
 ![시험 캐릭터 — 기지(왼쪽)와 원본](docs/screenshots/test_char_compare.png)
+
+### 네온 칠 (캐릭터별 선택)
+`character.json` 에 `"style": "neon"` 을 넣으면 그 캐릭터는 **선화는 원화 그대로, 면은 조명색으로 쨍하게** 칠합니다 (레퍼런스: `docs/screenshots/ref_neon.png`).
+- 원화 밝기 → 조명색 명도. 검정 옷도 바닥 밝기(`neon_floor`)까지 올라가 깊은 보라·남색이 되고, 흰 코트는 흰빛 섞인 조명색. 선은 그보다 어두운 원화 색이라 묻히지 않음.
+- `"neon_gradient": 1` → 몸 위(빛 쪽)에서 아래로 조명 색상이 푸른 보라 쪽으로 넘어가는 그라데이션 (주황→빨강→분홍, 분홍→보라, 초록→청록).
+- 실행 옵션으로 비교: `--char_style=neon|classic`, `--char_gradient=0|1` (모든 캐릭터에 강제). 세기는 셰이더 `neon_*` 값.
+- 기지 확대 촬영: `--base_focus=npc_nikita --base_zoom=3.6 --base_focus_y=0.9`.
+- 지금은 시험 캐릭터 `test` 만 네온 + 그라데이션.
+
+![원본·기존 칠·네온·네온+그라데이션 (기지, 주황 조명 방)](docs/screenshots/neon_base.png)
+![얼굴 확대 — 선화 유지](docs/screenshots/neon_lines.png)
+![전투 — 기존·네온·그라데이션 (G1, G4)](docs/screenshots/neon_battle.png)
 
 ## 규칙 테스트 (헤드리스)
 ```

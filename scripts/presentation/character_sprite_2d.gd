@@ -22,6 +22,8 @@ const HOLD := ["death"]                       # 마지막 프레임에서 멈춤
 
 static var _cache: Dictionary = {}   # "<id>/<anim>" → {frames, masks_r, masks_l, fps, loop, ground, figure_px, hip_y, weapon}
 static var _info_cache: Dictionary = {}
+## 칠 방식 강제 (CLI --char_style=neon|classic, --char_gradient=0|1 → Game 이 넣음). 비어 있으면 character.json 그대로
+static var style_override: Dictionary = {}
 
 var cid := ""
 var info: Dictionary = {}
@@ -251,6 +253,7 @@ func build(id: String, p_height_cm: float = 175.0) -> void:
 	mat.shader = SHADER
 	body.material = mat
 	mats = [mat]
+	_apply_style()
 	add_child(body)
 	weapon_holder = Node2D.new()
 	weapon_holder.name = "Hand"
@@ -373,9 +376,18 @@ func _apply_mask() -> void:
 		mat.set_shader_parameter("near_rim_mask", ml if _tex_from_right else mr)
 
 
+## character.json "style": "neon" → 네온 칠 (면은 조명색으로 쨍하게, 선화는 원화 그대로). "neon_gradient": 0~1 → 몸 위아래로 주조명색→림색 그라데이션
+func _apply_style() -> void:
+	var style := str(style_override.get("style", info.get("style", "classic")))
+	var grad := float(style_override.get("neon_gradient", info.get("neon_gradient", 0.0)))
+	mat.set_shader_parameter("neon", 1.0 if style == "neon" else 0.0)
+	mat.set_shader_parameter("neon_gradient", grad if style == "neon" else 0.0)
+
+
 ## tex_from_right: 텍스처 기준 빛이 오른쪽에서 오는가 (좌우 반전된 유닛은 호출하는 쪽에서 뒤집어 넘김)
 func set_light_direction(tex_from_right: bool) -> void:
 	_tex_from_right = tex_from_right
+	mat.set_shader_parameter("grad_dir", Vector2(-0.35 if tex_from_right else 0.35, 1.0))   # 빛 쪽 위에서 반대쪽 아래로
 	_apply_mask()
 
 

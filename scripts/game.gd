@@ -123,6 +123,10 @@ func _ready() -> void:
 
 ## 테스트 캐릭터 그림: --test_char=<assets/characters 폴더> [--test_slot=a_nikita] — 그 아군(전투)과 같은 인물(기지)의 그림만 바꿔서 렌더 확인
 func _apply_test_char() -> void:
+	if cli.has("char_style"):
+		CharacterSprite2D.style_override["style"] = str(cli.char_style)
+	if cli.has("char_gradient"):
+		CharacterSprite2D.style_override["neon_gradient"] = float(cli.char_gradient)
 	var cid := str(cli.get("test_char", ""))
 	if cid == "":
 		return

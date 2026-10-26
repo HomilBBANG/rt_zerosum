@@ -40,6 +40,21 @@ uniform bool paint_eyes = true;   // false: 눈동자를 칠하지 않고 주변
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
 uniform int debug_view = 0;   // 1: 원화 그대로 출력 (디버그)
 
+// ── 네온 칠 (character.json "style": "neon") ── 레퍼런스: 면은 조명색으로 쨍하게 덮고 선화만 원화 그대로.
+//   원화 밝기 → 조명색 명도로 옮김 (검정 옷도 바닥 밝기 neon_floor 로 들어 올려 깊은 조명색이 됨, 흰 옷은 밝은 조명색)
+//   원화 고유색은 neon_keep 만큼만 남김 (빨간 머리·적십자가 '조명 받은 빨강'으로 읽히게)
+uniform float neon : hint_range(0.0, 1.0) = 0.0;          // 0 = 기존 칠, 1 = 네온 칠
+uniform float neon_floor : hint_range(0.0, 0.5) = 0.19;    // 가장 어두운 면의 밝기 (선화는 이보다 어두워서 묻히지 않음)
+uniform float neon_keep : hint_range(0.0, 1.0) = 0.45;     // 원화 고유색(채도) 남기는 양
+uniform float neon_white : hint_range(0.0, 1.0) = 0.38;    // 밝은 면을 흰빛 쪽으로 (흰 코트가 '빛나는 흰색'으로 남게)
+uniform float neon_shadow : hint_range(0.2, 1.0) = 0.70;   // 그림자 면 밝기 배율
+uniform float neon_dark : hint_range(0.0, 0.5) = 0.30;     // 검정·어두운 면을 푸른 보라 쪽으로 돌리는 양 (0 = 조명색 그대로 어둡게 → 갈색·고동색)
+uniform float neon_cool : hint_range(0.0, 0.4) = 0.16;     // 그림자 면 색상을 주조명색에서 푸른 보라(0.72) 쪽으로 돌리는 양 — 빛/그림자가 색상으로도 갈림
+// 그라데이션: 몸 위(빛 쪽)→아래(반대쪽)로 주조명색 색상을 푸른 보라 쪽으로 돌림 (핑크→보라, 초록→청록, 빨강→마젠타)
+uniform float neon_gradient : hint_range(0.0, 1.0) = 0.0;
+uniform float grad_hue : hint_range(0.0, 0.4) = 0.16;      // 그라데이션 끝에서 돌아가는 색상 양 (0.16 ≈ 58°)
+uniform vec2 grad_dir = vec2(-0.35, 1.0);                  // 텍스처 UV 기준 진행 방향 (x 는 빛 방향에 따라 스크립트가 뒤집음)
+
 float lum(vec3 c) {
 	return dot(c, vec3(0.299, 0.587, 0.114));
 }
@@ -52,6 +67,69 @@ vec3 hue_of(vec3 c) {   // 밝기를 1 로 맞춘 색상 (어두운 그림자색
 vec3 tint_keep_L(vec3 c, float L) {
 	vec3 h = hue_of(c);
 	return h * (L / max(lum(h), 0.001));
+}
+
+vec3 rgb2hsv(vec3 c) {
+	vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+	vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+	vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+	float d = q.x - min(q.w, q.y);
+	return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x);
+}
+
+vec3 hsv2rgb(vec3 c) {
+	vec3 p = abs(fract(c.xxx + vec3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+	return c.z * clamp(p - 1.0, 0.0, 1.0);
+}
+
+// 색상환에서 가까운 쪽으로 a → b (보색끼리 RGB 로 섞으면 회색이 되므로)
+vec3 hue_lerp(vec3 a, vec3 b, float t) {
+	vec3 ha = rgb2hsv(a);
+	vec3 hb = rgb2hsv(b);
+	float dh = hb.x - ha.x;
+	dh -= round(dh);
+	return hsv2rgb(vec3(fract(ha.x + dh * t), mix(ha.y, hb.y, t), mix(ha.z, hb.z, t)));
+}
+
+// 색상을 target 색상(0~1) 쪽으로 최대 amt 만큼 돌림 (가까운 방향)
+vec3 hue_toward(vec3 c, float target, float amt) {
+	vec3 h = rgb2hsv(c);
+	float dh = target - h.x;
+	dh -= round(dh);
+	return hsv2rgb(vec3(fract(h.x + clamp(dh, -amt, amt)), h.y, h.z));
+}
+
+// 어두운 면 색상: 주조명색을 푸른 보라(0.72) 쪽으로 neon_dark 만큼 돌린 색
+vec3 neon_dark_hue() {
+	return hue_toward(key_color.rgb, 0.72, neon_dark);
+}
+
+// 네온 칠: src = 원화색, light = 이 면에 닿는 조명색, gain = 면 밝기 배율
+// 원화 밝기로 색을 고름 (그라데이션 맵): 어두운 면(검정 옷) → 깊은 보라 neon_dark, 밝은 면 → 조명색. 갈색처럼 탁해지지 않게
+vec3 neon_fill(vec3 src, vec3 light, float gain) {
+	float L = lum(src);
+	float v = mix(neon_floor, 1.0, L) * gain;
+	vec3 hue = hue_of(hue_lerp(hue_of(neon_dark_hue()), hue_of(light), smoothstep(0.10, 0.55, L)));
+	vec3 c = hue * v;
+	c += (src - vec3(L)) * neon_keep;                          // 원화 고유색 조금
+	c = mix(c, vec3(v), smoothstep(0.55, 1.0, L) * neon_white); // 밝은 면은 흰빛 섞인 조명색
+	return clamp(c, 0.0, 1.0);
+}
+
+vec3 shade_neon(vec3 src, float zone, float gt) {
+	vec3 key = hue_toward(key_color.rgb, 0.72, grad_hue * gt * neon_gradient);
+	vec3 sh = mix(hue_toward(key, 0.72, neon_cool), hue_of(shadow_tint.rgb), 0.25);
+	if (zone < 0.17 || (zone >= 0.83 && !use_rim)) {
+		return neon_fill(src, sh, neon_shadow);
+	} else if (zone < 0.45) {
+		return neon_fill(src, hue_lerp(ambient_tint.rgb, key, 0.45), 0.88);
+	} else if (zone < 0.55) {
+		vec3 e = (paint_eyes ? eye_color.rgb : key) * (lum(src) / max(lum(paint_eyes ? eye_color.rgb : key), 0.05)) * 1.35;
+		return clamp(mix(e, neon_fill(src, key, 1.0), paint_eyes ? 0.2 : 0.7), 0.0, 1.0);
+	} else if (zone < 0.83) {
+		return neon_fill(src, key, 1.08);
+	}
+	return mix(neon_fill(src, key, 1.08), accent_color.rgb, accent_mix);
 }
 
 vec3 shade(vec3 base, float zone) {
@@ -74,11 +152,19 @@ vec3 shade(vec3 base, float zone) {
 	return mix(base, accent_color.rgb, accent_mix);
 }
 
-vec3 shade2(vec3 base, vec2 uv) {
-	if (!use_zone_mask) {
-		return mix(shade(base, 0.33), shade(base, 0.7), 0.35);
+// 기존 칠(base = 두 번 곱한 진한 톤)과 네온 칠(src = 원화색)을 neon 으로 섞음
+vec3 shade_any(vec3 base, vec3 src, float zone, float gt) {
+	if (neon <= 0.0) {
+		return shade(base, zone);
 	}
-	vec3 c = shade(base, texture(zone_mask, uv).r);
+	return mix(shade(base, zone), shade_neon(src, zone, gt), neon);
+}
+
+vec3 shade2(vec3 base, vec3 src, vec2 uv, float gt) {
+	if (!use_zone_mask) {
+		return mix(shade_any(base, src, 0.33, gt), shade_any(base, src, 0.7, gt), 0.35);
+	}
+	vec3 c = shade_any(base, src, texture(zone_mask, uv).r, gt);
 	if (use_near_rim && texture(near_rim_mask, uv).r >= 0.83) {
 		c = mix(c, near_rim_color.rgb, near_rim_mix);
 	}
@@ -90,10 +176,12 @@ void fragment() {
 	vec3 orig = COLOR.rgb;   // 원화 색 (텍스처 × 모듈레이트 한 번) — 선화는 이 색 그대로
 	vec4 base = texture(TEXTURE, UV) * COLOR;
 	vec2 d = fwidth(UV) * 0.25;
-	vec3 o = shade2(base.rgb, UV + vec2(-d.x, -d.y))
-		+ shade2(base.rgb, UV + vec2(d.x, -d.y))
-		+ shade2(base.rgb, UV + vec2(-d.x, d.y))
-		+ shade2(base.rgb, UV + vec2(d.x, d.y));
+	vec2 gd = normalize(grad_dir);
+	float gt = smoothstep(0.0, 1.0, clamp(dot(UV - 0.5, gd) / (abs(gd.x) * 0.5 + abs(gd.y) * 0.5) * 0.5 + 0.5, 0.0, 1.0));
+	vec3 o = shade2(base.rgb, orig, UV + vec2(-d.x, -d.y), gt)
+		+ shade2(base.rgb, orig, UV + vec2(d.x, -d.y), gt)
+		+ shade2(base.rgb, orig, UV + vec2(-d.x, d.y), gt)
+		+ shade2(base.rgb, orig, UV + vec2(d.x, d.y), gt);
 	o *= 0.25;
 	float l = lum(o);
 	o = clamp(mix(vec3(l), o, saturation), 0.0, 1.0);

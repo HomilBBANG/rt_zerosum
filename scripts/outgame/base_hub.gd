@@ -67,8 +67,8 @@ func _ready() -> void:
 			cam_size = float(p[2])
 	if sim.npcs.has(str(Game.cli.get("base_focus", ""))):
 		var foot := v3d.to3d(sim.npcs[Game.cli.base_focus].pos)
-		cam_target = Vector3(foot.x, foot.y + 1.2, -0.6)
-		cam_size = 5.0
+		cam_target = Vector3(foot.x, foot.y + float(Game.cli.get("base_focus_y", 1.2)), -0.6)
+		cam_size = float(Game.cli.get("base_zoom", 5.0))   # 화면 높이 (m) — 작을수록 가까이
 	cam_size = clampf(cam_size, ZOOM_MIN, ZOOM_MAX)
 	_zoom_goal = cam_size
 	_apply_camera()
