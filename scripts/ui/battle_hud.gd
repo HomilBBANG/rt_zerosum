@@ -25,7 +25,7 @@ var _last_busy := false
 var slot_tip: PanelContainer        # 슬롯 설명 말풍선 (호버)
 var slot_tip_label: Label
 var hint_label: Label
-var status_flow: HFlowContainer     # 현재 유닛 상태 이상 칩
+var status_flow: VBoxContainer      # 현재 유닛 상태 이상 (한 줄씩)
 var end_btn: Button
 var log_box: RichTextLabel
 var log_panel: PanelContainer
@@ -183,9 +183,8 @@ func _build_ui() -> void:
 	stat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	stat_label.custom_minimum_size.x = 196
 	info.add_child(stat_label)
-	hint_label = _label("", 12, Color(1, 0.95, 0.7))
-	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint_label.custom_minimum_size.x = 196
+	hint_label = _label("", 12, Color(1, 0.95, 0.7))   # 안내 문구는 표시하지 않음 (사용자 요청)
+	hint_label.visible = false
 	info.add_child(hint_label)
 	var fill := Control.new()
 	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -201,25 +200,37 @@ func _build_ui() -> void:
 		sbx.set_corner_radius_all(14)
 		end_btn.add_theme_stylebox_override(st, sbx)
 	end_btn.pressed.connect(func(): cancel_pending(); controller.player_end_turn())
-	hb.add_child(end_btn)
+	var end_wrap := MarginContainer.new()
+	end_wrap.add_theme_constant_override("margin_right", 1)   # 왼쪽으로 1px
+	end_wrap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	end_wrap.add_child(end_btn)
+	hb.add_child(end_wrap)
 	# 상태 이상: 슬롯 줄과 턴 종료 사이 빈 칸 (긍정 녹색 / 부정 붉은색, 호버 시 설명)
-	var st_box := VBoxContainer.new()
-	st_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var st_box := PanelContainer.new()
+	var st_style := StyleBoxFlat.new()
+	st_style.bg_color = Color(0.04, 0.06, 0.12, 0.9)
+	st_style.border_color = Color(0.25, 0.55, 1.0, 1.0)   # 불투명 파란 외곽선 창
+	st_style.set_border_width_all(2)
+	st_style.set_corner_radius_all(6)
+	st_style.set_content_margin_all(6)
+	st_box.add_theme_stylebox_override("panel", st_style)
 	st_box.anchor_left = 1.0
 	st_box.anchor_right = 1.0
 	st_box.anchor_top = 1.0
 	st_box.anchor_bottom = 1.0
-	st_box.offset_left = -330
-	st_box.offset_right = -124
+	st_box.offset_left = -322
+	st_box.offset_right = -126
 	st_box.offset_top = -130
 	st_box.offset_bottom = -16
 	st_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(st_box)
-	status_flow = HFlowContainer.new()
-	status_flow.add_theme_constant_override("h_separation", 6)
-	status_flow.add_theme_constant_override("v_separation", 6)
-	status_flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	st_box.add_child(status_flow)
+	var st_scroll := ScrollContainer.new()
+	st_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	st_box.add_child(st_scroll)
+	status_flow = VBoxContainer.new()   # 상태 이상 한 줄씩
+	status_flow.add_theme_constant_override("separation", 4)
+	status_flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	st_scroll.add_child(status_flow)
 	# 슬롯 줄: 화면 가로 가운데, 하단 패널 안 (무기 칸은 패널 천장까지 세로로 길게)
 	slots_row = HBoxContainer.new()
 	slots_row.add_theme_constant_override("separation", 8)
@@ -228,7 +239,7 @@ func _build_ui() -> void:
 	slots_row.anchor_top = 1.0
 	slots_row.anchor_bottom = 1.0
 	slots_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	slots_row.offset_top = -138
+	slots_row.offset_top = -137   # 무기 칸 위 1px 여유
 	slots_row.offset_bottom = -12
 	add_child(slots_row)
 	# 무기 장착 팝업 (불투명 검은 버튼) + 슬롯 설명 말풍선
@@ -533,10 +544,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 # ---------------------------------------------------------------- 갱신
-const SLOT := 56.0
+const SLOT := 58.0
 const SLOT_GAP := 18.0
 const WEAPON_W := 44.0      # 무기 칸: 세로로 긴 칸 (패널 천장까지)
-const WEAPON_H := 104.0
+const WEAPON_H := 103.0
 const WEAPON_SEP := 4       # 무기 사이 간격 (다른 슬롯 8 의 절반)
 
 
@@ -615,34 +626,43 @@ func _refresh_panel() -> void:
 	_refresh_statuses(u)
 
 
-## 현재 유닛의 상태 이상 칩: 긍정 녹색 / 부정 붉은색, 호버 시 설명
+## 현재 유닛의 상태 이상: 한 줄씩 (긍정 녹색 / 부정 붉은색). 호버 시 그 줄을 50% 밝게(페이드) + 설명
 func _refresh_statuses(u: UnitRuntime) -> void:
 	for c in status_flow.get_children():
 		c.queue_free()
 	if u.statuses.is_empty():
-		var none := _label("상태 이상 없음", 12, Color(0.55, 0.58, 0.62))
-		status_flow.add_child(none)
+		status_flow.add_child(_label("상태 이상 없음", 12, Color(0.55, 0.58, 0.62)))
 		return
 	for sid in u.statuses:
 		var d := StatusCatalog.get_def(sid)
 		var good: bool = d.get("positive", false)
-		var chip := PanelContainer.new()
+		var row := PanelContainer.new()
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.12, 0.45, 0.22, 0.95) if good else Color(0.55, 0.12, 0.12, 0.95)
+		sb.bg_color = Color(0.12, 0.42, 0.22, 0.95) if good else Color(0.5, 0.12, 0.12, 0.95)
 		sb.border_color = Color(0.45, 1.0, 0.6) if good else Color(1.0, 0.45, 0.4)
-		sb.set_border_width_all(2)
-		sb.set_corner_radius_all(6)
-		sb.content_margin_left = 10
-		sb.content_margin_right = 10
-		sb.content_margin_top = 3
-		sb.content_margin_bottom = 3
-		chip.add_theme_stylebox_override("panel", sb)
-		chip.mouse_filter = Control.MOUSE_FILTER_STOP
-		chip.add_child(_label(d.get("name", sid), 13, Color(1, 1, 1)))
+		sb.border_width_left = 4
+		sb.set_corner_radius_all(4)
+		sb.content_margin_left = 8
+		sb.content_margin_right = 8
+		sb.content_margin_top = 2
+		sb.content_margin_bottom = 2
+		row.add_theme_stylebox_override("panel", sb)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.add_child(_label(d.get("name", sid), 13, Color(1, 1, 1)))
 		var tip := "%s  ·  %s\n%s" % [d.get("name", sid), "긍정" if good else "부정", d.get("desc", "")]
-		chip.mouse_entered.connect(_show_slot_tip.bind(chip, tip))
-		chip.mouse_exited.connect(func(): slot_tip.visible = false)
-		status_flow.add_child(chip)
+		row.mouse_entered.connect(func():
+			_fade(row, Color(1.5, 1.5, 1.5))
+			_show_slot_tip(row, tip))
+		row.mouse_exited.connect(func():
+			_fade(row, Color(1, 1, 1))
+			slot_tip.visible = false)
+		status_flow.add_child(row)
+
+
+func _fade(c: CanvasItem, to: Color) -> void:
+	var tw := c.create_tween()
+	tw.tween_property(c, "modulate", to, 0.15)
 
 
 func _add_skill_slot(o: Dictionary, is_player: bool) -> void:
@@ -690,9 +710,7 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	btn.focus_mode = Control.FOCUS_NONE
 	var sb := StyleBoxFlat.new()
-	if is_weapon:
-		sb.bg_color = Color(0.5, 0.52, 0.56, 0.95)   # 무기 원화는 어두운 색이라 밝은 바탕
-	elif is_ult:
+	if is_ult:
 		sb.bg_color = Color(0.2, 0.08, 0.28, 0.95)
 	else:
 		sb.bg_color = Color(0.1, 0.11, 0.14, 0.95)
