@@ -1,3 +1,4 @@
+@tool
 class_name UnitArt
 extends RefCounted
 ## 유닛 아트 조회 헬퍼: 평면 스프라이트(assets/sprites/<id>.png) 또는 Skeleton2D 리그(assets/sprites/rig_<id>/rig.json)

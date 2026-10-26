@@ -1,3 +1,4 @@
+@tool
 class_name XlsxReader
 extends RefCounted
 ## .xlsx(엑셀 통합 문서)를 외부 도구 없이 읽는다: xlsx = zip + XML.

@@ -1,3 +1,4 @@
+@tool
 class_name UnitData
 extends Resource
 ## Static definition of a unit (GDD 7절 UnitData). 수치는 모두 프로토타입 임시값.

@@ -10,3 +10,4 @@ __pycache__/
 
 # 엑셀이 열려 있는 동안 만드는 잠금 파일
 ~$*
+data/.editor_play.json

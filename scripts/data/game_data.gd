@@ -1,3 +1,4 @@
+@tool
 class_name GameData
 extends RefCounted
 ## 밸런스 데이터 (data/balance.xlsx) → UnitData / ActionData / 아이템 / 스테이지.
@@ -6,6 +7,8 @@ extends RefCounted
 
 const BALANCE_PATH := "res://data/balance.xlsx"
 const STAGE_DIR := "res://data/stages"
+## 에디터 스테이지 탭의 "테스트 플레이" 요청 (게임이 시작할 때 읽고 지움, git 무시)
+const EDITOR_PLAY_PATH := "res://data/.editor_play.json"
 const ROW_NAMES := ["전방", "중앙", "후방"]
 
 var allies: Array[UnitData] = []

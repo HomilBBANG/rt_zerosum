@@ -1,5 +1,6 @@
+@tool
 extends Control
-## 스테이지 에디터: 스테이지별 적 배치(data/stages/<id>.json)를 칸에 놓아 편집.
+## 스테이지 에디터 (Godot 에디터 상단 "스테이지" 탭, addons/rtz_stage_editor): 스테이지별 적 배치(data/stages/<id>.json)를 칸에 놓아 편집.
 ## 스테이지 목록·조명·선공·배율은 밸런스 엑셀 "스테이지" 시트, 몬스터 목록·차지칸은 "몬스터" 시트.
 ## 왼쪽에서 몬스터를 고르고 칸을 클릭해 배치, 배치된 몬스터를 클릭(또는 우클릭)하면 제거. 저장 → 테스트 플레이.
 
@@ -17,14 +18,14 @@ var placement: Array = []      # [{monster, row, index}]
 var selected := ""             # 고른 몬스터 id
 var _hover := Vector2i(-1, -1)
 var _palette_btns: Dictionary = {}
+var data: GameData = null     # 밸런스 엑셀 (스테이지·몬스터)
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var bg := ColorRect.new()
-	bg.color = Color(0.07, 0.08, 0.1)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	data = GameData.load_from()
 	var root := VBoxContainer.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.offset_left = 10
@@ -38,7 +39,6 @@ func _ready() -> void:
 	root.add_child(top)
 	var title := Label.new()
 	title.text = "스테이지 에디터"
-	title.add_theme_font_override("font", load("res://assets/fonts/Pretendard-Bold.ttf"))
 	title.add_theme_font_size_override("font_size", 20)
 	top.add_child(title)
 	stage_list = OptionButton.new()
@@ -53,7 +53,7 @@ func _ready() -> void:
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(sp)
-	top.add_child(_btn("메뉴로", func(): Game.go_menu()))
+	top.add_child(_btn("엑셀 다시 읽기", reload_data))
 	info = Label.new()
 	info.add_theme_font_size_override("font_size", 13)
 	info.add_theme_color_override("font_color", Color(0.75, 0.8, 0.88))
@@ -82,10 +82,17 @@ func _ready() -> void:
 	body.add_child(grid)
 	_build_palette()
 	_refresh_stages()
-	if Game.data != null and not Game.data.stage_order.is_empty():
-		_load(Game.stage_id if Game.stage_id != "" else Game.data.stage_order[0])
-	Game.data_reloaded.connect(func(_w): _build_palette(); _refresh_stages(); _update_info(); grid.queue_redraw())
-	Game.maybe_cli_capture()
+	if data != null and not data.stage_order.is_empty():
+		_load(data.stage_order[0])
+
+
+## 엑셀(스테이지·몬스터 시트)을 다시 읽음. 탭을 열 때마다 자동으로도 호출
+func reload_data() -> void:
+	data = GameData.load_from()
+	_build_palette()
+	_refresh_stages()
+	_update_info()
+	grid.queue_redraw()
 
 
 func _btn(t: String, cb: Callable) -> Button:
@@ -105,7 +112,7 @@ func _small(t: String) -> Label:
 
 
 func _monsters() -> Dictionary:
-	return Game.data.monsters if Game.data != null else {}
+	return data.monsters if data != null else {}
 
 
 func _build_palette() -> void:
@@ -137,10 +144,10 @@ func _select(id: String) -> void:
 
 func _refresh_stages() -> void:
 	stage_list.clear()
-	if Game.data == null:
+	if data == null:
 		return
-	for id in Game.data.stage_order:
-		stage_list.add_item("%s  (%s)" % [Game.data.stages[id].name, id])
+	for id in data.stage_order:
+		stage_list.add_item("%s  (%s)" % [data.stages[id].name, id])
 		stage_list.set_item_metadata(stage_list.item_count - 1, id)
 		if id == stage_id:
 			stage_list.select(stage_list.item_count - 1)
@@ -156,10 +163,10 @@ func _load(id: String) -> void:
 
 
 func _update_info() -> void:
-	if Game.data == null or not Game.data.stages.has(stage_id):
+	if data == null or not data.stages.has(stage_id):
 		info.text = ""
 		return
-	var st: Dictionary = Game.data.stages[stage_id]
+	var st: Dictionary = data.stages[stage_id]
 	var amb: String = {"none": "동전", "ally": "기습(아군 선공)", "enemy": "매복(적 선공)"}.get(st.ambush, st.ambush)
 	info.text = "조명 %s · 선공 %s · 적 HP ×%s · 적 공격 ×%s · 시드 %d   — %s   (엑셀 스테이지 시트에서 수정)" % [st.preset, amb, str(st.hp_mult), str(st.dmg_mult), st.seed, st.desc]
 
@@ -284,18 +291,24 @@ func _save() -> bool:
 		es.append({"monster": str(e.monster), "row": int(e.row), "index": int(e.index)})
 	f.store_string(JSON.stringify({"enemies": es}, "\t"))
 	f.close()
+	if Engine.is_editor_hint():
+		EditorInterface.get_resource_filesystem().scan()
 	status.text = "저장됨: data/stages/%s.json" % stage_id
 	return true
 
 
+## 저장 → 이 스테이지로 전투 씬 실행 (에디터 실행 요청 파일: 게임이 시작할 때 읽고 지움)
 func _play() -> void:
 	if not _save():
 		return
-	Game.set_stage(stage_id)
-	Game.restart_count = 0
-	Game.start_battle()
+	var f := FileAccess.open(GameData.EDITOR_PLAY_PATH, FileAccess.WRITE)
+	f.store_string(JSON.stringify({"stage": stage_id}))
+	f.close()
+	if Engine.is_editor_hint():
+		EditorInterface.play_custom_scene("res://scenes/battle_2d.tscn")
 
 
-func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.ctrl_pressed and event.keycode == KEY_S:
+func _shortcut_input(event: InputEvent) -> void:
+	if is_visible_in_tree() and event is InputEventKey and event.pressed and (event.ctrl_pressed or event.meta_pressed) and event.keycode == KEY_S:
 		_save()
+		get_viewport().set_input_as_handled()

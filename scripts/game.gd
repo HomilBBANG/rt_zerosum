@@ -26,8 +26,6 @@ var stage_id: String = ""
 signal data_reloaded(warnings: PackedStringArray)
 var _balance_mtime: int = 0
 var _poll_t: float = 0.0
-const SCENE_AI_EDITOR := "res://scenes/ai_editor.tscn"
-const SCENE_STAGE_EDITOR := "res://scenes/stage_editor.tscn"
 
 
 ## 렌더 해상도: 창(=렌더 버퍼)을 QHD(2560×1440 픽셀)로 고정. 게임 좌표는 1280×720 그대로이고
@@ -67,6 +65,12 @@ func _ready() -> void:
 		for w in data.warnings:
 			push_warning("balance.xlsx: " + w)
 		set_stage(str(cli.get("stage", data.stage_order[0] if not data.stage_order.is_empty() else "")))
+		# Godot 에디터 스테이지 탭에서 "테스트 플레이" 로 실행했으면 그 스테이지
+		if FileAccess.file_exists(GameData.EDITOR_PLAY_PATH):
+			var req: Variant = JSON.parse_string(FileAccess.get_file_as_string(GameData.EDITOR_PLAY_PATH))
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(GameData.EDITOR_PLAY_PATH))
+			if req is Dictionary:
+				set_stage(str(req.get("stage", stage_id)))
 	else:
 		push_warning("data/balance.xlsx 를 읽지 못해 내장 테스트 데이터를 씁니다")
 		allies = TestRoster.build_provided_allies()
@@ -111,10 +115,6 @@ func _cli_jump() -> void:
 			pass
 		"bench":
 			get_tree().change_scene_to_file(SCENE_BENCH)
-		"ai_editor":
-			get_tree().change_scene_to_file(SCENE_AI_EDITOR)
-		"stage_editor":
-			get_tree().change_scene_to_file(SCENE_STAGE_EDITOR)
 		"result":
 			last_result = {"winner": cli.get("winner", "ally"), "rounds": 4, "mode": mode,
 				"log": PackedStringArray(["(CLI 미리보기) 전투 로그 예시", "라운드 4 시작: 라온 → 저격수 → ...", "라온 → 지휘관: 필살기 21 피해 (전투 불능)", "전투 종료: 아군 승리"])}

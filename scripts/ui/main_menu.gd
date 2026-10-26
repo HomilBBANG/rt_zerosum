@@ -102,16 +102,7 @@ func _ready() -> void:
 	var bb := _big_button("리그 벤치", Color(0.9, 0.8, 0.3))
 	bb.pressed.connect(func(): get_tree().change_scene_to_file(Game.SCENE_BENCH))
 	btn_row.add_child(bb)
-	var tool_row := HBoxContainer.new()
-	tool_row.add_theme_constant_override("separation", 12)
-	box.add_child(tool_row)
-	var ai_b := _big_button("AI 에디터", Color(0.55, 0.7, 1.0))
-	ai_b.pressed.connect(func(): get_tree().change_scene_to_file(Game.SCENE_AI_EDITOR))
-	tool_row.add_child(ai_b)
-	var st_b := _big_button("스테이지 에디터", Color(0.55, 0.7, 1.0))
-	st_b.pressed.connect(func(): get_tree().change_scene_to_file(Game.SCENE_STAGE_EDITOR))
-	tool_row.add_child(st_b)
-	box.add_child(_label("밸런스: data/balance.xlsx (저장하면 즉시 반영) · 전투 중: 1~4 조명 프리셋 전환 · F1 디버그 패널 · R 재시작 · Space 턴 종료", 13, Color(0.8, 0.9, 0.9)))
+	box.add_child(_label("밸런스: data/balance.xlsx (저장하면 즉시 반영) · AI·스테이지 에디터: Godot 에디터 상단 탭 · 전투 중: 1~4 조명 프리셋 전환 · F1 디버그 패널 · R 재시작 · Space 턴 종료", 13, Color(0.8, 0.9, 0.9)))
 	if Game.cli.get("scene", "menu") == "menu":
 		Game.maybe_cli_capture()
 

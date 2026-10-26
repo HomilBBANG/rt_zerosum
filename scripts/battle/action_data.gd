@@ -1,3 +1,4 @@
+@tool
 class_name ActionData
 extends Resource
 ## 행동 정의 (GDD 7절 ActionData). kind/target_rule 로 UI 와 해결 로직을 분리한다.

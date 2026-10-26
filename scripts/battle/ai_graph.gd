@@ -1,3 +1,4 @@
+@tool
 class_name AIGraph
 extends RefCounted
 ## 노드 그래프 AI (AI 에디터로 만든 data/ai/<id>.json 을 실행).

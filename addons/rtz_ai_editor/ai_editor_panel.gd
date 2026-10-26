@@ -1,5 +1,6 @@
+@tool
 extends Control
-## AI 노드 에디터: data/ai/<id>.json 을 노드 그래프로 편집.
+## AI 노드 에디터 (Godot 에디터 상단 "AI" 탭, addons/rtz_ai_editor): data/ai/<id>.json 을 노드 그래프로 편집.
 ## 왼쪽 목록에서 노드를 추가 → 출력 점을 끌어 다른 노드 입력에 연결 → 저장. 저장하면 실행 중인 게임에도 바로 반영.
 ## 몬스터가 어떤 AI 를 쓸지는 밸런스 엑셀 "몬스터" 시트의 AI 열.
 
@@ -15,14 +16,14 @@ var status: Label
 var users_label: Label
 var current_id := ""
 var _counter := 0
+var data: GameData = null     # 밸런스 엑셀 (스킬 목록·몬스터 AI 지정 확인용)
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var bg := ColorRect.new()
-	bg.color = Color(0.07, 0.08, 0.1)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	data = GameData.load_from()
 	var root := VBoxContainer.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.offset_left = 10
@@ -50,7 +51,10 @@ func _ready() -> void:
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(sp)
-	top.add_child(_btn("메뉴로", func(): Game.go_menu()))
+	top.add_child(_btn("엑셀 다시 읽기", func():
+		data = GameData.load_from()
+		if current_id != "":
+			_load(current_id)))
 	users_label = Label.new()
 	users_label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
 	users_label.add_theme_font_size_override("font_size", 13)
@@ -71,7 +75,7 @@ func _ready() -> void:
 		var b := _btn("＋ " + AIGraph.TYPES[t].title, func(): _add_at_center(tt))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		pal.add_child(b)
-	var help := _small("· 출력 점을 끌어 다른 노드의 입력 점에 연결\n· 연결 끝을 끌어 떼면 연결 해제\n· 노드 선택 후 Delete 로 삭제\n· 위에서부터: 조건은 예/아니오,\n  스킬은 성공하면 그 행동, 안 되면 '실패 시'\n· 행동 하나마다 시작부터 다시 평가\n· 저장하면 실행 중인 게임에 즉시 반영")
+	var help := _small("· 출력 점을 끌어 다른 노드의 입력 점에 연결\n· 연결 끝을 끌어 떼면 연결 해제\n· 노드 선택 후 Delete 로 삭제\n· 위에서부터: 조건은 예/아니오,\n  스킬은 성공하면 그 행동, 안 되면 '실패 시'\n· 행동 하나마다 시작부터 다시 평가\n· 저장(Ctrl/Cmd+S)하면 실행 중인 게임에 즉시 반영")
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	pal.add_child(help)
 	graph = GraphEdit.new()
@@ -85,14 +89,12 @@ func _ready() -> void:
 	_refresh_list()
 	var ids := AIGraph.list_ids()
 	if not ids.is_empty():
-		_load(Game.cli.get("ai", ids[0]) if Game.cli.get("ai", "") in ids else ids[0])
-	Game.maybe_cli_capture()
+		_load("default" if ids.has("default") else ids[0])
 
 
 func _title(t: String) -> Label:
 	var l := Label.new()
 	l.text = t
-	l.add_theme_font_override("font", load("res://assets/fonts/Pretendard-Bold.ttf"))
 	l.add_theme_font_size_override("font_size", 20)
 	return l
 
@@ -124,7 +126,7 @@ func _refresh_list() -> void:
 # ---------------------------------------------------------------- 노드
 func _skill_ids() -> Array:
 	var out := []
-	var acts: Dictionary = Game.actions
+	var acts: Dictionary = data.actions if data != null else {}
 	for id in acts:
 		if acts[id].kind not in ["move", "weapon"]:
 			out.append(id)
@@ -201,8 +203,8 @@ func _param_control(gn: GraphNode, pd: Dictionary, value: Variant) -> Control:
 				opts.append(str(value))
 			for o in opts:
 				var label: String = str(o)
-				if pd.type == "skill" and Game.actions.has(o):
-					label = "%s (%s)" % [Game.actions[o].display_name, o]
+				if pd.type == "skill" and data != null and data.actions.has(o):
+					label = "%s (%s)" % [data.actions[o].display_name, o]
 				elif pd.type == "target":
 					label = AIGraph.TARGETS[o]
 				ob.add_item(label)
@@ -270,10 +272,10 @@ func _load(id: String) -> void:
 	_refresh_list()
 	_frame_nodes.call_deferred()
 	var users: PackedStringArray = []
-	if Game.data != null:
-		for mid in Game.data.monsters:
-			if Game.data.monsters[mid].ai_id == id:
-				users.append(Game.data.monsters[mid].display_name)
+	if data != null:
+		for mid in data.monsters:
+			if data.monsters[mid].ai_id == id:
+				users.append(data.monsters[mid].display_name)
 	users_label.text = "이 AI 를 쓰는 몬스터: %s   (엑셀 몬스터 시트 AI 열에서 지정)" % (", ".join(users) if not users.is_empty() else "없음")
 	status.text = ""
 
@@ -302,6 +304,7 @@ func _save() -> void:
 	for c in graph.get_connection_list():
 		conns.append({"from": str(c.from_node), "port": int(c.from_port), "to": str(c.to_node)})
 	var err := AIGraph.save_graph(current_id, {"nodes": nodes, "connections": conns})
+	_scan()
 	status.text = "저장됨: data/ai/%s.json" % current_id if err == OK else "저장 실패 (%d)" % err
 
 
@@ -318,10 +321,18 @@ func _create() -> void:
 		{"id": "end", "type": "act_end", "params": {}, "pos": [320, 200]}],
 		"connections": [{"from": "start", "port": 0, "to": "end"}]})
 	new_id.text = ""
+	_scan()
 	_load(id)
 	status.text = "새 AI: data/ai/%s.json" % id
 
 
-func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.ctrl_pressed and event.keycode == KEY_S:
+## 에디터 파일 시스템 창 갱신
+func _scan() -> void:
+	if Engine.is_editor_hint():
+		EditorInterface.get_resource_filesystem().scan()
+
+
+func _shortcut_input(event: InputEvent) -> void:
+	if is_visible_in_tree() and event is InputEventKey and event.pressed and (event.ctrl_pressed or event.meta_pressed) and event.keycode == KEY_S:
 		_save()
+		get_viewport().set_input_as_handled()
