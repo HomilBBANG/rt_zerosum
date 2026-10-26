@@ -198,7 +198,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   속도·반복 등은 같은 이름 json(선택): `walk.json` = `{"fps": 10, "loop": true, "ground": [x, y], "figure_px": 키 픽셀, "weapon": false, "durations": [초, …]}`.
 - **끊기는 프레임 고치기** (시트 그림은 그대로): json 에 `"skip": [14, 15, 16]` = 그 칸 빼기, `"order": [1, 5, 13, …]` = 그 순서로 재생 (칸 번호는 왼쪽 위부터 1),
   `"align_feet": true` = 칸마다 발바닥을 같은 땅선에 맞춤 (그림마다 발 높이가 달라 위아래로 튈 때).
-  적용: 하나 walk `skip [14,15,16]` (14~16칸이 1~3칸 반복), 키라 walk `skip [13,14,15,16]` + `align_feet` (13→14 큰 튐, 발 높이 최대 16px 차이).
+  적용: 하나 walk `skip [14,15,16]` (14~16칸이 1~3칸 반복), 키라 walk `skip [1]` (걷는 중에 발이 idle 모양인 칸).
 - 여러 동작을 한 장에: `sheet.png` + `sheet.json` = `{"cols": 8, "rows": 4, "anims": {"idle": {"row": 0, "count": 6, "fps": 8}, "walk": {"row": 1, "count": 8}, …}}`.
 - 프레임 낱장으로도 됨: `assets/characters/<id>/<동작>/0001.png, 0002.png …` (이름 순서대로 재생, 기본 12fps).
   **캔버스 크기·발 위치를 `base.png`(512×768, 발 접지점 `character.json` 의 `ground`)와 같게** 그리면 따로 설정할 것이 없습니다.
