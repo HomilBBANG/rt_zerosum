@@ -1,28 +1,12 @@
 @tool
 class_name UnitArt
 extends RefCounted
-## 유닛 아트 조회 헬퍼: 평면 스프라이트(assets/sprites/<id>.png) 또는 Skeleton2D 리그(assets/sprites/rig_<id>/rig.json)
-
-
-static func rig_dir(sprite_id: String) -> String:
-	return "res://assets/sprites/rig_%s" % sprite_id
-
-
-static func has_rig(sprite_id: String) -> bool:
-	return ResourceLoader.exists(rig_dir(sprite_id).path_join("rig.json")) or FileAccess.file_exists(rig_dir(sprite_id).path_join("rig.json"))
+## 유닛 아트 조회 헬퍼: 캐릭터 프레임 애니메이션(assets/characters/<id>/) 또는 옛 평면 스프라이트(assets/sprites/<id>.png)
 
 
 static func portrait(sprite_id: String, manifest: Dictionary) -> Texture2D:
-	if has_rig(sprite_id) and ResourceLoader.exists(rig_dir(sprite_id).path_join("portrait.png")):
-		return load(rig_dir(sprite_id).path_join("portrait.png"))   # 파츠 시트로 만든 리그: 눈동자를 합친 초상화
-	if has_rig(sprite_id):
-		var tex: Texture2D = load(rig_dir(sprite_id).path_join("head.png"))
-		var at := AtlasTexture.new()
-		at.atlas = tex
-		var s := tex.get_size()
-		var side := minf(s.x, s.y)
-		at.region = Rect2((s.x - side) * 0.5, 0, side, side)
-		return at
+	if CharacterSprite2D.exists(sprite_id):
+		return CharacterSprite2D.portrait(sprite_id)
 	var at := AtlasTexture.new()
 	at.atlas = load("res://assets/sprites/%s.png" % sprite_id)
 	var hr: Array = manifest.get("units", {}).get(sprite_id, {}).get("head_rect", [64, 36, 128, 128])

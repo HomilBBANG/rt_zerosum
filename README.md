@@ -49,7 +49,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 - **기지 화면**: 배경은 **3D 단면 건물**(방마다 원색 스폿 조명·하드 섀도우, 셀 셰이딩), 건물 바깥은 **검정**.
   카메라는 **정면처럼 반듯한 직교 뷰**(원근 없음 — 방마다 같은 크기 사각형, 한 칸 ≈ 정사각형)이고 **방 안만 위에서 살짝(18°) 내려다보는** 구도라 바닥이 보입니다.
-  처음엔 대원들이 있는 지상 1층·지하 1층을 크게(화면 세로 9m) 보여 줍니다. 대원은 2D 리그(Skeleton2D)를 그 위에 덧그림.
+  처음엔 대원들이 있는 지상 1층·지하 1층을 크게(화면 세로 9m) 보여 줍니다. 대원은 2D 캐릭터 스프라이트(프레임 애니메이션)를 그 위에 덧그림.
   3개 층 (지상 1층·지하 1층 기본 개방, 지하 2층(임시) 잠금). `WASD` 이동 · `F11` 전체 화면.
   **확대/축소**: 마우스 휠(커서 위치 기준) · Mac 트랙패드 핀치 또는 두 손가락 위아래 · `Q`/`E` 누르고 있기 · `-`/`+` · 오른쪽 아래 `－ 100% ＋` 버튼 · `0` = 기본.
   범위 45%~250% (화면 세로 20m~3.6m): 최대 확대는 대원 원화(전신 약 760px)가 QHD 화면에서 원화보다 커지지 않는 한계, 최대 축소는 기지 전체가 보이는 정도. 3D 배경은 늘 QHD 로 다시 그려 어느 배율에서도 선명.
@@ -95,7 +95,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![무기고](docs/screenshots/outgame/armory.png)
 
 ## 밸런스 데이터 (엑셀) · AI 에디터 · 스테이지 에디터
-에디터 다섯 개는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`, `addons/rtz_rig_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` · `리깅` 이 있습니다.
+에디터 네 개는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` 이 있습니다.
 **밸런스 수치는 `data/balance.xlsx`** 한 파일에 시트별로 있습니다: `캐릭터` · `몬스터` · `아이템` · `스킬` · `스테이지` (+ 열 설명 `읽어보기`).
 - 엑셀(또는 Numbers·LibreOffice)로 열어 고치고 **저장하면 1초 안에 게임이 다시 읽어 바로 적용** — 진행 중인 전투의 HP·AP·위력·이름까지.
   캐릭터 추가·편성·적 배치처럼 전투 구성이 바뀌는 것은 다음 전투(R 재시작)부터.
@@ -168,9 +168,8 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - 적(괴물, 적으로만 등장): 구울(2.4m) — **전방+중앙 두 칸 차지** (`UnitData.row_span = 2`), 늑대(4m) — 후방 한 칸
   두 칸 괴물은 살아 있는 동안 전방을 막고(근접은 괴물부터), 자리 이동·교환을 하지 않으며, 두 칸의 가운데에 선다.
 도형으로 생성한 12인(`build_allies/build_enemies`)은 규칙 테스트에서만 씁니다.
-새 캐릭터 추가: 원화를 `assets/source/` 에 두고(검정 배경 원화는 먼저 `python3 tools/remove_black_bg.py 입력 출력` 으로 투명화) `tools/rig_cutter.py` 의 `CHARACTERS` 에 본·파츠 좌표를 추가 →
-`python3 tools/rig_cutter.py <id>` → 임포트 후 `tools/set_mipmaps.py` → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.
-캐릭터 키는 `rig.json` 의 `figure_px`(원화 정수리~발 픽셀)를 화면 230px = 175cm 기준으로 환산해 2D·3D 모두에 반영됩니다.
+새 캐릭터 추가: `assets/characters/<id>/` 폴더(아래 '캐릭터 스프라이트 애니메이션') → 로스터에 `sprite_id: "<id>"`, `height_cm` 으로 등록.
+캐릭터 키는 `character.json` 의 `figure_px`(원화 정수리~발 픽셀)를 화면 230px = 175cm 기준으로 환산해 2D·3D 모두에 반영됩니다.
 
 ## 배경 3D + 캐릭터 2D (하이브리드, 기본)
 2D 전투의 배경은 3D 방(창·문 밖 스폿라이트, 하드 섀도우, 셀 셰이더)을 2D 가상 카메라와 **같은 투영**으로 렌더한 텍스처입니다
@@ -187,29 +186,31 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 화면 가장자리 캐릭터도 정확히 중앙에 올 수 있습니다. 배경 밖은 보이지 않게 제한합니다. 값은 `battle_view_2d.gd` 의 `CAM_*` 상수.
 스크린샷 CLI 는 기본으로 인트로를 건너뛰며 `--intro=1`(재생), `--intro=hold`(전체 구도에서 멈춤)로 바꿀 수 있습니다.
 
-## Skeleton2D 리그 (2D 확정 후 비용 테스트)
-사용자 제공 원화 1장을 `tools/rig_cutter.py` 로 17개 파츠 + 16개 본 + 파츠별 구역 마스크로 잘라 `assets/sprites/rig_<id>/` 에 두고,
-`RiggedUnit2D` 가 rig.json 으로 Bone2D 트리와 애니메이션(idle/attack/hit/heal/death)을 만든다. 아군 '라온' 슬롯이 이 캐릭터다.
-비용 측정 결과와 파이프라인은 `docs/skeleton2d_cost.md`, 벤치는 메뉴의 "리그 벤치" 또는
-`++ --scene=bench --count=48 --rig=1` (B 본 표시, Tab 평면↔리그, +/- 인원).
+## 캐릭터 스프라이트 애니메이션 (스프라이트 시트, Skeleton2D 리그는 제거)
+![전투 — 기본 그림](docs/screenshots/battle_sprites.png)
 
-### 리깅 탭 (직접 리깅하기)
-Godot 에디터 상단 **`리깅`** 탭에서 캐릭터 리그를 직접 만듭니다. 저장하면 게임이 쓰는 `assets/sprites/rig_<id>/` 가 바로 바뀝니다 (`rig.json` + 파츠 PNG + 조명 마스크 + 실루엣 + 초상화).
+캐릭터(전투·기지 공통)는 **직접 뽑은 스프라이트 프레임**으로 움직입니다. 폴더: `assets/characters/<id>/`
+(`dan` 단 · `kira` 키라 · `ethan` 이선 · `hero2` 하나 · `alma` 앨마 · `nikita_army` 니키타 · `ghoul` 구울 · `wolf` 늑대 · `slime`).
+- `base.png` = 기본 한 장 (지금은 예전 리그를 쉬는 자세로 합친 원화). **애니메이션 프레임이 없는 동작은 이 그림이 그대로 서 있거나 미끄러지듯 이동**합니다.
+- **스프라이트 시트 넣기 (기본 방법)**: 시트 한 장을 `assets/characters/<id>/` 에 **`<동작>_<칸 수>.png`** (한 줄) 또는 **`<동작>_<열>x<행>.png`** 이름으로 두면 끝.
+  예: `assets/characters/kira/walk_8.png` (8칸 한 줄), `assets/characters/kira/attack_4x2.png` (4열 2행, 빈 칸은 건너뜀). 칸은 모두 같은 크기, 왼쪽 위부터 오른쪽으로.
+  **발 위치·키는 첫 칸 그림에서 자동** (그림 맨 아래 가운데 = 발, 그림 높이 = 키 → 캐릭터 키(cm)에 맞춰 크기 조절). 칸 안에서 캐릭터가 움직이는 만큼은 그대로 움직입니다.
+  속도·반복 등은 같은 이름 json(선택): `walk.json` = `{"fps": 10, "loop": true, "ground": [x, y], "figure_px": 키 픽셀, "weapon": false, "durations": [초, …]}`.
+- 여러 동작을 한 장에: `sheet.png` + `sheet.json` = `{"cols": 8, "rows": 4, "anims": {"idle": {"row": 0, "count": 6, "fps": 8}, "walk": {"row": 1, "count": 8}, …}}`.
+- 프레임 낱장으로도 됨: `assets/characters/<id>/<동작>/0001.png, 0002.png …` (이름 순서대로 재생, 기본 12fps).
+  **캔버스 크기·발 위치를 `base.png`(512×768, 발 접지점 `character.json` 의 `ground`)와 같게** 그리면 따로 설정할 것이 없습니다.
+  다르면 그 폴더에 `anim.json`: `{"fps": 12, "loop": true, "ground": [x, y], "figure_px": 정수리~발 픽셀, "hip_y": 골반 y, "weapon": false}`.
+- 동작 이름: 기지 `idle`(서 있기) · `walk`(이동) · `sit`(의자·소파, 골반 높이 = `hip_y`) · `sleep`(누워 자기, 눕혀 그린 그림·접지점 = 침대에 닿는 몸 가운데) ·
+  `work`(업무·치료) · `clean`(청소, 없으면 work) · `train`(훈련, 없으면 work) · `talk`(대화) / 전투 `idle` · `attack` · `hit` · `heal` · `death`(마지막 프레임 유지).
+  attack·hit·heal 은 한 번 재생 후 idle. 프레임이 없으면: 앉기 → 의자 앞에 서 있음, 자기 → 기본 그림을 눕힘, 전투 동작 → 간단한 앞뒤 이동·흔들림.
+- 무기: 전투에서 손 위치(`character.json` 의 `hand`)에 무기 그림을 붙입니다. 무기를 직접 그린 동작은 `anim.json` 에 `"weapon": false` (attack·hit·heal·idle 외 동작은 기본으로 숨김).
+- 조명(셀 명암) 마스크: 프레임만 넣어도 동작합니다(마스크 없이 고른 조명). 방향 있는 명암을 원하면 `python3 tools/char_sprites.py masks` → 프레임마다 `_mask_l/_r.png` 생성.
+- 새 프레임은 게임을 다시 켜면 바로 반영 (임포트 기다릴 필요 없음).
+- (선택) 움직이는 GIF·WebP → 프레임 변환: `python3 tools/char_sprites.py import nikita_army hit 파일.webp` (조명 마스크까지 만듦).
+  ※ 채팅에 올린 움직이는 이미지는 첫 장면 한 장으로만 전달되므로, 시트 한 장으로 주거나 저장소에 넣어 커밋해 주세요.
+- 프레임마다 보여 줄 시간을 다르게: `anim.json` 의 `"durations": [2.4, 1.2]` (초, fps 대신).
+- **들어간 애니메이션**: 아직 없음 (모든 캐릭터가 기본 그림 한 장).
 
-![리깅 탭](docs/screenshots/rig_editor.png)
-
-1. **캐릭터 고르기** (위 목록, 기존 리그 그대로 열림) 또는 id 입력 → `새 캐릭터`. 기존 캐릭터 이름(`kira`, `dan` …)을 고르면 그 캐릭터를 고쳐 씁니다.
-2. **`파츠 가져오기…`** — 셋 중 아무거나:
-   - **레이어별 PNG 여러 장, 모두 같은 캔버스 크기** (포토샵·클립 스튜디오의 '레이어를 파일로 내보내기') → 그린 자리 그대로 조립됨. **가장 편한 방법.**
-   - 크기가 제각각인 PNG 여러 장 → 옆으로 늘어놓음 → 끌어서 배치.
-   - 파츠를 펼쳐 놓은 **시트 한 장** → 떨어진 조각마다 파츠(`part_01`…), 가장 큰 조각(원본 전신)은 **반투명 참고 그림**으로 깔림 → 그 위에 맞춰 배치.
-   - 파일 이름이 파츠 이름: `head`, `hair_back`, `torso`, `hips`, `arm_upper_l`, `arm_lower_l`, `hand_l`, `thigh_l`, `shin_l`, `foot_l`, `_r` … (`_l` = 화면 왼쪽). 이름으로 뼈가 자동 연결됨.
-3. **[파츠] 모드**: 클릭 = 선택, 끌기 = 이동, 방향키 1px (Shift 10px). 왼쪽 목록 `앞으로 ▲ / 뒤로 ▼` = 그리는 순서(위가 앞). 이름·뼈는 아래 속성 칸에서.
-4. **[뼈] 모드**: `기본 뼈대` = 게임 애니메이션이 쓰는 16개 뼈(hip·spine·chest·head·shoulder/elbow/wrist·hip/knee/ankle _l/_r)를 사람 비율로 깔아 줌 → **관절(분홍 점)을 그림의 관절 위치로 끌기** (Shift+끌기 = 자식 뼈도 함께, Ctrl+클릭 = 자식 뼈 추가). 하늘색 십자 = 발 위치(키 기준).
-5. **[포즈] 모드**: 관절을 끌어 돌려 봄 (저장 안 됨) — 팔·다리가 관절에서 자연스럽게 도는지, 겹침 순서가 맞는지 확인.
-6. **저장 (Ctrl+S)** → 오른쪽 **미리보기**가 게임과 같은 코드로 idle·walk·attack·hit·heal·death·sit 재생. `전투에서 보기` / `기지에서 보기` 로 바로 실행. `되돌리기` = Ctrl+Z.
-- **눈동자**: 홍채(눈동자) 파츠를 따로 그려 넣고 속성에서 `눈동자` 체크 → 붙을 파츠(머리) · 자를 모양(흰자 파츠 = 눈 테두리 모양) · 움직임 px. 게임에서 흰자 안에서만 보이며 몇 초마다 시선이 움직입니다.
-- 조명(셀 명암) 마스크는 저장할 때 자동으로 만듭니다.
 ## 규칙 테스트 (헤드리스)
 ```
 godot --headless --path . --import          # 최초 1회 (클래스 캐시 생성)
@@ -233,7 +234,7 @@ CLI 인자(`++` 뒤): `--scene=battle|formation|result|menu|title|base --mode=2d
 scenes/            title, main_menu(전투 테스트), formation, battle_2d, battle_3d, battle_hud, result, outgame/base_hub
 scripts/battle/    규칙 계층 (표현 비의존): unit_data, action_data, unit_runtime, slot_manager,
                    turn_scheduler, ap_component, target_validator, action_resolver, enemy_ai, battle_controller
-scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d + unit_sprite_2d + rigged_unit_2d + slot_marker_2d,
+scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d + unit_sprite_2d + character_sprite_2d(프레임 애니메이션) + slot_marker_2d,
                    battle_view_3d + unit_model_3d, lighting_presets
 scripts/ui/        battle_hud, title, main_menu, formation, result
 scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정·단면 좌표), world_clock, room_route_service, npc_schedule_resolver,
@@ -243,10 +244,11 @@ addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_bat
 data/              balance.xlsx(전투), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_zoned_lighting (2D 배경, v0.3), cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
-assets/sprites/    생성된 캐릭터/무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + manifest.json, rig_<id>/ = 캐릭터 리그
+assets/characters/ 캐릭터별 base·프레임 애니메이션·마스크·character.json (전투·기지 공통)
+assets/sprites/    무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + 옛 테스트 캐릭터 + manifest.json
 assets/textures/   배경 플레이트 + 마스크, 3D 얼굴 데칼
 setup/             install_windows.ps1, install.sh (기기 설치), play.bat / play.sh / play.command (루트, 실행)
-tools/             gen_sprites.py (원화·마스크 생성기), rig_cutter.py (원화→리그 파츠), render_shots.sh,
+tools/             gen_sprites.py (원화·마스크 생성기), char_sprites.py (애니메이션 프레임 조명 마스크), render_shots.sh,
                    gen_balance_xlsx.py / gen_outgame_xlsx.py (엑셀·일정 초기 생성 — 이미 있으면 덮어쓰지 않음)
 tests/             run_tests.gd, outgame_tests.gd
 docs/              design/ (기획서 사본, outgame/ = 아웃게임 기획 01~04 + 구현 현황 05), screenshots/, 2D_vs_3D_comparison.md

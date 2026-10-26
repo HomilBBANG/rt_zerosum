@@ -1,0 +1,26 @@
+{
+ "image_size": [
+  768,
+  512
+ ],
+ "ground": [
+  380,
+  495
+ ],
+ "figure_px": 494,
+ "head_rect": [
+  450,
+  0,
+  318,
+  350
+ ],
+ "hip_y": 410,
+ "hand": [
+  535,
+  385,
+  70
+ ],
+ "eyes": [],
+ "fps": 12,
+ "silhouette": "silhouette.png"
+}

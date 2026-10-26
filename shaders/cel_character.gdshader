@@ -11,7 +11,7 @@ shader_type canvas_item;
 render_mode unshaded;
 
 uniform sampler2D zone_mask : filter_nearest, repeat_disable;
-// false: 조명 마스크가 없는 파츠 → 주변광 + 약한 주조명을 고르게 섞음 (리깅 탭에서 저장하면 마스크가 생김)
+// false: 조명 마스크가 없는 프레임 (사용자가 막 넣은 애니메이션 등) → 주변광 + 약한 주조명을 고르게 섞음. tools/char_sprites.py masks 로 마스크를 만들면 true
 uniform bool use_zone_mask = true;
 // 반대 방향 마스크: 그 림(255) 구역이 '빛 쪽' 가장자리에 해당 → 빛 쪽 몸을 밝히면서 같은 쪽 가장자리에 림을 더할 때 사용
 uniform sampler2D near_rim_mask : filter_nearest, repeat_disable;
@@ -34,11 +34,6 @@ uniform bool use_rim = true;
 uniform vec4 eye_color : source_color = vec4(0.3, 0.6, 1.0, 1.0);
 uniform bool paint_eyes = true;   // false: 눈동자를 칠하지 않고 주변광 구역처럼 (원화 눈 색)
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
-// 눈동자(홍채) 파츠: 눈 테두리(소켓) 마스크 안에서만 보이게. 마스크 좌표 = 이 그림 픽셀 + clip_offset (리그 원화 픽셀)
-uniform bool use_clip = false;
-uniform sampler2D clip_mask : filter_linear, repeat_disable;
-uniform vec2 clip_offset = vec2(0.0);
-uniform vec2 clip_size = vec2(1.0);
 uniform int debug_view = 0;   // 1: 원화 그대로 출력 (디버그)
 
 float lum(vec3 c) {
@@ -101,11 +96,5 @@ void fragment() {
 	if (debug_view == 1) {
 		o = base.rgb;
 	}
-	float alpha = base.a;
-	if (use_clip) {
-		vec2 suv = (UV / TEXTURE_PIXEL_SIZE + clip_offset) / clip_size;
-		float inside = step(0.0, suv.x) * step(0.0, suv.y) * step(suv.x, 1.0) * step(suv.y, 1.0);
-		alpha *= texture(clip_mask, suv).r * inside;
-	}
-	COLOR = vec4(o, alpha);
+	COLOR = vec4(o, base.a);
 }

@@ -1,18 +1,17 @@
 class_name NpcView
 extends Node2D
-## 기지 대원 화면 노드: 전투와 같은 Skeleton2D 리그를, 3D 기지 위 그 대원의 발 위치(투영)에 원근 크기로, 지금 있는 방의 조명색으로.
+## 기지 대원 화면 노드: 전투와 같은 캐릭터 프레임 애니메이션(CharacterSprite2D)을, 3D 기지 위 그 대원의 발 위치(투영)에 원근 크기로, 지금 있는 방의 조명색으로.
 ## 머리 위: '!' 요청 마커, 수면 Zz, 마우스를 올리면 이름·상태. 화면 좌표 노드 (BaseHub 의 화면 층).
 
 var npc_id: String = ""
 var sim: BaseSim
 var hub: Node               # BaseHub (투영)
 var screen_h: float = 80.0  # 화면에서의 키 (px)
-var _s: float = 0.4         # 리그 배율
-var rig: RiggedUnit2D
+var _s: float = 0.4         # 캐릭터 배율
+var chr: CharacterSprite2D
 var hovered: bool = false
 var _anim := ""
 var _light := ""
-var _act_t := 0.0
 var _font: Font
 var _bold: Font
 
@@ -24,17 +23,18 @@ func setup(p_hub: Node, p_sim: BaseSim, id: String) -> void:
 	_font = load("res://assets/fonts/Pretendard-Medium.ttf")
 	_bold = load("res://assets/fonts/Pretendard-Bold.ttf")
 	var n: NpcAgent = sim.npcs[id]
-	if UnitArt.has_rig(n.sprite):
-		rig = RiggedUnit2D.new()
-		add_child(rig)
-		rig.build(UnitArt.rig_dir(n.sprite), false, n.height_cm)
-		rig.set_param("eye_color", Color(0.3, 0.6, 1.0))
-		rig.set_param("paint_eyes", false)
+	if CharacterSprite2D.exists(n.sprite):
+		chr = CharacterSprite2D.new()
+		add_child(chr)
+		chr.build(n.sprite, n.height_cm)
+		chr.set_param("eye_color", Color(0.3, 0.6, 1.0))
+		chr.set_param("paint_eyes", false)
 	_place(n)
 
 
-## 3D 발 위치를 화면으로 투영, 1m 의 화면 길이로 크기 결정 (리그는 175cm = 230px 기준).
+## 3D 발 위치를 화면으로 투영, 1m 의 화면 길이로 크기 결정 (캐릭터는 175cm = 230px 기준).
 ## 자세: 서기 / 앉기(골반을 의자 높이에) / 눕기(침대 위에 가로로). 계단을 오르내릴 때는 계단 깊이로.
+## 앉기·눕기 애니메이션(sit·sleep 프레임)이 없으면: 앉기 = 의자 앞에 서 있음, 눕기 = 기본 그림을 눕혀서.
 var _z: float = 999.0
 var _pose: String = "stand"
 
@@ -43,6 +43,8 @@ func _place(n: NpcAgent, delta: float = 1.0) -> void:
 	var v3d: BaseView3D = hub.v3d
 	var post: Dictionary = sim.posture(n)
 	_pose = post.pose
+	if _pose == "sit" and chr != null and not chr.has_anim("sit"):
+		_pose = "stand"
 	var want_z := v3d.stand_z(npc_id)
 	var t := (n.pos.y + OutgameData.FLOOR_SLAB) / OutgameData.FLOOR_H
 	var on_flight := absf(t - roundf(t)) > 0.01
@@ -60,11 +62,15 @@ func _place(n: NpcAgent, delta: float = 1.0) -> void:
 	_s = ppm * 1.75 / 230.0
 	match _pose:
 		"lie":
-			# 침대 가운데에 등을 대고 가로로: 머리는 왼쪽(베개 쪽), 발 = 가운데 + 키/2 (회전 -90°)
-			position = hub.project(foot + Vector3(h_m * 0.5, float(post.height) + 0.12, 0.0))
+			if chr != null and chr.has_anim("sleep"):
+				# 누운 프레임: 접지점 = 침대에 닿는 몸 가운데
+				position = hub.project(foot + Vector3(0.0, float(post.height), 0.0))
+			else:
+				# 기본 그림을 눕힘: 머리는 왼쪽(베개 쪽), 발 = 가운데 + 키/2 (회전 -90°)
+				position = hub.project(foot + Vector3(h_m * 0.5, float(post.height) + 0.12, 0.0))
 			screen_h = ppm * 0.6
 		"sit":
-			var hip := (rig.hip_ratio() if rig != null else 0.5) * h_m
+			var hip := (chr.hip_ratio("sit") if chr != null else 0.5) * h_m
 			position = hub.project(foot + Vector3(0.0, float(post.height) + 0.05 - hip, 0.0))
 			screen_h = ppm * (float(post.height) + h_m - hip)
 		_:
@@ -76,6 +82,8 @@ func _place(n: NpcAgent, delta: float = 1.0) -> void:
 func hit_rect() -> Rect2:
 	if _pose == "lie":
 		var len: float = screen_h / 0.6 * (sim.npcs[npc_id].height_cm / 100.0)
+		if chr != null and chr.has_anim("sleep"):
+			return Rect2(position + Vector2(-len * 0.5, -screen_h), Vector2(len, screen_h + 8))
 		return Rect2(position + Vector2(-len, -screen_h), Vector2(len, screen_h + 8))
 	var w := maxf(22.0, screen_h * 0.42)
 	return Rect2(position + Vector2(-w * 0.5, -screen_h - 6), Vector2(w, screen_h + 10))
@@ -89,40 +97,39 @@ func _process(delta: float) -> void:
 		return
 	visible = n.state != NpcAgent.UNAVAILABLE
 	_place(n, delta)
-	if rig != null:
-		if _pose == "lie":
-			rig.rotation = deg_to_rad(-90.0)
-			rig.scale = Vector2(_s, _s)
+	if chr != null:
+		if _pose == "lie" and not chr.has_anim("sleep"):
+			chr.rotation = deg_to_rad(-90.0)
+			chr.scale = Vector2(_s, _s)
 		else:
-			rig.rotation = 0.0
-			rig.scale = Vector2(_s * n.facing, _s)
-		_update_anim(n, delta)
+			chr.rotation = 0.0
+			chr.scale = Vector2(_s * n.facing, _s)
+		_update_anim(n)
 		_update_light(n)
 	queue_redraw()
 
 
-func _update_anim(n: NpcAgent, delta: float) -> void:
-	var want := "idle"
+## 상태 → 애니메이션 (앞에서부터 프레임이 있는 것, 없으면 기본 그림)
+func _update_anim(n: NpcAgent) -> void:
+	var cands: Array = ["idle"]
 	if n.state == NpcAgent.MOVING:
-		want = "walk"
+		cands = ["walk", "idle"]
+	elif _pose == "lie":
+		cands = ["sleep", "idle"]
 	elif _pose == "sit":
-		want = "sit"
-	elif n.state in [NpcAgent.CLEANING, NpcAgent.TRAINING, NpcAgent.ASSIGNED_WORK, NpcAgent.TREATMENT]:
-		want = "work"
-	if want == "work":
-		_act_t -= delta
-		if _act_t <= 0.0:
-			_act_t = 1.1 if n.state == NpcAgent.CLEANING else 1.6
-			rig.anim.stop()
-			rig.anim.play("attack" if n.state != NpcAgent.ASSIGNED_WORK else "heal")
-		_anim = want
-		return
+		cands = ["sit", "idle"]
+	elif n.state == NpcAgent.CLEANING:
+		cands = ["clean", "work", "idle"]
+	elif n.state == NpcAgent.TRAINING:
+		cands = ["train", "work", "idle"]
+	elif n.state in [NpcAgent.ASSIGNED_WORK, NpcAgent.TREATMENT]:
+		cands = ["work", "idle"]
+	elif n.state in [NpcAgent.CHATTING, NpcAgent.PLAYER_DIALOGUE]:
+		cands = ["talk", "idle"]
+	var want := chr.first_anim(cands)
 	if want != _anim:
 		_anim = want
-		if rig.anim.has_animation(want):
-			rig.anim.play(want)
-		else:
-			rig.anim.play("idle")
+		chr.play(want)
 
 
 func _update_light(n: NpcAgent) -> void:
@@ -132,12 +139,12 @@ func _update_light(n: NpcAgent) -> void:
 		return
 	_light = light
 	var p := LightingPresets.get_preset(light)
-	rig.set_param("shadow_tint", p.shadow)
-	rig.set_param("ambient_tint", p.ambient)
-	rig.set_param("key_color", p.key)
-	rig.set_param("accent_color", p.accent)
-	rig.set_param("key_mix", p.char_key_mix)
-	rig.set_param("accent_mix", p.char_accent_mix)
+	chr.set_param("shadow_tint", p.shadow)
+	chr.set_param("ambient_tint", p.ambient)
+	chr.set_param("key_color", p.key)
+	chr.set_param("accent_color", p.accent)
+	chr.set_param("key_mix", p.char_key_mix)
+	chr.set_param("accent_mix", p.char_accent_mix)
 
 
 func _draw() -> void:
