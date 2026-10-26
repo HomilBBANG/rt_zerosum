@@ -94,8 +94,10 @@ func _ready() -> void:
 		allies = TestRoster.build_provided_allies()
 		enemies = TestRoster.build_provided_enemies()
 		actions = TestRoster.build_actions()
+	_apply_test_char()
 	reset_formation()
 	outgame_data = OutgameData.load_from()
+	_apply_test_char()
 	if outgame_data != null:
 		_outgame_mtime = FileAccess.get_modified_time(OutgameData.PATH)
 		_sched_mtime = outgame_data.schedules_mtime()
@@ -117,6 +119,23 @@ func _ready() -> void:
 		rim_enabled = cli.rim != "0"
 	if cli.has("scene"):
 		call_deferred("_cli_jump")
+
+
+## 테스트 캐릭터 그림: --test_char=<assets/characters 폴더> [--test_slot=a_nikita] — 그 아군(전투)과 같은 인물(기지)의 그림만 바꿔서 렌더 확인
+func _apply_test_char() -> void:
+	var cid := str(cli.get("test_char", ""))
+	if cid == "":
+		return
+	var slot := str(cli.get("test_slot", "a_nikita"))
+	for u in allies:
+		if u.id == slot:
+			u.sprite_id = cid
+			u.palette["sprite_id"] = cid
+			u.palette.erase("eye_paint")   # 새 그림 눈 색 그대로
+	if outgame_data != null:
+		for nid in outgame_data.npcs:
+			if outgame_data.npcs[nid].character_id == slot:
+				outgame_data.npcs[nid].sprite = cid
 
 
 func _parse_cli() -> void:

@@ -12,6 +12,8 @@ assets/characters/<id>/
 사용:
   python3 tools/char_sprites.py masks            프레임·시트마다 조명 마스크(<프레임>_mask_l/_r.png, <시트>_mask_l/_r.png)가 없으면 만든다
   python3 tools/char_sprites.py masks dan        한 캐릭터만
+  python3 tools/char_sprites.py new <캐릭터 id> <전신 그림.png>   새 캐릭터 폴더 (투명 배경 전신 한 장 → base.png·조명 마스크·초상화·그림자·character.json)
+      키 760px 로 맞추고 발 = 그림 맨 아래 가운데, 머리·골반·손 위치는 그림에서 추정 (character.json 에서 고칠 수 있음)
   python3 tools/char_sprites.py breathe <캐릭터> [칸 수=16]   기본 그림(base.png)으로 숨쉬기 idle 시트를 만든다 (idle_4x4.png)
       그림을 다시 그리지 않고 원화 픽셀만 살짝 늘이고 흔듦: 골반 위 상체가 숨 쉬듯 오르내리고 좌우로 조금, 발은 고정
   python3 tools/char_sprites.py import <캐릭터> <동작> <파일…> [--grid 4x2] [--fps 12] [--hold 0.35]
@@ -230,10 +232,63 @@ def cmd_breathe(cid, frames=16):
     print(cid, name, frames, "프레임 (숨쉬기)")
 
 
+def cmd_new(cid, src, fig_px=760):
+    import numpy as np
+    im = Image.open(src).convert("RGBA")
+    a = np.array(im)[..., 3]
+    ys, xs = np.where(a > 40)
+    if len(ys) == 0:
+        sys.exit("그림이 비어 있습니다 (투명 배경 전신 그림이어야 함)")
+    im = im.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
+    k = fig_px / im.height
+    im = im.resize((max(1, round(im.width * k)), fig_px), Image.LANCZOS)
+    w = max(512, im.width + 24)
+    h = fig_px + 8
+    base = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ox = (w - im.width) // 2
+    base.alpha_composite(im, (ox, 2))
+    A = np.array(base)[..., 3] > 40
+    ys, xs = np.where(A)
+    top, bot = int(ys.min()), int(ys.max())
+    fig = bot - top
+    band = A[bot - max(3, int(fig * 0.04)):bot + 1]
+    fx = np.where(band.any(0))[0]
+    gx = int((fx.min() + fx.max()) / 2)
+    hrows = A[top:top + int(fig * 0.18)]
+    hx = np.where(hrows.any(0))[0]
+    head = [int(hx.min()), top, int(hx.max() - hx.min()), int(fig * 0.2)]
+    # 손: 화면 오른쪽 몸 끝 (골반~허벅지 높이에서 가장 오른쪽 불투명 점)
+    y0, y1 = top + int(fig * 0.42), top + int(fig * 0.62)
+    best = (0, y0)
+    for y in range(y0, y1):
+        r = np.where(A[y])[0]
+        if len(r) and r.max() > best[0]:
+            best = (int(r.max()), y)
+    info = {"image_size": [w, h], "ground": [gx, bot], "figure_px": fig, "head_rect": head,
+            "hip_y": top + int(fig * 0.47), "hand": [best[0] - 12, best[1] + 8, 70], "eyes": [], "fps": 12,
+            "silhouette": "silhouette.png"}
+    cdir = os.path.join(CHAR_DIR, cid)
+    os.makedirs(cdir, exist_ok=True)
+    base.save(os.path.join(cdir, "base.png"))
+    mr, ml = make_masks(base)
+    mr.save(os.path.join(cdir, "base_mask_r.png"))
+    ml.save(os.path.join(cdir, "base_mask_l.png"))
+    sil = Image.new("RGBA", base.size, (255, 255, 255, 0))
+    sil.putalpha(base.split()[3].point(lambda v: 255 if v > 100 else 0))
+    sil.resize((w // 2, h // 2), Image.LANCZOS).save(os.path.join(cdir, "silhouette.png"))
+    side = int(max(head[2], head[3]) * 1.15)
+    cx = head[0] + head[2] // 2
+    base.crop((cx - side // 2, max(0, top - 4), cx + side // 2, max(0, top - 4) + side)).save(os.path.join(cdir, "portrait.png"))
+    json.dump(info, open(os.path.join(cdir, "character.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print(cid, "base", (w, h), "ground", info["ground"], "head", head, "hand", info["hand"])
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
         cmd_masks(args[1] if len(args) > 1 else None)
+    elif args[:1] == ["new"] and len(args) >= 3:
+        cmd_new(args[1], args[2])
     elif args[:1] == ["breathe"] and len(args) >= 2:
         cmd_breathe(args[1], int(args[2]) if len(args) > 2 else 16)
     elif args[:1] == ["import"] and len(args) >= 4:

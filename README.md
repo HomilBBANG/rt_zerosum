@@ -223,6 +223,14 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   단·이선·앨마 `idle_4x4` = **기본 그림으로 만든 숨쉬기**(`python3 tools/char_sprites.py breathe <캐릭터>` — 원화 픽셀만 살짝 늘여 상체가 오르내림, 발 고정). 직접 그린 시트로 바꾸면 그 파일을 덮어쓰면 됨.
   속도는 같은 이름 json(`walk.json` 등). 조명 마스크 시트(`*_mask_r/_l.png`)는 `python3 tools/char_sprites.py masks` 로 칸마다 만듦 — 없어도 동작.
 
+### 새 캐릭터 그림 시험하기
+1. 투명 배경 전신 그림 한 장 → `python3 tools/char_sprites.py new <id> 그림.png` → `assets/characters/<id>/` (기본 그림·조명 마스크·초상화·그림자·character.json, 키 760px·발·머리·손 위치 자동).
+2. 실행할 때 `--test_char=<id>` (+ `--test_slot=a_kira` 등, 기본 니키타 자리)를 붙이면 그 자리 캐릭터만 새 그림으로 전투·기지에 나옴 (데이터는 그대로).
+   예: `godot --path . ++ --scene=battle --test_char=test` / `++ --scene=base --test_char=test`. 계속 쓰려면 엑셀 `캐릭터`·`대원` 시트 `스프라이트` 열에 `<id>`.
+- 지금 들어 있는 시험 캐릭터: `test` (의무병 코트, 사용자 제공).
+
+![시험 캐릭터 — 기지(왼쪽)와 원본](docs/screenshots/test_char_compare.png)
+
 ## 규칙 테스트 (헤드리스)
 ```
 godot --headless --path . --import          # 최초 1회 (클래스 캐시 생성)
