@@ -12,6 +12,8 @@ assets/characters/<id>/
 사용:
   python3 tools/char_sprites.py masks            프레임·시트마다 조명 마스크(<프레임>_mask_l/_r.png, <시트>_mask_l/_r.png)가 없으면 만든다
   python3 tools/char_sprites.py masks dan        한 캐릭터만
+  python3 tools/char_sprites.py breathe <캐릭터> [칸 수=16]   기본 그림(base.png)으로 숨쉬기 idle 시트를 만든다 (idle_4x4.png)
+      그림을 다시 그리지 않고 원화 픽셀만 살짝 늘이고 흔듦: 골반 위 상체가 숨 쉬듯 오르내리고 좌우로 조금, 발은 고정
   python3 tools/char_sprites.py import <캐릭터> <동작> <파일…> [--grid 4x2] [--fps 12] [--hold 0.35]
       움직이는 GIF·WebP(APNG) → 프레임마다, 스프라이트 시트 → --grid 열x행 칸마다, PNG 여러 장 → 그 순서대로
       첫 프레임의 발·키를 base.png 에 맞추는 같은 이동·배율을 모든 프레임에 적용 (프레임 사이 움직임은 그대로)
@@ -179,10 +181,61 @@ def cmd_import(cid, anim, paths, grid=None, fps=None, hold=None):
     cmd_masks(cid)
 
 
+def cmd_breathe(cid, frames=16):
+    import math
+    import numpy as np
+    from scipy.ndimage import map_coordinates
+    cdir = os.path.join(CHAR_DIR, cid)
+    info = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    im = np.array(Image.open(os.path.join(cdir, "base.png")).convert("RGBA")).astype(np.float32)
+    h, w = im.shape[:2]
+    fig = float(info.get("figure_px", h))
+    ground_y = float(info["ground"][1])
+    hip = float(info.get("hip_y", ground_y - fig * 0.55))
+    hr = info.get("head_rect") or [0, 0, 0, fig * 0.18]
+    shoulder = hr[1] + hr[3] * 1.05            # 목·어깨 쯤
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    # 무게: 골반 아래 0 → 어깨 위 1 (부드럽게)
+    t = np.clip((hip - yy) / max(1.0, hip - shoulder), 0.0, 1.0)
+    wgt = t * t * (3 - 2 * t)
+    amp_y = fig * 0.0055                        # 숨 들이쉴 때 상체가 오르는 정도 (키 760px 이면 약 4px)
+    amp_x = fig * 0.0028                        # 좌우 흔들림 (약 2px)
+    cols = 4
+    rows = int(math.ceil(frames / cols))
+    sheet = Image.new("RGBA", (w * cols, h * rows), (0, 0, 0, 0))
+    masks = {}
+    for suf in ("_mask_r", "_mask_l"):
+        mp = os.path.join(cdir, "base" + suf + ".png")
+        if os.path.exists(mp):
+            masks[suf] = (np.array(Image.open(mp).convert("L")).astype(np.float32), Image.new("L", (w * cols, h * rows), 85))
+    for i in range(frames):
+        ph = 2 * math.pi * i / frames
+        dy = -amp_y * (0.5 - 0.5 * math.cos(ph))          # 0 → 위로 → 0
+        dx = amp_x * math.sin(ph)
+        sy = yy - dy * wgt                                   # 출력 픽셀이 읽어 올 원본 위치
+        sx = xx - dx * wgt * (1.0 - 0.3 * t)
+        out = np.zeros_like(im)
+        for c in range(4):
+            out[..., c] = map_coordinates(im[..., c], [sy, sx], order=1, mode="constant", cval=0.0)
+        sheet.paste(Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)), ((i % cols) * w, (i // cols) * h))
+        for suf, (m, ms) in masks.items():   # 기본 그림 조명 마스크도 같은 움직임으로 (눈동자 구역 등 그대로)
+            mw = map_coordinates(m, [sy, sx], order=0, mode="nearest")
+            ms.paste(Image.fromarray(mw.astype(np.uint8)), ((i % cols) * w, (i // cols) * h))
+    name = "idle_%dx%d.png" % (cols, rows)
+    sheet.save(os.path.join(cdir, name), optimize=True)
+    json.dump({"fps": 8, "ground": info["ground"], "figure_px": fig, "hip_y": hip},
+              open(os.path.join(cdir, "idle.json"), "w", encoding="utf-8"))
+    for suf, (_m, ms) in masks.items():
+        ms.save(os.path.join(cdir, name[:-4] + suf + ".png"))
+    print(cid, name, frames, "프레임 (숨쉬기)")
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
         cmd_masks(args[1] if len(args) > 1 else None)
+    elif args[:1] == ["breathe"] and len(args) >= 2:
+        cmd_breathe(args[1], int(args[2]) if len(args) > 2 else 16)
     elif args[:1] == ["import"] and len(args) >= 4:
         opts = {}
         rest = []
