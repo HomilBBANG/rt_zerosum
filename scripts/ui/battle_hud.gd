@@ -170,30 +170,26 @@ func _build_ui() -> void:
 	pf.add_theme_stylebox_override("panel", _panel_style(0.6, Color(1, 1, 1, 0.3)))
 	pf.add_child(portrait)
 	hb.add_child(pf)
-	var col := VBoxContainer.new()
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_theme_constant_override("separation", 4)
-	hb.add_child(col)
-	var head_row := HBoxContainer.new()
-	head_row.add_theme_constant_override("separation", 14)
-	col.add_child(head_row)
-	name_label = _label("-", 20, Color(1, 1, 1))
-	head_row.add_child(name_label)
-	stat_label = _label("", 13, Color(0.8, 0.85, 0.9))
-	stat_label.size_flags_vertical = Control.SIZE_SHRINK_END
-	head_row.add_child(stat_label)
-	var slots_line := HBoxContainer.new()
-	slots_line.add_theme_constant_override("separation", 16)
-	col.add_child(slots_line)
-	slots_row = HBoxContainer.new()
-	slots_row.add_theme_constant_override("separation", 8)
-	slots_line.add_child(slots_row)
-	# 안내 문구: 슬롯 오른쪽 (캐릭터를 가리지 않게 패널 안)
-	hint_label = _label("", 13, Color(1, 0.95, 0.7))
+	# 이름·수치·안내: 초상화 오른쪽 좁은 칸 (슬롯 줄은 화면 가운데에 따로)
+	var info := VBoxContainer.new()
+	info.custom_minimum_size.x = 196
+	info.add_theme_constant_override("separation", 2)
+	hb.add_child(info)
+	name_label = _label("-", 18, Color(1, 1, 1))
+	name_label.clip_text = true
+	name_label.custom_minimum_size.x = 196
+	info.add_child(name_label)
+	stat_label = _label("", 12, Color(0.8, 0.85, 0.9))
+	stat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	stat_label.custom_minimum_size.x = 196
+	info.add_child(stat_label)
+	hint_label = _label("", 12, Color(1, 0.95, 0.7))
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	slots_line.add_child(hint_label)
+	hint_label.custom_minimum_size.x = 196
+	info.add_child(hint_label)
+	var fill := Control.new()
+	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(fill)
 	var right := VBoxContainer.new()
 	right.custom_minimum_size.x = 150
 	right.add_theme_constant_override("separation", 8)
@@ -204,6 +200,17 @@ func _build_ui() -> void:
 	end_btn = _button("턴 종료", Color(0.9, 0.45, 0.3))
 	end_btn.pressed.connect(func(): cancel_pending(); controller.player_end_turn())
 	right.add_child(end_btn)
+	# 슬롯 줄: 화면 가로 가운데, 하단 패널 안 (무기 칸은 패널 천장까지 세로로 길게)
+	slots_row = HBoxContainer.new()
+	slots_row.add_theme_constant_override("separation", 8)
+	slots_row.anchor_left = 0.5
+	slots_row.anchor_right = 0.5
+	slots_row.anchor_top = 1.0
+	slots_row.anchor_bottom = 1.0
+	slots_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	slots_row.offset_top = -138
+	slots_row.offset_bottom = -12
+	add_child(slots_row)
 	# 무기 장착 팝업 (불투명 검은 버튼) + 슬롯 설명 말풍선
 	equip_popup = _button("장착하기  AP -1", Color(0.85, 0.85, 0.85))
 	var ep: StyleBoxFlat = equip_popup.get_theme_stylebox("normal").duplicate()
@@ -508,6 +515,9 @@ func _unhandled_input(event: InputEvent) -> void:
 # ---------------------------------------------------------------- 갱신
 const SLOT := 56.0
 const SLOT_GAP := 18.0
+const WEAPON_W := 44.0      # 무기 칸: 세로로 긴 칸 (패널 천장까지)
+const WEAPON_H := 104.0
+const WEAPON_SEP := 4       # 무기 사이 간격 (다른 슬롯 8 의 절반)
 
 
 func _refresh_panel() -> void:
@@ -517,31 +527,39 @@ func _refresh_panel() -> void:
 	var u := controller.current
 	if u == null:
 		return
-	name_label.text = "%s  ·  %s  Lv%d" % [u.display_name(), u.data.role, u.data.level]
-	stat_label.text = "HP %d/%d   AP %d/%d (+%d/턴)   속도 %d   %s %d" % [u.hp, u.data.max_hp, u.ap, u.data.max_ap, u.data.ap_recovery, u.data.speed, _row_text(u), u.index + 1]
+	name_label.text = "%s · %s  Lv%d" % [u.display_name(), u.data.role, u.data.level]
+	stat_label.text = "HP %d/%d   AP %d/%d (+%d/턴)\n속도 %d   %s %d" % [u.hp, u.data.max_hp, u.ap, u.data.max_ap, u.data.ap_recovery, u.data.speed, _row_text(u), u.index + 1]
 	portrait.texture = UnitArt.portrait(u.data.sprite_id, manifest)
 	portrait.flip_h = (u.team == "enemy") != bool(u.data.palette.get("art_faces_left", false))
 	var is_player := controller.is_player_turn() and not view.busy
 	var opts := {}
 	for o in controller.get_command_options():
 		opts[o.id] = o
-	# 무기 3칸: 주무기 · 보조무기1 · 보조무기2
+	# 무기 3칸: 주무기 · 보조무기1 · 보조무기2 (세로로 긴 칸, 간격 좁게)
+	var wbox := HBoxContainer.new()
+	wbox.add_theme_constant_override("separation", WEAPON_SEP)
+	slots_row.add_child(wbox)
 	var wcost := int(opts.get("weapon", {}).get("cost", 1))
 	for i in 3:
+		var slot_name: String = ["주무기", "보조무기 1", "보조무기 2"][i]
 		if i < u.data.weapons.size():
 			var w: Dictionary = u.data.weapons[i]
 			var equipped := i == u.weapon_index
-			var tip := "%s  ·  %s  ·  위력 %+d%s\n%s" % [w.name, "원거리" if w.range_type == "ranged" else "근접", int(w.power_bonus), "  (장착 중)" if equipped else "", ["주무기", "보조무기 1", "보조무기 2"][i]]
+			var tip := "%s  ·  %s  ·  위력 %+d%s\n%s" % [w.name, "원거리" if w.range_type == "ranged" else "근접", int(w.power_bonus), "  (장착 중)" if equipped else "", slot_name]
 			var wi: int = i
-			_add_slot(_weapon_icon(str(w.id)), w.name, -1, is_player, "equipped" if equipped else "", tip, func(btn: Control): _open_equip_popup(btn, wi, wcost), false, true)
+			_add_slot(wbox, {"icon": _weapon_icon_vertical(str(w.id)), "caption": w.name, "enabled": is_player,
+				"mark": "equipped" if equipped else "", "tip": tip, "weapon": true,
+				"press": func(btn: Control): _open_equip_popup(btn, wi, wcost)})
 		else:
-			_add_slot(null, ["주무기", "보조무기 1", "보조무기 2"][i], -1, false, "", "", Callable())
+			_add_slot(wbox, {"caption": slot_name, "weapon": true})
 	_add_gap()
 	# 자리 이동
 	var mv: Dictionary = opts.get("move", {})
 	if not mv.is_empty():
 		var mv_tip := "%s  ·  AP %d\n이동·교체할 수 있는 자리 아래에 파란 표시가 생깁니다. 빈 자리 = 이동, 아군 = 자리 교체.%s" % [mv.name, mv.cost, "" if mv.enabled else "\n(%s)" % mv.reason]
-		_add_slot(load("res://assets/textures/ui_move.png"), "자리 이동", mv.cost, is_player and mv.enabled, "selected" if pending_move else "", mv_tip, func(_b): _hide_equip(); begin_move())
+		_add_slot(slots_row, {"icon": load("res://assets/textures/ui_move.png"), "caption": "자리 이동", "cost": mv.cost,
+			"enabled": is_player and mv.enabled, "mark": "move_on" if pending_move else "", "tip": mv_tip,
+			"press": func(_b): _hide_equip(); begin_move()})
 	_add_gap()
 	# 기본 스킬 3칸 + 필살기
 	var skills: Array = []
@@ -558,12 +576,12 @@ func _refresh_panel() -> void:
 		if i < skills.size():
 			_add_skill_slot(skills[i], is_player)
 		else:
-			_add_slot(null, "", -1, false, "", "", Callable())
+			_add_slot(slots_row, {})
 	_add_gap()
 	if not ult.is_empty():
 		_add_skill_slot(ult, is_player)
 	else:
-		_add_slot(null, "필살기", -1, false, "", "", Callable())
+		_add_slot(slots_row, {"caption": "필살기", "ult": true})
 	end_btn.disabled = not is_player
 	cancel_btn.disabled = not (pending_action != "" or pending_move or equip_popup.visible)
 
@@ -572,7 +590,9 @@ func _add_skill_slot(o: Dictionary, is_player: bool) -> void:
 	var tip := "%s  ·  AP %d\n%s%s" % [o.name, o.cost, o.desc, "" if o.enabled else "\n(%s)" % o.reason]
 	var id: String = o.id
 	var icon_id := id if ResourceLoader.exists("res://assets/textures/ui_%s.png" % id) else ("ultimate" if o.kind == "ultimate" else "basic_attack")
-	_add_slot(load("res://assets/textures/ui_%s.png" % icon_id), o.name, o.cost, is_player and o.enabled, "selected" if pending_action == id else "", tip, func(_b): _hide_equip(); begin_action(id), o.kind == "ultimate")
+	_add_slot(slots_row, {"icon": load("res://assets/textures/ui_%s.png" % icon_id), "caption": o.name, "cost": o.cost,
+		"enabled": is_player and o.enabled, "mark": "selected" if pending_action == id else "", "tip": tip,
+		"ult": o.kind == "ultimate", "press": func(_b): _hide_equip(); begin_action(id)})
 
 
 func _add_gap() -> void:
@@ -581,19 +601,37 @@ func _add_gap() -> void:
 	slots_row.add_child(g)
 
 
-## 정사각 슬롯 + 아래 이름. mark: "" | "equipped"(노란 테두리) | "selected"(선택 중). on_press(btn) 은 클릭 시 호출.
-func _add_slot(icon: Texture2D, caption: String, cost: int, enabled: bool, mark: String, tip: String, on_press: Callable, is_ult: bool = false, is_weapon: bool = false) -> void:
+## 슬롯 하나: 버튼 + 아래 이름. d 키:
+##   icon, caption, cost(-1 = 표시 없음), enabled, tip, press(Callable(btn)),
+##   mark: "" | "equipped"(노란 테두리) | "selected"(선택 중 테두리) | "move_on"(자리 이동 선택: 파란 바탕 + 화살표 흔들림)
+##   weapon(세로로 긴 무기 칸), ult(필살기 바탕)
+## 사용할 수 없으면 회색 처리, 비용은 붉은 "-AP" (사용 가능하면 파란 "-AP")
+func _add_slot(parent: Container, d: Dictionary) -> void:
+	var icon: Texture2D = d.get("icon", null)
+	var cost: int = d.get("cost", -1)
+	var mark: String = d.get("mark", "")
+	var tip: String = d.get("tip", "")
+	var on_press: Callable = d.get("press", Callable())
+	var is_weapon: bool = d.get("weapon", false)
+	var is_ult: bool = d.get("ult", false)
+	var active: bool = d.get("enabled", false) and on_press.is_valid()
+	var usable := active or mark == "equipped"
+	var bsize := Vector2(WEAPON_W, WEAPON_H) if is_weapon else Vector2(SLOT, SLOT)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
-	box.custom_minimum_size.x = SLOT + 8.0
+	box.custom_minimum_size.x = bsize.x + 8.0
+	box.size_flags_vertical = Control.SIZE_SHRINK_END
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(SLOT, SLOT)
+	btn.custom_minimum_size = bsize
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	btn.focus_mode = Control.FOCUS_NONE
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.2, 0.08, 0.28, 0.95) if is_ult else Color(0.1, 0.11, 0.14, 0.95)
 	if is_weapon:
 		sb.bg_color = Color(0.5, 0.52, 0.56, 0.95)   # 무기 원화는 어두운 색이라 밝은 바탕
+	elif is_ult:
+		sb.bg_color = Color(0.2, 0.08, 0.28, 0.95)
+	else:
+		sb.bg_color = Color(0.1, 0.11, 0.14, 0.95)
 	sb.border_color = Color(1, 1, 1, 0.22)
 	sb.set_border_width_all(2)
 	sb.set_corner_radius_all(6)
@@ -603,6 +641,13 @@ func _add_slot(icon: Texture2D, caption: String, cost: int, enabled: bool, mark:
 	elif mark == "selected":
 		sb.border_color = Color(0.45, 0.85, 1.0)
 		sb.set_border_width_all(3)
+	elif mark == "move_on":
+		sb.bg_color = Color(0.18, 0.45, 0.95)
+		sb.border_color = Color(0.6, 0.85, 1.0)
+		sb.set_border_width_all(3)
+	if not usable:
+		sb.bg_color = Color(0.24, 0.24, 0.26, 0.9)   # 회색 처리
+		sb.border_color = Color(1, 1, 1, 0.1)
 	btn.add_theme_stylebox_override("normal", sb)
 	var hov: StyleBoxFlat = sb.duplicate()
 	hov.bg_color = sb.bg_color.lightened(0.12)
@@ -617,23 +662,30 @@ func _add_slot(icon: Texture2D, caption: String, cost: int, enabled: bool, mark:
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		tr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		tr.offset_left = 7
-		tr.offset_top = 7
-		tr.offset_right = -7
-		tr.offset_bottom = -7
+		var m := 4.0 if is_weapon else 7.0
+		tr.offset_left = m
+		tr.offset_top = m
+		tr.offset_right = -m
+		tr.offset_bottom = -m
 		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if not usable:
+			tr.modulate = Color(0.55, 0.55, 0.58, 0.8)
 		btn.add_child(tr)
+		if mark == "move_on":
+			# 가운데 화살표가 좌우로 살짝 왔다갔다
+			var set_dx := func(v: float): tr.offset_left = m + v; tr.offset_right = -m + v
+			var tw := tr.create_tween().set_loops()
+			tw.tween_method(set_dx, -3.0, 3.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tw.tween_method(set_dx, 3.0, -3.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	elif d.is_empty() or not d.has("icon"):
+		btn.modulate = Color(1, 1, 1, 0.35)   # 빈 칸
 	if cost >= 0:
-		var cl := _label(str(cost), 12, Color(0.55, 0.8, 1.0))
-		cl.position = Vector2(SLOT - 13, 0)
+		var cl := _label("-%d" % cost, 12, Color(0.6, 0.85, 1.0) if usable else Color(1.0, 0.3, 0.28))
 		cl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		btn.add_child(cl)
-	var active := enabled and on_press.is_valid()
+		cl.position = Vector2(bsize.x - 18.0, -1.0)
 	btn.disabled = not active
-	if icon == null or not active:
-		btn.modulate = Color(1, 1, 1, 0.45) if icon != null else Color(1, 1, 1, 0.3)
 	if mark == "equipped":
-		btn.modulate = Color(1, 1, 1, 1)   # 장착 중 표시는 항상 선명하게
 		btn.disabled = not on_press.is_valid()
 	if on_press.is_valid():
 		btn.pressed.connect(func(): on_press.call(btn))
@@ -641,12 +693,33 @@ func _add_slot(icon: Texture2D, caption: String, cost: int, enabled: bool, mark:
 		btn.mouse_entered.connect(_show_slot_tip.bind(btn, tip))
 		btn.mouse_exited.connect(func(): slot_tip.visible = false)
 	box.add_child(btn)
-	var cap := _label(caption, 12, Color(0.9, 0.9, 0.92))
+	var cap := _label(d.get("caption", ""), 12, Color(0.9, 0.9, 0.92) if usable else Color(0.55, 0.55, 0.58))
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cap.custom_minimum_size.x = SLOT + 8.0
+	cap.custom_minimum_size.x = bsize.x + 8.0
 	cap.clip_text = true
 	box.add_child(cap)
-	slots_row.add_child(box)
+	parent.add_child(box)
+
+
+var _wicon_cache: Dictionary = {}
+
+
+## 세로 무기 칸용: 가로로 그린 무기 원화를 90° 돌린 텍스처 (총구가 위)
+func _weapon_icon_vertical(wid: String) -> Texture2D:
+	if _wicon_cache.has(wid):
+		return _wicon_cache[wid]
+	var tex := _weapon_icon(wid)
+	var img := tex.get_image()
+	if img == null:
+		return tex
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	img.clear_mipmaps()
+	img.rotate_90(COUNTERCLOCKWISE)
+	var out := ImageTexture.create_from_image(img)
+	_wicon_cache[wid] = out
+	return out
 
 
 func _weapon_icon(wid: String) -> Texture2D:
@@ -855,10 +928,13 @@ func toggle_log() -> void:
 
 ## 자동 검증용: 하단 슬롯 i 번째(간격 칸 제외) 버튼
 func debug_slot_button(i: int) -> Button:
-	var n := 0
+	var boxes: Array = []
 	for c in slots_row.get_children():
-		if c is VBoxContainer and not c.is_queued_for_deletion():
-			if n == i:
-				return c.get_child(0)
-			n += 1
-	return null
+		if c.is_queued_for_deletion():
+			continue
+		if c is HBoxContainer:
+			for w in c.get_children():
+				boxes.append(w)
+		elif c is VBoxContainer:
+			boxes.append(c)
+	return boxes[i].get_child(0) if i < boxes.size() else null
