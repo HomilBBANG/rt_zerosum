@@ -41,6 +41,9 @@ var log_lines: PackedStringArray = []
 var _next_instance_id: int = 1
 var _roster: Array = []                 # [{data, row, index}]
 var _enemy_turn_running := false
+## true 면 선공 판정 뒤 첫 라운드를 바로 시작하지 않고 begin_rounds() 를 기다린다 (동전 연출용)
+var wait_for_intro := false
+var coin_face: String = ""              # 일반 전투 동전 결과: "front"(앞면=아군 선공) | "back" | ""(기습·매복)
 
 
 func setup(p_actions: Dictionary, roster: Array, p_seed: int, p_ambush: String) -> void:
@@ -79,11 +82,19 @@ func start_battle() -> void:
 	_log("전투 준비: 아군 %d / 적군 %d (seed %d)" % [slots.living_units("ally").size(), slots.living_units("enemy").size(), seed_value])
 	battle_started.emit()
 	_decide_initiative()
-	_start_round()
+	if not wait_for_intro:
+		_start_round()
+
+
+## 선공 연출(동전)이 끝난 뒤 첫 라운드 시작
+func begin_rounds() -> void:
+	if state == State.INITIATIVE:
+		_start_round()
 
 
 func _decide_initiative() -> void:
 	_set_state(State.INITIATIVE)
+	coin_face = ""
 	match ambush_mode:
 		"ally":
 			first_team = "ally"
@@ -94,6 +105,7 @@ func _decide_initiative() -> void:
 		_:
 			var coin := rng.randi() % 2
 			first_team = "ally" if coin == 0 else "enemy"
+			coin_face = "front" if coin == 0 else "back"
 			initiative_reason = "동전 %s — %s 선공" % ["앞면" if coin == 0 else "뒷면", "아군" if first_team == "ally" else "적"]
 	_log("선공 판정: " + initiative_reason)
 	initiative_decided.emit(first_team, initiative_reason)

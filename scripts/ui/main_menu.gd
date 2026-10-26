@@ -2,14 +2,13 @@ extends Control
 ## 메인 메뉴: 2D/3D 모드, 조명 프리셋, 선공 설정, 시드 선택 후 편성 또는 바로 전투.
 
 var _font: Font
-var mode_btns: Array[Button] = []
 var preset_opt: OptionButton
 var ambush_opt: OptionButton
 var seed_edit: LineEdit
 
 
 func _ready() -> void:
-	_font = load("res://assets/fonts/NotoSansKR-VF.otf")
+	_font = load("res://assets/fonts/Pretendard-Medium.ttf")
 	var bg := ColorRect.new()
 	bg.color = Color(0.04, 0.07, 0.09)
 	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
@@ -36,27 +35,9 @@ func _ready() -> void:
 	add_child(box)
 	box.add_child(_label("RT ZEROSUM", 54, Color(1, 1, 1)))
 	box.add_child(_label("전투 플레이어블 프로토타입 v1.0 — 횡스크롤 턴제 6인 AP 전투", 17, Color(0.85, 0.95, 0.95)))
-	box.add_child(_label("표현 방식 비교: 2D(원화+구역 마스크) vs 3D(셀 셰이더+실광원)", 15, Color(0.7, 0.9, 0.9)))
 	var sp := Control.new()
 	sp.custom_minimum_size.y = 10
 	box.add_child(sp)
-
-	var mode_row := HBoxContainer.new()
-	mode_row.add_theme_constant_override("separation", 10)
-	box.add_child(mode_row)
-	mode_row.add_child(_label("표현 모드", 16))
-	for m in ["2d", "3d"]:
-		var b := Button.new()
-		b.text = m.to_upper()
-		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(90, 36)
-		b.add_theme_font_override("font", _font)
-		b.pressed.connect(func():
-			Game.mode = m
-			_sync_mode())
-		mode_row.add_child(b)
-		mode_btns.append(b)
-	_sync_mode()
 
 	var opt_row := HBoxContainer.new()
 	opt_row.add_theme_constant_override("separation", 10)
@@ -102,20 +83,15 @@ func _ready() -> void:
 	var bb := _big_button("리그 벤치", Color(0.9, 0.8, 0.3))
 	bb.pressed.connect(func(): get_tree().change_scene_to_file(Game.SCENE_BENCH))
 	btn_row.add_child(bb)
-	box.add_child(_label("전투 중: 1~4 조명 프리셋 전환 · Tab 2D/3D 즉시 전환 · F1 디버그 패널 · R 재시작 · Space 턴 종료", 13, Color(0.8, 0.9, 0.9)))
+	box.add_child(_label("전투 중: 1~4 조명 프리셋 전환 · F1 디버그 패널 · R 재시작 · Space 턴 종료", 13, Color(0.8, 0.9, 0.9)))
 	if Game.cli.get("scene", "menu") == "menu":
 		Game.maybe_cli_capture()
-
-
-func _sync_mode() -> void:
-	for i in mode_btns.size():
-		mode_btns[i].button_pressed = (["2d", "3d"][i] == Game.mode)
 
 
 func _label(text: String, size: int, color: Color = Color(1, 1, 1)) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_override("font", _font)
+	l.add_theme_font_override("font", load("res://assets/fonts/Pretendard-Bold.ttf") if size >= 20 else _font)   # 큰 글자는 Bold
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))

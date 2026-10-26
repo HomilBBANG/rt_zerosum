@@ -10,8 +10,8 @@ var manifest: Dictionary
 
 var top_bar: PanelContainer
 var round_label: Label
-var init_label: Label
 var timeline: HBoxContainer
+var hover_label: Label   # 행동 순서 초상화에 마우스를 올리면 이름 표시
 var floating_root: Control
 var popup_root: Control
 var bottom: PanelContainer
@@ -36,11 +36,13 @@ var pending_move: bool = false
 var floating: Dictionary = {}       # instance_id -> {root, name, hp, ap}
 var _toast_t: float = 0.0
 var _font: Font
+var _font_bold: Font
 
 
 func _ready() -> void:
 	layer = 10
-	_font = load("res://assets/fonts/NotoSansKR-VF.otf")
+	_font = load("res://assets/fonts/Pretendard-Medium.ttf")
+	_font_bold = load("res://assets/fonts/Pretendard-Bold.ttf")
 	var f := FileAccess.open("res://assets/sprites/manifest.json", FileAccess.READ)
 	manifest = JSON.parse_string(f.get_as_text())
 	_build_ui()
@@ -51,7 +53,6 @@ func setup(p_controller: BattleController, p_view: BattleViewBase, p_preset: Dic
 	view = p_view
 	preset = p_preset
 	controller.battle_started.connect(_on_battle_started)
-	controller.initiative_decided.connect(func(_t, reason): init_label.text = reason)
 	controller.round_started.connect(_on_round_started)
 	controller.actor_started.connect(_on_actor_started)
 	controller.awaiting_command.connect(_on_awaiting_command)
@@ -72,7 +73,7 @@ func setup(p_controller: BattleController, p_view: BattleViewBase, p_preset: Dic
 
 func apply_preset(p: Dictionary) -> void:
 	preset = p
-	preset_label.text = "%s  (%s)   [1~4 프리셋 · Tab %s 전환 · F1 디버그 · R 재시작]" % [p.name, p.ref, "3D" if Game.mode == "2d" else "2D"]
+	preset_label.text = "%s  (%s)   [1~4 프리셋 · F1 디버그 · R 재시작]" % [p.name, p.ref]
 
 
 # ---------------------------------------------------------------- UI 구성
@@ -89,7 +90,7 @@ func _panel_style(alpha: float = 0.82, border: Color = Color(1, 1, 1, 0.12)) -> 
 func _label(text: String, size: int = 16, color: Color = Color(0.95, 0.95, 0.95)) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_override("font", _font)
+	l.add_theme_font_override("font", load("res://assets/fonts/Pretendard-Bold.ttf") if size >= 20 else _font)   # 큰 글자는 Bold
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
@@ -98,39 +99,36 @@ func _label(text: String, size: int = 16, color: Color = Color(0.95, 0.95, 0.95)
 
 
 func _build_ui() -> void:
-	# 상단 바
+	# 상단 바: 배경 없이 라운드 + 행동 순서 초상화 (동전 결과·"행동 순서" 글자는 표시하지 않음)
 	top_bar = PanelContainer.new()
-	top_bar.add_theme_stylebox_override("panel", _panel_style())
+	top_bar.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	top_bar.offset_left = 12
-	top_bar.offset_right = -12
+	top_bar.offset_left = 16
+	top_bar.offset_right = -16
 	top_bar.offset_top = 8
 	top_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(top_bar)
 	var top_h := HBoxContainer.new()
 	top_h.add_theme_constant_override("separation", 18)
+	top_h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_bar.add_child(top_h)
 	round_label = _label("라운드 1", 22, Color(1, 0.92, 0.5))
+	round_label.add_theme_font_override("font", _font_bold)
 	top_h.add_child(round_label)
-	init_label = _label("", 15, Color(0.8, 0.9, 1.0))
-	top_h.add_child(init_label)
-	var sep := VSeparator.new()
-	top_h.add_child(sep)
-	top_h.add_child(_label("행동 순서", 14, Color(0.7, 0.7, 0.75)))
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size.y = 34
-	top_h.add_child(scroll)
 	timeline = HBoxContainer.new()
-	timeline.add_theme_constant_override("separation", 4)
-	scroll.add_child(timeline)
+	timeline.add_theme_constant_override("separation", 6)
+	timeline.alignment = BoxContainer.ALIGNMENT_BEGIN
+	timeline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_h.add_child(timeline)
+	hover_label = _label("", 14)
+	hover_label.visible = false
+	hover_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	preset_label = _label("", 13, Color(0.75, 0.8, 0.85))
 	preset_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	preset_label.position = Vector2(16, 60)
+	preset_label.position = Vector2(16, 70)
 	add_child(preset_label)
+	add_child(hover_label)
 
 	# 유닛 위 HP/AP
 	floating_root = Control.new()
@@ -499,30 +497,64 @@ func _refresh_floating() -> void:
 		e.hp.modulate = e.root.modulate
 
 
+## 행동 순서: 초상화를 순서대로. 차례인 유닛은 30% 크게, 끝난 유닛은 어둡게, 쓰러진 유닛은 회색.
+const TL_SIZE := 40.0
+const TL_CUR_SCALE := 1.3
+
+
 func _refresh_timeline() -> void:
 	for c in timeline.get_children():
 		c.queue_free()
+	hover_label.visible = false
 	for i in controller.queue.size():
 		var u: UnitRuntime = controller.queue[i]
-		var p := PanelContainer.new()
-		var sb := StyleBoxFlat.new()
 		var is_cur := (u == controller.current and i == controller.queue_pos - 1)
 		var done := i < controller.queue_pos - 1 or (i == controller.queue_pos - 1 and not is_cur)
-		sb.bg_color = (Color(0.2, 0.45, 0.3) if u.team == "ally" else Color(0.5, 0.2, 0.25))
-		if is_cur:
-			sb.bg_color = Color(0.95, 0.8, 0.25)
-		elif done or not u.alive:
-			sb.bg_color = Color(0.2, 0.2, 0.22)
-		sb.set_corner_radius_all(4)
-		sb.set_content_margin_all(4)
-		sb.content_margin_left = 7
-		sb.content_margin_right = 7
-		p.add_theme_stylebox_override("panel", sb)
-		var l := _label("%s %d" % [u.display_name(), u.data.speed], 12, Color(0.1, 0.1, 0.1) if is_cur else (Color(1, 1, 1) if u.alive else Color(0.5, 0.5, 0.5)))
+		# 컨테이너는 자식 scale 을 1 로 되돌리므로, 고정 크기 칸 안에 초상화를 직접 놓고 키운다
+		var cell := Control.new()
+		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var side := TL_SIZE * (TL_CUR_SCALE if is_cur else 1.0)
+		cell.custom_minimum_size = Vector2(side, TL_SIZE * TL_CUR_SCALE)
+		var frame := Panel.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.06, 0.07, 0.1, 0.85)
+		sb.border_color = Color(1.0, 0.82, 0.3) if is_cur else (Color(0.35, 0.95, 0.6) if u.team == "ally" else Color(1.0, 0.35, 0.3))
+		sb.set_border_width_all(3 if is_cur else 2)
+		sb.set_corner_radius_all(6)
+		frame.add_theme_stylebox_override("panel", sb)
+		frame.size = Vector2(TL_SIZE, TL_SIZE)
+		frame.position = Vector2((side - TL_SIZE) * 0.5, 0.0)
+		frame.pivot_offset = Vector2(TL_SIZE * 0.5, 0.0)
+		frame.scale = Vector2.ONE * (TL_CUR_SCALE if is_cur else 1.0)
+		frame.clip_contents = true
+		frame.mouse_filter = Control.MOUSE_FILTER_STOP
+		var tr := TextureRect.new()
+		tr.texture = UnitArt.portrait(u.data.sprite_id, manifest)
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		tr.flip_h = (u.team == "enemy") != bool(u.data.palette.get("art_faces_left", false))
+		tr.position = Vector2(2, 2)
+		tr.size = Vector2(TL_SIZE - 4, TL_SIZE - 4)
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		frame.add_child(tr)
 		if not u.alive:
-			l.text = "✕ " + l.text
-		p.add_child(l)
-		timeline.add_child(p)
+			frame.modulate = Color(0.45, 0.45, 0.48, 0.8)
+		elif done:
+			frame.modulate = Color(0.6, 0.6, 0.62, 1.0)
+		frame.mouse_entered.connect(_show_timeline_name.bind(frame, u))
+		frame.mouse_exited.connect(func(): hover_label.visible = false)
+		cell.add_child(frame)
+		timeline.add_child(cell)
+
+
+## 초상화 아래에 이름 표시 (마우스 호버)
+func _show_timeline_name(frame: Control, u: UnitRuntime) -> void:
+	hover_label.text = u.display_name() + ("" if u.alive else " (전투 불능)")
+	hover_label.add_theme_color_override("font_color", Color(1, 1, 1) if u.team == "ally" else Color(1, 0.75, 0.72))
+	hover_label.reset_size()
+	var r := frame.get_global_rect()
+	hover_label.position = Vector2(r.get_center().x - hover_label.size.x * 0.5, r.end.y + 4.0)
+	hover_label.visible = true
 
 
 func _spawn_popup(target: UnitRuntime, text: String, color: Color) -> void:

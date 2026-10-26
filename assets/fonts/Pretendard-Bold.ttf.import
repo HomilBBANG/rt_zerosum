@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://d2dl358qlkmos"
-path="res://.godot/imported/NotoSansKR-VF.otf-f2daa156a9c8650a2bd2a9a4c52e4f20.fontdata"
+uid="uid://c02oveo0lrmue"
+path="res://.godot/imported/Pretendard-Bold.ttf-10452bd575160037b68bdbcf415ddd07.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/NotoSansKR-VF.otf"
-dest_files=["res://.godot/imported/NotoSansKR-VF.otf-f2daa156a9c8650a2bd2a9a4c52e4f20.fontdata"]
+source_file="res://assets/fonts/Pretendard-Bold.ttf"
+dest_files=["res://.godot/imported/Pretendard-Bold.ttf-10452bd575160037b68bdbcf415ddd07.fontdata"]
 
 [params]
 

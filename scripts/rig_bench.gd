@@ -54,7 +54,7 @@ func _ready() -> void:
 	add_child(overlay)
 	overlay.draw.connect(_draw_bones)
 	label = Label.new()
-	label.add_theme_font_override("font", load("res://assets/fonts/NotoSansKR-VF.otf"))
+	label.add_theme_font_override("font", load("res://assets/fonts/Pretendard-Medium.ttf"))
 	label.add_theme_font_size_override("font_size", 18)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	label.add_theme_constant_override("outline_size", 5)

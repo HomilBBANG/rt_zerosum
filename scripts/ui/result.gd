@@ -5,7 +5,7 @@ var _font: Font
 
 
 func _ready() -> void:
-	_font = load("res://assets/fonts/NotoSansKR-VF.otf")
+	_font = load("res://assets/fonts/Pretendard-Medium.ttf")
 	var r := Game.last_result
 	var win: bool = r.get("winner", "enemy") == "ally"
 	var bg := ColorRect.new()
@@ -37,9 +37,6 @@ func _ready() -> void:
 	var again := _big_button("다시 전투 (같은 설정)", Color(1.0, 0.5, 0.3))
 	again.pressed.connect(func(): Game.restart_count += 1; Game.start_battle())
 	btns.add_child(again)
-	var other := _big_button("%s 로 다시" % ("3D" if Game.mode == "2d" else "2D"), Color(0.9, 0.5, 1.0))
-	other.pressed.connect(func(): Game.mode = "3d" if Game.mode == "2d" else "2d"; Game.restart_count += 1; Game.start_battle())
-	btns.add_child(other)
 	var form := _big_button("편성", Color(0.3, 0.8, 0.7))
 	form.pressed.connect(func(): Game.go_formation())
 	btns.add_child(form)
@@ -52,7 +49,7 @@ func _ready() -> void:
 func _label(text: String, size: int, color: Color = Color(1, 1, 1)) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_override("font", _font)
+	l.add_theme_font_override("font", load("res://assets/fonts/Pretendard-Bold.ttf") if size >= 20 else _font)   # 큰 글자는 Bold
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))

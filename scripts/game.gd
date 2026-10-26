@@ -8,7 +8,7 @@ const SCENE_BATTLE_3D := "res://scenes/battle_3d.tscn"
 const SCENE_RESULT := "res://scenes/result.tscn"
 const SCENE_BENCH := "res://scenes/rig_bench.tscn"
 
-var mode: String = "2d"            # "2d" | "3d"
+var mode: String = "2d"            # 캐릭터는 2D 확정 (3D 전환 제거, 2026-10-26). 3D 씬은 비교 기록용으로만 남김
 var preset: String = "g1"          # LightingPresets 키
 var ambush: String = "none"        # "none" | "ally" | "enemy"
 var seed_value: int = 12345
@@ -120,7 +120,7 @@ func build_roster() -> Array:
 
 
 func battle_scene_path() -> String:
-	return SCENE_BATTLE_3D if mode == "3d" else SCENE_BATTLE_2D
+	return SCENE_BATTLE_2D
 
 
 func start_battle() -> void:

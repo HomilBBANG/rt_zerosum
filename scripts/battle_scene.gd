@@ -1,6 +1,6 @@
 extends Node
 ## 전투 씬 공통 스크립트 (battle_2d.tscn / battle_3d.tscn 양쪽에서 사용).
-## 컨트롤러 생성 → 뷰/HUD 연결 → 전투 시작 → 결과 전환. 단축키: 1~4 조명 프리셋, Tab 2D/3D 전환, F1 디버그, F2 HUD, F3 림 라인, R 재시작, Esc 메뉴.
+## 컨트롤러 생성 → 뷰/HUD 연결 → 전투 시작 → 결과 전환. 단축키: 1~4 조명 프리셋, F1 디버그, F2 HUD, F3 림 라인, R 재시작, Esc 메뉴.
 
 @onready var view: BattleViewBase = $View
 @onready var hud: BattleHUD = $HUD
@@ -22,8 +22,23 @@ func _ready() -> void:
 	controller.battle_ended.connect(_on_battle_ended)
 	if Game.cli.get("hud", "1") == "0":
 		hud.visible = false
+	# 일반 전투(동전)는 선공 동전 연출이 끝난 뒤 첫 라운드 시작. 스크린샷 자동화는 --coin=1 일 때만 연출
+	controller.wait_for_intro = Game.ambush == "none" and Game.cli.get("coin", "0" if Game.cli.has("shot") else "1") == "1"
+	controller.initiative_decided.connect(_on_initiative)
 	controller.start_battle()
 	_run_cli()
+
+
+func _on_initiative(_first: String, _reason: String) -> void:
+	if not controller.wait_for_intro:
+		return
+	if controller.coin_face == "":
+		controller.begin_rounds.call_deferred()
+		return
+	var coin := CoinFlip.new()
+	add_child(coin)
+	coin.finished.connect(controller.begin_rounds)
+	coin.play(controller.coin_face)
 
 
 func _on_battle_ended(winner: String) -> void:
@@ -47,9 +62,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_2: set_preset("g2")
 			KEY_3: set_preset("g3")
 			KEY_4: set_preset("g4")
-			KEY_TAB:
-				Game.mode = "3d" if Game.mode == "2d" else "2d"
-				Game.start_battle()
 			KEY_F1: hud.toggle_debug()
 			KEY_F3:
 				Game.rim_enabled = not Game.rim_enabled

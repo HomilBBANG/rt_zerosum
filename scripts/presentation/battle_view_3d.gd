@@ -110,7 +110,7 @@ func _build_room() -> void:
 	# 바닥 (평면) + 바닥 널빤지 선은 셀 스타일상 생략
 	_box_at(Vector3(24, 0.2, 14), Vector3(0, -0.1, 1.0), floor_m)
 	# 뒷벽: 창(x -4.6..-2.6, y 1.5..3.1), 문(x 3.4..4.8, y 0..3.2) 개구부를 남기고 분할
-	var H := 5.2
+	var H := 7.5   # 화면 맨 위까지 벽이 덮도록 (벽 위 빈 공간이 검은 띠로 보이지 않게)
 	_box_at(Vector3(7.4, H, 0.3), Vector3(-8.3, H / 2, WZ), wall)        # -12 .. -4.6
 	_box_at(Vector3(2.0, 1.5, 0.3), Vector3(-3.6, 0.75, WZ), wall)       # 창 아래
 	_box_at(Vector3(2.0, H - 3.1, 0.3), Vector3(-3.6, 3.1 + (H - 3.1) / 2, WZ), wall)  # 창 위
@@ -137,6 +137,7 @@ func _build_room() -> void:
 	pmi.position = Vector3(0, 4.7, WZ + 0.5)
 	pmi.rotation_degrees = Vector3(0, 0, 90)
 	room.add_child(pmi)
+	pmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# 창틀
 	_box_at(Vector3(2.3, 0.12, 0.2), Vector3(-3.6, 1.5, WZ), frame)
 	_box_at(Vector3(2.3, 0.12, 0.2), Vector3(-3.6, 3.1, WZ), frame)

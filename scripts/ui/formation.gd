@@ -10,7 +10,7 @@ var info_label: Label
 
 
 func _ready() -> void:
-	_font = load("res://assets/fonts/NotoSansKR-VF.otf")
+	_font = load("res://assets/fonts/Pretendard-Medium.ttf")
 	var f := FileAccess.open("res://assets/sprites/manifest.json", FileAccess.READ)
 	manifest = JSON.parse_string(f.get_as_text())
 	var bg := ColorRect.new()
@@ -160,7 +160,7 @@ func _refresh() -> void:
 func _label(text: String, size: int, color: Color = Color(1, 1, 1)) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_override("font", _font)
+	l.add_theme_font_override("font", load("res://assets/fonts/Pretendard-Bold.ttf") if size >= 20 else _font)   # 큰 글자는 Bold
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	return l
