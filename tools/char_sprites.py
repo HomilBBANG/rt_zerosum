@@ -15,6 +15,8 @@ assets/characters/<id>/
   python3 tools/char_sprites.py new <캐릭터 id> <전신 그림.png>   새 캐릭터 폴더 (투명 배경 전신 한 장 → base.png·조명 마스크·초상화·그림자·character.json)
       키 760px 로 맞추고 발 = 그림 맨 아래 가운데, 머리·골반·손 위치는 그림에서 추정 (character.json 에서 고칠 수 있음)
   python3 tools/char_sprites.py lines [캐릭터]    선화 마스크(<그림>_line.png) — 게임이 선은 원화 그대로, 면에만 조명 (new 는 자동)
+  python3 tools/char_sprites.py eyes <캐릭터> [x0,y0,x1,y1 …]   눈 마스크(base_eye.png) — 게임이 눈(흰자·눈동자)은 원화 색 그대로 (new 는 자동)
+      상자를 안 주면 머리 영역에서 흰자·푸르스름한 눈동자 덩어리 2개를 자동으로 찾음, 상자를 주면 그 안에서만
   python3 tools/char_sprites.py breathe <캐릭터> [칸 수=16]   기본 그림(base.png)으로 숨쉬기 idle 시트를 만든다 (idle_4x4.png)
       그림을 다시 그리지 않고 원화 픽셀만 살짝 늘이고 흔듦: 골반 위 상체가 숨 쉬듯 오르내리고 좌우로 조금, 발은 고정
   python3 tools/char_sprites.py import <캐릭터> <동작> <파일…> [--grid 4x2] [--fps 12] [--hold 0.35]
@@ -60,7 +62,7 @@ def cmd_lines(only=None):
             continue
         for fn in sorted(os.listdir(cdir)):
             path = os.path.join(cdir, fn)
-            if not fn.endswith(".png") or "_mask_" in fn or fn.endswith("_line.png") or fn in ("silhouette.png", "portrait.png"):
+            if not fn.endswith(".png") or "_mask_" in fn or fn.endswith(("_line.png", "_eye.png")) or fn in ("silhouette.png", "portrait.png"):
                 continue
             m = SHEET_RE.match(fn)
             im = Image.open(path).convert("RGBA")
@@ -81,10 +83,51 @@ def cmd_lines(only=None):
             if not os.path.isdir(adir):
                 continue
             for fn in sorted(os.listdir(adir)):
-                if fn.endswith(".png") and "_mask_" not in fn and not fn.endswith("_line.png"):
+                if fn.endswith(".png") and "_mask_" not in fn and not fn.endswith(("_line.png", "_eye.png")):
                     line_mask(Image.open(os.path.join(adir, fn))).save(os.path.join(adir, fn[:-4] + "_line.png"))
                     n += 1
     print("선화 마스크:", n)
+
+
+def eye_mask(im, head=None, boxes=None):
+    """눈(흰자·홍채·동공) 마스크 L: 피부보다 푸르거나 흰, 너무 어둡지 않은 픽셀 덩어리 → 구멍(동공) 메움 → 1px 부드럽게.
+    boxes: [(x0,y0,x1,y1)…] 그 안에서만. 없으면 head(x,y,w,h) 의 세로 30~85% 띠에서 큰 덩어리 2개."""
+    import numpy as np
+    from scipy import ndimage
+    from PIL import ImageFilter
+    a = np.asarray(im.convert("RGBA")).astype(int)
+    r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
+    cand = (al > 200) & (b >= r - 3) & ((r + g + b) / 3 > 70)
+    keep = np.zeros(cand.shape, bool)
+    if boxes:
+        for x0, y0, x1, y1 in boxes:
+            keep[y0:y1, x0:x1] = True
+    elif head:
+        hx, hy, hw, hh = head
+        keep[int(hy + hh * 0.30):int(hy + hh * 0.85), int(hx):int(hx + hw)] = True
+    cand &= keep
+    cand = ndimage.binary_closing(cand, iterations=2)
+    lab, n = ndimage.label(cand)
+    if n == 0:
+        return Image.new("L", im.size, 0)
+    sizes = ndimage.sum(cand, lab, range(1, n + 1))
+    order = [i + 1 for i in np.argsort(sizes)[::-1] if sizes[i] >= 12]
+    pick = order if boxes else order[:2]
+    m = np.isin(lab, pick)
+    dark = (al > 200) & ((r + g + b) / 3 <= 70)
+    m |= dark & ndimage.binary_dilation(m, iterations=3)   # 동공·눈 테두리(어두운 픽셀)도 원화 그대로
+    m = ndimage.binary_fill_holes(m)
+    out = Image.fromarray((m * 255).astype(np.uint8))
+    return out.filter(ImageFilter.GaussianBlur(0.7))
+
+
+def cmd_eyes(cid, boxes=None):
+    cdir = os.path.join(CHAR_DIR, cid)
+    info = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    base = Image.open(os.path.join(cdir, "base.png")).convert("RGBA")
+    m = eye_mask(base, info.get("head_rect"), boxes)
+    m.save(os.path.join(cdir, "base_eye.png"))
+    print(cid, "눈 마스크 픽셀", int((__import__("numpy").asarray(m) > 127).sum()), "bbox", m.getbbox())
 
 
 def make_masks(im, k=0.5):
@@ -138,7 +181,7 @@ def cmd_masks(only=None):
             if not os.path.isdir(adir):
                 continue
             for fn in sorted(os.listdir(adir)):
-                if not fn.endswith(".png") or "_mask_" in fn or fn.endswith("_line.png"):
+                if not fn.endswith(".png") or "_mask_" in fn or fn.endswith(("_line.png", "_eye.png")):
                     continue
                 stem = fn[:-4]
                 r_path = os.path.join(adir, stem + "_mask_r.png")
@@ -369,6 +412,7 @@ def cmd_new(cid, src, fig_px=760):
                 info[k] = prev[k]
     json.dump(info, open(old, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     line_mask(base).save(os.path.join(cdir, "base_line.png"))
+    eye_mask(base, head).save(os.path.join(cdir, "base_eye.png"))
     print(cid, "base", (w, h), "ground", info["ground"], "head", head, "hand", info["hand"])
 
 
@@ -378,6 +422,8 @@ if __name__ == "__main__":
         cmd_masks(args[1] if len(args) > 1 else None)
     elif args[:1] == ["lines"]:
         cmd_lines(args[1] if len(args) > 1 else None)
+    elif args[:1] == ["eyes"] and len(args) >= 2:
+        cmd_eyes(args[1], [tuple(int(v) for v in b.split(",")) for b in args[2:]] or None)
     elif args[:1] == ["new"] and len(args) >= 3:
         cmd_new(args[1], args[2])
     elif args[:1] == ["breathe"] and len(args) >= 2:

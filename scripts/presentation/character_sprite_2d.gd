@@ -2,7 +2,7 @@
 class_name CharacterSprite2D
 extends Node2D
 ## 캐릭터 = 프레임(스프라이트) 애니메이션. 에셋: assets/characters/<id>/ (도구·형식 설명: tools/char_sprites.py, README)
-##   character.json · base.png(정지 그림) · base_mask_l/_r.png
+##   character.json · base.png(정지 그림) · base_mask_l/_r.png · base_line.png(선화) · base_eye.png(눈, 원화 색 유지)
 ##   애니메이션 (셋 중 아무거나, 위에서부터 찾음):
 ##     ① 스프라이트 시트 한 장: <애니메이션>_<칸 수>.png (한 줄) 또는 <애니메이션>_<열>x<행>.png — 예: walk_8.png, attack_4x2.png
 ##        (+ 선택 <애니메이션>.json: {"cols", "rows", "count", "skip": [칸 번호…], "order": [칸 번호…], "align_feet": true, "fps", "loop", "ground", "figure_px", "hip_y", "weapon", "durations"})
@@ -88,7 +88,7 @@ static func anim_data(id: String, anim: String) -> Dictionary:
 	if _cache.has(key):
 		return _cache[key]
 	var inf := info_of(id)
-	var d := {"frames": [], "masks_r": [], "masks_l": [], "lines": [], "fps": float(inf.get("fps", 12)), "loop": not anim in ONE_SHOT and not anim in HOLD,
+	var d := {"frames": [], "masks_r": [], "masks_l": [], "lines": [], "eyes": [], "fps": float(inf.get("fps", 12)), "loop": not anim in ONE_SHOT and not anim in HOLD,
 		"ground": inf.get("ground", [256, 760]), "figure_px": float(inf.get("figure_px", 760)), "hip_y": float(inf.get("hip_y", 400)),
 		"weapon": anim in ["", "idle", "attack", "hit", "heal"], "hand": inf.get("hand", null)}
 	var dir := dir_of(id)
@@ -101,7 +101,7 @@ static func anim_data(id: String, anim: String) -> Dictionary:
 			var seen := {}
 			for f in DirAccess.get_files_at(dir):
 				var fn := f.trim_suffix(".import").trim_suffix(".remap")
-				if fn.ends_with(".png") and not fn.contains("_mask_") and not seen.has(fn):
+				if fn.ends_with(".png") and not fn.contains("_mask_") and not fn.ends_with("_line.png") and not fn.ends_with("_eye.png") and not seen.has(fn):
 					seen[fn] = true
 					names.append(fn.get_basename())
 			names.sort_custom(func(a, b): return a.naturalnocasecmp_to(b) < 0)
@@ -127,6 +127,7 @@ static func anim_data(id: String, anim: String) -> Dictionary:
 		d.masks_r.append(_mask(dir.path_join(nm + "_mask_r.png")))
 		d.masks_l.append(_mask(dir.path_join(nm + "_mask_l.png")))
 		d.lines.append(_mask(dir.path_join(nm + "_line.png")))   # 선화 마스크 (있으면 선은 원화 그대로)
+		d.eyes.append(_mask(dir.path_join(nm + "_eye.png")))     # 눈 마스크 (있으면 눈은 원화 색 그대로)
 	_cache[key] = d
 	return d
 
@@ -189,7 +190,7 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 		count = int(opt.get("count", cols * rows - start))
 	# 조명 마스크 시트 (tools/char_sprites.py masks 로 만듦, 같은 칸 배치) — 없으면 고른 조명
 	var mimg := {}
-	for suf in ["_mask_r", "_mask_l", "_line"]:
+	for suf in ["_mask_r", "_mask_l", "_line", "_eye"]:
 		var mp: String = path.get_basename() + str(suf) + ".png"
 		if FileAccess.file_exists(mp):
 			var mi := Image.load_from_file(ProjectSettings.globalize_path(mp))
@@ -219,6 +220,7 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 		d.masks_r.append(ImageTexture.create_from_image(mimg["_mask_r"].get_region(r)) if mimg.has("_mask_r") else null)
 		d.masks_l.append(ImageTexture.create_from_image(mimg["_mask_l"].get_region(r)) if mimg.has("_mask_l") else null)
 		d.lines.append(ImageTexture.create_from_image(mimg["_line"].get_region(r)) if mimg.has("_line") else null)
+		d.eyes.append(ImageTexture.create_from_image(mimg["_eye"].get_region(r)) if mimg.has("_eye") else null)
 	if (d.frames as Array).is_empty():
 		return
 	# 발 위치·키: 적혀 있으면 그대로, 아니면 첫 칸 그림에서
@@ -371,6 +373,10 @@ func _apply_mask() -> void:
 	mat.set_shader_parameter("use_line_mask", ln != null)
 	if ln != null:
 		mat.set_shader_parameter("line_mask", ln)
+	var ey: Variant = (_a.get("eyes", []) as Array)[_frame] if _frame < (_a.get("eyes", []) as Array).size() else null
+	mat.set_shader_parameter("use_eye_mask", ey != null)
+	if ey != null:
+		mat.set_shader_parameter("eye_mask", ey)
 	mat.set_shader_parameter("use_zone_mask", has)
 	if has:
 		mat.set_shader_parameter("zone_mask", mr if _tex_from_right else ml)
