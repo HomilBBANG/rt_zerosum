@@ -50,18 +50,25 @@
 - **전투 연계**: 기지에서 출전한 전투만 훈련·장비·강화 반영 (전투 규칙·AP 체계는 그대로, UnitData 복제본의 수치만). 외부 의뢰 중인 대원도 편성 가능.
 - **저장**: `user://outgame_save.json` — 날짜 변경·출전·저장 버튼·타이틀로 갈 때. 슬롯 1개.
 
-## 4. 파일
+## 4. 화면 (2026-10-26 갱신)
+
+- 배경은 3D 단면 건물, 카메라는 위에서 살짝(15°) 내려다보는 원근. 방마다 시설 시트 '조명'(g1~g4) 색 스폿 조명 + 하드 섀도우, 셀 셰이딩.
+- 잠긴 방 = 단면 앞을 검은 판으로 막음 + 자물쇠·가격. 해금하면 그 방만 다시 지어 내부·조명이 생김.
+- 대원은 전투와 같은 2D 리그를 발 위치(3D)를 투영한 화면 위치에 원근 크기로 그림. 클릭 판정은 화면 좌표(방 = 단면 앞면 사각형).
+- 규칙(BaseSim)의 좌표는 그대로 2D (칸 240px = 3m, 층 220px = 3.8m 로 변환) — 테스트·저장 형식 변화 없음.
+
+## 5. 파일
 
 | 역할 | 파일 |
 |---|---|
 | 데이터 (엑셀) | `data/outgame.xlsx` — 설정·층·시설·대원·의뢰·대사·대화이벤트·요청·제작·읽어보기 (초기 생성 `tools/gen_outgame_xlsx.py`, 이미 있으면 덮어쓰지 않음) |
 | 데이터 (일정) | `data/outgame/schedules/<대원 id>.json` (Godot 에디터 `일정` 탭) |
 | 규칙 | `scripts/outgame/` outgame_data · world_clock · room_route_service · npc_schedule_resolver · npc_agent · economy_ledger · base_sim |
-| 화면 | `scenes/outgame/base_hub.tscn` + `scripts/outgame/base_hub.gd`, `scripts/outgame/view/` base_world_view · npc_view · outgame_hud, `scenes/title.tscn` |
+| 화면 | `scenes/outgame/base_hub.tscn` + `scripts/outgame/base_hub.gd`, `scripts/outgame/view/` base_view_3d(3D 배경) · base_overlay · npc_view · outgame_hud, `scenes/title.tscn` |
 | 에디터 | `addons/rtz_schedule_editor/` |
 | 테스트 | `tests/outgame_tests.gd` ([15]~[24]) |
 
-## 5. 아직 정하지 않은 것 (기획서 13절 — 임시값으로 동작 중)
+## 6. 아직 정하지 않은 것 (기획서 13절 — 임시값으로 동작 중)
 
 시설 목록·층 배치/이름, 시간 스케일, 결산 요일·지출, 미화 점수 공식·장군 연출, 대원 설정·관계·위임 대상, 훈련·제작·강화 실제 규칙, 전투 결과가 기지에 주는 영향(보상·부상·시간 경과).
 미승인 제안(주간 보고서·불만 대사·점검 대비 모드)은 구현하지 않음.

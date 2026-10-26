@@ -1,12 +1,13 @@
 class_name NpcView
 extends Node2D
-## 기지 대원 화면 노드: 전투와 같은 Skeleton2D 리그를 작게, 지금 있는 방의 조명색으로.
-## 머리 위: '!' 요청 마커, 수면 Zz, 마우스를 올리면 이름·상태.
-
-const BASE_SCALE := 0.5   # 전투 키(175cm = 230px) 대비 기지 크기
+## 기지 대원 화면 노드: 전투와 같은 Skeleton2D 리그를, 3D 기지 위 그 대원의 발 위치(투영)에 원근 크기로, 지금 있는 방의 조명색으로.
+## 머리 위: '!' 요청 마커, 수면 Zz, 마우스를 올리면 이름·상태. 화면 좌표 노드 (BaseHub 의 화면 층).
 
 var npc_id: String = ""
 var sim: BaseSim
+var hub: Node               # BaseHub (투영)
+var screen_h: float = 80.0  # 화면에서의 키 (px)
+var _s: float = 0.4         # 리그 배율
 var rig: RiggedUnit2D
 var hovered: bool = false
 var _anim := ""
@@ -16,11 +17,8 @@ var _font: Font
 var _bold: Font
 
 
-static func height_of(height_cm: float) -> float:
-	return 230.0 * (height_cm / 175.0) * BASE_SCALE
-
-
-func setup(p_sim: BaseSim, id: String) -> void:
+func setup(p_hub: Node, p_sim: BaseSim, id: String) -> void:
+	hub = p_hub
 	sim = p_sim
 	npc_id = id
 	_font = load("res://assets/fonts/Pretendard-Medium.ttf")
@@ -30,16 +28,24 @@ func setup(p_sim: BaseSim, id: String) -> void:
 		rig = RiggedUnit2D.new()
 		add_child(rig)
 		rig.build(UnitArt.rig_dir(n.sprite), false, n.height_cm)
-		rig.scale = Vector2(BASE_SCALE, BASE_SCALE)
 		rig.set_param("eye_color", Color(0.3, 0.6, 1.0))
 		rig.set_param("paint_eyes", false)
-	position = n.pos
+	_place(n)
+
+
+## 3D 발 위치를 화면으로 투영, 1m 의 화면 길이로 크기 결정 (리그는 175cm = 230px 기준)
+func _place(n: NpcAgent) -> void:
+	var foot: Vector3 = hub.v3d.to3d(n.pos, hub.v3d.stand_z(npc_id))
+	position = hub.project(foot)
+	var ppm: float = (hub.project(foot + Vector3.UP) - position).length()
+	screen_h = ppm * n.height_cm / 100.0
+	_s = ppm * 1.75 / 230.0
+	z_index = int((foot.z + 5.0) * 20.0)
 
 
 func hit_rect() -> Rect2:
-	var n: NpcAgent = sim.npcs[npc_id]
-	var h := height_of(n.height_cm)
-	return Rect2(n.pos + Vector2(-24, -h - 6), Vector2(48, h + 10))
+	var w := maxf(22.0, screen_h * 0.42)
+	return Rect2(position + Vector2(-w * 0.5, -screen_h - 6), Vector2(w, screen_h + 10))
 
 
 func _process(delta: float) -> void:
@@ -49,9 +55,9 @@ func _process(delta: float) -> void:
 	if n == null:
 		return
 	visible = n.state != NpcAgent.UNAVAILABLE
-	position = n.pos
+	_place(n)
 	if rig != null:
-		rig.scale.x = BASE_SCALE * n.facing
+		rig.scale = Vector2(_s * n.facing, _s)
 		_update_anim(n, delta)
 		_update_light(n)
 	queue_redraw()
@@ -98,11 +104,10 @@ func _draw() -> void:
 	var n: NpcAgent = sim.npcs.get(npc_id)
 	if n == null:
 		return
-	var h := height_of(n.height_cm)
-	var top := Vector2(0, -h - 14)
+	var top := Vector2(0, -screen_h - 14)
 	# 발밑 그림자
-	draw_set_transform(Vector2(0, 0), 0, Vector2(1, 0.25))
-	draw_circle(Vector2.ZERO, 22, Color(0, 0, 0, 0.35))
+	draw_set_transform(Vector2(0, 0), 0, Vector2(1, 0.3))
+	draw_circle(Vector2.ZERO, screen_h * 0.24, Color(0, 0, 0, 0.35))
 	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 	if not sim.active_request(npc_id).is_empty():
 		var b := sin(Time.get_ticks_msec() / 180.0) * 3.0
