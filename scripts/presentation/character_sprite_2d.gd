@@ -5,7 +5,7 @@ extends Node2D
 ##   character.json · base.png(정지 그림) · base_mask_l/_r.png
 ##   애니메이션 (셋 중 아무거나, 위에서부터 찾음):
 ##     ① 스프라이트 시트 한 장: <애니메이션>_<칸 수>.png (한 줄) 또는 <애니메이션>_<열>x<행>.png — 예: walk_8.png, attack_4x2.png
-##        (+ 선택 <애니메이션>.json: {"cols", "rows", "count", "skip": [칸 번호…], "order": [칸 번호…], "fps", "loop", "ground", "figure_px", "hip_y", "weapon", "durations"})
+##        (+ 선택 <애니메이션>.json: {"cols", "rows", "count", "skip": [칸 번호…], "order": [칸 번호…], "align_feet": true, "fps", "loop", "ground", "figure_px", "hip_y", "weapon", "durations"})
 ##     ② 여러 애니메이션을 한 장에: sheet.png + sheet.json {"cols": 8, "rows": 4, "anims": {"idle": {"row": 0, "count": 6, "fps": 8}, …}}
 ##     ③ 폴더: <애니메이션>/0001.png, 0002.png … (+ 선택 anim.json, 프레임별 _mask_l/_r.png)
 ##   시트 칸은 모두 같은 크기. 발 위치·키를 안 적으면 첫 칸 그림에서 자동 (그림 맨 아래 가운데 = 발, 높이 = 키).
@@ -211,6 +211,7 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 		lowest = maxi(lowest, used.end.y)
 		cell.generate_mipmaps()
 		d.frames.append(ImageTexture.create_from_image(cell))
+		d.get_or_add("feet_y", []).append(used.end.y)
 		d.masks_r.append(ImageTexture.create_from_image(mimg["_mask_r"].get_region(r)) if mimg.has("_mask_r") else null)
 		d.masks_l.append(ImageTexture.create_from_image(mimg["_mask_l"].get_region(r)) if mimg.has("_mask_l") else null)
 	if (d.frames as Array).is_empty():
@@ -220,6 +221,9 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 	d.ground = opt.get("ground", [gx, lowest])
 	d.figure_px = float(opt.get("figure_px", lowest - first_used.position.y))
 	d.hip_y = float(opt.get("hip_y", float(d.ground[1]) - d.figure_px * 0.48))
+	if bool(opt.get("align_feet", false)):   # 칸마다 발바닥을 같은 땅선에 (그림마다 발 높이가 달라 위아래로 튀는 것 방지)
+		d.align_feet = true
+		d.ground = [d.ground[0], d.feet_y[0]]
 	for k in ["fps", "loop", "weapon", "durations"]:
 		if opt.has(k):
 			d[k] = opt[k]
@@ -341,7 +345,10 @@ func _show(i: int) -> void:
 	var g: Array = _a.ground
 	var s := 230.0 * (height_cm / 175.0) / maxf(1.0, float(_a.figure_px))
 	body.scale = Vector2(s, s)
-	body.position = -Vector2(float(g[0]), float(g[1])) * s
+	var gy := float(g[1])
+	if _a.get("align_feet", false):
+		gy = float(_a.feet_y[i])
+	body.position = -Vector2(float(g[0]), gy) * s
 	weapon_holder.visible = bool(_a.get("weapon", true))
 	_apply_mask()
 
