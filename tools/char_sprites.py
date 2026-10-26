@@ -12,8 +12,13 @@ assets/characters/<id>/
 사용:
   python3 tools/char_sprites.py masks            프레임마다 조명 마스크(<프레임>_mask_l/_r.png)가 없으면 만든다
   python3 tools/char_sprites.py masks dan        한 캐릭터만
+  python3 tools/char_sprites.py import <캐릭터> <동작> <파일…> [--grid 4x2] [--fps 12] [--hold 0.35]
+      움직이는 GIF·WebP(APNG) → 프레임마다, 스프라이트 시트 → --grid 열x행 칸마다, PNG 여러 장 → 그 순서대로
+      첫 프레임의 발·키를 base.png 에 맞추는 같은 이동·배율을 모든 프레임에 적용 (프레임 사이 움직임은 그대로)
+      → assets/characters/<캐릭터>/<동작>/0001.png … + anim.json(움직이는 파일의 프레임 시간) + 조명 마스크
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
+import json
 import os
 import sys
 
@@ -61,8 +66,102 @@ def cmd_masks(only=None):
     print("만든 마스크:", n)
 
 
+def _feet(im):
+    """알파 기준 (bbox, 발 가운데 x) — 아래 6% 줄의 좌우 끝 가운데"""
+    a = im.split()[3].point(lambda v: 255 if v > 40 else 0)
+    bb = a.getbbox()
+    if bb is None:
+        return None, 0
+    h = bb[3] - bb[1]
+    band = a.crop((0, bb[3] - max(1, int(h * 0.06)), im.width, bb[3]))
+    cols = [x for x in range(band.width) if band.crop((x, 0, x + 1, band.height)).getbbox()]
+    return bb, (cols[0] + cols[-1]) / 2
+
+
+def _read_frames(paths, grid):
+    """[(RGBA 이미지, 표시 ms 또는 None)]"""
+    out = []
+    for p in paths:
+        im = Image.open(p)
+        n = getattr(im, "n_frames", 1)
+        if n > 1:
+            for i in range(n):
+                im.seek(i)
+                out.append((im.convert("RGBA").copy(), im.info.get("duration")))
+        elif grid:
+            cols, rows = grid
+            sheet = im.convert("RGBA")
+            cw, ch = sheet.width // cols, sheet.height // rows
+            for r in range(rows):
+                for c in range(cols):
+                    cell = sheet.crop((c * cw, r * ch, (c + 1) * cw, (r + 1) * ch))
+                    if cell.split()[3].getbbox():   # 빈 칸은 건너뜀
+                        out.append((cell, None))
+        else:
+            out.append((im.convert("RGBA"), None))
+    return out
+
+
+def cmd_import(cid, anim, paths, grid=None, fps=None, hold=None):
+    cdir = os.path.join(CHAR_DIR, cid)
+    info = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    w, h = info["image_size"]
+    base = Image.open(os.path.join(cdir, "base.png")).convert("RGBA")
+    _bb, gx = _feet(base)
+    gy = info["ground"][1]
+    fig = info.get("figure_px", h)
+    frames = _read_frames(paths, grid)
+    if not frames:
+        sys.exit("프레임이 없습니다")
+    bb, cx = _feet(frames[0][0])
+    s = fig / (bb[3] - bb[1])
+    ox, oy = gx - cx * s, gy - bb[3] * s
+    adir = os.path.join(cdir, anim)
+    os.makedirs(adir, exist_ok=True)
+    for fn in os.listdir(adir):   # 예전 프레임 지우기
+        if fn.endswith(".png"):
+            os.remove(os.path.join(adir, fn))
+    pad = max(w, h)
+    durs = []
+    for i, (im, ms) in enumerate(frames):
+        im2 = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+        big = Image.new("RGBA", (w + 2 * pad, h + 2 * pad), (0, 0, 0, 0))
+        big.alpha_composite(im2, (round(ox) + pad, round(oy) + pad))
+        big.crop((pad, pad, pad + w, pad + h)).save(os.path.join(adir, "%04d.png" % (i + 1)))
+        durs.append(round((ms or 0) / 1000.0, 3))
+    meta = {}
+    if fps:
+        meta["fps"] = fps
+    elif all(d > 0 for d in durs) and len(set(durs)) > 1:
+        meta["durations"] = durs
+    elif durs and durs[0] > 0:
+        meta["fps"] = round(1.0 / durs[0], 2)
+    if hold and len(frames) == 1:
+        meta["durations"] = [hold]
+    if meta:
+        json.dump(meta, open(os.path.join(adir, "anim.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    elif os.path.exists(os.path.join(adir, "anim.json")):
+        os.remove(os.path.join(adir, "anim.json"))
+    print(cid, anim, "프레임", len(frames), "배율", round(s, 3), meta)
+    cmd_masks(cid)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2 or sys.argv[1] != "masks":
+    args = sys.argv[1:]
+    if args[:1] == ["masks"]:
+        cmd_masks(args[1] if len(args) > 1 else None)
+    elif args[:1] == ["import"] and len(args) >= 4:
+        opts = {}
+        rest = []
+        it = iter(args[3:])
+        for a in it:
+            if a in ("--grid", "--fps", "--hold"):
+                opts[a[2:]] = next(it)
+            else:
+                rest.append(a)
+        grid = tuple(int(v) for v in opts["grid"].lower().split("x")) if "grid" in opts else None
+        cmd_import(args[1], args[2], rest, grid, float(opts["fps"]) if "fps" in opts else None,
+                   float(opts["hold"]) if "hold" in opts else None)
+    else:
         print(__doc__)
         sys.exit(1)
-    cmd_masks(sys.argv[2] if len(sys.argv) > 2 else None)

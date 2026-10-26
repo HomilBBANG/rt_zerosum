@@ -338,7 +338,8 @@ func play_hit() -> void:
 	_flash = 1.0
 	if chr != null and chr.has_anim("hit"):
 		chr.play("hit")
-		return
+		if (CharacterSprite2D.anim_data(chr.cid, "hit").frames as Array).size() >= 3:
+			return   # 프레임이 충분하면 그림만, 1~2장이면 흔들림도 함께
 	var tw := create_tween()
 	tw.tween_property(flip, "rotation", -0.12 if unit.team == "ally" else 0.12, 0.06)
 	tw.tween_property(flip, "rotation", 0.0, 0.16)

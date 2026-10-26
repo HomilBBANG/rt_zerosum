@@ -201,6 +201,9 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - 무기: 전투에서 손 위치(`character.json` 의 `hand`)에 무기 그림을 붙입니다. 무기를 직접 그린 동작은 `anim.json` 에 `"weapon": false` (attack·hit·heal·idle 외 동작은 기본으로 숨김).
 - 조명(셀 명암) 마스크: 프레임만 넣어도 동작합니다(마스크 없이 고른 조명). 방향 있는 명암을 원하면 `python3 tools/char_sprites.py masks` → 프레임마다 `_mask_l/_r.png` 생성.
 - 새 프레임은 게임을 다시 켜면 바로 반영 (임포트 기다릴 필요 없음).
+- **움직이는 GIF·WebP / 스프라이트 시트 / PNG 여러 장 → 프레임 자동 변환**: `python3 tools/char_sprites.py import nikita_army hit 파일.webp`
+  (시트는 `--grid 4x2`, 속도 `--fps 12`). 첫 프레임의 발·키를 기본 그림에 맞춘 같은 이동·배율을 모든 프레임에 적용하고 조명 마스크까지 만듭니다.
+  ※ 채팅에 올린 움직이는 이미지는 첫 장면 한 장으로만 전달되므로, 원본 파일은 저장소(예: `assets/characters/nikita_army/_src/`)에 넣어 커밋하거나 스프라이트 시트 한 장으로 주세요.
 - 프레임마다 보여 줄 시간을 다르게: `anim.json` 의 `"durations": [2.4, 1.2]` (초, fps 대신).
 - **들어간 애니메이션**: 니키타 `idle` 2프레임 (사용자 제공, 2.4초·1.2초 반복) — 전투·기지 대기 모두.
 

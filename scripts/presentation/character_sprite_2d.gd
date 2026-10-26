@@ -183,8 +183,8 @@ func is_static() -> bool:
 
 func _process(delta: float) -> void:
 	var n := (_a.get("frames", []) as Array).size()
-	if n <= 1 or _done:
-		return
+	if _done or n == 0 or (n == 1 and _a.loop):
+		return   # 한 장짜리 반복 동작은 넘길 프레임이 없음 (한 장짜리 hit 같은 1회 동작은 시간이 지나면 끝나야 함)
 	var i := 0
 	var durs: Array = _a.get("durations", [])
 	if not durs.is_empty():
