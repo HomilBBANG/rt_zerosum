@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bk78m5il5q26c"
-path="res://.godot/imported/hit_4x4.png-eb03f4b67b992ef5d3b5b47796535a46.ctex"
+uid="uid://1uyciowmr0c3"
+path="res://.godot/imported/idle_4x4_eye.png-0c94308372a0be5cab39a84bacc2b250.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/characters/hero2/hit_4x4.png"
-dest_files=["res://.godot/imported/hit_4x4.png-eb03f4b67b992ef5d3b5b47796535a46.ctex"]
+source_file="res://assets/characters/hero2/idle_4x4_eye.png"
+dest_files=["res://.godot/imported/idle_4x4_eye.png-0c94308372a0be5cab39a84bacc2b250.ctex"]
 
 [params]
 
@@ -23,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

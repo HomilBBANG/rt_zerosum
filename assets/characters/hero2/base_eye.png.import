@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://rs6n5864j58e"
-path="res://.godot/imported/hit_4x4_mask_l.png-3ce240032c9097b30a5aec54b262a24d.ctex"
+uid="uid://olpo1o1ioih1"
+path="res://.godot/imported/base_eye.png-e354525d599633d854fbd62619459480.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/characters/hero2/hit_4x4_mask_l.png"
-dest_files=["res://.godot/imported/hit_4x4_mask_l.png-3ce240032c9097b30a5aec54b262a24d.ctex"]
+source_file="res://assets/characters/hero2/base_eye.png"
+dest_files=["res://.godot/imported/base_eye.png-e354525d599633d854fbd62619459480.ctex"]
 
 [params]
 

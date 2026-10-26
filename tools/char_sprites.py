@@ -123,6 +123,27 @@ def eye_mask(im, head=None, boxes=None):
         box[max(0, ys.start - 6):ys.stop + 6, max(0, xs.start - 6):xs.stop + 6] = True
     dl, _dn = ndimage.label(dark & box)
     m |= np.isin(dl, np.unique(dl[near & (dl > 0)]))
+    # 홍채 색이 노랑·갈색 등이어도: 눈마다 볼록 껍질 안에서 피부색과 다른 픽셀은 눈으로
+    from PIL import ImageDraw
+    from scipy.spatial import ConvexHull
+    lab2, n2 = ndimage.label(m)
+    for k in range(1, n2 + 1):
+        ys, xs = np.nonzero(lab2 == k)
+        if len(xs) < 8:
+            continue
+        try:
+            hull = ConvexHull(np.stack([xs, ys], 1))
+        except Exception:
+            continue
+        poly = Image.new("L", im.size, 0)
+        ImageDraw.Draw(poly).polygon([(int(xs[v]), int(ys[v])) for v in hull.vertices], fill=255)
+        inside = np.asarray(poly) > 0
+        ring = ndimage.binary_dilation(inside, iterations=5) & ~ndimage.binary_dilation(inside, iterations=1) & (al > 200) & ~dark
+        if ring.sum() < 10:
+            continue
+        skin = np.median(a[..., :3][ring], 0)
+        diff = np.abs(a[..., :3] - skin).sum(-1)
+        m |= inside & (al > 200) & (diff > 70)
     m = ndimage.binary_fill_holes(m)
     out = Image.fromarray((m * 255).astype(np.uint8))
     return out.filter(ImageFilter.GaussianBlur(0.7))
