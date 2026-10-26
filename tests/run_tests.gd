@@ -55,6 +55,7 @@ func _init() -> void:
 	_test_equip_and_move_lock()
 	_test_rally_status()
 	_test_balance_data_and_ai_graph()
+	load("res://tests/outgame_tests.gd").new().run(_check)
 	print("== %d passed, %d failed ==" % [_passes, _fails])
 	quit(1 if _fails > 0 else 0)
 

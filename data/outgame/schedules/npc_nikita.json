@@ -1,0 +1,474 @@
+{
+ "npc_id": "npc_nikita",
+ "preferred_facility_ids": [
+  "f1_office"
+ ],
+ "weekly_schedule": [
+  {
+   "weekday": 0,
+   "start_minute": 0,
+   "end_minute": 420,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "sleep"
+  },
+  {
+   "weekday": 0,
+   "start_minute": 420,
+   "end_minute": 480,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 0,
+   "start_minute": 480,
+   "end_minute": 720,
+   "target_facility_id": "f1_office",
+   "activity_id": "work"
+  },
+  {
+   "weekday": 0,
+   "start_minute": 720,
+   "end_minute": 780,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 0,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "b1_training",
+   "activity_id": "train",
+   "required_unlocks": [
+    "b1_training"
+   ]
+  },
+  {
+   "weekday": 0,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "f1_office",
+   "activity_id": "work"
+  },
+  {
+   "weekday": 0,
+   "start_minute": 1020,
+   "end_minute": 1140,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "chat"
+  },
+  {
+   "weekday": 0,
+   "start_minute": 1140,
+   "end_minute": 1200,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 0,
+   "start_minute": 1200,
+   "end_minute": 1440,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "rest"
+  },
+  {
+   "weekday": 1,
+   "start_minute": 0,
+   "end_minute": 420,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "sleep"
+  },
+  {
+   "weekday": 1,
+   "start_minute": 420,
+   "end_minute": 480,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 1,
+   "start_minute": 480,
+   "end_minute": 720,
+   "target_facility_id": "f1_office",
+   "activity_id": "work"
+  },
+  {
+   "weekday": 1,
+   "start_minute": 720,
+   "end_minute": 780,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 1,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "b1_training",
+   "activity_id": "train",
+   "required_unlocks": [
+    "b1_training"
+   ]
+  },
+  {
+   "weekday": 1,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "f1_office",
+   "activity_id": "work"
+  },
+  {
+   "weekday": 1,
+   "start_minute": 1020,
+   "end_minute": 1140,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "chat"
+  },
+  {
+   "weekday": 1,
+   "start_minute": 1140,
+   "end_minute": 1200,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 1,
+   "start_minute": 1200,
+   "end_minute": 1440,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "rest"
+  },
+  {
+   "weekday": 2,
+   "start_minute": 0,
+   "end_minute": 420,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "sleep"
+  },
+  {
+   "weekday": 2,
+   "start_minute": 420,
+   "end_minute": 480,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 2,
+   "start_minute": 480,
+   "end_minute": 720,
+   "target_facility_id": "f1_office",
+   "activity_id": "work"
+  },
+  {
+   "weekday": 2,
+   "start_minute": 720,
+   "end_minute": 780,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 2,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "b1_training",
+   "activity_id": "train",
+   "required_unlocks": [
+    "b1_training"
+   ]
+  },
+  {
+   "weekday": 2,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "f1_office",
+   "activity_id": "work"
+  },
+  {
+   "weekday": 2,
+   "start_minute": 1020,
+   "end_minute": 1140,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "chat"
+  },
+  {
+   "weekday": 2,
+   "start_minute": 1140,
+   "end_minute": 1200,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 2,
+   "start_minute": 1200,
+   "end_minute": 1440,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "rest"
+  },
+  {
+   "weekday": 3,
+   "start_minute": 0,
+   "end_minute": 420,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "sleep"
+  },
+  {
+   "weekday": 3,
+   "start_minute": 420,
+   "end_minute": 480,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 3,
+   "start_minute": 480,
+   "end_minute": 720,
+   "target_facility_id": "f1_office",
+   "activity_id": "work"
+  },
+  {
+   "weekday": 3,
+   "start_minute": 720,
+   "end_minute": 780,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 3,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "b1_training",
+   "activity_id": "train",
+   "required_unlocks": [
+    "b1_training"
+   ]
+  },
+  {
+   "weekday": 3,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "f1_office",
+   "activity_id": "work"
+  },
+  {
+   "weekday": 3,
+   "start_minute": 1020,
+   "end_minute": 1140,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "chat"
+  },
+  {
+   "weekday": 3,
+   "start_minute": 1140,
+   "end_minute": 1200,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 3,
+   "start_minute": 1200,
+   "end_minute": 1440,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "rest"
+  },
+  {
+   "weekday": 4,
+   "start_minute": 0,
+   "end_minute": 420,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "sleep"
+  },
+  {
+   "weekday": 4,
+   "start_minute": 420,
+   "end_minute": 480,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 4,
+   "start_minute": 480,
+   "end_minute": 720,
+   "target_facility_id": "f1_office",
+   "activity_id": "work"
+  },
+  {
+   "weekday": 4,
+   "start_minute": 720,
+   "end_minute": 780,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 4,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "b1_training",
+   "activity_id": "train",
+   "required_unlocks": [
+    "b1_training"
+   ]
+  },
+  {
+   "weekday": 4,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "f1_office",
+   "activity_id": "work"
+  },
+  {
+   "weekday": 4,
+   "start_minute": 1020,
+   "end_minute": 1140,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "chat"
+  },
+  {
+   "weekday": 4,
+   "start_minute": 1140,
+   "end_minute": 1200,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 4,
+   "start_minute": 1200,
+   "end_minute": 1440,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "rest"
+  },
+  {
+   "weekday": 5,
+   "start_minute": 0,
+   "end_minute": 420,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "sleep"
+  },
+  {
+   "weekday": 5,
+   "start_minute": 420,
+   "end_minute": 480,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 5,
+   "start_minute": 480,
+   "end_minute": 720,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "rest"
+  },
+  {
+   "weekday": 5,
+   "start_minute": 720,
+   "end_minute": 780,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 5,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "rest"
+  },
+  {
+   "weekday": 5,
+   "start_minute": 1020,
+   "end_minute": 1140,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "chat"
+  },
+  {
+   "weekday": 5,
+   "start_minute": 1140,
+   "end_minute": 1200,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 5,
+   "start_minute": 1200,
+   "end_minute": 1440,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "rest"
+  },
+  {
+   "weekday": 6,
+   "start_minute": 0,
+   "end_minute": 420,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "sleep"
+  },
+  {
+   "weekday": 6,
+   "start_minute": 420,
+   "end_minute": 480,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 6,
+   "start_minute": 480,
+   "end_minute": 720,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "rest"
+  },
+  {
+   "weekday": 6,
+   "start_minute": 720,
+   "end_minute": 780,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 6,
+   "start_minute": 780,
+   "end_minute": 1020,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "rest"
+  },
+  {
+   "weekday": 6,
+   "start_minute": 1020,
+   "end_minute": 1140,
+   "target_facility_id": "f1_lounge",
+   "activity_id": "chat"
+  },
+  {
+   "weekday": 6,
+   "start_minute": 1140,
+   "end_minute": 1200,
+   "target_facility_id": "f1_mess",
+   "activity_id": "eat",
+   "fallback_facility_id": "f1_lounge"
+  },
+  {
+   "weekday": 6,
+   "start_minute": 1200,
+   "end_minute": 1440,
+   "target_facility_id": "b1_quarters",
+   "activity_id": "rest"
+  }
+ ],
+ "delegation_rules": {
+  "can_delegate_cleaning": false
+ }
+}

@@ -17,7 +17,8 @@ func _ready() -> void:
 	bg.color = Color(0.05, 0.08, 0.1)
 	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	add_child(bg)
-	var title := _label("편성 — 아군 전방/중앙/후방 2슬롯 (유닛을 고른 뒤 슬롯을 클릭: 빈 슬롯 이동, 점유 슬롯 교환)", 20, Color(1, 0.95, 0.7))
+	var head := "전투 배치 — %s" % Game.data.stages.get(Game.stage_id, {}).get("name", Game.stage_id) if Game.campaign and Game.data != null else "편성"
+	var title := _label("%s — 아군 전방/중앙/후방 2슬롯 (유닛을 고른 뒤 슬롯을 클릭: 빈 슬롯 이동, 점유 슬롯 교환)" % head, 20, Color(1, 0.95, 0.7))
 	title.position = Vector2(40, 24)
 	add_child(title)
 	info_label = _label("", 15, Color(0.8, 0.95, 1.0))
@@ -57,7 +58,8 @@ func _ready() -> void:
 	roster.add_theme_constant_override("separation", 8)
 	add_child(roster)
 	roster.add_child(_label("아군 로스터", 18, Color(1, 1, 1)))
-	for u in Game.allies:
+	for u0 in Game.allies:
+		var u := Game.ally_view(u0)   # 기지 훈련·장비 반영
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(480, 44)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -66,7 +68,8 @@ func _ready() -> void:
 		b.text = "%s  %s  Lv%d  속도%d  HP%d  AP%d(+%d)  %s" % [u.display_name, u.role, u.level, u.speed, u.max_hp, u.max_ap, u.ap_recovery, "원거리" if u.range_type == "ranged" else "근접"]
 		b.icon = _portrait(u)
 		b.expand_icon = true
-		b.pressed.connect(func(): _select(u.id))
+		var uid := u0.id
+		b.pressed.connect(func(): _select(uid))
 		roster.add_child(b)
 		roster_buttons[u.id] = b
 
@@ -80,7 +83,7 @@ func _ready() -> void:
 	var reset := _big_button("기본 편성", Color(0.5, 0.7, 0.9))
 	reset.pressed.connect(func(): Game.reset_formation(); _refresh())
 	btns.add_child(reset)
-	var back := _big_button("메뉴", Color(0.6, 0.6, 0.6))
+	var back := _big_button("기지로" if Game.campaign else "메뉴", Color(0.6, 0.6, 0.6))
 	back.pressed.connect(func(): Game.go_menu())
 	btns.add_child(back)
 	_refresh()

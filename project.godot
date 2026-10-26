@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="RT Zerosum Battle Prototype"
-run/main_scene="res://scenes/main_menu.tscn"
+run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
@@ -29,7 +29,7 @@ window/stretch/mode="canvas_items"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/rtz_ai_editor/plugin.cfg", "res://addons/rtz_stage_editor/plugin.cfg")
+enabled=PackedStringArray("res://addons/rtz_ai_editor/plugin.cfg", "res://addons/rtz_stage_editor/plugin.cfg", "res://addons/rtz_schedule_editor/plugin.cfg")
 
 [gui]
 

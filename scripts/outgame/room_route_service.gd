@@ -1,0 +1,71 @@
+@tool
+class_name RoomRouteService
+extends RefCounted
+## 시설 연결 그래프 경로 탐색.
+## 같은 층에서 맞닿은 시설끼리 연결, 계단(기능=계단)은 같은 칸의 위아래 층 계단과 연결.
+## 잠긴 시설은 지나갈 수 없다 (방을 통과해 다니는 단면 구조). 경로는 목적지가 바뀔 때만 계산한다.
+
+
+static func neighbors(data: OutgameData, fid: String) -> Array[String]:
+	var out: Array[String] = []
+	var a: Dictionary = data.facilities.get(fid, {})
+	if a.is_empty():
+		return out
+	for id in data.facility_order:
+		if id == fid:
+			continue
+		var b: Dictionary = data.facilities[id]
+		if b.order == a.order and (a.col + a.width == b.col or b.col + b.width == a.col):
+			out.append(id)
+		elif a.tag == "계단" and b.tag == "계단" and absi(b.order - a.order) == 1 and b.col == a.col:
+			out.append(id)
+	return out
+
+
+## from → to 시설 목록 (from, …, to). is_open(fid) 가 false 인 시설은 지나가지 않음 (출발지는 예외).
+## 갈 수 없으면 빈 배열, 같은 곳이면 [from].
+static func find_path(data: OutgameData, from: String, to: String, is_open: Callable) -> Array[String]:
+	var out: Array[String] = []
+	if not data.facilities.has(from) or not data.facilities.has(to):
+		return out
+	if from == to:
+		out.append(from)
+		return out
+	if not is_open.call(to):
+		return out
+	var prev := {from: ""}
+	var queue: Array[String] = [from]
+	while not queue.is_empty():
+		var cur: String = queue.pop_front()
+		if cur == to:
+			break
+		for n in neighbors(data, cur):
+			if prev.has(n) or not is_open.call(n):
+				continue
+			prev[n] = cur
+			queue.append(n)
+	if not prev.has(to):
+		return out
+	var c := to
+	while c != "":
+		out.push_front(c)
+		c = prev[c]
+	return out
+
+
+static func reachable(data: OutgameData, from: String, to: String, is_open: Callable) -> bool:
+	return not find_path(data, from, to, is_open).is_empty()
+
+
+## 시설 경로 → 걸어갈 지점들 (층이 바뀌는 곳은 계단 가운데에서 수직 이동). 마지막 = 목적지 안의 end_x
+static func waypoints(data: OutgameData, path: Array[String], end_x: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in range(path.size() - 1):
+		var a := path[i]
+		var b := path[i + 1]
+		if data.facilities[a].order != data.facilities[b].order:
+			pts.append(Vector2(data.facility_center_x(a), data.floor_line(a)))
+			pts.append(Vector2(data.facility_center_x(b), data.floor_line(b)))
+	if not path.is_empty():
+		pts.append(Vector2(end_x, data.floor_line(path[-1])))
+	return pts

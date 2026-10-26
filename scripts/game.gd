@@ -1,6 +1,10 @@
 extends Node
 ## Autoload "Game": 씬 전환, 전역 설정(2D/3D 모드, 조명 프리셋, 선공, 시드, 편성), CLI 스크린샷 지원.
+## 게임 루프 [임시]: 타이틀 → 게임 시작/이어하기 → 기지(아웃게임) → 전투 출전 → 전투 배치(편성) → 전투 → 결과 → 기지.
+## 전투 테스트 메뉴(main_menu)는 타이틀에서 따로 들어가는 개발용.
 
+const SCENE_TITLE := "res://scenes/title.tscn"
+const SCENE_BASE := "res://scenes/outgame/base_hub.tscn"
 const SCENE_MENU := "res://scenes/main_menu.tscn"
 const SCENE_FORMATION := "res://scenes/formation.tscn"
 const SCENE_BATTLE_2D := "res://scenes/battle_2d.tscn"
@@ -26,6 +30,16 @@ var stage_id: String = ""
 signal data_reloaded(warnings: PackedStringArray)
 var _balance_mtime: int = 0
 var _poll_t: float = 0.0
+## 아웃게임 (data/outgame.xlsx + 대원 일정). base = 진행 중인 기지 (없으면 null)
+const SAVE_PATH := "user://outgame_save.json"
+var outgame_data: OutgameData = null
+var base: BaseSim = null
+var campaign: bool = false          # 기지에서 출전한 전투인가 (결과 → 기지로)
+var autosave: bool = true           # 에디터 테스트 플레이는 저장하지 않음
+signal outgame_reloaded(warnings: PackedStringArray)
+var _outgame_mtime: int = 0
+var _sched_mtime: int = 0
+var _ally_copies: Array = []        # [{copy, base}] 기지 성장(훈련·장비)을 반영한 전투용 아군 복제본
 
 
 ## 렌더 해상도: 창(=렌더 버퍼)을 QHD(2560×1440 픽셀)로 고정. 게임 좌표는 1280×720 그대로이고
@@ -71,12 +85,21 @@ func _ready() -> void:
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(GameData.EDITOR_PLAY_PATH))
 			if req is Dictionary:
 				set_stage(str(req.get("stage", stage_id)))
+				if req.get("base", false):   # 일정 탭 "기지 테스트 플레이": 새 기지, 저장 안 함, 카메라는 그 대원
+					cli["editor_base"] = true
+					cli["base_focus"] = str(req.get("npc", ""))
 	else:
 		push_warning("data/balance.xlsx 를 읽지 못해 내장 테스트 데이터를 씁니다")
 		allies = TestRoster.build_provided_allies()
 		enemies = TestRoster.build_provided_enemies()
 		actions = TestRoster.build_actions()
 	reset_formation()
+	outgame_data = OutgameData.load_from()
+	if outgame_data != null:
+		_outgame_mtime = FileAccess.get_modified_time(OutgameData.PATH)
+		_sched_mtime = outgame_data.schedules_mtime()
+		for w in outgame_data.warnings:
+			push_warning("outgame.xlsx: " + w)
 	if cli.has("export_hud"):   # HUD 레이아웃을 scenes/battle_hud.tscn 으로 저장 (tools/export_hud_scene.gd)
 		var err: int = load("res://tools/export_hud_scene.gd").run()
 		get_tree().quit(0 if err == OK else 1)
@@ -112,7 +135,12 @@ func _cli_jump() -> void:
 		"formation":
 			get_tree().change_scene_to_file(SCENE_FORMATION)
 		"menu":
+			go_menu_test()
+		"title":
 			pass
+		"base":
+			start_base_session(cli.get("new", "1") == "1")
+			go_base()
 		"bench":
 			get_tree().change_scene_to_file(SCENE_BENCH)
 		"result":
@@ -148,12 +176,13 @@ func set_stage(id: String) -> void:
 
 ## 실행 중 엑셀 저장 감지 (1초마다 수정 시각 확인)
 func _process(delta: float) -> void:
-	if data == null:
-		return
 	_poll_t += delta
 	if _poll_t < 1.0:
 		return
 	_poll_t = 0.0
+	_poll_outgame()
+	if data == null:
+		return
 	var t := FileAccess.get_modified_time(GameData.BALANCE_PATH)
 	if t == 0 or t == _balance_mtime:
 		return
@@ -164,21 +193,146 @@ func _process(delta: float) -> void:
 	data.apply_from(newer)
 	for w in data.warnings:
 		push_warning("balance.xlsx: " + w)
+	for e in _ally_copies:
+		_derive_ally(e.copy, e.base)
 	print("[balance] data/balance.xlsx 다시 읽음")
 	data_reloaded.emit(data.warnings)
+
+
+## 기지 엑셀·대원 일정 파일이 바뀌면 다시 읽어 진행 중인 기지에 반영
+func _poll_outgame() -> void:
+	if outgame_data == null:
+		return
+	var t := FileAccess.get_modified_time(OutgameData.PATH)
+	var ts := outgame_data.schedules_mtime()
+	if (t == 0 or t == _outgame_mtime) and ts == _sched_mtime:
+		return
+	var newer := OutgameData.load_from()
+	if newer == null:
+		return
+	_outgame_mtime = t
+	_sched_mtime = ts
+	outgame_data = newer
+	if base != null:
+		base.set_data(newer)
+	for w in newer.warnings:
+		push_warning("outgame.xlsx: " + w)
+	print("[outgame] 기지 데이터 다시 읽음")
+	outgame_reloaded.emit(newer.warnings)
 
 
 func build_roster() -> Array:
 	var out: Array = []
 	if data != null and stage_id != "":
 		enemies = data.build_stage_enemies(stage_id)   # 스테이지 에디터에서 바꾼 배치를 매 전투 반영
+	_ally_copies.clear()
 	for f in formation:
 		var d := find_ally(f.unit_id)
 		if d != null:
+			if campaign and base != null:   # 기지 훈련·장비·강화 반영 (전투 규칙은 그대로, 수치만)
+				var c := UnitData.new()
+				_derive_ally(c, d)
+				_ally_copies.append({"copy": c, "base": d})
+				d = c
 			out.append({"data": d, "row": f.row, "index": f.index})
 	for e in enemies:
 		out.append({"data": e, "row": e.default_row, "index": e.default_index})
 	return out
+
+
+func _derive_ally(copy: UnitData, src: UnitData) -> void:
+	GameData._copy_props(copy, src)
+	if base != null:
+		base.apply_to_ally(copy, src)
+
+
+## 편성 화면 표시용: 기지 성장이 반영된 아군 (캠페인이 아니면 원본)
+func ally_view(u: UnitData) -> UnitData:
+	if not (campaign and base != null):
+		return u
+	var c := UnitData.new()
+	_derive_ally(c, u)
+	return c
+
+
+# ---------------------------------------------------------------- 아웃게임 (기지)
+func has_save() -> bool:
+	return FileAccess.file_exists(SAVE_PATH)
+
+
+## 기지 세션 준비: new_game = true 면 새로 시작, 아니면 저장 불러오기 (없으면 새로)
+func start_base_session(new_game: bool = true) -> bool:
+	if outgame_data == null:
+		return false
+	autosave = not cli.has("editor_base") and not cli.has("shot")
+	if not new_game and has_save():
+		var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+		if j is Dictionary:
+			base = BaseSim.from_dict(outgame_data, data, j)
+			campaign = true
+			return true
+	base = BaseSim.create(outgame_data, data)
+	campaign = true
+	if new_game:
+		reset_formation()
+	save_campaign()
+	return true
+
+
+func save_campaign() -> bool:
+	if base == null or not autosave:
+		return base != null
+	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		return false
+	var d := base.to_dict()
+	d["formation"] = formation
+	d["stage_id"] = stage_id
+	f.store_string(JSON.stringify(d))
+	return true
+
+
+func load_campaign() -> bool:
+	if not start_base_session(false):
+		return false
+	var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	if j is Dictionary:
+		if j.get("formation") is Array and not (j.formation as Array).is_empty():
+			formation = []
+			for e in j.formation:
+				formation.append({"unit_id": str(e.unit_id), "row": int(e.row), "index": int(e.index)})
+		if str(j.get("stage_id", "")) != "":
+			set_stage(str(j.stage_id))
+	return true
+
+
+func delete_save() -> void:
+	if has_save():
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+
+
+func go_title() -> void:
+	campaign = false
+	get_tree().change_scene_to_file(SCENE_TITLE)
+
+
+func go_base() -> void:
+	campaign = true
+	get_tree().change_scene_to_file(SCENE_BASE)
+
+
+## 기지 → 전투 출전 → 전투 배치(편성)
+func sortie(p_stage: String) -> void:
+	set_stage(p_stage)
+	campaign = true
+	restart_count = 0
+	save_campaign()
+	go_formation()
+
+
+func go_menu_test() -> void:
+	campaign = false
+	get_tree().change_scene_to_file(SCENE_MENU)
 
 
 func battle_scene_path() -> String:
@@ -189,8 +343,12 @@ func start_battle() -> void:
 	get_tree().change_scene_to_file(battle_scene_path())
 
 
+## 전투·편성·결과의 "메뉴/돌아가기": 기지에서 출전했으면 기지로, 아니면 전투 테스트 메뉴로
 func go_menu() -> void:
-	get_tree().change_scene_to_file(SCENE_MENU)
+	if campaign and base != null:
+		go_base()
+	else:
+		get_tree().change_scene_to_file(SCENE_MENU)
 
 
 func go_formation() -> void:

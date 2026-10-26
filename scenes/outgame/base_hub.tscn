@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bbasehub00000001"]
+
+[ext_resource type="Script" path="res://scripts/outgame/base_hub.gd" id="1"]
+
+[node name="BaseHub" type="Node2D"]
+script = ExtResource("1")

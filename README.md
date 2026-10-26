@@ -1,4 +1,4 @@
-# RT Zerosum — 전투 플레이어블 프로토타입 (Godot 4.7)
+# RT Zerosum — 전투 + 기지(아웃게임) 플레이어블 프로토타입 (Godot 4.7)
 
 횡스크롤 턴제 6인 AP 전투 프로토타입. `docs/design/PROTOTYPE_GDD_v1_0.md` 의 확정 규칙과 임시값을 구현했고,
 **같은 전투 규칙 위에 2D 표현(원화 + 구역 마스크 셰이더)과 3D 표현(셀 셰이더 + 실광원) 두 가지 뷰**를 올려
@@ -39,8 +39,33 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 > git 이 설치돼 있으면 두 기기 모두 `git pull` 로 같은 코드를 맞출 수 있습니다. 한쪽에서 수정한 뒤 다른 쪽에서 받으려면
 > 수정한 기기에서 `git push` 할 권한(HomilBBANG/rt_zerosum 저장소 협업자)이 필요합니다.
 
+## 게임 루프 · 아웃게임(기지 운영)
+**타이틀 → 게임 시작(또는 이어하기) → 기지 → `전투 출전` → 전투 배치(편성) → 전투 → 결과 → `기지로 복귀`** [임시 루프, 바뀔 수 있음].
+기획: `docs/design/outgame/01~04` (사용자 제공), 구현 현황·수용 기준 대응표: `docs/design/outgame/05_IMPLEMENTATION_STATUS.md`.
+
+![기지](docs/screenshots/outgame/base.png)
+
+- **기지 화면**: 3개 층 단면 (지상 1층·지하 1층 기본 개방, 지하 2층(임시) 잠금). `WASD` 이동 · 휠 확대/축소 · `F11` 전체 화면.
+  검은 방 = 잠긴 시설 → 클릭해 **달러로 해금** (자유 건설 없음). 열린 방 클릭 = 시설 정보 (작업실: 무기 제작·강화).
+- **시간**: 2048-04-07 (화) 08:00 시작, 현실 1초 = 게임 1분 [임시]. 위쪽 `정지/1x/4x/16x`, `Space` 정지/재개. 창이 열려 있으면 시계가 멈춤.
+- **대원 6명** (전투 아군과 같은 인물): 주간 일정대로 방을 오가며 생활 (수면·식사·업무·잡담…).
+  - **좌클릭** = 직접 대화. 머리 위 **`!`** 가 있으면 요청 대화 → 수락.
+  - 대원 둘이 같은 방에서 쉬면 **말풍선** → 클릭하면 엿듣기 (스토리 대화 포함).
+  - **우클릭** = 지시: 청소(→ 장소 클릭) · 업무/외부 의뢰 · 훈련 · 정보·장비. 일부 대원(단)은 청소를 다른 대원에게 넘김.
+- **위생**: 매일 0시에 해금된 방이 랜덤으로 더러워짐(쓰레기·얼룩, 방 이름표의 청결 점수). 청소하면 100.
+- **재정 (USD)**: 7일마다 주간 결산(행정 지원금 + 그 주 작업·의뢰 수익). 수익은 완료 즉시 '미지급'으로 쌓였다가 결산 때 입금.
+  **월 1회 랜덤 시각 장군 점검** → 기지 위생 점수로 만족도 → 그 주 결산에 보너스. 같은 거래는 원장 id 로 한 번만 반영.
+- **훈련·제작·강화 → 전투**: 훈련 단계마다 전투 최대 HP +5, 작업실에서 무기 제작(시간만)·강화(+1당 위력 +1), 대원 정보창에서 장비 교체. 기지에서 출전한 전투에 반영 [더미 수치].
+- **저장**: 날짜가 바뀔 때·출전할 때·`저장` 버튼·타이틀로 갈 때 자동 저장 (`user://outgame_save.json`). 타이틀 `이어하기`로 불러옴.
+- **디버그 `F1`**: +1시간 · 다음 날/주/달 · 오염 추가 · 점검 지금 · 달러 +100 · 대원별 상태·목적지·이유 · 이번 달 점검 예정 시각.
+- **기지 데이터 = `data/outgame.xlsx`** (설정·층·시설·대원·의뢰·대사·대화이벤트·요청·제작 + 읽어보기). 시설 이름·대사·수치는 모두 **더미/임시값** — 엑셀에서 바꾸고 저장하면 실행 중인 게임에 1초 안에 반영.
+- **대원 주간 일정 = Godot 에디터 상단 `일정` 탭** (`data/outgame/schedules/<대원 id>.json`): 7일 시간표, 블록(시작·끝·목적지·행동·해금 조건·잠기면 갈 곳),
+  자주 머무는 장소, 청소 위임 성향, 시간 스크러버 미리보기(그 시각의 목적지·경로), 검사(경로 불가·겹침·잠긴 목적지·참조 누락), `기지 테스트 플레이`.
+
+![일정 에디터](docs/screenshots/outgame/schedule_editor.png)
+
 ## 밸런스 데이터 (엑셀) · AI 에디터 · 스테이지 에디터
-에디터 두 개는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` 가 있습니다.
+에디터 세 개는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` 이 있습니다.
 **밸런스 수치는 `data/balance.xlsx`** 한 파일에 시트별로 있습니다: `캐릭터` · `몬스터` · `아이템` · `스킬` · `스테이지` (+ 열 설명 `읽어보기`).
 - 엑셀(또는 Numbers·LibreOffice)로 열어 고치고 **저장하면 1초 안에 게임이 다시 읽어 바로 적용** — 진행 중인 전투의 HP·AP·위력·이름까지.
   캐릭터 추가·편성·적 배치처럼 전투 구성이 바뀌는 것은 다음 전투(R 재시작)부터.
@@ -89,8 +114,8 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 아트 규격(아이콘·초상화·UI): `docs/ui_art_spec.md`
 
 ## 실행
-1. 위 설치 스크립트를 썼다면 `play.bat` / `play.sh`. 직접 설치한 Godot 4.7 (stable) 로 이 폴더를 열어 F5 해도 됩니다. 메인 씬 `scenes/main_menu.tscn`.
-2. 메뉴에서 조명 프리셋(G1~G4), 선공(동전/아군 기습/적 매복), 시드를 고른 뒤 편성 → 전투.
+1. 위 설치 스크립트를 썼다면 `play.bat` / `play.sh`. 직접 설치한 Godot 4.7 (stable) 로 이 폴더를 열어 F5 해도 됩니다. 메인 씬 `scenes/title.tscn` (타이틀).
+2. 타이틀 `게임 시작` → 기지 (위 '게임 루프' 참고). 전투만 따로 보려면 타이틀 `전투 테스트 메뉴 (개발용)`: 조명 프리셋(G1~G4), 선공(동전/아군 기습/적 매복), 시드를 고른 뒤 편성 → 전투 (기지 성장 반영 없음).
 3. 화면: 창은 **QHD(2560×1440 픽셀)** 로 고정해 그 해상도로 렌더합니다(모니터가 작으면 16:9 로 맞춰 줄임). `F11` 전체 화면.
 4. 전투 시작: 일반 전투(동전)는 화면 아래에서 금화가 튀어 올라 오른쪽으로 돌며 떨어집니다 — **고양이 면(앞면) = 아군 선공, 매끈한 면(뒷면) = 적 선공**.
    착지 후 "아군 선공"/"적 선공" 글자가 잠깐 뜹니다.
@@ -143,32 +168,41 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 godot --headless --path . --import          # 최초 1회 (클래스 캐시 생성)
 godot --headless --path . -s tests/run_tests.gd
 ```
-GDD 8절 "필수 검증 사례" 10개 그룹 59개 체크를 모두 통과합니다 (선공 특례, 2라운드 미적용, 동률 아군/레벨/원거리 우선,
-AP 상한 버림/이월/0 자동 종료, 이동/교환 AP 1, 무기 변경 AP 1, AP 부족/무효 대상 시 AP 미소모, 재시작 초기화, 시드 재현성).
+전투: GDD 8절 "필수 검증 사례" (선공 특례, 2라운드 미적용, 동률 아군/레벨/원거리 우선, AP 상한 버림/이월/0 자동 종료,
+이동/교환 AP 1, 무기 변경 AP 1, AP 부족/무효 대상 시 AP 미소모, 재시작 초기화, 시드 재현성) + 큰 몸집·장착·상태 이상·엑셀·AI 그래프.
+기지([15]~[24], `tests/outgame_tests.gd`): 날짜 전환(23:59→다음 날·월말·연말), 해금(부족/정확/초과/중복), 잠긴 방 경로·7일 이동, 요일별 일정·해금 → 생활 변화,
+대화/엿듣기/요청 구분, 일일 오염·청소·위임, 주간 결산 중복 없음, 월 1회 점검·그 주 보너스, 훈련·제작·강화 → 전투 수치, 저장/불러오기 복구. 현재 197개 통과.
 
 ## 스크린샷 일괄 렌더
 ```
 GODOT=/path/to/godot tools/render_shots.sh docs/screenshots      # Xvfb + Mesa 소프트웨어 렌더, QHD 출력
 ```
-CLI 인자(`++` 뒤): `--scene=battle|formation|result|menu --mode=2d|3d --preset=g1..g4 --shot=경로 --autoplay=aim|move|fight:N --hud=0`.
+CLI 인자(`++` 뒤): `--scene=battle|formation|result|menu|title|base --mode=2d|3d --preset=g1..g4 --shot=경로 --autoplay=aim|move|fight:N --hud=0`.
 디버그: `--charview=1`(캐릭터 원화를 조명 없이 출력), `--outline=0`(외곽선 끔), `--rim=0`(림 끔).
+기지: `--scene=base --base_skip=분 --base_cam=x,y,확대 --base_ui=dialogue:npc_alma|overhear|unlock:f1_mess|facility:b1_workshop|character:npc_kira|contracts|context:npc_dan|clean:npc_kira|debug|sortie`.
 
 ## 폴더
 ```
-scenes/            main_menu, formation, battle_2d, battle_3d, battle_hud, result
+scenes/            title, main_menu(전투 테스트), formation, battle_2d, battle_3d, battle_hud, result, outgame/base_hub
 scripts/battle/    규칙 계층 (표현 비의존): unit_data, action_data, unit_runtime, slot_manager,
                    turn_scheduler, ap_component, target_validator, action_resolver, enemy_ai, battle_controller
 scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d + unit_sprite_2d + rigged_unit_2d + slot_marker_2d,
                    battle_view_3d + unit_model_3d, lighting_presets
-scripts/ui/        battle_hud, main_menu, formation, result
+scripts/ui/        battle_hud, title, main_menu, formation, result
+scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정·단면 좌표), world_clock, room_route_service, npc_schedule_resolver,
+                   npc_agent, economy_ledger, base_sim(해금·이동·대화·위생·의뢰·결산·점검·제작·저장) / base_hub(씬)
+scripts/outgame/view/  base_world_view(단면 그리기), npc_view(대원 리그), outgame_hud(HUD·창)
+addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor (Godot 에디터 상단 탭)
+data/              balance.xlsx(전투), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_zoned_lighting (2D 배경, v0.3), cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/sprites/    생성된 캐릭터/무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + manifest.json
 assets/textures/   배경 플레이트 + 마스크, 3D 얼굴 데칼
 setup/             install_windows.ps1, install.sh (기기 설치), play.bat / play.sh / play.command (루트, 실행)
-tools/             gen_sprites.py (원화·마스크 생성기), rig_cutter.py (원화→리그 파츠), render_shots.sh
-tests/             run_tests.gd
-docs/              design/ (기획서 사본), screenshots/, 2D_vs_3D_comparison.md
+tools/             gen_sprites.py (원화·마스크 생성기), rig_cutter.py (원화→리그 파츠), render_shots.sh,
+                   gen_balance_xlsx.py / gen_outgame_xlsx.py (엑셀·일정 초기 생성 — 이미 있으면 덮어쓰지 않음)
+tests/             run_tests.gd, outgame_tests.gd
+docs/              design/ (기획서 사본, outgame/ = 아웃게임 기획 01~04 + 구현 현황 05), screenshots/, 2D_vs_3D_comparison.md
 ```
 
 ## 데이터 흐름

@@ -34,7 +34,7 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 14)
 	add_child(box)
 	box.add_child(_label("RT ZEROSUM", 54, Color(1, 1, 1)))
-	box.add_child(_label("전투 플레이어블 프로토타입 v1.0 — 횡스크롤 턴제 6인 AP 전투", 17, Color(0.85, 0.95, 0.95)))
+	box.add_child(_label("전투 테스트 메뉴 (개발용) — 기지 성장 반영 없음. 실제 게임은 타이틀 → 게임 시작", 17, Color(0.85, 0.95, 0.95)))
 	var sp := Control.new()
 	sp.custom_minimum_size.y = 10
 	box.add_child(sp)
@@ -102,6 +102,10 @@ func _ready() -> void:
 	var bb := _big_button("리그 벤치", Color(0.9, 0.8, 0.3))
 	bb.pressed.connect(func(): get_tree().change_scene_to_file(Game.SCENE_BENCH))
 	btn_row.add_child(bb)
+	var tt := _big_button("타이틀로", Color(0.6, 0.6, 0.65))
+	tt.custom_minimum_size.x = 140
+	tt.pressed.connect(func(): Game.go_title())
+	btn_row.add_child(tt)
 	box.add_child(_label("밸런스: data/balance.xlsx (저장하면 즉시 반영) · AI·스테이지 에디터: Godot 에디터 상단 탭 · 전투 중: 1~4 조명 프리셋 전환 · F1 디버그 패널 · R 재시작 · Space 턴 종료", 13, Color(0.8, 0.9, 0.9)))
 	if Game.cli.get("scene", "menu") == "menu":
 		Game.maybe_cli_capture()

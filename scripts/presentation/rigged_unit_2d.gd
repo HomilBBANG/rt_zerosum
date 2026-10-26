@@ -189,6 +189,20 @@ func _build_animations() -> void:
 	_track(die, "shoulder_l", [[0.0, 0.0], [0.8, deg_to_rad(-15)]])
 	_track(die, "shoulder_r", [[0.0, 0.0], [0.8, deg_to_rad(15)]])
 	lib.add_animation("death", die)
+	# walk: 기지(아웃게임) 이동용 — 다리·팔 교차 + 상하 흔들림
+	if bones.has("hip_l") and bones.has("hip_r") and bones.has("knee_l") and bones.has("knee_r"):
+		var walk := Animation.new()
+		walk.length = 0.9
+		walk.loop_mode = Animation.LOOP_LINEAR
+		_track(walk, "hip_l", [[0.0, deg_to_rad(-20)], [0.45, deg_to_rad(20)], [0.9, deg_to_rad(-20)]])
+		_track(walk, "hip_r", [[0.0, deg_to_rad(20)], [0.45, deg_to_rad(-20)], [0.9, deg_to_rad(20)]])
+		_track(walk, "knee_l", [[0.0, 0.0], [0.22, deg_to_rad(28)], [0.45, 0.0], [0.9, 0.0]])
+		_track(walk, "knee_r", [[0.0, 0.0], [0.45, 0.0], [0.67, deg_to_rad(-28)], [0.9, 0.0]])
+		_track(walk, "shoulder_l", [[0.0, deg_to_rad(14)], [0.45, deg_to_rad(-14)], [0.9, deg_to_rad(14)]])
+		_track(walk, "shoulder_r", [[0.0, deg_to_rad(-14)], [0.45, deg_to_rad(14)], [0.9, deg_to_rad(-14)]])
+		_track(walk, "hip", [[0.0, Vector2(bones.hip.position)], [0.22, bones.hip.position + Vector2(0, -8) * px_k], [0.45, Vector2(bones.hip.position)],
+			[0.67, bones.hip.position + Vector2(0, -8) * px_k], [0.9, Vector2(bones.hip.position)]], "position")
+		lib.add_animation("walk", walk)
 	anim.add_animation_library("", lib)
 
 

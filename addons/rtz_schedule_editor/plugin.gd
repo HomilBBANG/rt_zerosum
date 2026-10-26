@@ -1,0 +1,36 @@
+@tool
+extends EditorPlugin
+## Godot 에디터 상단(2D · 3D · Script 옆)의 "일정" 탭. 기지 대원 주간 동선·행동 에디터 (data/outgame/schedules/*.json)
+
+const PANEL := preload("res://addons/rtz_schedule_editor/schedule_editor_panel.gd")
+var panel: Control
+
+
+func _enter_tree() -> void:
+	panel = PANEL.new()
+	EditorInterface.get_editor_main_screen().add_child(panel)
+	_make_visible(false)
+
+
+func _exit_tree() -> void:
+	if panel != null:
+		panel.queue_free()
+
+
+func _has_main_screen() -> bool:
+	return true
+
+
+func _make_visible(visible: bool) -> void:
+	if panel != null:
+		panel.visible = visible
+		if visible and panel.has_method("reload_data"):
+			panel.reload_data(true)   # 탭을 열 때마다 엑셀(시설·대원) 다시 읽기 (편집 중인 일정은 유지)
+
+
+func _get_plugin_name() -> String:
+	return "일정"
+
+
+func _get_plugin_icon() -> Texture2D:
+	return EditorInterface.get_editor_theme().get_icon("Calendar" if EditorInterface.get_editor_theme().has_icon("Calendar", "EditorIcons") else "Time", "EditorIcons")

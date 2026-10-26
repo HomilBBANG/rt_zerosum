@@ -1,3 +1,4 @@
+@tool
 class_name LightingPresets
 extends RefCounted
 ## 조명 프리셋 (02_graphics_implementation v0.2 §6 G1~G4 시연용 색 조합). 확정 팔레트 아님.
