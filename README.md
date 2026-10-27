@@ -320,16 +320,21 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   액션·쓰러짐 시트는 발이 땅에 붙어 있는데도 칸마다 땅선이 8~16px 오르내려(카메라 흔들림) 발 기준으로 맞춤. 확인: `--scene=battle --anim_frame=a_alma:death:19` (그 프레임에 멈춤).
   **단 = 사용자 AI 시트 3장**: `idle` 30장 12fps (5~34) · `walk` 17장 16fps (16~32 한 걸음 주기) · `run` 15장 18fps (12~26 한 주기, 선 자세가 없어 서 있기 시트 키로 크기, 뜀 높이 그대로).
   **이선 = 사용자 AI 시트 3장**: `idle` 24장 12fps (5~28, 주머니에 손) · `walk` 18장 16fps (14~31 한 걸음 주기) · `run` 19장 24fps (6~24 한 주기, 주기가 길어 24fps 로 빠르게).
-  **하나 walk·run = 사용자 AI 시트 + 머리는 원화로 바꿔 붙임** (AI 가 얼굴을 뭉개서): `walk` 18장 16fps (10~27) · `run` 17장 22fps (11~27). `python3 tools/char_sprites.py head hero2 walk` — 원화에서 턱 아래까지 잘라 프레임마다 피부·머리카락 영역이 가장 잘 겹치는 크기·기울기·위치에 붙이고 삐져나온 AI 머리카락은 지움 (sheet 다음에 실행).
+  **하나 walk·run = 사용자 AI 시트 + 머리는 원화로 바꿔 붙임** (AI 가 얼굴을 뭉개서): `walk` 18장 16fps (10~27) · `run` 17장 22fps (11~27). `python3 tools/char_sprites.py head hero2 walk` — 원화에서 턱 아래까지 잘라 프레임마다 원화 머리 대표 색(머리카락·피부·모자) 영역이 가장 잘 겹치는 크기·기울기·위치에 붙이고 삐져나온 AI 머리카락·조각은 지움, 묶은 머리처럼 자른 선 아래로 늘어진 머리카락도 같이 (sheet 다음에 실행, `--cut <원화 y>` 턱 바로 아래 · `--deg` 기울기 폭).
+  **해상도 유지 — AI 시트 4배 확대** (하나·니키타 walk·run): AI 시트 한 칸은 키 300px 정도라 게임 그림(키 760px)으로 그냥 키우면 흐릿함 → `tools/sr_upscale.py` (Real-ESRGAN 애니 모델, torch 필요)로 시트를 먼저 4배로 키운 뒤 `sheet` 에 넣음 (`--ref-height` 도 4배 값). 발밑 바닥 그림자·외곽선 밖 흰 테는 지움.
+  **니키타 = 새 기본 그림 + 리깅 idle + AI 시트 walk·run (머리 = 원화)**: `idle` 32장 12fps (리깅, 손은 주머니) · `walk` 18장 16fps (10~27) · `run` 23장 22fps (13~35, 뜀 높이 그대로) — `sr_upscale` 4배 → `sheet --ref-height 1268`(모자 너비로 원화와 배율 맞춤) → `head nikita_army <동작> --cut 157` (run 은 `--deg 6 --scale 1-1`).
+  **로한 = 리깅 idle** (`rig rohan`, 32장 12fps — 예전 숨쉬기 시트는 지움).
   **하나 = 리깅 idle** (시트가 안 뽑혀 원화 한 장으로): `python3 tools/char_sprites.py rig hero2` → `idle/` 32장 12fps — 다리·골반 고정, 몸통 숨쉬기(어깨 오르내림·가슴 살짝 넓어짐), 머리 = 목 기준 갸웃·끄덕(숨보다 조금 늦게), 팔 = 어깨 기준 흔들림(팔·몸통 빈틈으로 팔 영역, 빈틈 없는 쪽은 반대 팔 너비로). **눈 깜빡임 없음** (눈 자리를 피부로 덮는 방식이 얻어맞은 것처럼 보여 뺌 — 도구 `--blink` 로만). 조명·선화·눈 마스크도 같은 움직임.
   **키라 = 사용자 AI 시트 3장**: `idle` 36장 10fps (1→19→2 왕복 — 시트 19장 안에 매끄럽게 이어지는 반복 구간이 없어 앞뒤로 재생) · `walk` 19장 17fps (17~35 한 걸음 주기, 서 있기 키로 크기) · `run` 12장 18fps (15~26 한 주기, 뜀 높이 그대로).
-  니키타 `idle_4x4` = **기본 그림으로 만든 숨쉬기** (니키타 = 빨간 머리 의무병, 하나 = 곱슬머리 군복 — 새 그림으로 바꾸며 예전 시트는 지움) (`python3 tools/char_sprites.py breathe <캐릭터>` — 원화 픽셀만 살짝 늘여 상체가 오르내림, 발 고정). 직접 그린 시트로 바꾸면 그 파일을 덮어쓰면 됨.
+  `breathe` (기본 그림으로 숨쉬기 idle 시트)는 이제 쓰는 캐릭터 없음 — 전원 리깅 또는 AI 시트.
   속도는 같은 이름 json(`walk.json` 등). 조명 마스크 시트(`*_mask_r/_l.png`)는 `python3 tools/char_sprites.py masks` 로 칸마다 만듦 — 없어도 동작.
 
 ![앨마 애니메이션 (idle · walk · run · attack · death)](docs/screenshots/alma_anims.png)
 ![단 애니메이션 (idle · walk · run) + 앨마 walk · run 다시 고른 반복 구간](docs/screenshots/dan_anims.png)
 ![이선 애니메이션 (idle · walk · run)](docs/screenshots/ethan_anims.png)
-![하나 walk · run (머리 = 원화)](docs/screenshots/hana_anims.png)
+![하나 idle(리깅) · walk · run (4배 확대 + 머리 = 원화)](docs/screenshots/hana_anims.png)
+![니키타 idle(리깅) · walk · run (4배 확대 + 머리 = 원화) + 로한 idle(리깅)](docs/screenshots/nikita_anims.png)
+![해상도: AI 시트 그대로 키움 vs 4배 AI 확대](docs/screenshots/sr_compare.png)
 ![키라 애니메이션 (idle · walk · run)](docs/screenshots/kira_anims.png)
 
 ### 선화 유지 (조명은 면에만)
