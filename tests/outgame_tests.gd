@@ -34,6 +34,7 @@ func run(p_check: Callable) -> void:
 	_test_food_px_affinity()
 	_test_battle_rules()
 	_test_player_control()
+	_test_sortie_lines()
 
 
 func _sim() -> BaseSim:
@@ -641,3 +642,61 @@ func _test_player_control() -> void:
 	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(a.to_dict())))
 	_c(sv.npcs.npc_dan.is_holding() and sv.npcs.npc_dan.facility == "b1_training", "저장/불러오기 후 지시 대기 유지")
 
+
+
+func _test_sortie_lines() -> void:
+	print("[31] 출정 대기: 상태에 맞는 말풍선 대사 · 출정 불가 대원")
+	var lines := SortieLines.read()
+	_c(lines.size() >= 20, "출정 대사 파일 읽기 (%d개)" % lines.size())
+	var names := {}
+	for u in battle.allies:
+		names[u.id] = u.display_name
+	var ctx := func(cid: String, aff: float, fat: float, hp: float, sts: Array, row: int, dep: Array) -> Dictionary:
+		return SortieLines.make_context(cid, str(names.get(cid, cid)), aff, fat, hp, sts, row, dep + [cid], names)
+	var all_ok := true
+	for u in battle.allies:
+		for row in 3:
+			if SortieLines.candidates(lines, ctx.call(u.id, 50.0, 20.0, 100.0, [], row, [])).is_empty():
+				all_ok = false
+	_c(all_ok, "모든 대원이 평범한 상태에서 어느 자리든 할 말이 있음")
+	var t := func(c: Dictionary) -> String:
+		return str(SortieLines.pick(lines, c).get("text", ""))
+	_c(t.call(ctx.call("a_dan", 20.0, 20.0, 30.0, ["injured"], 0, [])) == "이 정도 상처로는 안 멈춰.", "부상 → 그 대원 전용 부상 대사 (공통보다 먼저)")
+	_c(t.call(ctx.call("a_kira", 20.0, 85.0, 100.0, [], 1, [])) == "오늘은 집중이 잘 안 돼요…", "피로 85 → 키라 피로 대사 (같은 우선순위면 전용 먼저)")
+	_c(t.call(ctx.call("a_kira", 20.0, 95.0, 100.0, [], 1, [])) == "눈이 감겨요… 정말 가야 해요?", "피로 95 → 우선순위 높은 공통 대사")
+	_c(t.call(ctx.call("a_alma", 20.0, 20.0, 100.0, [], 1, ["a_hana"])) == "하나, 무리하지 마.", "함께 출정 조건 (하나도 출정)")
+	_c(t.call(ctx.call("a_alma", 20.0, 20.0, 100.0, [], 1, [])) != "하나, 무리하지 마.", "함께 출정 대원이 없으면 그 대사 안 나옴")
+	_c(t.call(ctx.call("a_nikita", 20.0, 20.0, 100.0, [], 2, [])) == "시야 확보 완료.", "자리 조건 (니키타 후방)")
+	var low := SortieLines.pick(lines, ctx.call("a_ethan", 5.0, 20.0, 100.0, [], 1, []))
+	_c(str(low.get("text", "")) == "…명령이니까 가는 겁니다.", "친밀도 낮음 → 공통 냉담 대사")
+	var custom := [SortieLines.new_line("x", "")]
+	custom[0].text = "{name}, 출정!"
+	custom[0].status = SortieLines.STATUS_NONE
+	var c1: Dictionary = ctx.call("a_hana", 50.0, 0.0, 100.0, [], 0, [])
+	_c(SortieLines.format(str(SortieLines.pick(custom, c1).text), custom[0], c1) == "하나, 출정!", "{name} 치환")
+	_c(SortieLines.pick(custom, ctx.call("a_hana", 50.0, 0.0, 100.0, ["injured"], 0, [])).is_empty(), "'상태 이상 없음' 조건은 부상이면 안 맞음")
+	custom[0].text = ""
+	_c(SortieLines.pick(custom, c1).is_empty(), "빈 대사는 고르지 않음")
+	# 저장 → 읽기
+	var tmp := "user://sortie_lines_test.json"
+	SortieLines.write(lines, tmp)
+	_c(SortieLines.read(tmp) == lines, "저장 후 다시 읽어도 같음")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+	# 출정 불가: 외부 의뢰 중인 대원은 편성에서 빠짐 (Game 스크립트를 따로 하나 만들어 시험 — 자동 로드는 건드리지 않음)
+	var game: Node = load("res://scripts/game.gd").new()
+	var s := _sim()
+	game.allies = battle.allies
+	game.base = s
+	game.campaign = true
+	game.reset_formation()
+	s.npcs.npc_ethan.state = NpcAgent.UNAVAILABLE
+	_c(game.sortie_block_reason("a_ethan") == "외부 의뢰 중" and game.sortie_block_reason("a_dan") == "", "외부 의뢰 중 = 출정 불가")
+	game.prune_formation()
+	var ids: Array = game.formation.map(func(f): return str(f.unit_id))
+	_c(not ids.has("a_ethan") and ids.size() == 5, "출정 대기에 들어가면 출정 불가 대원은 진형에서 빠짐 %s" % [ids])
+	s.chars["a_kira"] = {"hp": 10.0, "statuses": ["injured"], "fatigue": 77.0, "affinity": 66.0, "talk_day": -1, "seen_talks": []}
+	var st: Dictionary = game.sortie_state("a_kira")
+	_c(st.known and is_equal_approx(float(st.fatigue), 77.0) and st.statuses == ["injured"], "출정 대기 대원 상태 = 기지 상태")
+	game.campaign = false
+	_c(game.sortie_block_reason("a_ethan") == "" and not game.sortie_state("a_kira").known, "전투 테스트(기지 없음)는 모두 출정 가능, 상태 기본값")
+	game.free()

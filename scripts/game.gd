@@ -158,6 +158,11 @@ func _cli_jump() -> void:
 			start_battle()
 		"formation":
 			get_tree().change_scene_to_file(SCENE_FORMATION)
+		"sortie":   # 새 기지에서 출전한 것처럼 출정 대기 화면 (--sortie_demo=1: 대원 상태를 섞어서 말풍선 확인)
+			start_base_session(true)
+			if cli.get("sortie_demo", "0") == "1":
+				_sortie_demo()
+			sortie(stage_id)
 		"menu":
 			go_menu_test()
 		"title":
@@ -173,10 +178,55 @@ func _cli_jump() -> void:
 			pass
 
 
+## CLI·에디터 테스트용: 대원 상태를 여러 가지로 (피로·부상·친밀도·외부 의뢰)
+func _sortie_demo() -> void:
+	if base == null:
+		return
+	var set_cs := func(uid: String, d: Dictionary):
+		var cs := base.cstate_of(uid)
+		for k in d:
+			cs[k] = d[k]
+	set_cs.call("a_kira", {"fatigue": 85.0})
+	set_cs.call("a_dan", {"statuses": ["injured"], "hp": float(base.char_max_hp("a_dan")) * 0.3})
+	set_cs.call("a_nikita", {"affinity": 82.0})
+	set_cs.call("a_hana", {"affinity": 76.0, "fatigue": 10.0})
+	for nid in base.npcs:
+		if base.npcs[nid].character_id == "a_ethan":
+			base.npcs[nid].state = NpcAgent.UNAVAILABLE
+
+
 func reset_formation() -> void:
 	formation.clear()
 	for u in allies:
 		formation.append({"unit_id": u.id, "row": u.default_row, "index": u.default_index})
+
+
+## 출정 대기: 이 대원이 못 나가는 이유 ("" = 출정 가능). 기지에서 외부 의뢰로 나가 있으면 출정 불가
+func sortie_block_reason(uid: String) -> String:
+	if not (campaign and base != null):
+		return ""
+	for nid in base.npcs:
+		var n: NpcAgent = base.npcs[nid]
+		if n.character_id == uid and n.state == NpcAgent.UNAVAILABLE:
+			return "외부 의뢰 중"
+	return ""
+
+
+## 출정 못 하는 대원을 편성에서 뺌
+func prune_formation() -> void:
+	formation = formation.filter(func(f): return find_ally(str(f.unit_id)) != null and sortie_block_reason(str(f.unit_id)) == "")
+
+
+## 출정 대기 화면 표시·대사 조건용 몸 상태 {affinity, fatigue, hp, max_hp, statuses, known}
+## 기지에서 출전하지 않은 전투(테스트 메뉴)는 기지 상태가 없으므로 known = false (친밀도 50 · 피로 0 · 체력 가득)
+func sortie_state(uid: String) -> Dictionary:
+	if campaign and base != null:
+		var cs := base.cstate_of(uid)
+		return {"affinity": float(cs.affinity), "fatigue": float(cs.fatigue), "hp": float(cs.hp), "max_hp": float(base.char_max_hp(uid)),
+			"statuses": (cs.statuses as Array).duplicate(), "known": true}
+	var u := find_ally(uid)
+	var mh := float(u.max_hp) if u != null else 100.0
+	return {"affinity": 50.0, "fatigue": 0.0, "hp": mh, "max_hp": mh, "statuses": [], "known": false}
 
 
 func find_ally(id: String) -> UnitData:

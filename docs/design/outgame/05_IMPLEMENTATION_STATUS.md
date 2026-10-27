@@ -47,7 +47,7 @@
 - **업무·의뢰**: 작업지시(기지 안 시설에서 일함, 반복 가능) / 외부의뢰(정문으로 나가 기지 밖 → 복귀, 1회). 성공률·위험 없음 = 고정 완료.
 - **요청**: 앨마 `req_01` 수락 → 외부 의뢰 '민간인 호위' 열림. 이선 `req_02`(4/9부터) 효과 없음.
 - **훈련·제작·강화**: 훈련 120분 → 훈련 단계 +1 = 전투 최대 HP +5. 제작은 비용 없이 시간만(레시피 미정). 강화 60분 → +1 = 무기 위력 +1 (최대 +5). 작업실 한 번에 하나.
-- **전투 연계**: 기지에서 출전한 전투만 훈련·장비·강화 반영 (전투 규칙·AP 체계는 그대로, UnitData 복제본의 수치만). 외부 의뢰 중인 대원도 편성 가능.
+- **전투 연계**: 기지에서 출전한 전투만 훈련·장비·강화 반영 (전투 규칙·AP 체계는 그대로, UnitData 복제본의 수치만). 외부 의뢰 중인 대원은 출정 불가(출정 대기 목록에서 흐리게, 진형에서 빠짐). 출정 인원 1~6명.
 - **플레이어 조작**: 대원 클릭 = 선택(노란 고리·카드), 방 클릭 = 그 위치로 걷기, 더블클릭 = 뛰기(×2.2, 피로 +12/시간), 도착 후 우클릭 = 방별 행동
   (`BaseSim.room_actions`: 잠자기·쉬기·식사·청소·훈련·치료·업무·시설 창), '지시 그만두기'. 직접 보낸 대원은 다음 일정 블록까지 지시 대기. 테스트 [30].
 - **계단**: 계단 칸 안에서 층마다 방향이 바뀌는 지그재그 계단 판. 대원은 아래층 계단 끝 → 위층 계단 끝으로 대각선 이동(속도 그대로), 화면에서도 계단 판 깊이에 맞춰 걸음.
@@ -70,6 +70,7 @@
 - 대원은 전투와 같은 2D 캐릭터 스프라이트(프레임 애니메이션, `assets/characters/`)를 발 위치(3D)를 투영한 화면 위치에 원근 크기로 그림. 동작: idle·walk·sit·sleep·work·clean·train·talk — 프레임이 없으면 기본 그림 한 장. 클릭 판정은 화면 좌표(방 = 단면 앞면 사각형).
 - 침대·의무침대에서는 누워 자고(`sleep` 프레임, 없으면 기본 그림을 눕힘 — 머리는 베개 쪽), 소파·의자에는 앉음(`sit` 프레임, 없으면 의자 앞에 서 있음). 휴식 중엔 Zz.
 - 대원 클릭 카드: 체력(붉은) · 피로도(보라) · 친밀도(파스텔 노랑) 게이지 + 상태 이상, 선물하기. 시설 창: 식당(식재료 공급) · PX(선물 구매) · 의무실(환자 목록) · 무기고(대원별 장착 3칸 + 제작·강화).
+- **출정 대기(편성) 화면** (2026-10-27): 왼쪽 대원 목록(체력·피로·친밀도·상태 이상) / 오른쪽 위 진형 후방2·중간2·전방2, 드래그 앤 드롭 배치·교환·빼기. 배치된 대원 초상화 위 말풍선 대사 (`data/outgame/sortie_lines.json`, Godot 에디터 `출정 대사` 탭).
 - 규칙(BaseSim)의 좌표는 그대로 2D (칸 240px = 3.6m, 층 220px = 3.8m 로 변환) — 테스트·저장 형식 변화 없음.
 
 ## 5. 파일
@@ -80,9 +81,11 @@
 | 데이터 (일정) | `data/outgame/schedules/<대원 id>.json` (Godot 에디터 `일정` 탭) |
 | 규칙 | `scripts/outgame/` outgame_data · world_clock · room_route_service · npc_schedule_resolver · npc_agent · economy_ledger · battle_rules · base_sim |
 | 데이터 (전투 발생) | `data/outgame/battle_rules.json` (Godot 에디터 `전투 발생` 탭) |
+| 데이터 (출정 대사) | `data/outgame/sortie_lines.json` (Godot 에디터 `출정 대사` 탭), 고르기 `scripts/outgame/sortie_lines.gd` |
+| 출정 대기 화면 | `scenes/formation.tscn` + `scripts/ui/formation.gd`, 말풍선 `scripts/ui/speech_bubble.gd` |
 | 화면 | `scenes/outgame/base_hub.tscn` + `scripts/outgame/base_hub.gd`, `scripts/outgame/view/` base_view_3d(3D 배경) · base_overlay · npc_view · outgame_hud, `scenes/title.tscn` |
-| 에디터 | `addons/rtz_schedule_editor/` (일정), `addons/rtz_battle_editor/` (전투 발생) |
-| 테스트 | `tests/outgame_tests.gd` ([15]~[30]: [30] 플레이어 조작 · [25] 계단 대각선 · [26] 피로·오브젝트 · [27] 체력·의무실 · [28] 식재료·PX 선호·친밀도 대화 · [29] 전투 발생 규칙) |
+| 에디터 | `addons/rtz_schedule_editor/` (일정), `addons/rtz_battle_editor/` (전투 발생), `addons/rtz_sortie_editor/` (출정 대사) |
+| 테스트 | `tests/outgame_tests.gd` ([15]~[31]: [31] 출정 대사·출정 불가 · [30] 플레이어 조작 · [25] 계단 대각선 · [26] 피로·오브젝트 · [27] 체력·의무실 · [28] 식재료·PX 선호·친밀도 대화 · [29] 전투 발생 규칙) |
 
 ## 6. 아직 정하지 않은 것 (기획서 13절 — 임시값으로 동작 중)
 
