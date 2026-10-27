@@ -26,6 +26,11 @@ func _ready() -> void:
 	# 일반 전투(동전)는 선공 동전 연출이 끝난 뒤 첫 라운드 시작. 스크린샷 자동화는 --coin=1 일 때만 연출
 	controller.wait_for_intro = Game.ambush == "none" and Game.cli.get("coin", "0" if Game.cli.has("shot") else "1") == "1"
 	controller.initiative_decided.connect(_on_initiative)
+	if Game.cli.has("try_skill") and Game.actions.has(str(Game.cli.try_skill)):   # 에디터 '상태 이상' 테스트: 아군 모두 첫 스킬 칸에
+		for e in controller._roster:
+			var ud: UnitData = e.data
+			if ud.team == "ally" and not ud.skill_ids.has(str(Game.cli.try_skill)):
+				ud.skill_ids.insert(0, str(Game.cli.try_skill))
 	controller.start_battle()
 	if Game.cli.get("status_demo", "0") == "1":   # 스크린샷용: 첫 아군에 상태 이상 예시
 		for u in controller.slots.living_units("ally"):

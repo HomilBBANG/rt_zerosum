@@ -390,10 +390,7 @@ func _test_rally_status() -> void:
 
 func _status_action(base: ActionData, sid: String, turns: int, value: int) -> ActionData:
 	var a := base.duplicate() as ActionData
-	a.status_id = sid
-	a.status_turns = turns
-	a.status_value = value
-	a.status_chance = 100
+	a.statuses = [{"id": sid, "turns": turns, "value": value, "chance": 100}]
 	return a
 
 
@@ -420,6 +417,14 @@ func _test_battle_statuses() -> void:
 	StatusRules.turn_start(t)
 	StatusRules.turn_end(t)
 	_check(not t.statuses.has("bleed") and t.hp == hp1 - 20, "2턴 뒤 풀림 (걸릴 때 + 차례 2번 = 3번 피해)")
+	# 한 스킬에 상태 이상 여러 개 (각각 확률)
+	var two := atk.duplicate() as ActionData
+	two.statuses = [{"id": "slow", "turns": 2, "value": 30, "chance": 100}, {"id": "blind", "turns": 1, "value": 0, "chance": 100}, {"id": "stun", "turns": 1, "value": 0, "chance": 0}]
+	var t2 := enemies[enemies.size() - 1]
+	var ev2 := ActionResolver.resolve(two, allies[0], t2, RandomNumberGenerator.new())
+	_check(t2.statuses.has("slow") and t2.statuses.has("blind") and not t2.statuses.has("stun") and ev2.applied.size() == 2 and "기절 실패" in ev2.text, "한 스킬에 감속·실명(100%%) + 기절(0%% → 실패)")
+	t2.remove_status("slow")
+	t2.remove_status("blind")
 	# 화상: 화염 고정 피해 (방어 무시)
 	t.data.defense = 5
 	var hp2 := t.hp
@@ -515,7 +520,7 @@ func _test_balance_data_and_ai_graph() -> void:
 		return
 	_check(d.allies.size() == 6 and d.actions.size() >= 7, "캐릭터 6 · 스킬 7 이상")
 	_check(d.monsters.has("ghoul") and d.monsters.ghoul.row_span == 2 and d.monsters.wolf.ai_id == "aggressive", "몬스터 차지칸·AI 열")
-	_check(d.actions.flank.status_id == "bleed" and d.actions.flank.status_turns == 2 and d.actions.sand_kick.status_chance == 70 and d.actions.hamstring.status_id == "root", "스킬 시트 상태이상·상태턴·상태확률 (한글 이름 → id)")
+	_check(d.actions.flank.status_ids() == ["bleed"] and int(d.actions.flank.statuses[0].turns) == 2 and int(d.actions.sand_kick.statuses[0].chance) == 70 and d.actions.hamstring.status_ids() == ["root"], "data/skill_status.json → 스킬 상태 이상 (턴·확률)")
 	_check(d.monsters.ghoul.skill_ids.has("rend") and d.monsters.wolf.skill_ids.has("sand_kick"), "몬스터 상태 이상 스킬")
 	_check(d.warnings.is_empty(), "밸런스·스킬 트리·신앙 데이터 경고 없음 %s" % [d.warnings])
 	var kira := GameData._find(d.allies, "a_kira")

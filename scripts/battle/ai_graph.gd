@@ -186,7 +186,7 @@ static func _try_skill(skill: String, rule: String, actor: UnitRuntime, actions:
 			best = targets[(rng.randi() % targets.size()) if rng != null else 0]
 		"no_status":
 			for t in targets:
-				if (a.status_id == "" or not t.statuses.has(a.status_id)) and (best == null or t.hp < best.hp):
+				if (a.statuses.is_empty() or a.status_ids().any(func(sid): return not t.statuses.has(sid))) and (best == null or t.hp < best.hp):
 					best = t
 			if best == null:
 				return {}

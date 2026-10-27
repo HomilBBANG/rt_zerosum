@@ -208,7 +208,9 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![신앙 스킬 에디터 (스킬 트리 탭 → 신앙 스킬)](docs/screenshots/faith_editor.png)
 
 ## 전투 상태 이상
-스킬에 상태 이상을 달면 맞은 대상에게 확률로 걸립니다 (밸런스 엑셀 `스킬` 시트 `상태이상`(이름 또는 id) · `상태턴` · `상태수치` · `상태확률`).
+스킬에 상태 이상을 달면 맞은 대상에게 확률로 걸립니다. **다는 곳 = Godot 에디터 `스킬 트리` 탭 → `상태 이상`** (`data/skill_status.json`):
+왼쪽 스킬 목록(전체 / 상태 이상 달린 것 / 아군이 쓰는 것 / 괴물이 쓰는 것, 달린 상태 표시) → 오른쪽에서 `+ 상태 이상 추가`, 상태·턴·수치(상태마다 뜻 표시)·확률, `빼기`. **한 스킬에 여러 개**(각각 따로 확률). 가운데에 8종 설명, 아래 검사.
+`전투 테스트 플레이` = 고른 스킬을 아군 모두의 첫 스킬 칸에 넣고 첫 스테이지 전투. 스킬 자체(AP·위력·대상)는 여전히 밸런스 엑셀 `스킬` 시트.
 **적용 시점**: 처음 걸릴 때 바로 한 번 + 그 캐릭터 차례가 올 때마다 **행동보다 먼저**. **n턴 = 그 캐릭터 차례 n번** (차례가 끝날 때 1 줄고 0 이면 풀림). 다시 걸리면 남은 턴·수치 중 큰 쪽.
 
 | 상태 | 효과 (n = 상태턴, v = 상태수치) |
@@ -228,6 +230,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - 확인: `godot --path . ++ --scene=battle --battle_status=a_dan:bleed:2:10;wolf:frost:2:20` (캐릭터 id 또는 스프라이트:상태:턴:수치).
 
 ![전투 상태 이상 배지](docs/screenshots/battle_statuses.png)
+![상태 이상 에디터 (스킬 트리 탭 → 상태 이상)](docs/screenshots/status_editor.png)
 
 ## 출정 대기 (편성 화면)
 기지에서 전투가 발생해 `전투 배치로` 를 누르면 출정 대기 화면이 뜹니다.
@@ -350,7 +353,7 @@ godot --headless --path . -s tests/run_tests.gd
 전투: GDD 8절 "필수 검증 사례" (선공 특례, 2라운드 미적용, 동률 아군/레벨/원거리 우선, AP 상한 버림/이월/0 자동 종료,
 이동/교환 AP 1, 무기 변경 AP 1, AP 부족/무효 대상 시 AP 미소모, 재시작 초기화, 시드 재현성) + 큰 몸집·장착·상태 이상·엑셀·AI 그래프.
 기지([15]~[24], `tests/outgame_tests.gd`): 날짜 전환(23:59→다음 날·월말·연말), 해금(부족/정확/초과/중복), 잠긴 방 경로·7일 이동, 요일별 일정·해금 → 생활 변화,
-대화/엿듣기/요청 구분, 일일 오염·청소·위임, 주간 결산 중복 없음, 월 1회 점검·그 주 보너스, 훈련·제작·강화 → 전투 수치, 저장/불러오기 복구, 출정 대사 고르기·출정 불가 대원([31]), 연구원 로한·무기 연구([32]), 레벨·스킬 트리([33]), 신앙([34]), 스킬 트리 데이터·에디터·신앙 데이터([35]), 전투 상태 이상([13b]). 현재 385개 통과.
+대화/엿듣기/요청 구분, 일일 오염·청소·위임, 주간 결산 중복 없음, 월 1회 점검·그 주 보너스, 훈련·제작·강화 → 전투 수치, 저장/불러오기 복구, 출정 대사 고르기·출정 불가 대원([31]), 연구원 로한·무기 연구([32]), 레벨·스킬 트리([33]), 신앙([34]), 스킬 트리 데이터·에디터·신앙 데이터([35]), 전투 상태 이상([13b]). 현재 392개 통과.
 
 ## 스크린샷 일괄 렌더
 ```
@@ -372,7 +375,7 @@ scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정
                    npc_agent, economy_ledger, base_sim(해금·이동·대화·위생·의뢰·결산·점검·제작·저장) / base_hub(씬)
 scripts/outgame/view/  base_view_3d(3D 단면 건물·조명·카메라), base_overlay(이름표·자물쇠·오염·말풍선 — 화면 좌표), npc_view(대원 스프라이트), outgame_hud(HUD·창)
 addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor, rtz_sortie_editor, rtz_skill_editor (Godot 에디터 상단 탭)
-data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), faith.json(신·신앙 스킬), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
+data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), faith.json(신·신앙 스킬), skill_status.json(스킬 상태 이상), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/characters/ 캐릭터별 base·프레임 애니메이션·마스크·character.json (전투·기지 공통)

@@ -1,0 +1,68 @@
+{
+	"version": 1,
+	"statuses": [
+		{
+			"skill": "brutal_strike",
+			"status": "stun",
+			"turns": 1,
+			"value": 0,
+			"chance": 50
+		},
+		{
+			"skill": "flank",
+			"status": "bleed",
+			"turns": 2,
+			"value": 10,
+			"chance": 100
+		},
+		{
+			"skill": "inspire",
+			"status": "haste",
+			"turns": 2,
+			"value": 30,
+			"chance": 100
+		},
+		{
+			"skill": "incendiary",
+			"status": "burn",
+			"turns": 2,
+			"value": 4,
+			"chance": 100
+		},
+		{
+			"skill": "suppress",
+			"status": "slow",
+			"turns": 2,
+			"value": 30,
+			"chance": 100
+		},
+		{
+			"skill": "rend",
+			"status": "bleed",
+			"turns": 2,
+			"value": 8,
+			"chance": 100
+		},
+		{
+			"skill": "grave_chill",
+			"status": "frost",
+			"turns": 2,
+			"value": 20,
+			"chance": 100
+		},
+		{
+			"skill": "hamstring",
+			"status": "root",
+			"turns": 2,
+			"value": 0,
+			"chance": 100
+		},
+		{
+			"skill": "sand_kick",
+			"status": "blind",
+			"turns": 1,
+			"value": 0,
+			"chance": 70
+		}
+	]
+}

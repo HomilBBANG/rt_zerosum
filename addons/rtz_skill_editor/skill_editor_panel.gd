@@ -3,6 +3,7 @@ extends Control
 ## 스킬 트리 에디터 (Godot 에디터 상단 "스킬 트리" 탭, addons/rtz_skill_editor) → data/skill_tree.json + data/faith.json.
 ## 위: 캐릭터 · 액티브/패시브/신앙 고르기 · 다른 캐릭터 트리 가져오기 · 필요 레벨 자동.
 ## 신앙: 왼쪽 신 목록(추가·삭제) · 가운데 그 신의 신앙 스킬(필요 신앙도 순) · 오른쪽 신·스킬 고치기. 누가 어느 신을 믿는지는 엑셀 캐릭터 시트.
+## 상태 이상: 왼쪽 스킬 목록(누가 쓰는지·달린 상태 이상) · 오른쪽 그 스킬에 상태 이상 달기(여러 개, 턴·수치·확률) → data/skill_status.json.
 ## 가운데: 게임과 같은 십자형 그림 — 노드 클릭 = 고르기, "+" 칸 = 그 갈래 끝에 단계 추가(최대 SkillTreeData.MAX_TIER).
 ## 오른쪽: 고른 노드의 id · 이름 · 필요 레벨 · 효과 · 값 · 설명, 단계 옮기기 · 삭제, 아래 검사.
 ## 게임 규칙(BaseSim): 중앙은 처음부터 습득, 갈래 안은 앞 단계부터, 갈래 끝(마지막 단계)은 트리마다 하나만, 스킬 포인트는 두 트리 공용.
@@ -26,12 +27,21 @@ var faith_box: Control
 var god_list: ItemList
 var fs_list: ItemList
 var fs_head: Label
-var tree_only: Array[Control] = []   # 신앙 모드에서 숨길 위쪽 도구
+var tree_only: Array[Control] = []   # 신앙·상태 이상 모드에서 숨길 위쪽 도구
+## 상태 이상 (kind == "status")
+var sstat: Array = []                # data/skill_status.json 항목 [{skill, status, turns, value, chance}]
+var monsters: Dictionary = {}        # 몬스터 id → UnitData (누가 쓰는 스킬인지 표시)
+var skill_sel := ""
+var skill_filter := "all"
+var status_box: Control
+var skill_list: ItemList
 
 var char_opt: OptionButton
 var kind_btns: Dictionary = {}
 var copy_opt: OptionButton
 var play_level: SpinBox
+var play_btn: Button
+var level_lab: Label
 var status: Label
 var canvas: Control
 var form: VBoxContainer
@@ -60,8 +70,10 @@ func _ready() -> void:
 	top.add_child(title)
 	top.add_child(_btn("저장 (Ctrl+S)", _save))
 	top.add_child(_btn("되돌리기", func(): _load()))
-	top.add_child(_btn("기지 스킬 창 테스트 플레이", _play))
-	top.add_child(_lab("레벨"))
+	play_btn = _btn("기지 스킬 창 테스트 플레이", _play)
+	top.add_child(play_btn)
+	level_lab = _lab("레벨")
+	top.add_child(level_lab)
 	play_level = _spin(1, 20, 1, 9, "")
 	play_level.tooltip_text = "테스트 플레이 때 이 대원의 레벨 (포인트도 그만큼)"
 	top.add_child(play_level)
@@ -84,9 +96,9 @@ func _ready() -> void:
 		_rebuild())
 	bar.add_child(char_opt)
 	tree_only.append(char_opt)
-	for k in SkillTreeData.KINDS + ["faith"]:
+	for k in SkillTreeData.KINDS + ["faith", "status"]:
 		var b := Button.new()
-		b.text = "%s 트리" % SkillTreeData.KIND_NAME[k] if k != "faith" else "신앙 스킬"
+		b.text = "%s 트리" % SkillTreeData.KIND_NAME[k] if k in SkillTreeData.KINDS else ("신앙 스킬" if k == "faith" else "상태 이상")
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
 		var kk: String = k
@@ -131,6 +143,10 @@ func _ready() -> void:
 	faith_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	faith_box.custom_minimum_size = Vector2(560, 420)
 	holder.add_child(faith_box)
+	status_box = _build_status_box()
+	status_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	status_box.custom_minimum_size = Vector2(560, 420)
+	holder.add_child(status_box)
 	var right := VBoxContainer.new()
 	right.custom_minimum_size.x = 400
 	right.add_theme_constant_override("separation", 6)
@@ -162,6 +178,7 @@ func reload_data(keep_edit: bool = true) -> void:
 		allies.assign(gd.allies)
 		actions = gd.actions
 		char_faith = gd.char_faith
+		monsters = gd.monsters
 	char_opt.clear()
 	copy_opt.clear()
 	for u in allies:
@@ -180,6 +197,9 @@ func reload_data(keep_edit: bool = true) -> void:
 func _load() -> void:
 	nodes = SkillTreeData.read()
 	faith = FaithData.read()
+	sstat = SkillStatusData.read()
+	if skill_sel == "" and not actions.is_empty():
+		skill_sel = str(actions.keys()[0])
 	if _god(god_sel).is_empty():
 		god_sel = faith.gods[0].id if not faith.gods.is_empty() else ""
 	dirty = false
@@ -187,19 +207,21 @@ func _load() -> void:
 	_rebuild()
 
 
-## 스킬 트리 · 신앙 둘 다 저장
+## 스킬 트리 · 신앙 · 상태 이상 모두 저장
 func _save() -> void:
 	var err := SkillTreeData.write(nodes)
 	var err2 := FaithData.write(faith)
-	if err == OK and err2 == OK:
+	var err3 := SkillStatusData.write(sstat)
+	if err == OK and err2 == OK and err3 == OK:
 		dirty = false
-		var errs: int = SkillTreeData.check(nodes, allies, actions).errors.size() + FaithData.check(faith, char_faith, actions).errors.size()
-		status.text = "저장됨: data/skill_tree.json · data/faith.json" + ("" if errs == 0 else "  (검사 오류 %d개 — 아래 확인)" % errs)
+		var errs: int = SkillTreeData.check(nodes, allies, actions).errors.size() + FaithData.check(faith, char_faith, actions).errors.size() \
+			+ SkillStatusData.check(sstat, actions).errors.size()
+		status.text = "저장됨: data/skill_tree.json · faith.json · skill_status.json" + ("" if errs == 0 else "  (검사 오류 %d개 — 아래 확인)" % errs)
 		if Engine.is_editor_hint():
-			EditorInterface.get_resource_filesystem().update_file(SkillTreeData.PATH)
-			EditorInterface.get_resource_filesystem().update_file(FaithData.PATH)
+			for path in [SkillTreeData.PATH, FaithData.PATH, SkillStatusData.PATH]:
+				EditorInterface.get_resource_filesystem().update_file(path)
 	else:
-		status.text = "저장 실패 (%d / %d)" % [err, err2]
+		status.text = "저장 실패 (%d / %d / %d)" % [err, err2, err3]
 
 
 func _mark() -> void:
@@ -209,9 +231,16 @@ func _mark() -> void:
 
 
 ## 저장 → 새 기지에서 이 대원 스킬 창 (레벨 올린 상태, 저장 파일은 건드리지 않음)
+## 상태 이상 모드: 전투 테스트 — 고른 스킬을 아군 모두에게 쥐여 주고 첫 스테이지
 func _play() -> void:
 	_save()
 	var f := FileAccess.open(GameData.EDITOR_PLAY_PATH, FileAccess.WRITE)
+	if kind == "status":
+		f.store_string(JSON.stringify({"try_skill": skill_sel}))
+		f.close()
+		if Engine.is_editor_hint():
+			EditorInterface.play_custom_scene("res://scenes/battle_2d.tscn")
+		return
 	var who := cid
 	if kind == "faith":   # 그 신을 믿는 첫 캐릭터
 		for u in allies:
@@ -362,16 +391,24 @@ func _rebuild() -> void:
 	for k in kind_btns:
 		kind_btns[k].button_pressed = k == kind
 	var is_f := kind == "faith"
-	canvas.visible = not is_f
+	var is_s := kind == "status"
+	canvas.visible = not is_f and not is_s
 	faith_box.visible = is_f
+	status_box.visible = is_s
 	for c in tree_only:
-		c.visible = not is_f
+		c.visible = not is_f and not is_s
+	play_level.visible = not is_s
+	level_lab.visible = not is_s
+	play_btn.text = "전투 테스트 플레이 (이 스킬 쥐여 주기)" if is_s else "기지 스킬 창 테스트 플레이"
 	for c in form.get_children():
 		form.remove_child(c)
 		c.queue_free()
 	if is_f:
 		_fill_faith_lists()
 		_build_faith_form()
+	elif is_s:
+		_fill_skill_list()
+		_build_status_form()
 	else:
 		_build_form()
 	_rebuilding = false
@@ -381,6 +418,10 @@ func _rebuild() -> void:
 func _refresh_view() -> void:
 	if kind == "faith":
 		_refresh_faith_view()
+		return
+	if kind == "status":
+		info_label.text = "상태 이상 %d개 · 달린 스킬 %d개" % [sstat.size(), SkillStatusData.by_skill(sstat).size()]
+		_show_check(SkillStatusData.check(sstat, actions))
 		return
 	canvas.show_tree(_tree(), sel)
 	var u := _unit(cid)
@@ -405,6 +446,197 @@ func _show_check(res: Dictionary) -> void:
 	for e in res.notes:
 		txt += "[color=#ffd166]△ %s[/color]\n" % e
 	check_label.text = txt if txt != "" else "[color=#77dd88]문제 없음[/color]"
+
+
+# ================================================================ 상태 이상 (스킬에 달기)
+const SKILL_FILTERS := [["all", "전체 스킬"], ["has", "상태 이상 달린 스킬"], ["ally", "아군이 쓰는 스킬"], ["monster", "괴물이 쓰는 스킬"]]
+
+
+func _build_status_box() -> Control:
+	var box := HBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 10)
+	var lc := VBoxContainer.new()
+	lc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(lc)
+	var fr := HBoxContainer.new()
+	lc.add_child(fr)
+	fr.add_child(_head("스킬"))
+	var fo := OptionButton.new()
+	for f in SKILL_FILTERS:
+		fo.add_item(f[1])
+		fo.set_item_metadata(fo.item_count - 1, f[0])
+	fo.item_selected.connect(func(i):
+		skill_filter = str(fo.get_item_metadata(i))
+		_fill_skill_list())
+	fr.add_child(fo)
+	skill_list = ItemList.new()
+	skill_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	skill_list.item_selected.connect(func(i):
+		skill_sel = str(skill_list.get_item_metadata(i))
+		_rebuild())
+	lc.add_child(skill_list)
+	lc.add_child(_small("스킬 자체(AP·위력·대상)는 밸런스 엑셀 스킬 시트. 여기서는 맞은 대상에게 거는 상태 이상만 답니다 (한 스킬에 여러 개, 각각 따로 확률)."))
+	# 상태 이상 설명 (참고)
+	var rc := VBoxContainer.new()
+	rc.custom_minimum_size.x = 300
+	box.add_child(rc)
+	rc.add_child(_head("상태 이상 종류"))
+	var sc := ScrollContainer.new()
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rc.add_child(sc)
+	var ref := VBoxContainer.new()
+	ref.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(ref)
+	for sid in StatusCatalog.BATTLE:
+		var l := Label.new()
+		l.text = "%s — %s" % [StatusCatalog.get_def(sid).name, str(StatusCatalog.get_def(sid).desc).replace("{t}", "n").replace("{v}", "v")]
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size.x = 280
+		l.add_theme_font_size_override("font_size", 12)
+		l.add_theme_color_override("font_color", StatusCatalog.color_of(sid).lightened(0.2))
+		ref.add_child(l)
+	ref.add_child(_small("\n적용: 처음 걸릴 때 한 번 + 그 캐릭터 차례마다 행동보다 먼저. n턴 = 그 캐릭터 차례 n번 (차례가 끝날 때 1 감소, 동상은 차례 시작에 감소 → 0 이면 터짐). 다시 걸리면 남은 턴·수치 중 큰 쪽."))
+	return box
+
+
+## 이 스킬을 쓰는 쪽: 아군(기본 스킬 · 스킬 트리 새 스킬 · 신앙 새 스킬) / 괴물
+func _users(sid: String) -> Dictionary:
+	var al := PackedStringArray()
+	var mo := PackedStringArray()
+	for u in allies:
+		if u.skill_ids.has(sid):
+			al.append(u.display_name)
+		elif nodes.any(func(n): return n.char == u.id and n.effect == "skill:" + sid):
+			al.append(u.display_name + "(트리)")
+	for f in faith.skills:
+		if f.effect == "skill:" + sid:
+			al.append("%s 신앙" % _god(f.god).get("name", f.god))
+	for mid in monsters:
+		if (monsters[mid] as UnitData).skill_ids.has(sid):
+			mo.append((monsters[mid] as UnitData).display_name)
+	return {"ally": al, "monster": mo}
+
+
+func _skill_statuses(sid: String) -> Array:
+	return sstat.filter(func(e): return e.skill == sid)
+
+
+func _fill_skill_list() -> void:
+	skill_list.clear()
+	for sid in actions:
+		var a: ActionData = actions[sid]
+		if a.effect in ["move", "weapon_swap"]:
+			continue
+		var us := _users(sid)
+		var mine := _skill_statuses(sid)
+		match skill_filter:
+			"has":
+				if mine.is_empty():
+					continue
+			"ally":
+				if us.ally.is_empty():
+					continue
+			"monster":
+				if us.monster.is_empty():
+					continue
+		var tag := " · ".join(mine.map(func(e): return StatusCatalog.get_def(e.status).name)) if not mine.is_empty() else "-"
+		skill_list.add_item("%s (%s)   [%s]" % [a.display_name, sid, tag])
+		skill_list.set_item_metadata(skill_list.item_count - 1, sid)
+		if not mine.is_empty():
+			skill_list.set_item_custom_fg_color(skill_list.item_count - 1, StatusCatalog.color_of(mine[0].status).lightened(0.3))
+		if sid == skill_sel:
+			skill_list.select(skill_list.item_count - 1)
+
+
+func _build_status_form() -> void:
+	var a: ActionData = actions.get(skill_sel)
+	if a == null:
+		form.add_child(_head("스킬을 고르세요"))
+		return
+	form.add_child(_head("%s (%s)" % [a.display_name, a.id]))
+	var eff := {"damage": "피해 %d" % a.power, "heal": "회복 %d" % a.power, "ap_grant": "AP +%d" % a.power, "status": "상태 이상만"}.get(a.effect, a.effect)
+	form.add_child(_small("AP %d · 대상 %s · %s\n%s" % [a.ap_cost, a.target_rule, eff, a.description]))
+	var us := _users(a.id)
+	form.add_child(_small("쓰는 쪽: 아군 %s / 괴물 %s" % [", ".join(us.ally) if not us.ally.is_empty() else "-", ", ".join(us.monster) if not us.monster.is_empty() else "-"]))
+	form.add_child(HSeparator.new())
+	var mine := _skill_statuses(a.id)
+	form.add_child(_head("맞은 대상에게 거는 상태 이상 (%d)" % mine.size()))
+	if mine.is_empty():
+		form.add_child(_small("없음 — 아래 '상태 이상 추가'"))
+	var items := []
+	for sid in StatusCatalog.BATTLE:
+		items.append([sid, StatusCatalog.get_def(sid).name])
+	for e in mine:
+		var card := PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(StatusCatalog.color_of(e.status).darkened(0.75), 0.9)
+		sb.border_color = StatusCatalog.color_of(e.status)
+		sb.border_width_left = 4
+		sb.set_corner_radius_all(4)
+		sb.set_content_margin_all(6)
+		card.add_theme_stylebox_override("panel", sb)
+		form.add_child(card)
+		var cv := VBoxContainer.new()
+		card.add_child(cv)
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 8)
+		cv.add_child(grid)
+		_row(grid, "상태 이상", _option(items, e.status, func(v):
+			e.status = str(v)
+			if SkillStatusData.VALUE_HINT.get(e.status, "") == "":
+				e.value = 0
+			elif int(e.value) <= 0:
+				e.value = 10
+			_mark()
+			_rebuild()))
+		var tu := _spin(1, 20, 1, int(e.turns), "")
+		tu.value_changed.connect(func(v):
+			if not _rebuilding:
+				e.turns = int(v)
+				_mark()
+				_fill_skill_list())
+		_row(grid, "턴 (차례 수)" if e.status != "frost" else "턴 (터지기까지)", tu)
+		var hint: String = SkillStatusData.VALUE_HINT.get(e.status, "")
+		if hint != "":
+			var va := _spin(0, 999, 1, int(e.value), "")
+			va.value_changed.connect(func(v):
+				if not _rebuilding:
+					e.value = int(v)
+					_mark())
+			_row(grid, "수치 (%s)" % hint, va)
+		var ch := _spin(0, 100, 1, int(e.chance), " %")
+		ch.value_changed.connect(func(v):
+			if not _rebuilding:
+				e.chance = int(v)
+				_mark())
+		_row(grid, "확률", ch)
+		var bot := HBoxContainer.new()
+		cv.add_child(bot)
+		var prev := _small(StatusCatalog.describe(e.status, {"turns": e.turns, "value": e.value}))
+		prev.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		prev.custom_minimum_size.x = 260
+		bot.add_child(prev)
+		bot.add_child(_btn("빼기", func():
+			sstat.erase(e)
+			_mark()
+			_rebuild()))
+	var add := _btn("+ 상태 이상 추가", func():
+		var used := mine.map(func(x): return x.status)
+		var pick := "bleed"
+		for sid in StatusCatalog.BATTLE:
+			if not used.has(sid):
+				pick = sid
+				break
+		sstat.append(SkillStatusData.new_entry(a.id, pick))
+		_mark()
+		_rebuild())
+	form.add_child(add)
+	if a.effect in ["heal", "ap_grant"]:
+		form.add_child(_small("아군 대상 스킬이라 상태 이상도 아군에게 걸립니다 (가속 같은 긍정 상태에 쓰세요)."))
+	form.add_child(_small("테스트 플레이 = 이 스킬을 아군 모두의 첫 스킬 칸에 넣고 첫 스테이지 전투."))
 
 
 # ================================================================ 신앙

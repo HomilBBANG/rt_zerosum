@@ -316,9 +316,8 @@ func get_command_options() -> Array[Dictionary]:
 			enabled = false
 			reason = "유효한 대상이 없습니다."
 		var desc := a.description
-		if a.status_id != "":
-			desc += "\n상태 이상: %s %d턴%s%s" % [StatusCatalog.get_def(a.status_id).name, a.status_turns,
-				" (수치 %d)" % a.status_value if a.status_value != 0 else "", " · 확률 %d%%" % a.status_chance if a.status_chance < 100 else ""]
+		for st in a.statuses:
+			desc += "\n상태 이상: " + SkillStatusData.summary(st)
 		out.append({"id": a.id, "name": a.display_name, "cost": a.ap_cost, "enabled": enabled, "reason": reason, "kind": a.kind, "desc": desc})
 	var mv: ActionData = actions.get("move", null)
 	if mv != null:

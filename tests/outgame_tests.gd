@@ -924,4 +924,21 @@ func _test_skill_tree_editor() -> void:
 	_c(panel.faith_box.visible and not panel.canvas.visible, "신앙 모드: 신 목록·신앙 스킬 목록")
 	panel._delete_god()
 	_c(panel._god(gid).is_empty() and not panel.faith.skills.any(func(f): return f.god == gid), "신 삭제 → 그 신의 신앙 스킬도 삭제")
+	# 에디터 상태 이상: 스킬에 달기 · 빼기
+	panel.kind = "status"
+	panel.skill_sel = "heavy_attack"
+	panel._rebuild()
+	_c(panel.status_box.visible and panel._skill_statuses("heavy_attack").is_empty(), "상태 이상 모드: 강공격에는 아직 없음")
+	panel.sstat.append(SkillStatusData.new_entry("heavy_attack", "burn"))
+	panel.sstat.append(SkillStatusData.new_entry("heavy_attack", "blind"))
+	panel._rebuild()
+	var us: Dictionary = panel._users("rend")
+	_c(panel._skill_statuses("heavy_attack").size() == 2 and us.monster.has("구울"), "강공격에 화상·실명 2개 · 할퀴기 쓰는 쪽 = 구울")
+	_c(SkillStatusData.check(panel.sstat, battle.actions).errors.is_empty(), "검사 통과")
+	var bad_e := SkillStatusData.new_entry("move", "stun")
+	_c(not SkillStatusData.check(panel.sstat + [bad_e], battle.actions).errors.is_empty(), "이동에는 못 닮 (검사 오류)")
+	var by := SkillStatusData.by_skill(panel.sstat)
+	_c(by.heavy_attack.size() == 2 and by.heavy_attack[0].id == "burn", "스킬별로 묶기 → ActionData.statuses 형식")
+	panel.sstat.erase(panel._skill_statuses("heavy_attack")[0])
+	_c(panel._skill_statuses("heavy_attack").size() == 1, "빼기")
 	panel.free()

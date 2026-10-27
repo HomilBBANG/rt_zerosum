@@ -14,9 +14,10 @@ extends Resource
 ## "damage" | "heal" | "ap_grant" | "status"(상태 이상만) | "move" | "weapon_swap"
 @export var effect: String = "damage"
 @export var power: int = 0
-## 맞은 대상에게 거는 상태 이상 (StatusCatalog id, "" = 없음) · 지속 턴 · 수치(% 또는 고정 피해) · 확률(%)
-@export var status_id: String = ""
-@export var status_turns: int = 0
-@export var status_value: int = 0
-@export var status_chance: int = 100
+## 맞은 대상에게 거는 상태 이상 [{id(StatusCatalog), turns, value(% 또는 고정 피해), chance(%)}] — data/skill_status.json (에디터 '스킬 트리' 탭 → 상태 이상)
+@export var statuses: Array[Dictionary] = []
+
+
+func status_ids() -> Array:
+	return statuses.map(func(s): return str(s.id))
 @export var description: String = ""

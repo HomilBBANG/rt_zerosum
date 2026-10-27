@@ -2,7 +2,8 @@
 class_name GameData
 extends RefCounted
 ## 밸런스 데이터 (data/balance.xlsx) → UnitData / ActionData / 아이템 / 스테이지.
-## 시트: 캐릭터(아군) · 몬스터 · 아이템 · 스킬 · 스테이지. 스킬 트리 노드는 data/skill_tree.json (SkillTreeData), 신·신앙 스킬은 data/faith.json (FaithData) — 둘 다 에디터 '스킬 트리' 탭. 열 이름은 1행 머리글로 찾는다(열 순서 자유).
+## 시트: 캐릭터(아군) · 몬스터 · 아이템 · 스킬 · 스테이지. 스킬 트리 노드는 data/skill_tree.json (SkillTreeData), 신·신앙 스킬은 data/faith.json (FaithData),
+## 스킬에 다는 상태 이상은 data/skill_status.json (SkillStatusData) — 모두 에디터 '스킬 트리' 탭. 열 이름은 1행 머리글로 찾는다(열 순서 자유).
 ## 게임 실행 중 파일이 바뀌면 apply_from() 으로 기존 객체를 제자리 갱신 → 진행 중인 전투에도 즉시 반영.
 
 const BALANCE_PATH := "res://data/balance.xlsx"
@@ -96,17 +97,17 @@ func _parse(sheets: Dictionary) -> void:
 		a.effect = d.get("효과", "damage")
 		a.power = _i(d, "위력")
 		a.description = d.get("설명", "")
-		# 상태 이상 (id 또는 한글 이름: 출혈·화상·동상·감속·가속·기절·구속·실명)
-		var sraw := str(d.get("상태이상", "")).strip_edges()
-		if sraw != "":
-			a.status_id = StatusCatalog.find(sraw)
-			if a.status_id == "" or not a.status_id in StatusCatalog.BATTLE:
-				warnings.append("스킬 %s: 모르는 상태이상 '%s' (%s)" % [a.id, sraw, ", ".join(StatusCatalog.BATTLE.map(func(x): return StatusCatalog.DEFS[x].name))])
-				a.status_id = ""
-			a.status_turns = maxi(1, _i(d, "상태턴", 1))
-			a.status_value = _i(d, "상태수치")
-			a.status_chance = clampi(_i(d, "상태확률", 100), 0, 100)
 		actions[a.id] = a
+	# 스킬에 다는 상태 이상 (data/skill_status.json — 에디터 '스킬 트리' 탭 → 상태 이상)
+	var sts := SkillStatusData.read()
+	for e in SkillStatusData.check(sts, actions).errors:
+		warnings.append("상태 이상: " + e)
+	var per := SkillStatusData.by_skill(sts)
+	for sid in per:
+		if actions.has(sid):
+			for st in per[sid]:
+				if st.id in StatusCatalog.BATTLE:
+					(actions[sid] as ActionData).statuses.append(st)
 	for d in _table(sheets.get("캐릭터", [])):
 		allies.append(_unit(d, "ally"))
 	for d in _table(sheets.get("캐릭터", [])):
