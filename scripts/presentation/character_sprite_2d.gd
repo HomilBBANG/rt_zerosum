@@ -99,7 +99,13 @@ static func anim_data(id: String, anim: String) -> Dictionary:
 		dir = dir.path_join(anim)
 		if DirAccess.dir_exists_absolute(dir):
 			var seen := {}
-			for f in DirAccess.get_files_at(dir):
+			var files := DirAccess.get_files_at(dir)
+			# 원본 PNG 가 하나라도 있으면(개발 중) 원본 PNG 만 프레임으로 — 지운 프레임의 .import 가 남아 있어도 무시.
+			# 내보낸 게임은 원본 PNG 없이 .import/.remap 만 있으므로 그때만 그 이름을 씀
+			var has_png := Array(files).any(func(f): return f.ends_with(".png"))
+			for f in files:
+				if has_png and not f.ends_with(".png"):
+					continue
 				var fn := f.trim_suffix(".import").trim_suffix(".remap")
 				if fn.ends_with(".png") and not fn.contains("_mask_") and not fn.ends_with("_line.png") and not fn.ends_with("_eye.png") and not seen.has(fn):
 					seen[fn] = true
@@ -142,7 +148,11 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 	var count := 0
 	var opt: Dictionary = {}
 	var names := {}
-	for f in DirAccess.get_files_at(cdir):
+	var files := DirAccess.get_files_at(cdir)
+	var has_png := Array(files).any(func(f): return f.ends_with(".png"))   # 개발 중이면 원본 PNG 만 (남은 .import 무시)
+	for f in files:
+		if has_png and not f.ends_with(".png") and not f.ends_with(".json"):
+			continue
 		names[f.trim_suffix(".import").trim_suffix(".remap")] = true
 	var aj := cdir.path_join(anim + ".json")
 	if FileAccess.file_exists(aj):
