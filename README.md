@@ -177,6 +177,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - 아래: 배치 수 · **출정(전투 시작)** · 기본 편성 · 모두 빼기 · 기지로.
 
 ![출정 대기](docs/screenshots/sortie_wait.png)
+![출정 대기 — 새 그림](docs/screenshots/sortie_wait_new_art.png)
 
 **말풍선 대사 = Godot 에디터 상단 `출정 대사` 탭** (`data/outgame/sortie_lines.json`):
 - 대사마다 누가(공통/대원) · 문장(`{name}` 이름, `{with}` 함께 출정 대원) · 우선순위 · 조건(친밀도·피로도·체력 % 범위, 상태 이상, 자리, 함께 출정하는 대원).
@@ -256,6 +257,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![시험 캐릭터 — 기지(왼쪽)와 원본](docs/screenshots/test_char_compare.png)
 
 ![키라·니키타 새 그림 — 원본과 기지 화면](docs/screenshots/kira_nikita_new.png)
+![아군 새 그림 — 단·이선·하나·앨마·니키타](docs/screenshots/roster_new.png)
 ![키라 최종 그림 — 원본·기지 화면·얼굴](docs/screenshots/kira_final.png)
 ![앨마 새 그림 — 원본·기지 화면·얼굴(초록 눈 원본 색)](docs/screenshots/alma_new.png)
 ![하나 최종 그림 — 원본·기지 화면·얼굴(노란 눈 원본 색, 오른쪽 눈 아래 점)](docs/screenshots/hana_new.png)

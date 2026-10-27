@@ -90,14 +90,17 @@ def cmd_lines(only=None):
 
 
 def eye_mask(im, head=None, boxes=None):
-    """눈(흰자·홍채·동공) 마스크 L: 피부보다 푸르거나 흰, 너무 어둡지 않은 픽셀 덩어리 → 구멍(동공) 메움 → 1px 부드럽게.
+    """눈(흰자·홍채·동공) 마스크 L: 흰자 덩어리 → 그 볼록 껍질 안의 홍채(피부와 다른 색)·검은 눈동자 → 구멍(동공) 메움 → 1px 부드럽게.
     boxes: [(x0,y0,x1,y1)…] 그 안에서만. 없으면 head(x,y,w,h) 의 세로 30~85% 띠에서 큰 덩어리 2개."""
     import numpy as np
     from scipy import ndimage
     from PIL import ImageFilter
     a = np.asarray(im.convert("RGBA")).astype(int)
     r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
-    cand = (al > 200) & (b >= r - 3) & ((r + g + b) / 3 > 70)
+    mx = np.maximum(np.maximum(r, g), b)
+    mn = np.minimum(np.minimum(r, g), b)
+    # 씨앗 = 흰자 (밝고 채도 낮음). 회색 옷·짧게 깎은 머리처럼 '푸르스름하지만 어두운' 면은 제외 — 홍채는 아래에서 흰자 껍질로 넓힘
+    cand = (al > 200) & ((r + g + b) / 3 > 185) & (mx - mn < 24)
     keep = np.zeros(cand.shape, bool)
     if boxes:
         for x0, y0, x1, y1 in boxes:
@@ -106,13 +109,21 @@ def eye_mask(im, head=None, boxes=None):
         hx, hy, hw, hh = head
         keep[int(hy + hh * 0.30):int(hy + hh * 0.85), int(hx):int(hx + hw)] = True
     cand &= keep
+    # 흰 피부(니키타 등)는 흰자보다 덜 희고 붉은 기가 있음 → 머리 띠의 대표 피부색과 가까우면 제외
+    band = keep & (al > 200) & ((r + g + b) / 3 > 90)
+    if band.sum() > 50:
+        skin0 = np.median(a[..., :3][band], 0)
+        cand &= np.abs(a[..., :3] - skin0).sum(-1) > 30
     cand = ndimage.binary_closing(cand, iterations=2)
     lab, n = ndimage.label(cand)
     if n == 0:
         return Image.new("L", im.size, 0)
     sizes = ndimage.sum(cand, lab, range(1, n + 1))
-    order = [i + 1 for i in np.argsort(sizes)[::-1] if sizes[i] >= 12]
-    pick = order if boxes else order[:2]
+    order = [i + 1 for i in np.argsort(sizes)[::-1] if sizes[i] >= 4]
+    pick = order
+    if not boxes and order:   # 가장 큰 흰자 + 높이가 비슷한(±30px) 다음 흰자 하나 — 목걸이 등 다른 흰 점 제외
+        cy = ndimage.center_of_mass(cand, lab, order)
+        pick = [order[0]] + [o for k, o in enumerate(order[1:], 1) if abs(cy[k][0] - cy[0][0]) <= 30][:1]
     m = np.isin(lab, pick)   # 흰자·밝은 홍채
     dark = (al > 200) & ((r + g + b) / 3 <= 70)
     # 눈마다 흰자의 볼록 껍질 (+여유) 안에서만 넓힘 → 옆 머리카락·눈썹으로 번지지 않게
