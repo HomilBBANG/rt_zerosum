@@ -322,13 +322,15 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   **이선 = 사용자 AI 시트 3장**: `idle` 24장 12fps (5~28, 주머니에 손) · `walk` 18장 16fps (14~31 한 걸음 주기) · `run` 19장 24fps (6~24 한 주기, 주기가 길어 24fps 로 빠르게).
   **하나 walk·run = 사용자 AI 시트 + 머리는 원화로 바꿔 붙임** (AI 가 얼굴을 뭉개서): `walk` 18장 16fps (10~27) · `run` 17장 22fps (11~27). `python3 tools/char_sprites.py head hero2 walk` — 원화에서 턱 아래까지 잘라 프레임마다 피부·머리카락 영역이 가장 잘 겹치는 크기·기울기·위치에 붙이고 삐져나온 AI 머리카락은 지움 (sheet 다음에 실행).
   **하나 = 리깅 idle** (시트가 안 뽑혀 원화 한 장으로): `python3 tools/char_sprites.py rig hero2` → `idle/` 32장 12fps — 다리·골반 고정, 몸통 숨쉬기(어깨 오르내림·가슴 살짝 넓어짐), 머리 = 목 기준 갸웃·끄덕(숨보다 조금 늦게), 팔 = 어깨 기준 흔들림(팔·몸통 빈틈으로 팔 영역, 빈틈 없는 쪽은 반대 팔 너비로). **눈 깜빡임 없음** (눈 자리를 피부로 덮는 방식이 얻어맞은 것처럼 보여 뺌 — 도구 `--blink` 로만). 조명·선화·눈 마스크도 같은 움직임.
-  니키타·키라 `idle_4x4` = **기본 그림으로 만든 숨쉬기** (니키타 = 빨간 머리 의무병, 키라 = 회색 군복, 하나 = 곱슬머리 군복 — 새 그림으로 바꾸며 예전 시트는 지움) (`python3 tools/char_sprites.py breathe <캐릭터>` — 원화 픽셀만 살짝 늘여 상체가 오르내림, 발 고정). 직접 그린 시트로 바꾸면 그 파일을 덮어쓰면 됨.
+  **키라 = 사용자 AI 시트 3장**: `idle` 36장 10fps (1→19→2 왕복 — 시트 19장 안에 매끄럽게 이어지는 반복 구간이 없어 앞뒤로 재생) · `walk` 19장 17fps (17~35 한 걸음 주기, 서 있기 키로 크기) · `run` 12장 18fps (15~26 한 주기, 뜀 높이 그대로).
+  니키타 `idle_4x4` = **기본 그림으로 만든 숨쉬기** (니키타 = 빨간 머리 의무병, 하나 = 곱슬머리 군복 — 새 그림으로 바꾸며 예전 시트는 지움) (`python3 tools/char_sprites.py breathe <캐릭터>` — 원화 픽셀만 살짝 늘여 상체가 오르내림, 발 고정). 직접 그린 시트로 바꾸면 그 파일을 덮어쓰면 됨.
   속도는 같은 이름 json(`walk.json` 등). 조명 마스크 시트(`*_mask_r/_l.png`)는 `python3 tools/char_sprites.py masks` 로 칸마다 만듦 — 없어도 동작.
 
 ![앨마 애니메이션 (idle · walk · run · attack · death)](docs/screenshots/alma_anims.png)
 ![단 애니메이션 (idle · walk · run) + 앨마 walk · run 다시 고른 반복 구간](docs/screenshots/dan_anims.png)
 ![이선 애니메이션 (idle · walk · run)](docs/screenshots/ethan_anims.png)
 ![하나 walk · run (머리 = 원화)](docs/screenshots/hana_anims.png)
+![키라 애니메이션 (idle · walk · run)](docs/screenshots/kira_anims.png)
 
 ### 선화 유지 (조명은 면에만)
 캐릭터 그림마다 **선화 마스크**(`<그림>_line.png`, `python3 tools/char_sprites.py lines`, `new` 는 자동)를 두면 셰이더가 **선은 원화 색 그대로** 두고 면에만 조명을 입힙니다.

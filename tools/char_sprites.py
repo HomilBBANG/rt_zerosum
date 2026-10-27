@@ -550,6 +550,8 @@ def cmd_sheet_report(path, grid=(6, 6), ground=True, lo=8, hi=36):
     """튀는 프레임(앞뒤 프레임 사이로 바로 가는 것보다 크게 돌아가는 프레임)과 이음새가 매끄러운 반복 구간 후보"""
     import numpy as np
     cells = _sheet_cells(path, *grid)
+    while cells and cells[-1] is None:   # 끝의 빈 칸은 빼고 (시트 칸이 다 차지 않았을 때)
+        cells.pop()
     v = _pose_vecs(cells, ground)
     n = len(v)
     D = np.array([[np.abs(v[i] - v[j]).mean() if v[i] is not None and v[j] is not None else 9 for j in range(n)] for i in range(n)])
