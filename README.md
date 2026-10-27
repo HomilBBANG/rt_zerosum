@@ -319,11 +319,13 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   `attack` 13장 12fps (행동 시트: 고개 튀는 3 빼고, 길게 멈춘 자세는 2장마다, 끝의 그냥 서 있는 12장 뺌, 무기 그림 숨김) · `death` 20장 14fps (쓰러짐 1~20 후 누운 채 유지; 누운 채 숨쉬기 21~31·일어나기 32~36 은 안 씀).
   액션·쓰러짐 시트는 발이 땅에 붙어 있는데도 칸마다 땅선이 8~16px 오르내려(카메라 흔들림) 발 기준으로 맞춤. 확인: `--scene=battle --anim_frame=a_alma:death:19` (그 프레임에 멈춤).
   **단 = 사용자 AI 시트 3장**: `idle` 30장 12fps (5~34) · `walk` 17장 16fps (16~32 한 걸음 주기) · `run` 15장 18fps (12~26 한 주기, 선 자세가 없어 서 있기 시트 키로 크기, 뜀 높이 그대로).
-  하나·니키타·키라·이선 `idle_4x4` = **기본 그림으로 만든 숨쉬기** (니키타 = 빨간 머리 의무병, 키라 = 회색 군복, 하나 = 곱슬머리 군복 — 새 그림으로 바꾸며 예전 시트는 지움) (`python3 tools/char_sprites.py breathe <캐릭터>` — 원화 픽셀만 살짝 늘여 상체가 오르내림, 발 고정). 직접 그린 시트로 바꾸면 그 파일을 덮어쓰면 됨.
+  **이선 = 사용자 AI 시트 3장**: `idle` 24장 12fps (5~28, 주머니에 손) · `walk` 18장 16fps (14~31 한 걸음 주기) · `run` 19장 24fps (6~24 한 주기, 주기가 길어 24fps 로 빠르게).
+  하나·니키타·키라 `idle_4x4` = **기본 그림으로 만든 숨쉬기** (니키타 = 빨간 머리 의무병, 키라 = 회색 군복, 하나 = 곱슬머리 군복 — 새 그림으로 바꾸며 예전 시트는 지움) (`python3 tools/char_sprites.py breathe <캐릭터>` — 원화 픽셀만 살짝 늘여 상체가 오르내림, 발 고정). 직접 그린 시트로 바꾸면 그 파일을 덮어쓰면 됨.
   속도는 같은 이름 json(`walk.json` 등). 조명 마스크 시트(`*_mask_r/_l.png`)는 `python3 tools/char_sprites.py masks` 로 칸마다 만듦 — 없어도 동작.
 
 ![앨마 애니메이션 (idle · walk · run · attack · death)](docs/screenshots/alma_anims.png)
 ![단 애니메이션 (idle · walk · run) + 앨마 walk · run 다시 고른 반복 구간](docs/screenshots/dan_anims.png)
+![이선 애니메이션 (idle · walk · run)](docs/screenshots/ethan_anims.png)
 
 ### 선화 유지 (조명은 면에만)
 캐릭터 그림마다 **선화 마스크**(`<그림>_line.png`, `python3 tools/char_sprites.py lines`, `new` 는 자동)를 두면 셰이더가 **선은 원화 색 그대로** 두고 면에만 조명을 입힙니다.
