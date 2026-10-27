@@ -264,7 +264,8 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![키라·니키타 새 그림 — 원본과 기지 화면](docs/screenshots/kira_nikita_new.png)
 ![현재 캐릭터 그림 전원 — 단·키라·이선·하나·앨마·니키타·로한](docs/screenshots/roster_latest.png)
-![키 순서 (게임과 같은 비율: 그림 맨 위~발 = 키)](docs/screenshots/roster_heights.png)
+![키 순서 (게임과 같은 비율)](docs/screenshots/roster_heights.png)
+- 키 = 그림 맨 위 ~ 발. **모자 쓴 캐릭터는 모자 절반 높이 ~ 발** (`character.json` "hat", `python3 tools/char_sprites.py hat <캐릭터> <모자 아래 y>` → 그다음 `breathe` 다시). 비교 그림: `python3 tools/height_chart.py`.
 ![키라 최종 그림 — 원본·기지 화면·얼굴](docs/screenshots/kira_final.png)
 ![앨마 새 그림 — 원본·기지 화면·얼굴(초록 눈 원본 색)](docs/screenshots/alma_new.png)
 ![하나 최종 그림 — 원본·기지 화면·얼굴(노란 눈 원본 색, 오른쪽 눈 아래 점)](docs/screenshots/hana_new.png)

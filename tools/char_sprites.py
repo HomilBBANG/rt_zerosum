@@ -17,6 +17,7 @@ assets/characters/<id>/
   python3 tools/char_sprites.py lines [캐릭터]    선화 마스크(<그림>_line.png) — 게임이 선은 원화 그대로, 면에만 조명 (new 는 자동)
   python3 tools/char_sprites.py eyes <캐릭터> [x0,y0,x1,y1 …]   눈 마스크(base_eye.png) — 게임이 눈(흰자·눈동자)은 원화 색 그대로 (new 는 자동)
       상자를 안 주면 머리 영역에서 흰자·푸르스름한 눈동자 덩어리 2개를 자동으로 찾음, 상자를 주면 그 안에서만
+  python3 tools/char_sprites.py hat <캐릭터> <모자 아래 y>   모자 쓴 캐릭터: 키를 '모자 절반 높이 ~ 발'로 (0 이면 해제). 그다음 breathe 다시
   python3 tools/char_sprites.py breathe <캐릭터> [칸 수=16]   기본 그림(base.png)으로 숨쉬기 idle 시트를 만든다 (idle_4x4.png)
       그림을 다시 그리지 않고 원화 픽셀만 살짝 늘이고 흔듦: 골반 위 상체가 숨 쉬듯 오르내리고 좌우로 조금, 발은 고정
   python3 tools/char_sprites.py import <캐릭터> <동작> <파일…> [--grid 4x2] [--fps 12] [--hold 0.35]
@@ -155,6 +156,29 @@ def eye_mask(im, head=None, boxes=None):
     m = ndimage.binary_fill_holes(m)
     out = Image.fromarray((m * 255).astype(np.uint8))
     return out.filter(ImageFilter.GaussianBlur(0.7))
+
+
+def hat_figure_px(info):
+    """모자 쓴 캐릭터의 키(px): 모자 위~모자 아래(이마에 닿는 곳)의 절반 높이부터 발까지. info["hat"] = [모자 위 y, 모자 아래 y]"""
+    top, bottom = info["hat"]
+    return int(info["ground"][1] - (top + (bottom - top) / 2.0))
+
+
+def cmd_hat(cid, bottom):
+    """모자 아래 y(기본 그림 기준)를 정하면 키 = 모자 절반부터 발까지로 (character.json figure_px). 숨쉬기 idle 도 다시 만들 것"""
+    cdir = os.path.join(CHAR_DIR, cid)
+    path = os.path.join(cdir, "character.json")
+    info = json.load(open(path, encoding="utf-8"))
+    base = Image.open(os.path.join(cdir, "base.png")).convert("RGBA")
+    top = base.split()[3].point(lambda v: 255 if v > 128 else 0).getbbox()[1]
+    if bottom <= 0:
+        info.pop("hat", None)
+        info["figure_px"] = int(info["ground"][1] - top)
+    else:
+        info["hat"] = [top, int(bottom)]
+        info["figure_px"] = hat_figure_px(info)
+    json.dump(info, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print(cid, "모자", info.get("hat"), "figure_px", info["figure_px"])
 
 
 def cmd_eyes(cid, boxes=None):
@@ -443,9 +467,11 @@ def cmd_new(cid, src, fig_px=760):
     old = os.path.join(cdir, "character.json")
     if os.path.exists(old):   # 다시 만들 때 칠 방식 설정은 유지
         prev = json.load(open(old, encoding="utf-8"))
-        for k in ("style", "neon_gradient"):
+        for k in ("style", "neon_gradient", "hat"):
             if k in prev:
                 info[k] = prev[k]
+        if "hat" in info:   # 모자 쓴 캐릭터: 키 = 모자 절반 높이 ~ 발
+            info["figure_px"] = hat_figure_px(info)
     json.dump(info, open(old, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     line_mask(base).save(os.path.join(cdir, "base_line.png"))
     eye_mask(base, head).save(os.path.join(cdir, "base_eye.png"))
@@ -458,6 +484,8 @@ if __name__ == "__main__":
         cmd_masks(args[1] if len(args) > 1 else None)
     elif args[:1] == ["lines"]:
         cmd_lines(args[1] if len(args) > 1 else None)
+    elif args[:1] == ["hat"] and len(args) >= 3:
+        cmd_hat(args[1], int(args[2]))
     elif args[:1] == ["eyes"] and len(args) >= 2:
         cmd_eyes(args[1], [tuple(int(v) for v in b.split(",")) for b in args[2:]] or None)
     elif args[:1] == ["new"] and len(args) >= 3:

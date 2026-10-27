@@ -7,7 +7,7 @@
   268,
   761
  ],
- "figure_px": 759,
+ "figure_px": 729,
  "head_rect": [
   160,
   2,
@@ -22,5 +22,9 @@
  ],
  "eyes": [],
  "fps": 12,
- "silhouette": "silhouette.png"
+ "silhouette": "silhouette.png",
+ "hat": [
+  2,
+  62
+ ]
 }

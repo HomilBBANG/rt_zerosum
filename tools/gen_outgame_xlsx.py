@@ -152,7 +152,7 @@ NPCS = [
     ["npc_hana", "하나", "a_hana", "hero2", 176.8, "f1_lounge", "d_talk_hana", ""],
     ["npc_alma", "앨마", "a_alma", "alma", 166, "b1_quarters", "d_talk_alma", ""],
     ["npc_nikita", "니키타", "a_nikita", "nikita_army", 168, "f1_office", "d_talk_nikita", ""],
-    ["npc_rohan", "로한", "", "rohan", 178, "b1_lab", "d_talk_rohan", "연구원 — 전투에 나가지 않음. 클릭하면 무기 연구"],
+    ["npc_rohan", "로한", "", "rohan", 172, "b1_lab", "d_talk_rohan", "연구원 — 전투에 나가지 않음. 클릭하면 무기 연구"],
 ]
 
 JOBS = [
