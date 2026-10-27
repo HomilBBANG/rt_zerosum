@@ -37,6 +37,7 @@ func run(p_check: Callable) -> void:
 	_test_sortie_lines()
 	_test_research()
 	_test_skill_tree()
+	_test_faith()
 
 
 func _sim() -> BaseSim:
@@ -806,3 +807,29 @@ func _test_skill_tree() -> void:
 	_c(s2.char_xp("a_kira") == data.inum("xp_win", 100) or s2.char_level("a_kira") > s2.start_level("a_kira"), "승리 → 출전 대원 경험치")
 	_c(s2.char_xp("a_dan") == 0 and s2.char_level("a_dan") == s2.start_level("a_dan"), "출전 안 한 대원은 경험치 없음")
 	_c(battle.warnings.is_empty(), "밸런스 데이터 참조 오류 없음 %s" % [battle.warnings])
+
+
+func _test_faith() -> void:
+	print("[34] 신앙: 믿는 신에 따라 다른 신앙 스킬 (임시 데이터)")
+	var s := _sim()
+	_c(battle.gods.size() >= 2, "신 종류 %d개" % battle.gods.size())
+	_c(s.god_of("a_dan") != "" and s.god_of("a_dan") != s.god_of("a_kira"), "캐릭터마다 믿는 신 (단 %s / 키라 %s)" % [s.god_of("a_dan"), s.god_of("a_kira")])
+	var dan := s.faith_skill_list("a_dan").map(func(x): return x.id)
+	var kira := s.faith_skill_list("a_kira").map(func(x): return x.id)
+	_c(not dan.is_empty() and dan.all(func(x): return not kira.has(x)), "신이 다르면 배울 수 있는 스킬이 다름")
+	_c(s.faith_state("a_dan", kira[0]) == "other_god" and not s.learn_faith_skill("a_dan", kira[0]).ok, "다른 신의 스킬은 못 배움")
+	var f0 := s.faith("a_dan")
+	_c(f0 == int(battle.char_faith.a_dan.faith), "시작 신앙도 = 캐릭터 시트 (%d)" % f0)
+	var hi: Dictionary = s.faith_skill_list("a_dan").back()
+	_c(s.faith_state("a_dan", hi.id) == "no_faith", "신앙도 모자라면 '신앙 부족'")
+	var lo: Dictionary = s.faith_skill_list("a_dan").front()
+	_c(s.learn_faith_skill("a_dan", lo.id).ok and s.has_faith_skill("a_dan", lo.id), "신앙도 충분하면 배움 (포인트 안 씀, 스킬 포인트 %d)" % s.skill_points("a_dan"))
+	s.apply_battle_result({"winner": "ally", "allies": [{"id": "a_dan", "hp": 30, "alive": true, "statuses": []}]})
+	_c(s.faith("a_dan") == f0 + data.inum("faith_battle", 5), "출전하면 신앙도 +%d" % data.inum("faith_battle", 5))
+	var base: UnitData = GameData._find(battle.allies, "a_dan")
+	var copy := UnitData.new()
+	GameData._copy_props(copy, base)
+	s.apply_to_ally(copy, base)
+	_c(copy.power_bonus >= 1, "신앙 스킬 효과 → 전투 복제본 (위력 +%d)" % copy.power_bonus)
+	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
+	_c(sv.faith("a_dan") == s.faith("a_dan") and sv.has_faith_skill("a_dan", lo.id), "저장/불러오기 후 신앙 유지")

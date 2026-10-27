@@ -61,6 +61,7 @@ SETTINGS = [
     ["xp_level_base", 100, "다음 레벨까지 필요 경험치 = base + step × (지금 레벨 - 시작 레벨) [임시]"],
     ["xp_level_step", 50, "(위 공식의 step) [임시]"],
     ["level_max", 20, "최대 레벨 [임시]"],
+    ["faith_battle", 5, "전투에 출전할 때마다 신앙도 + [임시]"],
     ["researcher_npc", "npc_rohan", "연구원 대원 id — 클릭하면 연구 창, 이 대원이 연구실(기능=연구)에서 깨어 있을 때만 연구가 진행됨 [임시]"],
 ]
 

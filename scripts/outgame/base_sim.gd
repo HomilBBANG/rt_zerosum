@@ -41,7 +41,7 @@ var conv_counts: Dictionary = {}     # 대화이벤트 id → 발생 횟수
 var heard: Dictionary = {}           # 대화이벤트 id → 엿들은 횟수
 var story_seen: Dictionary = {}      # 스토리 이벤트 id → 처음 엿들은 시각 라벨
 var inspections: Dictionary = {}     # "YYYY-MM" → {month, minute, done, score, grade, bonus, week, date}
-var progression: Dictionary = {}     # 전투 캐릭터 id → {training, level, xp, skills: [배운 스킬 트리 노드 id]}
+var progression: Dictionary = {}     # 전투 캐릭터 id → {training, level, xp, skills: [배운 스킬 트리 노드 id], faith, faith_skills: [배운 신앙 스킬 id]}
 var inventory: Array = []            # [{uid, item, plus, owner(캐릭터 id 또는 ""), slot}]
 var workshop: Dictionary = {}        # {kind: craft|enhance, recipe?, uid?, remaining, total}
 var researched: Dictionary = {}      # 연구 id → true (완료)
@@ -971,6 +971,9 @@ func _prog(cid: String) -> Dictionary:
 		p.level = start_level(cid)
 		p.xp = 0
 		p.skills = []
+	if not p.has("faith"):
+		p.faith = int(battle.char_faith.get(cid, {}).get("faith", 0)) if battle != null else 0
+		p.faith_skills = []
 	return p
 
 
@@ -1109,15 +1112,97 @@ func reset_skills(cid: String) -> Dictionary:
 	return {"ok": true, "msg": "%s 스킬 초기화 — 포인트를 돌려받았습니다" % _char_label(cid)}
 
 
-## 배운 노드 효과를 전투용 복제본에
+# ---------------------------------------------------------------- 신앙 [임시 데이터]: 믿는 신에 따라 배울 수 있는 신앙 스킬이 다름
+func god_of(cid: String) -> String:
+	return str(battle.char_faith.get(cid, {}).get("god", "")) if battle != null else ""
+
+
+func god_info(cid: String) -> Dictionary:
+	return battle.gods.get(god_of(cid), {}) if battle != null else {}
+
+
+func faith(cid: String) -> int:
+	return int(_prog(cid).faith)
+
+
+func faith_max() -> int:
+	return 100
+
+
+func add_faith(cid: String, v: int) -> void:
+	var p := _prog(cid)
+	var before := int(p.faith)
+	p.faith = clampi(before + v, 0, faith_max())
+	var g := god_of(cid)
+	if g == "":
+		return
+	for fs in battle.faith_skills.get(g, []):
+		if before < int(fs.need) and int(p.faith) >= int(fs.need):
+			_log("%s 신앙도 %d — 신앙 스킬 '%s' 을(를) 배울 수 있습니다" % [_char_label(cid), p.faith, fs.name])
+
+
+## 이 캐릭터가 믿는 신의 신앙 스킬 (필요 신앙도 순)
+func faith_skill_list(cid: String) -> Array:
+	return battle.faith_skills.get(god_of(cid), []) if battle != null else []
+
+
+func faith_skill(cid: String, sid: String) -> Dictionary:
+	for fs in faith_skill_list(cid):
+		if fs.id == sid:
+			return fs
+	return {}
+
+
+func has_faith_skill(cid: String, sid: String) -> bool:
+	return (_prog(cid).faith_skills as Array).has(sid)
+
+
+## learned 배움 / ready 배울 수 있음 / no_faith 신앙 부족 / other_god 다른 신의 스킬
+func faith_state(cid: String, sid: String) -> String:
+	var fs := faith_skill(cid, sid)
+	if fs.is_empty():
+		return "other_god"
+	if has_faith_skill(cid, sid):
+		return "learned"
+	if faith(cid) < int(fs.need):
+		return "no_faith"
+	return "ready"
+
+
+func learn_faith_skill(cid: String, sid: String) -> Dictionary:
+	match faith_state(cid, sid):
+		"other_god":
+			return _fail("믿는 신의 스킬이 아닙니다")
+		"learned":
+			return _fail("이미 배웠습니다")
+		"no_faith":
+			return _fail("신앙 부족 — 신앙도 %d 필요" % int(faith_skill(cid, sid).need))
+	(_prog(cid).faith_skills as Array).append(sid)
+	var fs := faith_skill(cid, sid)
+	_log("%s 신앙 스킬 습득: %s (%s)" % [_char_label(cid), fs.name, god_info(cid).get("name", "")])
+	return {"ok": true, "msg": "%s — %s 습득" % [_char_label(cid), fs.name]}
+
+
+## 배운 스킬 트리 노드 + 신앙 스킬 (효과 계산용) [{effect, value}]
+func _learned_effects(cid: String) -> Array:
+	var out: Array = []
+	for nid in learned_skills(cid):
+		var n := tree_node(cid, nid)
+		if not n.is_empty():
+			out.append(n)
+	for sid in _prog(cid).faith_skills:
+		var fs := faith_skill(cid, str(sid))
+		if not fs.is_empty():
+			out.append(fs)
+	return out
+
+
+## 배운 노드·신앙 스킬 효과를 전투용 복제본에
 func _apply_skill_tree(copy: UnitData, cid: String) -> void:
 	copy.power_bonus = 0
 	copy.heal_bonus = 0
 	copy.skill_power = {}
-	for nid in learned_skills(cid):
-		var n := tree_node(cid, nid)
-		if n.is_empty():
-			continue
+	for n in _learned_effects(cid):
 		var v := int(n.value)
 		var ef: String = n.effect
 		match ef:
@@ -1437,8 +1522,7 @@ func char_max_hp(character_id: String) -> int:
 		if u != null:
 			base_hp = u.max_hp
 	var tree_hp := 0
-	for nid in learned_skills(character_id):
-		var n := tree_node(character_id, nid)
+	for n in _learned_effects(character_id):
 		if str(n.get("effect", "")) == "hp":
 			tree_hp += int(n.value)
 	return base_hp + training_level(character_id) * data.inum("train_hp_bonus", 5) + tree_hp
@@ -1717,6 +1801,7 @@ func apply_battle_result(result: Dictionary) -> void:
 		cs.fatigue = clampf(float(cs.fatigue) + data.num("fatigue_battle", 20.0), 0.0, 100.0)
 		var gain := data.inum("xp_win", 100) if str(result.get("winner", "")) == "ally" else data.inum("xp_lose", 40)
 		var ups := add_xp(cid, gain)
+		add_faith(cid, data.inum("faith_battle", 5))
 		growth.append({"id": cid, "name": _char_label(cid), "xp": gain, "level": char_level(cid), "ups": ups})
 		lines.append("%s HP %d/%d%s" % [_char_label(cid), floori(float(cs.hp)), char_max_hp(cid), " 부상" if "injured" in sts else ""])
 	var w := str(result.get("winner", ""))

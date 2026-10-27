@@ -88,7 +88,7 @@
 | 출정 대기 화면 | `scenes/formation.tscn` + `scripts/ui/formation.gd`, 말풍선 `scripts/ui/speech_bubble.gd` |
 | 화면 | `scenes/outgame/base_hub.tscn` + `scripts/outgame/base_hub.gd`, `scripts/outgame/view/` base_view_3d(3D 배경) · base_overlay · npc_view · outgame_hud, `scenes/title.tscn` |
 | 에디터 | `addons/rtz_schedule_editor/` (일정), `addons/rtz_battle_editor/` (전투 발생), `addons/rtz_sortie_editor/` (출정 대사) |
-| 테스트 | `tests/outgame_tests.gd` ([15]~[33]: [33] 레벨·스킬 트리 · [32] 연구원 로한·연구 · [31] 출정 대사·출정 불가 · [30] 플레이어 조작 · [25] 계단 대각선 · [26] 피로·오브젝트 · [27] 체력·의무실 · [28] 식재료·PX 선호·친밀도 대화 · [29] 전투 발생 규칙) |
+| 테스트 | `tests/outgame_tests.gd` ([15]~[34]: [34] 신앙 · [33] 레벨·스킬 트리 · [32] 연구원 로한·연구 · [31] 출정 대사·출정 불가 · [30] 플레이어 조작 · [25] 계단 대각선 · [26] 피로·오브젝트 · [27] 체력·의무실 · [28] 식재료·PX 선호·친밀도 대화 · [29] 전투 발생 규칙) |
 
 ## 6. 아직 정하지 않은 것 (기획서 13절 — 임시값으로 동작 중)
 

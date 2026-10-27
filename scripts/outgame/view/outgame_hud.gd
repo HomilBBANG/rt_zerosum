@@ -719,7 +719,7 @@ func open_facility(fid: String) -> void:
 
 # ---------------------------------------------------------------- 스킬 트리 (캐릭터마다 십자형)
 ## cid = "" 이면 첫 대원. 위: 대원 탭(초상화·레벨·포인트) / 왼쪽: 레벨·경험치·포인트·고른 스킬 설명·배우기 / 오른쪽: 십자형 트리
-func open_skills(cid: String = "", pick: String = "") -> void:
+func open_skills(cid: String = "", pick: String = "", mode: String = "tree") -> void:
 	var allies: Array = sim.battle.allies if sim.battle != null else []
 	if allies.is_empty():
 		return
@@ -741,10 +741,25 @@ func open_skills(cid: String = "", pick: String = "") -> void:
 		var uid: String = u.id
 		b.pressed.connect(func():
 			close_top()
-			open_skills(uid))
+			open_skills(uid, "", mode))
 		tabs.add_child(b)
+	var gap := Control.new()
+	gap.size_flags_horizontal = SIZE_EXPAND_FILL
+	tabs.add_child(gap)
+	for m in [["tree", "스킬 트리"], ["faith", "신앙"]]:
+		var mb := _button(m[1], Color(1.0, 0.85, 0.35) if m[0] == mode else Color(0.45, 0.55, 0.7), 15, 96)
+		mb.custom_minimum_size.y = 46
+		var mm: String = m[0]
+		mb.pressed.connect(func():
+			if mm != mode:
+				close_top()
+				open_skills(cid, "", mm))
+		tabs.add_child(mb)
 	var row := _hbox(14)
 	body.add_child(row)
+	if mode == "faith":
+		_faith_page(row, cid)
+		return
 	# 왼쪽: 정보
 	var info := _vbox(6)
 	info.custom_minimum_size = Vector2(330, 560)
@@ -759,6 +774,8 @@ func open_skills(cid: String = "", pick: String = "") -> void:
 	hc.add_child(_label("%s · Lv%d%s" % [unit.role, sim.char_level(cid), "  (최대)" if sim.char_level(cid) >= sim.level_max() else ""], 15, Color(0.85, 0.9, 1)))
 	var pts := sim.skill_points(cid)
 	hc.add_child(_label("스킬 포인트 %d" % pts, 17, Color(0.85, 0.6, 1.0) if pts > 0 else Color(0.7, 0.72, 0.78)))
+	var gi := sim.god_info(cid)
+	hc.add_child(_label("신앙: %s · %d" % [gi.get("name", "무신앙"), sim.faith(cid)], 13, Color(gi.get("color", Color(0.75, 0.78, 0.85)))))
 	info.add_child(_gauge("경험치", float(sim.char_xp(cid)), maxf(1.0, float(sim.xp_need(cid))), Color(0.85, 0.6, 1.0),
 		"%d / %d" % [sim.char_xp(cid), sim.xp_need(cid)]))
 	info.add_child(_label("전투에 나가면 경험치 (승리 %d · 패배 %d) → 레벨 업마다 포인트 1" % [sim.data.inum("xp_win", 100), sim.data.inum("xp_lose", 40)], 12, Color(0.7, 0.75, 0.85)))
@@ -817,6 +834,107 @@ func open_skills(cid: String = "", pick: String = "") -> void:
 	if pick != "":
 		tree.selected = pick
 	show.call(tree.selected)
+
+
+## 신앙 탭: 믿는 신 · 신앙도 · 그 신의 신앙 스킬 (신앙도가 모자라면 회색 + 붉은 "신앙 부족"), 아래에 다른 신들의 스킬 (참고)
+func _faith_page(row: HBoxContainer, cid: String) -> void:
+	var unit: UnitData = GameData._find(sim.battle.allies, cid)
+	var gi := sim.god_info(cid)
+	var gcol: Color = gi.get("color", Color(0.75, 0.78, 0.85))
+	var info := _vbox(6)
+	info.custom_minimum_size = Vector2(330, 560)
+	row.add_child(info)
+	var head := _hbox(10)
+	info.add_child(head)
+	head.add_child(_portrait_rect(unit.sprite_id, 84))
+	var hc := _vbox(2)
+	head.add_child(hc)
+	hc.add_child(_label(unit.display_name, 22, GOLD))
+	hc.add_child(_label("%s · Lv%d" % [unit.role, sim.char_level(cid)], 15, Color(0.85, 0.9, 1)))
+	hc.add_child(_label("신앙도 %d" % sim.faith(cid), 17, gcol))
+	info.add_child(_gauge("신앙도", float(sim.faith(cid)), float(sim.faith_max()), gcol, "%d / %d" % [sim.faith(cid), sim.faith_max()]))
+	info.add_child(_label("전투에 출전할 때마다 신앙도 +%d · 신앙 스킬은 포인트 없이 배움" % sim.data.inum("faith_battle", 5), 12, Color(0.7, 0.75, 0.85)))
+	info.add_child(_label("믿는 신에 따라 배울 수 있는 스킬이 다릅니다 (임시 데이터)", 12, Color(0.7, 0.75, 0.85)))
+	var learned := sim.faith_skill_list(cid).filter(func(fs): return sim.has_faith_skill(cid, fs.id))
+	info.add_child(_label("배운 신앙 스킬", 15, Color(1, 0.95, 0.75)))
+	if learned.is_empty():
+		info.add_child(_label("(없음)", 12, Color(0.6, 0.64, 0.7)))
+	for fs in learned:
+		info.add_child(_label("· %s — %s" % [fs.name, fs.desc], 12, gcol.lightened(0.3)))
+	# 오른쪽: 신 카드 + 신앙 스킬
+	var right := _vbox(10)
+	right.custom_minimum_size = Vector2(800, 560)
+	row.add_child(right)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _panel_style(Color(gcol.darkened(0.8), 0.95), gcol, 10))
+	right.add_child(card)
+	var cv := _vbox(4)
+	card.add_child(cv)
+	if gi.is_empty():
+		cv.add_child(_label("무신앙 — 믿는 신이 없습니다 (밸런스 엑셀 캐릭터 시트 '신' 열)", 18, Color(0.8, 0.82, 0.88)))
+		return
+	cv.add_child(_label("✦ %s" % gi.name, 24, gcol.lightened(0.2)))
+	cv.add_child(_label(str(gi.desc), 14, Color(0.88, 0.9, 0.95)))
+	var grid := HBoxContainer.new()
+	grid.add_theme_constant_override("separation", 12)
+	right.add_child(grid)
+	for fs in sim.faith_skill_list(cid):
+		grid.add_child(_faith_card(cid, fs, gcol))
+	# 다른 신들 (참고): 무엇을 믿느냐에 따라 스킬이 다름
+	right.add_child(_label("다른 신의 신앙 스킬 (이 캐릭터는 배울 수 없음)", 14, Color(0.75, 0.78, 0.85)))
+	for g in sim.battle.god_order:
+		if g == sim.god_of(cid):
+			continue
+		var og: Dictionary = sim.battle.gods[g]
+		var names := (sim.battle.faith_skills.get(g, []) as Array).map(func(x): return "%s(%d)" % [x.name, int(x.need)])
+		right.add_child(_label("%s — %s" % [og.name, " · ".join(names)], 12, Color(og.color).darkened(0.15)))
+
+
+func _faith_card(cid: String, fs: Dictionary, gcol: Color) -> Control:
+	var st := sim.faith_state(cid, fs.id)
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(191, 200)
+	c.draw.connect(func():
+		var sb := StyleBoxFlat.new()
+		sb.set_corner_radius_all(10)
+		sb.set_border_width_all(2)
+		var ncol := Color(1, 1, 1)
+		match st:
+			"learned":
+				sb.bg_color = gcol.darkened(0.45)
+				sb.border_color = gcol.lightened(0.3)
+			"ready":
+				sb.bg_color = Color(0.1, 0.12, 0.16)
+				sb.border_color = gcol
+				sb.set_border_width_all(3)
+			_:
+				sb.bg_color = Color(0.17, 0.17, 0.18)
+				sb.border_color = Color(0.28, 0.28, 0.3)
+				ncol = Color(0.45, 0.46, 0.5)
+		var r := Rect2(Vector2.ZERO, c.size)
+		c.draw_style_box(sb, r)
+		c.draw_string(bold, Vector2(0, 30), str(fs.name), HORIZONTAL_ALIGNMENT_CENTER, c.size.x, 18, ncol)
+		c.draw_string(font, Vector2(0, 54), "신앙 %d" % int(fs.need), HORIZONTAL_ALIGNMENT_CENTER, c.size.x, 13, gcol if st != "no_faith" else ncol)
+		c.draw_multiline_string(font, Vector2(10, 136), str(fs.desc), HORIZONTAL_ALIGNMENT_CENTER, c.size.x - 20, 14, -1, ncol.darkened(0.05))
+		var sub: String = {"learned": "습득", "ready": "배우기 가능", "no_faith": ""}.get(st, "")
+		c.draw_string(font, Vector2(0, c.size.y - 14), sub, HORIZONTAL_ALIGNMENT_CENTER, c.size.x, 13, gcol.lightened(0.4))
+		if st == "no_faith":
+			c.draw_rect(r.grow(-2), Color(0.1, 0.1, 0.1, 0.35))
+			var t := "신앙 부족"
+			var ts := bold.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 20)
+			var p := r.get_center() + Vector2(-ts.x * 0.5, ts.y * 0.35)
+			c.draw_string_outline(bold, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 4, Color(0, 0, 0, 0.8))
+			c.draw_string(bold, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, SkillTreeView.RED))
+	if st == "ready":
+		c.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		c.tooltip_text = "클릭: 배우기"
+		c.gui_input.connect(func(ev):
+			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+				var res := sim.learn_faith_skill(cid, fs.id)
+				show_toast(res.msg, GOOD if res.ok else BAD)
+				close_top()
+				open_skills(cid, "", "faith"))
+	return c
 
 
 # ---------------------------------------------------------------- 연구실 (로한): 연구 → 무기고 제작 해금

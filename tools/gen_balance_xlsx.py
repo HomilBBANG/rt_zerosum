@@ -11,14 +11,14 @@ OUT = os.path.join(ROOT, "data", "balance.xlsx")
 if os.path.exists(OUT) and "--force" not in sys.argv:
     sys.exit("data/balance.xlsx 가 이미 있습니다 (엑셀에서 고친 값이 사라지므로 덮어쓰려면 --force)")
 
-CHAR_COLS = ["id", "이름", "병과", "레벨", "속도", "사거리", "HP", "AP", "AP회복", "방어", "스킬", "무기", "열", "줄", "키(cm)", "스프라이트", "눈색", "원화방향"]
+CHAR_COLS = ["id", "이름", "병과", "레벨", "속도", "사거리", "HP", "AP", "AP회복", "방어", "스킬", "무기", "열", "줄", "키(cm)", "스프라이트", "눈색", "원화방향", "신", "신앙"]
 CHARS = [
-    ["a_dan", "단", "돌격병", 5, 8, "근접", 46, 6, 2, 2, "basic_attack, heavy_attack, ultimate", "axe, pistol", "전방", 1, 185, "dan", "#7fb2ff", "오른쪽"],
-    ["a_kira", "키라", "돌격병", 5, 10, "근접", 40, 6, 2, 1, "basic_attack, heavy_attack, ultimate", "combat_knife, pistol", "전방", 2, 175, "kira", "#c8d4ff", "오른쪽"],
-    ["a_ethan", "이선", "소총수", 5, 9, "원거리", 30, 6, 2, 0, "basic_attack, heavy_attack, ultimate", "rifle, bayonet", "중앙", 1, 178, "ethan", "", "오른쪽"],
-    ["a_hana", "하나", "돌격소총수", 5, 9, "원거리", 34, 6, 2, 1, "basic_attack, heavy_attack, ultimate", "rifle, bayonet", "중앙", 2, 176.8, "hero2", "#ffb020", "오른쪽"],
-    ["a_alma", "앨마", "의무병", 4, 7, "원거리", 28, 7, 3, 0, "basic_attack, heal, rally, ultimate", "pistol, syringe", "후방", 1, 166, "alma", "#43d6a0", "오른쪽"],
-    ["a_nikita", "니키타", "저격수", 6, 11, "원거리", 24, 5, 2, 0, "basic_attack, heavy_attack, ultimate", "sniper, knife", "후방", 2, 168, "nikita_army", "#4f9cff", "오른쪽"],
+    ["a_dan", "단", "돌격병", 5, 8, "근접", 46, 6, 2, 2, "basic_attack, heavy_attack, ultimate", "axe, pistol", "전방", 1, 185, "dan", "#7fb2ff", "오른쪽", "veyra", 30],
+    ["a_kira", "키라", "돌격병", 5, 10, "근접", 40, 6, 2, 1, "basic_attack, heavy_attack, ultimate", "combat_knife, pistol", "전방", 2, 175, "kira", "#c8d4ff", "오른쪽", "noct", 20],
+    ["a_ethan", "이선", "소총수", 5, 9, "원거리", 30, 6, 2, 0, "basic_attack, heavy_attack, ultimate", "rifle, bayonet", "중앙", 1, 178, "ethan", "", "오른쪽", "solus", 40],
+    ["a_hana", "하나", "돌격소총수", 5, 9, "원거리", 34, 6, 2, 1, "basic_attack, heavy_attack, ultimate", "rifle, bayonet", "중앙", 2, 176.8, "hero2", "#ffb020", "오른쪽", "terra", 10],
+    ["a_alma", "앨마", "의무병", 4, 7, "원거리", 28, 7, 3, 0, "basic_attack, heal, rally, ultimate", "pistol, syringe", "후방", 1, 166, "alma", "#43d6a0", "오른쪽", "solus", 50],
+    ["a_nikita", "니키타", "저격수", 6, 11, "원거리", 24, 5, 2, 0, "basic_attack, heavy_attack, ultimate", "sniper, knife", "후방", 2, 168, "nikita_army", "#4f9cff", "오른쪽", "noct", 25],
 ]
 MON_COLS = ["id", "이름", "분류", "레벨", "속도", "사거리", "HP", "AP", "AP회복", "방어", "스킬", "무기", "차지칸", "키(cm)", "스프라이트", "원화방향", "AI"]
 MONS = [
@@ -57,6 +57,33 @@ SKILLS = [
     ["flank", "측면 기습", "attack", 2, "enemy_any", "damage", 9, "스킬 트리(동·기동 끝): 열 무관 적 1명 공격"],
     ["second_wind", "재정비", "support", 1, "ally_any", "heal", 8, "스킬 트리(남·생존 끝): 아군 1명(자신 포함) HP 회복"],
     ["inspire", "고무", "support", 1, "ally_other", "ap_grant", 1, "스킬 트리(서·전술 끝): 다른 아군 1명 AP +1"],
+]
+# 신앙 [임시 데이터 — 나중에 사용자 표로 교체]: 신 종류마다 배울 수 있는 신앙 스킬이 다름
+GOD_COLS = ["id", "이름", "상징색", "설명"]
+GODS = [
+    ["solus", "태양신 솔루스", "#ffd166", "빛과 치유의 신 — 회복·체력 (임시)"],
+    ["veyra", "전쟁신 베이라", "#ff5a4e", "피와 전투의 신 — 공격 위력 (임시)"],
+    ["noct", "밤의 여신 녹트", "#8f7bff", "그림자와 은밀함의 신 — 속도·AP (임시)"],
+    ["terra", "대지모 테라", "#5fd38a", "땅과 수호의 신 — 방어·체력 (임시)"],
+]
+FS_COLS = ["신", "id", "이름", "필요신앙", "효과", "값", "설명"]
+FAITH_SKILLS = [
+    ["solus", "solus_1", "햇살의 손길", 20, "heal", 2, "회복량 +2"],
+    ["solus", "solus_2", "빛의 가호", 40, "hp", 6, "최대 HP +6"],
+    ["solus", "solus_3", "성광", 60, "skill_power:heal", 5, "응급 처치 회복 +5"],
+    ["solus", "solus_4", "태양의 축복", 80, "hp", 12, "최대 HP +12"],
+    ["veyra", "veyra_1", "피의 맹세", 20, "power", 1, "모든 공격 위력 +1"],
+    ["veyra", "veyra_2", "전쟁의 함성", 40, "skill_power:heavy_attack", 3, "강공격 위력 +3"],
+    ["veyra", "veyra_3", "광전사", 60, "power", 2, "모든 공격 위력 +2"],
+    ["veyra", "veyra_4", "신의 철퇴", 80, "skill_power:ultimate", 6, "필살기 위력 +6"],
+    ["noct", "noct_1", "그림자 걸음", 20, "speed", 1, "속도 +1"],
+    ["noct", "noct_2", "밤의 숨결", 40, "ap_rec", 1, "턴마다 AP 회복 +1"],
+    ["noct", "noct_3", "암습", 60, "skill_power:basic_attack", 3, "기본 공격 위력 +3"],
+    ["noct", "noct_4", "달 없는 밤", 80, "ap", 1, "최대 AP +1"],
+    ["terra", "terra_1", "단단한 뿌리", 20, "defense", 1, "방어 +1"],
+    ["terra", "terra_2", "대지의 피", 40, "hp", 8, "최대 HP +8"],
+    ["terra", "terra_3", "바위 피부", 60, "defense", 1, "방어 +1"],
+    ["terra", "terra_4", "어머니의 품", 80, "hp", 14, "최대 HP +14"],
 ]
 # 스킬 트리 (캐릭터마다 십자형: 중앙 + 동서남북 1~3단계). 방향 = 빌드 성향 (북 화력 / 동 기동 / 남 생존 / 서 전술)
 TREE_COLS = ["캐릭터", "방향", "단계", "id", "이름", "필요레벨", "효과", "값", "설명"]
@@ -146,6 +173,9 @@ STAGES = [
 ]
 README = [
     ["시트", "열", "설명"],
+    ["신", "id / 이름 / 상징색", "믿는 신 종류 [임시 데이터 — 나중에 교체]. 캐릭터 시트 '신' 열에 id"],
+    ["신앙스킬", "신 / 필요신앙", "그 신을 믿는 캐릭터만 배울 수 있는 스킬. 신앙도가 필요신앙 이상이면 배울 수 있음(포인트 안 씀). 효과·값은 스킬트리와 같은 형식"],
+    ["캐릭터", "신 / 신앙", "믿는 신(신 시트 id, 비우면 무신앙)과 시작 신앙도 0~100. 출전할 때마다 신앙도 + (기지 설정 faith_battle)"],
     ["스킬트리", "캐릭터 / 방향 / 단계", "캐릭터마다 십자형 트리: 중앙(0단계, 처음부터 습득) + 동서남북 갈래 1~3단계. 갈래 안에서는 앞 단계를 배워야 다음 단계"],
     ["스킬트리", "필요레벨", "이 레벨이 되어야 배울 수 있음 (안 되면 스킬 창에 회색 + '경험 부족'). 스킬 포인트 = 레벨 오를 때마다 1 + 처음 1"],
     ["스킬트리", "효과 / 값", "hp·speed·ap·ap_rec·defense·power(모든 공격 위력)·heal(회복량) +값, skill_power:<스킬 id> = 그 스킬 위력 +값, skill:<스킬 id> = 새 스킬 (기본 스킬 칸 3개까지)"],
@@ -173,7 +203,7 @@ wb = Workbook()
 first = True
 for name, cols, rows, widths in [
     ("캐릭터", CHAR_COLS, CHARS, None), ("몬스터", MON_COLS, MONS, None), ("아이템", ITEM_COLS, ITEMS, None),
-    ("스킬", SKILL_COLS, SKILLS, None), ("스킬트리", TREE_COLS, TREE, None), ("스테이지", STAGE_COLS, STAGES, None), ("읽어보기", README[0], README[1:], [12, 22, 90])]:
+    ("스킬", SKILL_COLS, SKILLS, None), ("스킬트리", TREE_COLS, TREE, None), ("신", GOD_COLS, GODS, None), ("신앙스킬", FS_COLS, FAITH_SKILLS, None), ("스테이지", STAGE_COLS, STAGES, None), ("읽어보기", README[0], README[1:], [12, 22, 90])]:
     ws = wb.active if first else wb.create_sheet()
     first = False
     ws.title = name
