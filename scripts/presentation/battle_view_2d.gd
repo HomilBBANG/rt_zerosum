@@ -489,6 +489,7 @@ func _on_status_ticked(event: Dictionary) -> void:
 func _on_unit_moved(unit: UnitRuntime, _from_key: String, _to_key: String) -> void:
 	var s := sprite_of(unit)
 	_begin_busy()
+	s.play_move_steps()
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(s, "position", unit_position(unit), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
@@ -504,6 +505,8 @@ func _on_units_swapped(a: UnitRuntime, b: UnitRuntime) -> void:
 	var sa := sprite_of(a)
 	var sb := sprite_of(b)
 	_begin_busy()
+	sa.play_move_steps()
+	sb.play_move_steps(0.09)   # 두 사람 발소리가 겹치지 않게 살짝 늦게
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(sa, "position", unit_position(a), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)

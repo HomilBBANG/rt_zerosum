@@ -56,6 +56,7 @@ func _init() -> void:
 	_test_rally_status()
 	_test_battle_statuses()
 	_test_balance_data_and_ai_graph()
+	_test_sfx()
 	load("res://tests/outgame_tests.gd").new().run(_check)
 	print("== %d passed, %d failed ==" % [_passes, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -571,3 +572,27 @@ func _test_balance_data_and_ai_graph() -> void:
 	ghoul.actions_this_turn = 2
 	_check((AIGraph.decide(g, ghoul, bc.actions, bc.slots, bc.rng) as Dictionary).is_empty(), "행동 2회 후 턴 종료")
 	bc.queue_free()
+
+
+## 발자국·쓰러짐 소리: 파일, 발 닿는 프레임, 걷기 한 바퀴 = 두 걸음
+func _test_sfx() -> void:
+	_check(Sfx.footsteps("kira", "walk").size() == 5, "키라 걷기 발자국 5조각 [got %d]" % Sfx.footsteps("kira", "walk").size())
+	_check(Sfx.footsteps("nikita_army", "run").size() == 3, "니키타 뛰기 발자국 3조각")
+	_check(Sfx.footsteps("rohan", "walk").is_empty(), "소리 없는 캐릭터 = 빈 목록")
+	_check(Sfx.common("dead") != null, "공용 쓰러짐 소리")
+	var d: Dictionary = CharacterSprite2D.anim_data("kira", "walk")
+	_check((d.get("steps", []) as Array).map(func(v): return int(v)) == [9, 18], "키라 걷기 발 닿는 프레임 [9, 18] [got %s]" % str(d.get("steps", [])))
+	var c := CharacterSprite2D.new()
+	c.build("kira")
+	c.play("walk")
+	var n := (d.frames as Array).size()
+	for k in n * 2:   # 두 바퀴 (프레임마다 한 번씩)
+		c._process(1.0 / float(d.fps) + 0.0001)
+	_check(c._step_i == 4, "걷기 두 바퀴 = 발자국 4번 [got %d]" % c._step_i)
+	c.play("idle")
+	var before := c._step_i
+	for k in 30:
+		c._process(0.1)
+	_check(c._step_i == before, "idle 에서는 발자국 없음")
+	c.free()
+

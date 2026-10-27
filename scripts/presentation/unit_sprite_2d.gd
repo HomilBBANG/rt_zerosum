@@ -356,7 +356,16 @@ func play_heal() -> void:
 	tw.tween_property(flip, "scale", flip.scale, 0.18)
 
 
+## 전투 자리 이동(0.35초 미끄러짐) 동안 발자국 두 걸음 (그 캐릭터 걷기 소리가 있을 때만)
+func play_move_steps(delay: float = 0.0) -> void:
+	if chr == null:
+		return
+	for t in [delay, delay + 0.19]:
+		get_tree().create_timer(t).timeout.connect(func(): if is_instance_valid(chr): chr.footstep("walk"))
+
+
 func play_death() -> void:
+	Sfx.play_at(self, Sfx.common("dead"), Sfx.DEAD_DB)   # 쓰러지는 소리 (공용)
 	if chr != null and chr.has_anim("death"):
 		chr.play("death")
 		var tw2 := create_tween()

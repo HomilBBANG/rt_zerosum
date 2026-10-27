@@ -39,6 +39,8 @@ var _frame := -1
 var _done := false
 var _tex_from_right := true
 var speed_scale := 1.0     # 재생 속도 배율 (뛰기 시트가 없을 때 걷기를 빠르게 등)
+var footsteps := true      # 걷기·뛰기 프레임에서 발자국 소리 (anim.json "steps" = 발 닿는 프레임, 없으면 처음·가운데)
+var _step_i := 0
 
 
 static func dir_of(id: String) -> String:
@@ -251,6 +253,7 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 static func clear_cache() -> void:
 	_cache.clear()
 	_info_cache.clear()
+	Sfx.clear_cache()
 
 
 func build(id: String, p_height_cm: float = 175.0) -> void:
@@ -307,6 +310,7 @@ func play(anim: String, restart: bool = true) -> void:
 	_frame = -1
 	_done = false
 	_show(0)
+	_step_check(-1, 0)
 
 
 ## 확인·스크린샷용: 그 애니메이션의 frame 번째(0부터) 프레임에 멈춤
@@ -351,6 +355,10 @@ func _process(delta: float) -> void:
 	if i >= n:
 		if _a.loop:
 			i = i % n
+			if i != _frame:
+				_step_check(_frame, i)
+				_show(i)
+			return
 		else:
 			_done = true
 			i = n - 1
@@ -359,7 +367,37 @@ func _process(delta: float) -> void:
 			if current in ONE_SHOT:
 				play("idle")
 			return
+	if i != _frame:
+		_step_check(_frame, i)
 	_show(i)
+
+
+## 걷기·뛰기: 지난 프레임(prev) 다음 ~ 이번 프레임(i) 사이에 발 닿는 프레임이 있으면 발자국 한 조각 (i ≤ prev = 한 바퀴 넘어감)
+func _step_check(prev: int, i: int) -> void:
+	if not footsteps or not current in ["walk", "run"] or Engine.is_editor_hint():
+		return
+	var n := (_a.get("frames", []) as Array).size()
+	if n == 0:
+		return
+	if prev >= 0 and i <= prev:
+		i += n
+	var steps: Array = _a.get("steps", [0, n / 2])
+	for st in steps:
+		for k in [int(st), int(st) + n]:
+			if k > prev and k <= i:
+				footstep(current)
+				return
+
+
+## 발자국 한 조각 (gait = walk|run, 뛰기 소리가 없으면 걷기 소리)
+func footstep(gait: String = "walk") -> void:
+	var list := Sfx.footsteps(cid, gait)
+	if list.is_empty() and gait == "run":
+		list = Sfx.footsteps(cid, "walk")
+	if list.is_empty():
+		return
+	Sfx.play_at(self, list[_step_i % list.size()], Sfx.FOOTSTEP_DB)
+	_step_i += 1
 
 
 func _show(i: int) -> void:

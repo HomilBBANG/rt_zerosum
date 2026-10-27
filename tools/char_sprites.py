@@ -37,6 +37,7 @@ assets/characters/<id>/
       AI 시트(영상에서 뽑은 칸 배열) → <동작>/0001.png … 칸 경계는 그림이 가장 적은 줄로 자름, 쓸 프레임만 골라 순서대로
       크기: 기준 프레임(--ref, 똑바로 선 칸)의 키 = figure_px. ground = 프레임마다 발을 접지선에(카메라 흔들림 제거), cell = 칸 높이 그대로(뛰기처럼 뜨는 동작)
       누운 자세처럼 캔버스를 넘으면 그 동작만 캔버스를 넓힘 (anim.json 의 ground). 조명·선화·눈 마스크도 프레임마다
+  python3 tools/char_sprites.py steps <캐릭터> [walk run]   걷기·뛰기에서 발이 땅에 닿는 프레임 2개 → anim.json "steps" (발자국 소리 맞추기)
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
 import json
@@ -990,6 +991,44 @@ def cmd_head(cid, anim, cut=None, src=None, max_deg=14, scales=(0.85, 1.15)):
     print(cid, anim, "머리 바꿔 붙임:", ", ".join(log))
 
 
+# ---------------------------------------------------------------- 발 닿는 프레임 (발자국 소리 맞추기)
+def cmd_steps(cid, anims=("walk", "run")):
+    """걷기·뛰기 한 주기에서 발이 땅에 닿는 프레임 2개 → anim.json "steps" (0부터).
+    점수 = 뛰기(발 높이가 변함)는 가장 낮은 프레임, 걷기는 두 발이 가장 벌어진 프레임(발 높이 띠의 가로 폭). 가장 높은 프레임과,
+    그로부터 주기의 1/3 이상 떨어진 프레임 중 가장 높은 것. 게임은 이 프레임이 보일 때 발자국 한 조각을 재생."""
+    import numpy as np
+    for anim in anims:
+        adir = os.path.join(CHAR_DIR, cid, anim)
+        aj = os.path.join(adir, "anim.json")
+        if not os.path.isdir(adir):
+            continue
+        names = sorted(f for f in os.listdir(adir) if re.match(r"^\d+\.png$", f))
+        if len(names) < 4:
+            continue
+        spread, bottom = [], []
+        for fn in names:
+            a = np.array(Image.open(os.path.join(adir, fn)))[..., 3] > 40
+            ys = np.nonzero(a.any(1))[0]
+            top, bot = int(ys.min()), int(ys.max())
+            band = a[bot - max(3, int((bot - top) * 0.06)):bot + 1]
+            xs = np.nonzero(band.any(0))[0]
+            spread.append(float(xs.max() - xs.min()))
+            bottom.append(float(bot))
+        sp, bo = np.array(spread), np.array(bottom)
+        norm = lambda v: (v - v.min()) / max(1e-6, v.max() - v.min())
+        # 뛰기처럼 뜨는 동작(발 높이가 변함) = 가장 낮은 프레임이 착지 (공중에서 다리를 벌린 프레임은 폭이 넓어도 착지 아님)
+        # 걷기(발이 늘 땅) = 두 발이 가장 벌어진 프레임이 앞발 착지
+        score = norm(bo) if bo.max() - bo.min() > 4 else norm(sp)
+        n = len(names)
+        i = int(np.argmax(score))
+        far = [k for k in range(n) if min(abs(k - i), n - abs(k - i)) >= n / 3]
+        j = max(far, key=lambda k: score[k])
+        meta = json.load(open(aj, encoding="utf-8")) if os.path.exists(aj) else {}
+        meta["steps"] = sorted([i, j])
+        json.dump(meta, open(aj, "w", encoding="utf-8"), ensure_ascii=False)
+        print(cid, anim, "발 닿는 프레임", meta["steps"], "(%d장 중)" % n)
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
@@ -1020,6 +1059,8 @@ if __name__ == "__main__":
         opt = {a[2:]: args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
         cmd_head(args[1], args[2], opt.get("cut"), None, int(opt.get("deg", 14)),
                  tuple(float(v) for v in opt.get("scale", "0.85-1.15").split("-")))
+    elif args[:1] == ["steps"] and len(args) >= 2:
+        cmd_steps(args[1], tuple(args[2:]) or ("walk", "run"))
     elif args[:1] == ["rig"] and len(args) >= 2:
         nums = [a for a in args[2:] if a.isdigit()]
         cmd_rig(args[1], int(nums[0]) if nums else 32, blink="--blink" in args)
