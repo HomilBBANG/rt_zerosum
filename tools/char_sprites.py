@@ -24,8 +24,9 @@ assets/characters/<id>/
       움직이는 GIF·WebP(APNG) → 프레임마다, 스프라이트 시트 → --grid 열x행 칸마다, PNG 여러 장 → 그 순서대로
       첫 프레임의 발·키를 base.png 에 맞추는 같은 이동·배율을 모든 프레임에 적용 (프레임 사이 움직임은 그대로)
       → assets/characters/<캐릭터>/<동작>/0001.png … + anim.json(움직이는 파일의 프레임 시간) + 조명 마스크
-  python3 tools/char_sprites.py rig <캐릭터> [칸 수=32]   리깅 idle: 원화 한 장을 부위별로 휨 → <캐릭터>/idle/ (숨쉬기 시트 대신)
-      다리·골반 고정 · 몸통 숨쉬기 · 머리 = 목(head_rect 아래) 기준 갸웃·끄덕 · 팔 = 어깨 기준 흔들림(팔·몸통 사이 빈틈으로 팔 영역) · 눈 깜빡임 1번 (base_eye.png)
+  python3 tools/char_sprites.py rig <캐릭터> [칸 수=32] [--blink]   리깅 idle: 원화 한 장을 부위별로 휨 → <캐릭터>/idle/ (숨쉬기 시트 대신)
+      다리·골반 고정 · 몸통 숨쉬기 · 머리 = 목(head_rect 아래) 기준 갸웃·끄덕 · 팔 = 어깨 기준 흔들림(팔·몸통 사이 빈틈으로 팔 영역)
+      --blink = 눈 깜빡임 1번 (눈 자리를 피부색으로 덮어 그림 — 그림체에 따라 어색할 수 있어 기본은 끔)
   python3 tools/char_sprites.py report <시트.png> [--grid 6x6] [--align ground|cell] [--loop 8-36]
       AI 로 만든 시트 분석: 튀는 프레임 후보(앞뒤 사이로 바로 가는 것보다 크게 돌아가는 프레임) + 이음새가 매끄러운 반복 구간 후보
   python3 tools/char_sprites.py sheet <캐릭터> <동작> <시트.png> [--grid 6x6] [--frames 1-20,22] [--fps 12] [--align ground|cell] [--ref 1] [--loop 0|1] [--weapon 0|1]
@@ -748,9 +749,9 @@ def _blink(img, eye, line, c):
                     line[yi, x] = max(line[yi, x], 255 * al)
 
 
-def cmd_rig(cid, frames=32, fps=12.0, head_deg=1.2, arm_deg=0.8, breath=0.005, blink_at=0.62):
+def cmd_rig(cid, frames=32, fps=12.0, head_deg=1.2, arm_deg=0.8, breath=0.005, blink_at=0.62, blink=False):
     """원화(base.png) 한 장을 부위별로 휘어 idle 만들기 → <캐릭터>/idle/ (시트 idle_4x4 대신)
-    다리·골반 고정 · 몸통 숨쉬기(어깨가 오르내림, 가슴 살짝 넓어짐) · 머리 = 목 기준 기울기 · 팔 = 어깨 기준 흔들림 · 눈 깜빡임 1번
+    다리·골반 고정 · 몸통 숨쉬기(어깨가 오르내림, 가슴 살짝 넓어짐) · 머리 = 목 기준 기울기 · 팔 = 어깨 기준 흔들림 · (blink=True 면) 눈 깜빡임 1번
     조명·선화·눈 마스크도 같은 움직임으로."""
     import math
     import numpy as np
@@ -785,7 +786,7 @@ def cmd_rig(cid, frames=32, fps=12.0, head_deg=1.2, arm_deg=0.8, breath=0.005, b
         if fn.endswith(".png") or fn.endswith(".png.import"):
             os.remove(os.path.join(adir, fn))
     kb = int(round(frames * blink_at))
-    blink = {kb - 1: 0.55, kb: 1.0, kb + 1: 1.0, kb + 2: 0.5}
+    blinks = {kb - 1: 0.55, kb: 1.0, kb + 1: 1.0, kb + 2: 0.5} if blink else {}
 
     def rot(px, py, cx, cy, deg):
         r = math.radians(deg)
@@ -813,7 +814,7 @@ def cmd_rig(cid, frames=32, fps=12.0, head_deg=1.2, arm_deg=0.8, breath=0.005, b
         img = base.copy()
         eye = srcs.get("_eye", np.zeros((H, W), np.float32)).copy()
         line = srcs.get("_line", np.zeros((H, W), np.float32)).copy()
-        _blink(img, eye, line, blink.get(i, 0.0))
+        _blink(img, eye, line, blinks.get(i, 0.0))
         out = np.zeros_like(img)
         for ch in range(4):
             out[..., ch] = map_coordinates(img[..., ch], [sy, sx], order=1, mode="constant", cval=0.0)
@@ -860,7 +861,8 @@ if __name__ == "__main__":
         cmd_import(args[1], args[2], rest, grid, float(opts["fps"]) if "fps" in opts else None,
                    float(opts["hold"]) if "hold" in opts else None)
     elif args[:1] == ["rig"] and len(args) >= 2:
-        cmd_rig(args[1], int(args[2]) if len(args) > 2 else 32)
+        nums = [a for a in args[2:] if a.isdigit()]
+        cmd_rig(args[1], int(nums[0]) if nums else 32, blink="--blink" in args)
     elif args[:1] in (["sheet"], ["report"]) and len(args) >= 2:
         opts = {}
         rest = []
