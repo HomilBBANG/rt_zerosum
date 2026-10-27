@@ -27,6 +27,8 @@ assets/characters/<id>/
   python3 tools/char_sprites.py rig <캐릭터> [칸 수=32] [--blink]   리깅 idle: 원화 한 장을 부위별로 휨 → <캐릭터>/idle/ (숨쉬기 시트 대신)
       다리·골반 고정 · 몸통 숨쉬기 · 머리 = 목(head_rect 아래) 기준 갸웃·끄덕 · 팔 = 어깨 기준 흔들림(팔·몸통 사이 빈틈으로 팔 영역)
       --blink = 눈 깜빡임 1번 (눈 자리를 피부색으로 덮어 그림 — 그림체에 따라 어색할 수 있어 기본은 끔)
+  python3 tools/char_sprites.py head <캐릭터> <동작> [--cut y]   AI 시트 얼굴이 뭉개졌을 때: 프레임마다 머리를 원화(base.png) 머리로 바꿔 붙임
+      원화에서 턱 아래(cut)까지 잘라 피부·머리카락 영역이 가장 잘 겹치는 크기·기울기·위치에 붙이고, 삐져나온 원래 머리카락은 지움 (sheet 다음에 실행)
   python3 tools/char_sprites.py report <시트.png> [--grid 6x6] [--align ground|cell] [--loop 8-36]
       AI 로 만든 시트 분석: 튀는 프레임 후보(앞뒤 사이로 바로 가는 것보다 크게 돌아가는 프레임) + 이음새가 매끄러운 반복 구간 후보
   python3 tools/char_sprites.py sheet <캐릭터> <동작> <시트.png> [--grid 6x6] [--frames 1-20,22] [--fps 12] [--align ground|cell] [--ref 1] [--loop 0|1] [--weapon 0|1]
@@ -834,6 +836,115 @@ def cmd_rig(cid, frames=32, fps=12.0, head_deg=1.2, arm_deg=0.8, breath=0.005, b
           "팔 경계 y%d %.0f / %.0f" % (int(B["hand"][1]), B["lx"][int(B["hand"][1])], B["rx"][int(B["hand"][1])]))
 
 
+# ---------------------------------------------------------------- 머리 바꿔 붙이기 (AI 시트의 뭉개진 얼굴 → 원화 머리)
+def _head_labels(rgba):
+    """머리 맞추기용 영역: 1 = 피부, 2 = 머리카락(어둡고 채도 낮음), 3 = 그 밖의 그림, 0 = 투명"""
+    import numpy as np
+    a = rgba.astype(np.float32)
+    r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
+    mx = np.maximum(np.maximum(r, g), b)
+    mn = np.minimum(np.minimum(r, g), b)
+    sat = (mx - mn) / np.maximum(mx, 1)
+    lab = np.where(al > 100, 3, 0).astype(np.uint8)
+    lab[(al > 100) & (r > g) & (g > b) & (sat > 0.32) & (mx > 120)] = 1
+    lab[(al > 100) & (mx >= 45) & (mx < 150) & (sat < 0.42) & (r >= b)] = 2
+    return lab
+
+
+def cmd_head(cid, anim, cut=None, src=None):
+    """<동작>/ 프레임마다 머리를 원화(base.png) 머리로 바꿔 붙임 — AI 시트 얼굴이 뭉개졌을 때.
+    원화에서 턱 아래(cut, 기본 = head_rect 아래 끝보다 키의 3.5% 위)까지 잘라, 프레임마다 피부·머리카락 영역이 가장 잘 겹치는
+    크기(0.85~1.15배)·기울기(±14°)·위치를 찾아 붙이고, 그 밖으로 삐져나온 원래 머리카락은 지움. 목 쪽은 부드럽게 섞음.
+    조명·선화·눈 마스크도 다시 (눈 = 원화 눈 마스크를 같은 위치로)."""
+    import math
+    import numpy as np
+    from scipy import ndimage
+    cdir = os.path.join(CHAR_DIR, cid)
+    info = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    base = Image.open(os.path.join(cdir, src or "base.png")).convert("RGBA")
+    bey = os.path.join(cdir, "base_eye.png")
+    beye = Image.open(bey).convert("L") if os.path.exists(bey) else Image.new("L", base.size, 0)
+    fig = float(info.get("figure_px", base.height))
+    hr = info["head_rect"]
+    cut = float(cut) if cut is not None else hr[1] + hr[3] - fig * 0.035
+    ba = np.array(base)
+    ys, xs = np.nonzero(ba[: int(cut), :, 3] > 20)
+    x0, y0, x1, y1 = int(xs.min()) - 4, max(0, int(ys.min()) - 4), int(xs.max()) + 5, int(cut) + 1
+    head = ba[y0:y1, x0:x1].copy()
+    feather = max(4, int(fig * 0.012))   # 아래쪽 경계를 이만큼 부드럽게
+    fade = np.clip((y1 - y0 - 1 - np.arange(y1 - y0))[:, None] / float(feather), 0, 1)
+    head[..., 3] = (head[..., 3] * fade).astype(np.uint8)
+    head_im = Image.fromarray(head)
+    eye_im = beye.crop((x0, y0, x1, y1))
+    anchor = (hr[0] + hr[2] / 2.0 - x0, cut - y0)        # 붙일 때 맞추는 점: 목(머리 가운데 · 자른 선)
+    adir = os.path.join(cdir, anim)
+    names = sorted(f for f in os.listdir(adir) if re.match(r"^\d+\.png$", f))
+    k = 0.5                                               # 찾기는 반 크기로
+    hl_full = _head_labels(np.array(head_im))
+    log = []
+    for fn in names:
+        path = os.path.join(adir, fn)
+        fr = Image.open(path).convert("RGBA")
+        fa = np.array(fr)
+        fys = np.nonzero(fa[..., 3].max(1) > 20)[0]
+        top = int(fys.min())
+        fl = _head_labels(fa)
+        best = None
+        for sc in np.arange(0.85, 1.151, 0.05):
+            for deg in range(-14, 15, 2):
+                t = head_im.resize((max(1, int(head_im.width * sc * k)), max(1, int(head_im.height * sc * k))), Image.BILINEAR)
+                ax, ay = anchor[0] * sc * k, anchor[1] * sc * k
+                t = t.rotate(deg, resample=Image.BILINEAR, center=(ax, ay), expand=False)
+                tl = _head_labels(np.array(t))
+                th, tw = tl.shape
+                nz = tl > 0
+                # 위치: 머리 맨 위 ≈ 프레임 맨 위, 가로는 넓게
+                ty0 = int(top * k - (np.nonzero(nz.any(1))[0].min()))
+                for dy in range(-6, 7, 2):
+                    for dx in range(-int(60 * k), int(60 * k) + 1, 2):
+                        px = int(fa.shape[1] * k / 2 - tw / 2) + dx + int((anchor[0] + x0 - fa.shape[1] / 2) * k)
+                        py = ty0 + dy
+                        if px < 0 or py < 0 or px + tw > fa.shape[1] * k or py + th > fa.shape[0] * k:
+                            continue
+                        win = fl[int(py / k):int((py + th) / k):2, int(px / k):int((px + tw) / k):2][:th, :tw]
+                        if win.shape != tl.shape:
+                            continue
+                        both = (win > 0) | nz
+                        score = ((win == tl) & nz & (tl < 3)).sum() / max(1, both.sum())
+                        if best is None or score > best[0]:
+                            best = (score, sc, deg, (px + ax) / k, (py + ay) / k)
+        score, sc, deg, nx, ny = best
+        # 원래 크기로 붙이기
+        t = head_im.resize((max(1, round(head_im.width * sc)), max(1, round(head_im.height * sc))), Image.LANCZOS)
+        e = eye_im.resize(t.size, Image.LANCZOS)
+        ax, ay = anchor[0] * sc, anchor[1] * sc
+        t = t.rotate(deg, resample=Image.BICUBIC, center=(ax, ay))
+        e = e.rotate(deg, resample=Image.BICUBIC, center=(ax, ay))
+        ox, oy = int(round(nx - ax)), int(round(ny - ay))
+        layer = Image.new("RGBA", fr.size, (0, 0, 0, 0))
+        layer.alpha_composite(t, (max(0, ox), max(0, oy)), (max(0, -ox), max(0, -oy)))
+        la = np.array(layer)[..., 3].astype(np.float32) / 255.0
+        # 붙인 머리 밖으로 삐져나온 원래 머리(자른 선 위쪽)는 지움 — 머리 둘레만
+        cut_y = ny
+        near = ndimage.binary_dilation(la > 0.05, iterations=int(fig * 0.06))
+        above = np.arange(fa.shape[0])[:, None] < cut_y - feather
+        erase = near & above & (la < 0.5)
+        fa[..., 3] = np.where(erase, 0, fa[..., 3])
+        out = Image.fromarray(fa)
+        out.alpha_composite(layer)
+        out.save(path)
+        stem = path[:-4]
+        mr, ml = make_masks(out)
+        mr.save(stem + "_mask_r.png")
+        ml.save(stem + "_mask_l.png")
+        line_mask(out).save(stem + "_line.png")
+        eye_layer = Image.new("L", fr.size, 0)
+        eye_layer.paste(e, (ox, oy))
+        eye_layer.save(stem + "_eye.png")
+        log.append("%s %.2f배 %+d° 점수 %.2f" % (fn, sc, deg, score))
+    print(cid, anim, "머리 바꿔 붙임:", ", ".join(log))
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
@@ -860,6 +971,9 @@ if __name__ == "__main__":
         grid = tuple(int(v) for v in opts["grid"].lower().split("x")) if "grid" in opts else None
         cmd_import(args[1], args[2], rest, grid, float(opts["fps"]) if "fps" in opts else None,
                    float(opts["hold"]) if "hold" in opts else None)
+    elif args[:1] == ["head"] and len(args) >= 3:
+        cut = next((args[i + 1] for i, a in enumerate(args) if a == "--cut"), None)
+        cmd_head(args[1], args[2], cut)
     elif args[:1] == ["rig"] and len(args) >= 2:
         nums = [a for a in args[2:] if a.isdigit()]
         cmd_rig(args[1], int(nums[0]) if nums else 32, blink="--blink" in args)
