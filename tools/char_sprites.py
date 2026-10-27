@@ -24,6 +24,8 @@ assets/characters/<id>/
       움직이는 GIF·WebP(APNG) → 프레임마다, 스프라이트 시트 → --grid 열x행 칸마다, PNG 여러 장 → 그 순서대로
       첫 프레임의 발·키를 base.png 에 맞추는 같은 이동·배율을 모든 프레임에 적용 (프레임 사이 움직임은 그대로)
       → assets/characters/<캐릭터>/<동작>/0001.png … + anim.json(움직이는 파일의 프레임 시간) + 조명 마스크
+  python3 tools/char_sprites.py rig <캐릭터> [칸 수=32]   리깅 idle: 원화 한 장을 부위별로 휨 → <캐릭터>/idle/ (숨쉬기 시트 대신)
+      다리·골반 고정 · 몸통 숨쉬기 · 머리 = 목(head_rect 아래) 기준 갸웃·끄덕 · 팔 = 어깨 기준 흔들림(팔·몸통 사이 빈틈으로 팔 영역) · 눈 깜빡임 1번 (base_eye.png)
   python3 tools/char_sprites.py report <시트.png> [--grid 6x6] [--align ground|cell] [--loop 8-36]
       AI 로 만든 시트 분석: 튀는 프레임 후보(앞뒤 사이로 바로 가는 것보다 크게 돌아가는 프레임) + 이음새가 매끄러운 반복 구간 후보
   python3 tools/char_sprites.py sheet <캐릭터> <동작> <시트.png> [--grid 6x6] [--frames 1-20,22] [--fps 12] [--align ground|cell] [--ref 1] [--loop 0|1] [--weapon 0|1]
@@ -645,6 +647,192 @@ def cmd_sheet(cid, anim, path, grid=(6, 6), frames=None, fps=12.0, align="ground
     print(cid, anim, "프레임", len(placed), "배율 %.3f" % s, "캔버스", (CW, CH), meta)
 
 
+# ---------------------------------------------------------------- 리깅 idle (원화 한 장 → 숨쉬기 + 머리·팔 + 눈 깜빡임)
+def _rig_bones(cid, info, a):
+    """뼈 위치: 목(머리 회전 중심), 어깨 높이, 골반, 왼·오른팔 경계(x, 행마다)와 어깨 회전 중심. a = 알파 마스크"""
+    import numpy as np
+    H, W = a.shape
+    fig = float(info.get("figure_px", H))
+    gy = float(info["ground"][1])
+    hr = info.get("head_rect") or [W * 0.3, gy - fig, W * 0.4, fig * 0.2]
+    neck = (hr[0] + hr[2] / 2.0, hr[1] + hr[3])
+    shoulder_y = neck[1] + fig * 0.04
+    hip = float(info.get("hip_y", gy - fig * 0.53))
+    hand = info.get("hand") or [W * 0.7, hip + fig * 0.05]
+    y_lo, y_hi = int(shoulder_y + fig * 0.06), int(min(H - 1, hand[1] + fig * 0.025))
+    left = np.full(H, np.nan)
+    right = np.full(H, np.nan)
+    for y in range(y_lo, y_hi):   # 팔과 몸통 사이 빈틈 (행마다 첫·마지막 빈틈)
+        row = a[y]
+        xs = np.nonzero(np.diff(np.concatenate([[0], row.astype(int), [0]])))[0]
+        segs = list(zip(xs[::2], xs[1::2]))
+        if len(segs) >= 2 and segs[0][1] - segs[0][0] < fig * 0.12:
+            left[y] = (segs[0][1] + segs[1][0]) / 2.0
+        if len(segs) >= 2 and segs[-1][1] - segs[-1][0] < fig * 0.12:
+            right[y] = (segs[-2][1] + segs[-1][0]) / 2.0
+
+    def fill(arr, default):
+        ok = ~np.isnan(arr)
+        if ok.sum() < 3:
+            return None if default is None else np.full(H, default)
+        ys = np.arange(H)
+        return np.interp(ys, ys[ok], arr[ok])
+    band = slice(y_lo, y_hi)
+    nl, nr = int((~np.isnan(left[band])).sum()), int((~np.isnan(right[band])).sum())
+    rows_n = max(1, y_hi - y_lo)
+    edge_l = np.array([np.nonzero(a[y])[0].min() if a[y].any() else np.nan for y in range(H)], float)
+    edge_r = np.array([np.nonzero(a[y])[0].max() if a[y].any() else np.nan for y in range(H)], float)
+    from scipy.ndimage import median_filter, uniform_filter1d
+
+    def smooth(v):
+        return uniform_filter1d(median_filter(v, size=15, mode="nearest"), 21, mode="nearest")
+    lx = fill(left, None) if nl >= rows_n * 0.3 else None
+    rx = fill(right, None) if nr >= rows_n * 0.3 else None
+    lx = smooth(lx) if lx is not None else None
+    rx = smooth(rx) if rx is not None else None
+    # 한쪽 팔만 몸통과 떨어져 있으면: 반대쪽 팔 너비만큼 몸 가장자리에서 안쪽 (팔 너비가 비슷하다고 봄)
+    if rx is None and lx is not None:
+        arm_w = float(np.nanmedian((left - edge_l)[band]))
+        rx = smooth(np.nan_to_num(edge_r, nan=W / 2) - arm_w)
+    if lx is None and rx is not None:
+        arm_w = float(np.nanmedian((edge_r - right)[band]))
+        lx = smooth(np.nan_to_num(edge_l, nan=0) + arm_w)
+    torso_cx = neck[0]
+    if lx is None:   # 빈틈이 없으면 손 위치로 대강 (손이 몸통 바깥쪽)
+        lx = np.full(H, torso_cx - (hand[0] - torso_cx) + fig * 0.045) if hand[0] > torso_cx else np.full(H, hand[0] + fig * 0.045)
+    if rx is None:
+        rx = np.full(H, hand[0] - fig * 0.045) if hand[0] > torso_cx else np.full(H, torso_cx + (torso_cx - hand[0]) - fig * 0.045)
+    row = a[int(shoulder_y + fig * 0.02)]
+    xs = np.nonzero(row)[0]
+    sh_l = (float(xs.min()) + fig * 0.03 if len(xs) else torso_cx - fig * 0.1, shoulder_y + fig * 0.01)
+    sh_r = (float(xs.max()) - fig * 0.03 if len(xs) else torso_cx + fig * 0.1, shoulder_y + fig * 0.01)
+    return {"fig": fig, "gy": gy, "neck": neck, "shoulder_y": shoulder_y, "hip": hip, "hand": hand, "lx": lx, "rx": rx,
+            "sh_l": sh_l, "sh_r": sh_r, "arm_y": (y_lo - fig * 0.05, y_hi)}
+
+
+def _blink(img, eye, line, c):
+    """눈 깜빡임: c 0 = 뜸, 1 = 감음. 위 눈꺼풀이 내려옴 = 눈 마스크 위쪽을 주변 피부색으로, 경계에 속눈썹 선.
+    img RGBA·eye·line 은 float 배열 (제자리 수정)"""
+    import numpy as np
+    from scipy import ndimage
+    if c <= 0:
+        return
+    em = eye > 90
+    lab, n = ndimage.label(em)
+    for k in range(1, n + 1):
+        blob = ndimage.binary_dilation(lab == k, iterations=1)
+        ys, xs = np.nonzero(blob)
+        if len(xs) < 6:
+            continue
+        y0, y1 = ys.min(), ys.max()
+        ring = ndimage.binary_dilation(blob, iterations=6) & ~ndimage.binary_dilation(blob, iterations=2) & (img[..., 3] > 200)
+        lum = img[..., :3].mean(-1)
+        ring &= lum > np.percentile(lum[ring], 35) if ring.sum() > 10 else ring
+        skin = np.median(img[..., :3][ring], 0) if ring.sum() > 10 else np.array([200, 150, 120])
+        box = img[y0:y1 + 1, xs.min():xs.max() + 1, :3].mean(-1)
+        dark_col = img[y0:y1 + 1, xs.min():xs.max() + 1, :3].reshape(-1, 3)[np.argsort(box.ravel())[:max(3, box.size // 12)]].mean(0)
+        lid = y0 + (y1 - y0) * (0.62 * c if c < 1 else 0.62)
+        cover = blob & (np.arange(img.shape[0])[:, None] <= (lid if c < 1 else y1 + 1))
+        img[..., :3][cover] = skin
+        eye[cover] = 0
+        # 눈꺼풀 선 (가운데가 살짝 아래로 휜 선)
+        x0, x1 = xs.min(), xs.max()
+        for x in range(x0, x1 + 1):
+            t = (x - x0) / max(1, x1 - x0)
+            yy = lid + (1.2 * np.sin(np.pi * t) if c >= 1 else 0)
+            for dy, al in ((0, 1.0), (1, 0.6)):
+                yi = int(round(yy)) + dy
+                if blob[min(max(yi, 0), img.shape[0] - 1), x] or (c >= 1 and y0 <= yi <= y1 + 1):
+                    img[yi, x, :3] = img[yi, x, :3] * (1 - al) + dark_col * al
+                    img[yi, x, 3] = 255
+                    line[yi, x] = max(line[yi, x], 255 * al)
+
+
+def cmd_rig(cid, frames=32, fps=12.0, head_deg=1.2, arm_deg=0.8, breath=0.005, blink_at=0.62):
+    """원화(base.png) 한 장을 부위별로 휘어 idle 만들기 → <캐릭터>/idle/ (시트 idle_4x4 대신)
+    다리·골반 고정 · 몸통 숨쉬기(어깨가 오르내림, 가슴 살짝 넓어짐) · 머리 = 목 기준 기울기 · 팔 = 어깨 기준 흔들림 · 눈 깜빡임 1번
+    조명·선화·눈 마스크도 같은 움직임으로."""
+    import math
+    import numpy as np
+    from scipy.ndimage import map_coordinates
+    cdir = os.path.join(CHAR_DIR, cid)
+    info = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    base = np.array(Image.open(os.path.join(cdir, "base.png")).convert("RGBA")).astype(np.float32)
+    H, W = base.shape[:2]
+    B = _rig_bones(cid, info, base[..., 3] > 40)
+    fig = B["fig"]
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+
+    def sstep(e0, e1, v):
+        t = np.clip((v - e0) / (e1 - e0), 0.0, 1.0)
+        return t * t * (3 - 2 * t)
+    # 가중치
+    w_head = sstep(B["neck"][1] + fig * 0.02, B["neck"][1] - fig * 0.025, yy)
+    feather = fig * 0.008
+    arm_band = sstep(B["arm_y"][0] - fig * 0.06, B["arm_y"][0], yy) * (1 - sstep(B["arm_y"][1] - fig * 0.03, B["arm_y"][1], yy))
+    w_al = sstep(B["lx"][:, None] + feather, B["lx"][:, None] - feather, xx) * arm_band * (1 - w_head)
+    w_ar = sstep(B["rx"][:, None] - feather, B["rx"][:, None] + feather, xx) * arm_band * (1 - w_head)
+    t_torso = np.clip((B["hip"] - yy) / max(1.0, B["hip"] - B["shoulder_y"]), 0.0, 1.0)
+    w_torso = t_torso * t_torso * (3 - 2 * t_torso)
+    srcs = {"": base}
+    for suf in ("_mask_r", "_mask_l", "_line", "_eye"):
+        mp = os.path.join(cdir, "base" + suf + ".png")
+        if os.path.exists(mp):
+            srcs[suf] = np.array(Image.open(mp).convert("L")).astype(np.float32)
+    adir = os.path.join(cdir, "idle")
+    os.makedirs(adir, exist_ok=True)
+    for fn in os.listdir(adir):
+        if fn.endswith(".png") or fn.endswith(".png.import"):
+            os.remove(os.path.join(adir, fn))
+    kb = int(round(frames * blink_at))
+    blink = {kb - 1: 0.55, kb: 1.0, kb + 1: 1.0, kb + 2: 0.5}
+
+    def rot(px, py, cx, cy, deg):
+        r = math.radians(deg)
+        dx, dy = px - cx, py - cy
+        return cx + dx * math.cos(r) - dy * math.sin(r) - px, cy + dx * math.sin(r) + dy * math.cos(r) - py
+    for i in range(frames):
+        ph = 2 * math.pi * i / frames
+        b = 0.5 - 0.5 * math.cos(ph)                          # 0 → 들숨 1 → 0
+        lift = -fig * breath * b                              # 어깨 높이 변화 (위 = -)
+        # 몸통: 골반 위로 갈수록 더 올라감 + 가슴 살짝 넓어짐
+        dxt = (xx - B["neck"][0]) * 0.006 * b * w_torso * (1 - sstep(B["shoulder_y"], B["neck"][1] - fig * 0.05, yy))
+        dyt = lift * w_torso
+        hd = head_deg * math.sin(ph - 0.9)                    # 머리: 숨보다 조금 늦게 갸웃
+        hx, hy = rot(xx, yy, B["neck"][0], B["neck"][1], hd)
+        hy = hy + lift - fig * 0.0015 * math.sin(ph - 0.4)    # 고개 살짝 끄덕임
+        al = arm_deg * math.sin(ph - 0.5)
+        lxd, lyd = rot(xx, yy, B["sh_l"][0], B["sh_l"][1], al)
+        rxd, ryd = rot(xx, yy, B["sh_r"][0], B["sh_r"][1], -al * 0.8)
+        lyd = lyd + lift
+        ryd = ryd + lift
+        w_rest = np.clip(1 - w_head - w_al - w_ar, 0, 1)
+        DX = w_head * hx + w_al * lxd + w_ar * rxd + w_rest * dxt
+        DY = w_head * hy + w_al * lyd + w_ar * ryd + w_rest * dyt
+        sy, sx = yy - DY, xx - DX
+        img = base.copy()
+        eye = srcs.get("_eye", np.zeros((H, W), np.float32)).copy()
+        line = srcs.get("_line", np.zeros((H, W), np.float32)).copy()
+        _blink(img, eye, line, blink.get(i, 0.0))
+        out = np.zeros_like(img)
+        for ch in range(4):
+            out[..., ch] = map_coordinates(img[..., ch], [sy, sx], order=1, mode="constant", cval=0.0)
+        stem = os.path.join(adir, "%04d" % (i + 1))
+        Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)).save(stem + ".png")
+        for suf, src in srcs.items():
+            if suf == "":
+                continue
+            m = eye if suf == "_eye" else (line if suf == "_line" else src)
+            w = map_coordinates(m, [sy, sx], order=1, mode="constant", cval=85.0 if "_mask_" in suf else 0.0)
+            Image.fromarray(np.clip(w, 0, 255).astype(np.uint8)).save(stem + suf + ".png")
+    json.dump({"fps": fps, "source": "rig: base.png 리깅 idle (%d장)" % frames}, open(os.path.join(adir, "anim.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    for fn in os.listdir(cdir):   # 예전 숨쉬기 시트는 지움 (폴더 idle 이 우선이지만 헷갈리지 않게)
+        if fn.startswith("idle_4x4") or fn == "idle.json":
+            os.remove(os.path.join(cdir, fn))
+    print(cid, "리깅 idle", frames, "장", "목", tuple(round(v) for v in B["neck"]), "어깨", tuple(round(v) for v in B["sh_l"]), tuple(round(v) for v in B["sh_r"]),
+          "팔 경계 y%d %.0f / %.0f" % (int(B["hand"][1]), B["lx"][int(B["hand"][1])], B["rx"][int(B["hand"][1])]))
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
@@ -671,6 +859,8 @@ if __name__ == "__main__":
         grid = tuple(int(v) for v in opts["grid"].lower().split("x")) if "grid" in opts else None
         cmd_import(args[1], args[2], rest, grid, float(opts["fps"]) if "fps" in opts else None,
                    float(opts["hold"]) if "hold" in opts else None)
+    elif args[:1] == ["rig"] and len(args) >= 2:
+        cmd_rig(args[1], int(args[2]) if len(args) > 2 else 32)
     elif args[:1] in (["sheet"], ["report"]) and len(args) >= 2:
         opts = {}
         rest = []

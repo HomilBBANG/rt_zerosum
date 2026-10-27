@@ -90,7 +90,7 @@ static func anim_data(id: String, anim: String) -> Dictionary:
 	var inf := info_of(id)
 	var d := {"frames": [], "masks_r": [], "masks_l": [], "lines": [], "eyes": [], "fps": float(inf.get("fps", 12)), "loop": not anim in ONE_SHOT and not anim in HOLD,
 		"ground": inf.get("ground", [256, 760]), "figure_px": float(inf.get("figure_px", 760)), "hip_y": float(inf.get("hip_y", 400)),
-		"weapon": anim in ["", "idle", "attack", "hit", "heal"], "hand": inf.get("hand", null)}
+		"weapon": false, "hand": inf.get("hand", null)}   # 손에 붙이는 무기 그림은 기본으로 숨김 (무기는 원화에 그려 넣음 — anim.json "weapon": true 면 표시)
 	var dir := dir_of(id)
 	var names: Array[String] = []
 	if anim == "":
@@ -368,7 +368,7 @@ func _show(i: int) -> void:
 		gy = float(_a.feet_y[i])
 	body.position = -Vector2(float(g[0]), gy) * s
 	mat.set_shader_parameter("rim_px", 14.0 * float(_a.figure_px) / 760.0)   # 림 두께: 키 760px 그림 기준 14px
-	weapon_holder.visible = bool(_a.get("weapon", true))
+	weapon_holder.visible = bool(_a.get("weapon", false))
 	_apply_mask()
 
 
