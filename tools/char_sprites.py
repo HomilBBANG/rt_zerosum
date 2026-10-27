@@ -27,6 +27,7 @@ assets/characters/<id>/
   python3 tools/char_sprites.py report <시트.png> [--grid 6x6] [--align ground|cell] [--loop 8-36]
       AI 로 만든 시트 분석: 튀는 프레임 후보(앞뒤 사이로 바로 가는 것보다 크게 돌아가는 프레임) + 이음새가 매끄러운 반복 구간 후보
   python3 tools/char_sprites.py sheet <캐릭터> <동작> <시트.png> [--grid 6x6] [--frames 1-20,22] [--fps 12] [--align ground|cell] [--ref 1] [--loop 0|1] [--weapon 0|1]
+        [--ref-height 324] [--anchor feet|torso]   (선 프레임이 없는 시트: 다른 시트의 선 키 · 몸통 기준 가로 위치)
       AI 시트(영상에서 뽑은 칸 배열) → <동작>/0001.png … 칸 경계는 그림이 가장 적은 줄로 자름, 쓸 프레임만 골라 순서대로
       크기: 기준 프레임(--ref, 똑바로 선 칸)의 키 = figure_px. ground = 프레임마다 발을 접지선에(카메라 흔들림 제거), cell = 칸 높이 그대로(뛰기처럼 뜨는 동작)
       누운 자세처럼 캔버스를 넘으면 그 동작만 캔버스를 넓힘 (anim.json 의 ground). 조명·선화·눈 마스크도 프레임마다
@@ -551,15 +552,16 @@ def cmd_sheet_report(path, grid=(6, 6), ground=True, lo=8, hi=36):
     print("프레임 %d개, 이웃 프레임 차이 중앙값 %.1f" % (n, np.median(steps) * 1000))
     det = sorted(((D[k - 1][k] + D[k][k + 1] - D[k - 1][k + 1]) * 1000, k + 1) for k in range(1, n - 1))[::-1]
     print("튀는 프레임 후보 (점수 높을수록):", ", ".join("%d(%.0f)" % (k, d) for d, k in det[:8]))
+    # 반복 a..b 가 매끄러우려면 '마지막 다음 프레임(b+1)' 이 첫 프레임(a)과 거의 같아야 함 (마지막 = 첫 프레임이면 이음새에서 한 박자 멈칫)
     cands = []
     for i in range(n):
         for L in range(lo, hi + 1):
-            j = i + L
-            if j > n:
+            j = i + L          # 0부터: 마지막 = j-1, 그 다음 = j
+            if j >= n:
                 break
-            cands.append((D[j - 1][i] + 0.3 * max(D[k][k + 1] for k in range(i, j - 1)), i + 1, j, D[j - 1][i]))
-    for sc, a, b, seam in sorted(cands)[:6]:
-        print("  반복 %d..%d (%d장) 이음새 %.0f" % (a, b, b - a + 1, seam * 1000))
+            cands.append((D[j][i] + 0.3 * max(D[k][k + 1] for k in range(i, j - 1)), i + 1, j, D[j][i], D[j - 1][i]))
+    for sc, a, b, seam, back in sorted(cands)[:6]:
+        print("  반복 %d..%d (%d장) 이음새 %.0f (%d 다음 = %d 와 거의 같음, %d→%d 차이 %.0f)" % (a, b, b - a + 1, seam * 1000, b, a, b, a, back * 1000))
 
 
 def _parse_frames(spec, n):
@@ -574,9 +576,12 @@ def _parse_frames(spec, n):
     return [k for k in out if 1 <= k <= n]
 
 
-def cmd_sheet(cid, anim, path, grid=(6, 6), frames=None, fps=12.0, align="ground", ref=1, loop=None, weapon=None, durations=None):
+def cmd_sheet(cid, anim, path, grid=(6, 6), frames=None, fps=12.0, align="ground", ref=1, loop=None, weapon=None, durations=None,
+              ref_height=None, anchor="feet"):
     """AI 시트 → assets/characters/<캐릭터>/<동작>/0001.png … + anim.json + 조명·선화·눈 마스크.
     크기: 기준 프레임(ref, 똑바로 선 프레임)의 키 = character.json figure_px. 시트 전체에 같은 배율·이동 (프레임 사이 움직임 그대로).
+          선 프레임이 없는 시트(뛰기 등)는 ref_height = 같은 배율의 다른 시트에서 똑바로 선 키(원본 px).
+    가로: anchor feet = 기준 프레임 두 발 가운데 / torso = 기준 프레임 몸통 가운데 → 접지점 x
     align: ground = 프레임마다 맨 아래를 발 접지선에 (발이 땅에 붙어 있는 동작 — 영상 카메라 흔들림 제거)
            cell = 칸 안 높이 그대로 (뛰기처럼 공중에 뜨는 동작)
     그림이 기본 캔버스(image_size)를 넘으면(누운 자세 등) 그 동작만 캔버스를 넓히고 anim.json 에 ground 를 적음"""
@@ -589,11 +594,15 @@ def cmd_sheet(cid, anim, path, grid=(6, 6), frames=None, fps=12.0, align="ground
     cells = _sheet_cells(path, *grid)
     pick = _parse_frames(frames, len(cells)) if frames else list(range(1, len(cells) + 1))
     rim, rx, ry = cells[ref - 1]
-    s = fig / rim.height
+    s = fig / float(ref_height or rim.height)
     ra = np.array(rim)[..., 3] > 40
-    feet = np.nonzero(ra[int(ra.shape[0] * 0.94):].any(0))[0]
-    ref_fx = rx + (feet.min() + feet.max()) / 2.0           # 기준 프레임 두 발 가운데 = 접지점 x
-    ref_bottom = ry + rim.height
+    if anchor == "torso":
+        band = ra[int(ra.shape[0] * 0.18):int(ra.shape[0] * 0.42)].sum(0)
+        ref_fx = rx + float((np.arange(len(band)) * band).sum() / max(1, band.sum()))
+    else:
+        feet = np.nonzero(ra[int(ra.shape[0] * 0.94):].any(0))[0]
+        ref_fx = rx + (feet.min() + feet.max()) / 2.0       # 기준 프레임 두 발 가운데 = 접지점 x
+    ref_bottom = max(c[2] + c[0].height for c in cells if c)   # cell: 시트 전체에서 가장 낮은 발 = 땅
     placed = []
     for k in pick:
         im, x, y = cells[k - 1]
@@ -678,7 +687,8 @@ if __name__ == "__main__":
         else:
             cmd_sheet(rest[0], rest[1], rest[2], grid, opts.get("frames"), float(opts.get("fps", 12)), opts.get("align", "ground"),
                       int(opts.get("ref", 1)), {"1": True, "0": False}.get(opts.get("loop", ""), None),
-                      {"1": True, "0": False}.get(opts.get("weapon", ""), None))
+                      {"1": True, "0": False}.get(opts.get("weapon", ""), None), None,
+                      float(opts["ref-height"]) if "ref-height" in opts else None, opts.get("anchor", "feet"))
     else:
         print(__doc__)
         sys.exit(1)
