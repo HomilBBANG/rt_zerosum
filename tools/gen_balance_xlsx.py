@@ -20,11 +20,11 @@ CHARS = [
     ["a_alma", "앨마", "의무병", 4, 7, "원거리", 28, 7, 3, 0, "basic_attack, heal, rally, ultimate", "pistol, syringe", "후방", 1, 166, "alma", "#43d6a0", "오른쪽", "solus", 50],
     ["a_nikita", "니키타", "저격수", 6, 11, "원거리", 24, 5, 2, 0, "basic_attack, heavy_attack, ultimate", "sniper, knife", "후방", 2, 168, "nikita_army", "#4f9cff", "오른쪽", "noct", 25],
 ]
-MON_COLS = ["id", "이름", "분류", "레벨", "속도", "사거리", "HP", "AP", "AP회복", "방어", "스킬", "무기", "차지칸", "키(cm)", "스프라이트", "원화방향", "AI"]
+MON_COLS = ["id", "이름", "분류", "레벨", "속도", "사거리", "HP", "AP", "AP회복", "방어", "무기", "차지칸", "키(cm)", "스프라이트", "원화방향", "AI"]
 MONS = [
-    ["ghoul", "구울", "괴물", 6, 10, "근접", 110, 6, 2, 2, "basic_attack, heavy_attack, rend, grave_chill, ultimate", "claw", 2, 240, "ghoul", "왼쪽", "default"],
-    ["wolf", "늑대", "괴물", 7, 12, "근접", 90, 6, 2, 1, "basic_attack, heavy_attack, hamstring, sand_kick, ultimate", "claw", 1, 400, "wolf", "오른쪽", "aggressive"],
-    ["slime", "슬라임", "괴물", 4, 5, "근접", 130, 5, 2, 3, "basic_attack, heavy_attack", "slam", 2, 400, "slime", "오른쪽", "default"],
+    ["ghoul", "구울", "괴물", 6, 10, "근접", 110, 6, 2, 2, "claw", 2, 240, "ghoul", "왼쪽", "default"],
+    ["wolf", "늑대", "괴물", 7, 12, "근접", 90, 6, 2, 1, "claw", 1, 400, "wolf", "오른쪽", "aggressive"],
+    ["slime", "슬라임", "괴물", 4, 5, "근접", 130, 5, 2, 3, "slam", 2, 400, "slime", "오른쪽", "default"],
 ]
 ITEM_COLS = ["id", "이름", "종류", "사거리", "위력보너스", "스프라이트", "설명"]
 ITEMS = [
@@ -59,10 +59,6 @@ SKILLS = [
     ["inspire", "고무", "support", 1, "ally_other", "ap_grant", 1, "스킬 트리(액티브): 다른 아군 1명 AP +1"],
     ["incendiary", "소이탄", "heavy", 2, "weapon", "damage", 6, "스킬 트리(액티브): 맞으면 화상 (화염 속성 고정 피해)"],
     ["suppress", "제압 사격", "attack", 2, "enemy_any", "damage", 5, "스킬 트리(액티브): 열 무관, 맞으면 감속"],
-    ["rend", "할퀴기", "heavy", 2, "weapon", "damage", 9, "괴물: 맞으면 출혈"],
-    ["grave_chill", "무덤의 냉기", "attack", 2, "enemy_any", "damage", 4, "괴물: 열 무관, 맞으면 동상"],
-    ["hamstring", "발목 물기", "attack", 2, "weapon", "damage", 7, "괴물: 맞으면 구속 (자리 이동 불가)"],
-    ["sand_kick", "모래 차기", "attack", 1, "weapon", "damage", 2, "괴물: 맞으면 실명 (대상 무작위)"],
 ]
 STAGE_COLS = ["id", "이름", "조명", "선공", "적HP배율", "적공격배율", "시드", "설명"]
 STAGES = [
@@ -80,7 +76,8 @@ README = [
     ["캐릭터", "눈색", "눈동자를 일부러 칠할 색(#RRGGBB). 비우면 원화 눈 색 그대로"],
     ["캐릭터·몬스터", "원화방향", "원화가 바라보는 쪽 (오른쪽 / 왼쪽) — 화면에서 상대를 보게 자동 반전"],
     ["몬스터", "차지칸", "1 = 한 칸, 2 = 전방+중앙처럼 연속 두 열 (이동·교환 불가)"],
-    ["몬스터", "AI", "data/ai/<AI>.json — 메뉴 → AI 에디터에서 만들고 고침"],
+    ["몬스터", "AI", "data/ai/<AI>.json — Godot 에디터 'AI' 탭에서 만들고 고침"],
+    ["몬스터", "스킬", "몬스터가 쓰는 스킬·몬스터 전용 스킬은 엑셀이 아니라 data/monster_skills.json — Godot 에디터 '스킬 트리' 탭 → '몬스터 스킬' 에서 짬 (공용 스킬 = 이 파일 스킬 시트도 넣을 수 있음)"],
     ["아이템", "스프라이트", "assets/sprites/w_<스프라이트>.png (비우면 손에 든 무기 그림 없음)"],
     ["스킬", "종류", "attack / heavy / support / ultimate / move / weapon (ultimate = 필살기 칸)"],
     ["스킬", "대상", "weapon(무기 사거리) / enemy_any / ally_any / ally_other / self / slot / none"],

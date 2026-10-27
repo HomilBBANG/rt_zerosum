@@ -3,7 +3,7 @@ class_name GameData
 extends RefCounted
 ## 밸런스 데이터 (data/balance.xlsx) → UnitData / ActionData / 아이템 / 스테이지.
 ## 시트: 캐릭터(아군) · 몬스터 · 아이템 · 스킬 · 스테이지. 스킬 트리 노드는 data/skill_tree.json (SkillTreeData), 신·신앙 스킬은 data/faith.json (FaithData),
-## 스킬에 다는 상태 이상은 data/skill_status.json (SkillStatusData) — 모두 에디터 '스킬 트리' 탭. 열 이름은 1행 머리글로 찾는다(열 순서 자유).
+## 스킬에 다는 상태 이상은 data/skill_status.json (SkillStatusData), 몬스터 전용 스킬·몬스터별 스킬 목록은 data/monster_skills.json (MonsterSkillData) — 모두 에디터 '스킬 트리' 탭. 열 이름은 1행 머리글로 찾는다(열 순서 자유).
 ## 게임 실행 중 파일이 바뀌면 apply_from() 으로 기존 객체를 제자리 갱신 → 진행 중인 전투에도 즉시 반영.
 
 const BALANCE_PATH := "res://data/balance.xlsx"
@@ -98,6 +98,12 @@ func _parse(sheets: Dictionary) -> void:
 		a.power = _i(d, "위력")
 		a.description = d.get("설명", "")
 		actions[a.id] = a
+	# 몬스터 전용 스킬 (data/monster_skills.json — 에디터 '스킬 트리' 탭 → 몬스터 스킬)
+	var sheet_ids := actions.keys()
+	var md := MonsterSkillData.read()
+	for ms in md.skills:
+		if not actions.has(ms.id) and str(ms.id) != "":
+			actions[ms.id] = MonsterSkillData.to_action(ms)
 	# 스킬에 다는 상태 이상 (data/skill_status.json — 에디터 '스킬 트리' 탭 → 상태 이상)
 	var sts := SkillStatusData.read()
 	for e in SkillStatusData.check(sts, actions).errors:
@@ -119,7 +125,12 @@ func _parse(sheets: Dictionary) -> void:
 		god_order.append(g.id)
 	faith_skills = FaithData.by_god(fd)
 	for d in _table(sheets.get("몬스터", [])):
-		monsters[d.id] = _unit(d, "enemy")
+		var m := _unit(d, "enemy")
+		if md.kits.has(m.id):   # 몬스터가 쓰는 스킬 = monster_skills.json kits (없으면 몬스터 시트 '스킬' 열)
+			m.skill_ids.assign(md.kits[m.id])
+		monsters[d.id] = m
+	for e in MonsterSkillData.check(md, sheet_ids, monsters).errors:
+		warnings.append("몬스터 스킬: " + e)
 	for d in _table(sheets.get("스테이지", [])):
 		var amb := "none"
 		match str(d.get("선공", "")).strip_edges():

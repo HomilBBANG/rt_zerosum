@@ -1,0 +1,65 @@
+{
+	"version": 1,
+	"skills": [
+		{
+			"id": "rend",
+			"name": "할퀴기",
+			"kind": "heavy",
+			"ap": 2,
+			"target": "weapon",
+			"effect": "damage",
+			"power": 9,
+			"desc": "맞으면 출혈"
+		},
+		{
+			"id": "grave_chill",
+			"name": "무덤의 냉기",
+			"kind": "attack",
+			"ap": 2,
+			"target": "enemy_any",
+			"effect": "damage",
+			"power": 4,
+			"desc": "열 무관, 맞으면 동상"
+		},
+		{
+			"id": "hamstring",
+			"name": "발목 물기",
+			"kind": "attack",
+			"ap": 2,
+			"target": "weapon",
+			"effect": "damage",
+			"power": 7,
+			"desc": "맞으면 구속 (자리 이동 불가)"
+		},
+		{
+			"id": "sand_kick",
+			"name": "모래 차기",
+			"kind": "attack",
+			"ap": 1,
+			"target": "weapon",
+			"effect": "damage",
+			"power": 2,
+			"desc": "맞으면 실명 (대상 무작위)"
+		}
+	],
+	"kits": {
+		"ghoul": [
+			"basic_attack",
+			"heavy_attack",
+			"rend",
+			"grave_chill",
+			"ultimate"
+		],
+		"wolf": [
+			"basic_attack",
+			"heavy_attack",
+			"hamstring",
+			"sand_kick",
+			"ultimate"
+		],
+		"slime": [
+			"basic_attack",
+			"heavy_attack"
+		]
+	}
+}

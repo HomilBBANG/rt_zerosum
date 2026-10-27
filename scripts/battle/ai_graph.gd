@@ -70,6 +70,57 @@ static func load_graph(id: String) -> Dictionary:
 	return g
 
 
+## 그래프의 '스킬 사용'·조건 노드가 쓰는 스킬 id
+static func skills_used(g: Dictionary) -> Array:
+	var out := []
+	for n in g.get("nodes", []):
+		var sk := str(n.get("params", {}).get("skill", ""))
+		if sk != "" and not out.has(sk):
+			out.append(sk)
+	return out
+
+
+## '스킬 사용' 노드를 끼워 넣음: 필살기 노드 바로 다음 (없으면 첫 '스킬 사용' 노드 앞). 실패하면 다음 노드로 넘어감.
+## 반환 = 넣었으면 true (이미 있거나 끼울 자리가 없으면 false)
+static func insert_skill(g: Dictionary, skill: String, target: String) -> bool:
+	if skills_used(g).has(skill):
+		return false
+	var nodes: Array = g.get("nodes", [])
+	var conns: Array = g.get("connections", [])
+	var acts := nodes.filter(func(n): return n.get("type", "") == "act_skill")
+	if acts.is_empty():
+		return false
+	var ult: Dictionary = {}
+	for n in acts:
+		if str(n.params.get("skill", "")) == "ultimate":
+			ult = n
+	var nid := "sk_" + skill
+	var i := 2
+	while nodes.any(func(n): return n.id == nid):
+		nid = "sk_%s_%d" % [skill, i]
+		i += 1
+	var anchor: Dictionary = ult if not ult.is_empty() else acts[0]
+	var pos: Array = anchor.get("pos", [0, 0])
+	var extra := nodes.filter(func(n): return str(n.id).begins_with("sk_") or str(n.id).begins_with("st")).size()
+	nodes.append({"id": nid, "type": "act_skill", "params": {"skill": skill, "target": target}, "pos": [float(pos[0]) + 140.0 * (extra + 1), float(pos[1]) + 170.0]})
+	if not ult.is_empty():
+		var nxt := ""
+		for c in conns:
+			if c.from == ult.id and int(c.port) == 0:
+				nxt = str(c.to)
+				c.to = nid
+		if nxt != "":
+			conns.append({"from": nid, "port": 0, "to": nxt})
+	else:
+		for c in conns:
+			if c.to == anchor.id:
+				c.to = nid
+		conns.append({"from": nid, "port": 0, "to": anchor.id})
+	g["nodes"] = nodes
+	g["connections"] = conns
+	return true
+
+
 static func save_graph(id: String, g: Dictionary) -> Error:
 	DirAccess.make_dir_recursive_absolute(AI_DIR)
 	var f := FileAccess.open(path_of(id), FileAccess.WRITE)

@@ -35,6 +35,16 @@ var skill_sel := ""
 var skill_filter := "all"
 var status_box: Control
 var skill_list: ItemList
+## 몬스터 스킬 (kind == "monster")
+var mdata: Dictionary = {"skills": [], "kits": {}}
+var sheet_skill_ids: Array = []      # 엑셀 스킬 시트 스킬 (공용, 여기서는 읽기만)
+var first_stage := ""
+var mon_sel := ""
+var mskill_sel := ""
+var monster_box: Control
+var mon_list: ItemList
+var kit_list: ItemList
+var kit_add: OptionButton
 
 var char_opt: OptionButton
 var kind_btns: Dictionary = {}
@@ -96,9 +106,9 @@ func _ready() -> void:
 		_rebuild())
 	bar.add_child(char_opt)
 	tree_only.append(char_opt)
-	for k in SkillTreeData.KINDS + ["faith", "status"]:
+	for k in SkillTreeData.KINDS + ["faith", "status", "monster"]:
 		var b := Button.new()
-		b.text = "%s 트리" % SkillTreeData.KIND_NAME[k] if k in SkillTreeData.KINDS else ("신앙 스킬" if k == "faith" else "상태 이상")
+		b.text = "%s 트리" % SkillTreeData.KIND_NAME[k] if k in SkillTreeData.KINDS else {"faith": "신앙 스킬", "status": "상태 이상", "monster": "몬스터 스킬"}[k]
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
 		var kk: String = k
@@ -147,6 +157,10 @@ func _ready() -> void:
 	status_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	status_box.custom_minimum_size = Vector2(560, 420)
 	holder.add_child(status_box)
+	monster_box = _build_monster_box()
+	monster_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	monster_box.custom_minimum_size = Vector2(560, 420)
+	holder.add_child(monster_box)
 	var right := VBoxContainer.new()
 	right.custom_minimum_size.x = 400
 	right.add_theme_constant_override("separation", 6)
@@ -179,6 +193,9 @@ func reload_data(keep_edit: bool = true) -> void:
 		actions = gd.actions
 		char_faith = gd.char_faith
 		monsters = gd.monsters
+		first_stage = gd.stage_order[0] if not gd.stage_order.is_empty() else ""
+		var mids: Array = (MonsterSkillData.read().skills as Array).map(func(x): return x.id)
+		sheet_skill_ids = actions.keys().filter(func(k): return not mids.has(k))
 	char_opt.clear()
 	copy_opt.clear()
 	for u in allies:
@@ -198,6 +215,9 @@ func _load() -> void:
 	nodes = SkillTreeData.read()
 	faith = FaithData.read()
 	sstat = SkillStatusData.read()
+	mdata = MonsterSkillData.read()
+	if not monsters.has(mon_sel) and not monsters.is_empty():
+		mon_sel = str(monsters.keys()[0])
 	if skill_sel == "" and not actions.is_empty():
 		skill_sel = str(actions.keys()[0])
 	if _god(god_sel).is_empty():
@@ -212,13 +232,14 @@ func _save() -> void:
 	var err := SkillTreeData.write(nodes)
 	var err2 := FaithData.write(faith)
 	var err3 := SkillStatusData.write(sstat)
+	err3 = maxi(err3, MonsterSkillData.write(mdata))
 	if err == OK and err2 == OK and err3 == OK:
 		dirty = false
 		var errs: int = SkillTreeData.check(nodes, allies, actions).errors.size() + FaithData.check(faith, char_faith, actions).errors.size() \
-			+ SkillStatusData.check(sstat, actions).errors.size()
-		status.text = "저장됨: data/skill_tree.json · faith.json · skill_status.json" + ("" if errs == 0 else "  (검사 오류 %d개 — 아래 확인)" % errs)
+			+ SkillStatusData.check(sstat, actions).errors.size() + MonsterSkillData.check(mdata, sheet_skill_ids, monsters).errors.size()
+		status.text = "저장됨: data/skill_tree.json · faith.json · skill_status.json · monster_skills.json" + ("" if errs == 0 else "  (검사 오류 %d개 — 아래 확인)" % errs)
 		if Engine.is_editor_hint():
-			for path in [SkillTreeData.PATH, FaithData.PATH, SkillStatusData.PATH]:
+			for path in [SkillTreeData.PATH, FaithData.PATH, SkillStatusData.PATH, MonsterSkillData.PATH]:
 				EditorInterface.get_resource_filesystem().update_file(path)
 	else:
 		status.text = "저장 실패 (%d / %d / %d)" % [err, err2, err3]
@@ -235,6 +256,12 @@ func _mark() -> void:
 func _play() -> void:
 	_save()
 	var f := FileAccess.open(GameData.EDITOR_PLAY_PATH, FileAccess.WRITE)
+	if kind == "monster":   # 첫 스테이지 전투 (괴물이 새 스킬을 쓰는지)
+		f.store_string(JSON.stringify({"stage": first_stage}))
+		f.close()
+		if Engine.is_editor_hint():
+			EditorInterface.play_custom_scene("res://scenes/battle_2d.tscn")
+		return
 	if kind == "status":
 		f.store_string(JSON.stringify({"try_skill": skill_sel}))
 		f.close()
@@ -392,14 +419,17 @@ func _rebuild() -> void:
 		kind_btns[k].button_pressed = k == kind
 	var is_f := kind == "faith"
 	var is_s := kind == "status"
-	canvas.visible = not is_f and not is_s
+	var is_m := kind == "monster"
+	var tree_mode := not is_f and not is_s and not is_m
+	canvas.visible = tree_mode
 	faith_box.visible = is_f
 	status_box.visible = is_s
+	monster_box.visible = is_m
 	for c in tree_only:
-		c.visible = not is_f and not is_s
-	play_level.visible = not is_s
-	level_lab.visible = not is_s
-	play_btn.text = "전투 테스트 플레이 (이 스킬 쥐여 주기)" if is_s else "기지 스킬 창 테스트 플레이"
+		c.visible = tree_mode
+	play_level.visible = not is_s and not is_m
+	level_lab.visible = play_level.visible
+	play_btn.text = "전투 테스트 플레이 (이 스킬 쥐여 주기)" if is_s else ("전투 테스트 플레이 (첫 스테이지)" if is_m else "기지 스킬 창 테스트 플레이")
 	for c in form.get_children():
 		form.remove_child(c)
 		c.queue_free()
@@ -409,6 +439,9 @@ func _rebuild() -> void:
 	elif is_s:
 		_fill_skill_list()
 		_build_status_form()
+	elif is_m:
+		_fill_monster_lists()
+		_build_monster_form()
 	else:
 		_build_form()
 	_rebuilding = false
@@ -418,6 +451,10 @@ func _rebuild() -> void:
 func _refresh_view() -> void:
 	if kind == "faith":
 		_refresh_faith_view()
+		return
+	if kind == "monster":
+		info_label.text = "몬스터 %d · 몬스터 전용 스킬 %d" % [monsters.size(), mdata.skills.size()]
+		_show_check(MonsterSkillData.check(mdata, sheet_skill_ids, monsters, _ai_uses()))
 		return
 	if kind == "status":
 		info_label.text = "상태 이상 %d개 · 달린 스킬 %d개" % [sstat.size(), SkillStatusData.by_skill(sstat).size()]
@@ -561,7 +598,13 @@ func _build_status_form() -> void:
 	var us := _users(a.id)
 	form.add_child(_small("쓰는 쪽: 아군 %s / 괴물 %s" % [", ".join(us.ally) if not us.ally.is_empty() else "-", ", ".join(us.monster) if not us.monster.is_empty() else "-"]))
 	form.add_child(HSeparator.new())
-	var mine := _skill_statuses(a.id)
+	_status_cards(a.id, a.effect)
+	form.add_child(_small("테스트 플레이 = 이 스킬을 아군 모두의 첫 스킬 칸에 넣고 첫 스테이지 전투."))
+
+
+## 그 스킬에 달린 상태 이상 카드들 + '상태 이상 추가' (상태 이상 · 몬스터 스킬 화면 공용)
+func _status_cards(skill_id: String, effect: String) -> void:
+	var mine := _skill_statuses(skill_id)
 	form.add_child(_head("맞은 대상에게 거는 상태 이상 (%d)" % mine.size()))
 	if mine.is_empty():
 		form.add_child(_small("없음 — 아래 '상태 이상 추가'"))
@@ -630,13 +673,305 @@ func _build_status_form() -> void:
 			if not used.has(sid):
 				pick = sid
 				break
-		sstat.append(SkillStatusData.new_entry(a.id, pick))
+		sstat.append(SkillStatusData.new_entry(skill_id, pick))
 		_mark()
 		_rebuild())
 	form.add_child(add)
-	if a.effect in ["heal", "ap_grant"]:
+	if effect in ["heal", "ap_grant"]:
 		form.add_child(_small("아군 대상 스킬이라 상태 이상도 아군에게 걸립니다 (가속 같은 긍정 상태에 쓰세요)."))
-	form.add_child(_small("테스트 플레이 = 이 스킬을 아군 모두의 첫 스킬 칸에 넣고 첫 스테이지 전투."))
+
+
+# ================================================================ 몬스터 스킬
+func _build_monster_box() -> Control:
+	var box := HBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 10)
+	var mc := VBoxContainer.new()
+	mc.custom_minimum_size.x = 220
+	box.add_child(mc)
+	mc.add_child(_head("몬스터"))
+	mon_list = ItemList.new()
+	mon_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	mon_list.item_selected.connect(func(i):
+		mon_sel = str(mon_list.get_item_metadata(i))
+		mskill_sel = ""
+		_rebuild())
+	mc.add_child(mon_list)
+	mc.add_child(_small("HP·속도·AI 등 스탯은 밸런스 엑셀 몬스터 시트."))
+	var kc := VBoxContainer.new()
+	kc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(kc)
+	kc.add_child(_head("이 몬스터가 쓰는 스킬 (순서대로)"))
+	kit_list = ItemList.new()
+	kit_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	kit_list.item_selected.connect(func(i):
+		mskill_sel = str(kit_list.get_item_metadata(i))
+		_rebuild())
+	kc.add_child(kit_list)
+	var r1 := HBoxContainer.new()
+	kc.add_child(r1)
+	kit_add = OptionButton.new()
+	kit_add.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	r1.add_child(kit_add)
+	r1.add_child(_btn("넣기", func():
+		if kit_add.selected < 0:
+			return
+		var sid := str(kit_add.get_item_metadata(kit_add.selected))
+		var kit := _kit()
+		if not kit.has(sid):
+			kit.append(sid)
+		mskill_sel = sid
+		_mark()
+		_rebuild()))
+	var r2 := HBoxContainer.new()
+	kc.add_child(r2)
+	r2.add_child(_btn("▲", func(): _kit_move(-1)))
+	r2.add_child(_btn("▼", func(): _kit_move(1)))
+	r2.add_child(_btn("빼기", func():
+		_kit().erase(mskill_sel)
+		mskill_sel = ""
+		_mark()
+		_rebuild()))
+	r2.add_child(_btn("+ 새 몬스터 스킬", _new_monster_skill))
+	r2.add_child(_btn("AI 그래프에 넣기", _add_to_ai))
+	kc.add_child(_small("공용 스킬(기본 공격·강공격·필살기 등 = 엑셀 스킬 시트)도 넣을 수 있음. 몬스터 전용 스킬은 여기서 만들고 고침. AI 가 쓰려면 그 몬스터 AI 그래프에 노드가 있어야 함 → 'AI 그래프에 넣기' (필살기 다음 칸, 실패하면 다음으로)."))
+	return box
+
+
+func _kit() -> Array:
+	if not mdata.kits.has(mon_sel):
+		mdata.kits[mon_sel] = []
+	return mdata.kits[mon_sel]
+
+
+func _mskill(id: String) -> Dictionary:
+	for s in mdata.skills:
+		if s.id == id:
+			return s
+	return {}
+
+
+func _ai_uses() -> Dictionary:
+	var out := {}
+	for mid in monsters:
+		out[mid] = AIGraph.skills_used(AIGraph.load_graph((monsters[mid] as UnitData).ai_id))
+	return out
+
+
+## 이름·AP·효과 한 줄 (엑셀 공용 스킬 또는 몬스터 전용 스킬)
+func _skill_line(sid: String) -> String:
+	var m := _mskill(sid)
+	var eff := ""
+	if not m.is_empty():
+		eff = "%s (%s) · AP %d · %s %d" % [m.name, sid, int(m.ap), MonsterSkillData.EFFECTS.get(m.effect, m.effect), int(m.power)]
+	elif actions.has(sid):
+		var a: ActionData = actions[sid]
+		eff = "%s (%s) · AP %d · %s %d · 공용" % [a.display_name, sid, a.ap_cost, MonsterSkillData.EFFECTS.get(a.effect, a.effect), a.power]
+	else:
+		eff = "%s (없는 스킬)" % sid
+	var st := _skill_statuses(sid)
+	if not st.is_empty():
+		eff += " · [%s]" % " · ".join(st.map(func(e): return StatusCatalog.get_def(e.status).name))
+	return eff
+
+
+func _fill_monster_lists() -> void:
+	mon_list.clear()
+	var uses := _ai_uses()
+	for mid in monsters:
+		var m: UnitData = monsters[mid]
+		mon_list.add_item("%s (%s) · AI %s" % [m.display_name, mid, m.ai_id])
+		mon_list.set_item_metadata(mon_list.item_count - 1, mid)
+		if mid == mon_sel:
+			mon_list.select(mon_list.item_count - 1)
+	kit_list.clear()
+	var used: Array = uses.get(mon_sel, [])
+	for sid in _kit():
+		kit_list.add_item(("" if used.has(sid) else "⚠ AI 안 씀 · ") + _skill_line(sid))
+		kit_list.set_item_metadata(kit_list.item_count - 1, sid)
+		if not used.has(sid):
+			kit_list.set_item_custom_fg_color(kit_list.item_count - 1, Color(1, 0.82, 0.4))
+		if sid == mskill_sel:
+			kit_list.select(kit_list.item_count - 1)
+	kit_add.clear()
+	var all := []
+	for s in mdata.skills:
+		all.append([s.id, "%s (%s) · 몬스터" % [s.name, s.id]])
+	for sid in sheet_skill_ids:
+		var a: ActionData = actions[sid]
+		if not a.effect in ["move", "weapon_swap"]:
+			all.append([sid, "%s (%s) · 공용" % [a.display_name, sid]])
+	for it in all:
+		if not _kit().has(it[0]):
+			kit_add.add_item(it[1])
+			kit_add.set_item_metadata(kit_add.item_count - 1, it[0])
+
+
+func _kit_move(d: int) -> void:
+	var kit := _kit()
+	var i := kit.find(mskill_sel)
+	if i < 0 or i + d < 0 or i + d >= kit.size():
+		return
+	kit[i] = kit[i + d]
+	kit[i + d] = mskill_sel
+	_mark()
+	_rebuild()
+
+
+func _new_monster_skill() -> void:
+	var base := "%s_skill" % mon_sel
+	var id := base
+	var i := 2
+	while not _mskill(id).is_empty() or actions.has(id):
+		id = "%s_%d" % [base, i]
+		i += 1
+	var s := MonsterSkillData.new_skill(id)
+	mdata.skills.append(s)
+	actions[id] = MonsterSkillData.to_action(s)
+	_kit().append(id)
+	mskill_sel = id
+	_mark()
+	_rebuild()
+
+
+## 고른 스킬을 이 몬스터 AI 그래프에 '스킬 사용' 노드로 (같은 AI 를 쓰는 다른 몬스터는 그 스킬이 없으면 건너뜀)
+func _add_to_ai() -> void:
+	if mskill_sel == "" or not monsters.has(mon_sel):
+		return
+	var ai_id: String = (monsters[mon_sel] as UnitData).ai_id
+	var g: Dictionary = AIGraph.load_graph(ai_id).duplicate(true)
+	if g.is_empty():
+		status.text = "AI 그래프 '%s' 가 없습니다 (AI 탭에서 만드세요)" % ai_id
+		return
+	var target := "no_status" if not _skill_statuses(mskill_sel).is_empty() else "hp_pct_low"
+	if not AIGraph.insert_skill(g, mskill_sel, target):
+		status.text = "이미 AI 그래프 '%s' 에 있거나 끼울 '스킬 사용' 노드가 없습니다" % ai_id
+		return
+	AIGraph.save_graph(ai_id, g)
+	if Engine.is_editor_hint():
+		EditorInterface.get_resource_filesystem().update_file(AIGraph.path_of(ai_id))
+	status.text = "AI 그래프 '%s' 에 '%s' 노드를 넣었습니다 (저장됨, AI 탭에서 위치·대상 규칙 조정)" % [ai_id, mskill_sel]
+	_rebuild()
+
+
+func _build_monster_form() -> void:
+	if not monsters.has(mon_sel):
+		form.add_child(_head("몬스터를 고르세요"))
+		return
+	var mu: UnitData = monsters[mon_sel]
+	form.add_child(_head("%s — HP %d · 속도 %d · AP %d(+%d) · 방어 %d" % [mu.display_name, mu.max_hp, mu.speed, mu.max_ap, mu.ap_recovery, mu.defense]))
+	if mskill_sel == "":
+		form.add_child(_small("가운데 목록에서 스킬을 고르면 여기서 고칩니다. '+ 새 몬스터 스킬' 로 이 몬스터 전용 스킬을 만들 수 있습니다."))
+		return
+	form.add_child(HSeparator.new())
+	var m := _mskill(mskill_sel)
+	if m.is_empty():
+		var a: ActionData = actions.get(mskill_sel)
+		if a == null:
+			form.add_child(_head("없는 스킬 '%s'" % mskill_sel))
+			return
+		form.add_child(_head("%s (%s) — 공용 스킬" % [a.display_name, a.id]))
+		form.add_child(_small("아군과 같이 쓰는 스킬이라 수치는 밸런스 엑셀 스킬 시트에서 고칩니다.\nAP %d · 대상 %s · %s %d\n%s" % [a.ap_cost,
+			MonsterSkillData.TARGETS.get(a.target_rule, a.target_rule), MonsterSkillData.EFFECTS.get(a.effect, a.effect), a.power, a.description]))
+		form.add_child(HSeparator.new())
+		_status_cards(a.id, a.effect)
+		form.add_child(_small("※ 공용 스킬에 단 상태 이상은 아군이 쓸 때도 걸립니다."))
+		return
+	form.add_child(_head("몬스터 전용 스킬"))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 6)
+	form.add_child(grid)
+	var idl := LineEdit.new()
+	idl.text = str(m.id)
+	idl.placeholder_text = "고유 id (영문) — Enter 로 적용"
+	idl.text_submitted.connect(func(v):
+		v = v.strip_edges()
+		if v == "" or v == m.id:
+			return
+		if not _mskill(v).is_empty() or sheet_skill_ids.has(v):
+			status.text = "스킬 id '%s' 는 이미 있습니다" % v
+			return
+		for k in mdata.kits:
+			var kit: Array = mdata.kits[k]
+			var at := kit.find(m.id)
+			if at >= 0:
+				kit[at] = v
+		for e in sstat:
+			if e.skill == m.id:
+				e.skill = v
+		actions.erase(m.id)
+		m.id = v
+		mskill_sel = v
+		_sync_mskill(m)
+		status.text = "id 바꿈 — AI 그래프에 옛 id 노드가 있으면 AI 탭에서 바꾸세요"
+		_mark()
+		_rebuild())
+	_row(grid, "id", idl)
+	_row(grid, "이름", _line(str(m.name), func(v):
+		m.name = v
+		_sync_mskill(m)
+		_fill_monster_lists()))
+	var kinds := []
+	for k in MonsterSkillData.KINDS:
+		kinds.append([k, MonsterSkillData.KINDS[k]])
+	_row(grid, "종류", _option(kinds, m.kind, func(v):
+		m.kind = str(v)
+		_sync_mskill(m)
+		_mark()))
+	var ap := _spin(0, 20, 1, int(m.ap), "")
+	ap.value_changed.connect(func(v):
+		if not _rebuilding:
+			m.ap = int(v)
+			_sync_mskill(m)
+			_mark()
+			_fill_monster_lists())
+	_row(grid, "AP 비용", ap)
+	var tg := []
+	for k in MonsterSkillData.TARGETS:
+		tg.append([k, MonsterSkillData.TARGETS[k]])
+	_row(grid, "대상", _option(tg, m.target, func(v):
+		m.target = str(v)
+		_sync_mskill(m)
+		_mark()))
+	var ef := []
+	for k in MonsterSkillData.EFFECTS:
+		ef.append([k, MonsterSkillData.EFFECTS[k]])
+	_row(grid, "효과", _option(ef, m.effect, func(v):
+		m.effect = str(v)
+		_sync_mskill(m)
+		_mark()
+		_rebuild()))
+	if m.effect != "status":
+		var pw := _spin(0, 999, 1, int(m.power), "")
+		pw.value_changed.connect(func(v):
+			if not _rebuilding:
+				m.power = int(v)
+				_sync_mskill(m)
+				_mark()
+				_fill_monster_lists())
+		_row(grid, "위력" if m.effect == "damage" else ("회복량" if m.effect == "heal" else "AP"), pw)
+	_row(grid, "설명", _line(str(m.desc), func(v):
+		m.desc = v
+		_sync_mskill(m)))
+	var del := _btn("이 몬스터 스킬 삭제 (모든 몬스터에서)", func():
+		mdata.skills.erase(m)
+		for k in mdata.kits:
+			(mdata.kits[k] as Array).erase(m.id)
+		sstat = sstat.filter(func(e): return e.skill != m.id)
+		actions.erase(m.id)
+		mskill_sel = ""
+		_mark()
+		_rebuild())
+	form.add_child(del)
+	form.add_child(HSeparator.new())
+	_status_cards(m.id, m.effect)
+
+
+## 고친 몬스터 스킬을 actions 에도 (상태 이상 화면·검사가 같은 스킬을 보게)
+func _sync_mskill(m: Dictionary) -> void:
+	actions[m.id] = MonsterSkillData.to_action(m)
 
 
 # ================================================================ 신앙

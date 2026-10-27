@@ -941,4 +941,36 @@ func _test_skill_tree_editor() -> void:
 	_c(by.heavy_attack.size() == 2 and by.heavy_attack[0].id == "burn", "스킬별로 묶기 → ActionData.statuses 형식")
 	panel.sstat.erase(panel._skill_statuses("heavy_attack")[0])
 	_c(panel._skill_statuses("heavy_attack").size() == 1, "빼기")
+	# 몬스터 스킬 (data/monster_skills.json)
+	var md := MonsterSkillData.read()
+	_c(md.skills.size() == 4 and md.kits.ghoul.has("rend") and battle.monsters.ghoul.skill_ids == md.kits.ghoul, "monster_skills.json: 전용 스킬 4 · 구울 스킬 목록 = kits")
+	_c(battle.actions.has("hamstring") and battle.actions.hamstring.status_ids() == ["root"], "몬스터 전용 스킬도 스킬로 읽힘 (+ 상태 이상)")
+	panel.kind = "monster"
+	panel.mon_sel = "wolf"
+	panel._rebuild()
+	_c(panel.monster_box.visible and panel._kit() == ["basic_attack", "heavy_attack", "hamstring", "sand_kick", "ultimate"], "몬스터 모드: 늑대 스킬 목록")
+	panel._new_monster_skill()
+	var nid: String = panel.mskill_sel
+	var nm: Dictionary = panel._mskill(nid)
+	nm.power = 13
+	panel._sync_mskill(nm)
+	_c(panel._kit().has(nid) and panel.actions[nid].power == 13, "새 몬스터 스킬 → 늑대 목록에 들어감 (%s)" % nid)
+	panel.mskill_sel = "sand_kick"
+	panel._kit_move(-1)
+	_c(panel._kit().find("sand_kick") == 2, "스킬 순서 위로")
+	var mchk := MonsterSkillData.check(panel.mdata, panel.sheet_skill_ids, panel.monsters, panel._ai_uses())
+	_c(mchk.errors.is_empty() and "\n".join(mchk.notes).contains(nid), "검사: 새 스킬은 'AI 가 안 씀' 주의 %s" % [mchk.errors])
+	# AI 그래프에 끼우기 (파일은 안 건드리고 복사본으로)
+	var g: Dictionary = AIGraph.load_graph("aggressive").duplicate(true)
+	_c(AIGraph.insert_skill(g, nid, "hp_pct_low") and AIGraph.skills_used(g).has(nid) and not AIGraph.insert_skill(g, nid, "hp_pct_low"), "AI 그래프에 '스킬 사용' 노드 끼움 (두 번은 안 들어감)")
+	var ult_next := ""
+	var ult_id := ""
+	for n in g.nodes:
+		if n.type == "act_skill" and n.params.skill == "ultimate":
+			ult_id = n.id
+	for c in g.connections:
+		if c.from == ult_id and int(c.port) == 0:
+			ult_next = c.to
+	_c(ult_next == "sk_" + nid, "필살기 다음 칸에 들어감")
+	_c(not MonsterSkillData.check({"skills": [MonsterSkillData.new_skill("heal")], "kits": {}}, battle.actions.keys(), battle.monsters).errors.is_empty(), "검사: 엑셀 스킬과 같은 id 는 오류")
 	panel.free()
