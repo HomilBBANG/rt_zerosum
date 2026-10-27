@@ -299,6 +299,15 @@ func play(anim: String, restart: bool = true) -> void:
 	_show(0)
 
 
+## 확인·스크린샷용: 그 애니메이션의 frame 번째(0부터) 프레임에 멈춤
+func freeze(anim: String, frame: int) -> void:
+	play(anim)
+	var n := (_a.get("frames", []) as Array).size()
+	if n > 0:
+		_show(clampi(frame, 0, n - 1))
+	_done = true
+
+
 func is_static() -> bool:
 	return not has_anim(current)
 

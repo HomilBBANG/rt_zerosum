@@ -24,6 +24,12 @@ assets/characters/<id>/
       움직이는 GIF·WebP(APNG) → 프레임마다, 스프라이트 시트 → --grid 열x행 칸마다, PNG 여러 장 → 그 순서대로
       첫 프레임의 발·키를 base.png 에 맞추는 같은 이동·배율을 모든 프레임에 적용 (프레임 사이 움직임은 그대로)
       → assets/characters/<캐릭터>/<동작>/0001.png … + anim.json(움직이는 파일의 프레임 시간) + 조명 마스크
+  python3 tools/char_sprites.py report <시트.png> [--grid 6x6] [--align ground|cell] [--loop 8-36]
+      AI 로 만든 시트 분석: 튀는 프레임 후보(앞뒤 사이로 바로 가는 것보다 크게 돌아가는 프레임) + 이음새가 매끄러운 반복 구간 후보
+  python3 tools/char_sprites.py sheet <캐릭터> <동작> <시트.png> [--grid 6x6] [--frames 1-20,22] [--fps 12] [--align ground|cell] [--ref 1] [--loop 0|1] [--weapon 0|1]
+      AI 시트(영상에서 뽑은 칸 배열) → <동작>/0001.png … 칸 경계는 그림이 가장 적은 줄로 자름, 쓸 프레임만 골라 순서대로
+      크기: 기준 프레임(--ref, 똑바로 선 칸)의 키 = figure_px. ground = 프레임마다 발을 접지선에(카메라 흔들림 제거), cell = 칸 높이 그대로(뛰기처럼 뜨는 동작)
+      누운 자세처럼 캔버스를 넘으면 그 동작만 캔버스를 넓힘 (anim.json 의 ground). 조명·선화·눈 마스크도 프레임마다
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
 import json
@@ -478,6 +484,158 @@ def cmd_new(cid, src, fig_px=760):
     print(cid, "base", (w, h), "ground", info["ground"], "head", head, "hand", info["hand"])
 
 
+
+# ---------------------------------------------------------------- AI 스프라이트 시트 (영상에서 뽑은 6x6 등) → 애니메이션 폴더
+def _sheet_cells(path, cols, rows):
+    """시트를 칸으로 자르기: 칸 경계 근처에서 그림이 가장 적은 줄로 자름 (옆 칸 그림이 살짝 겹쳐도 OK), 칸마다 작은 조각 버림.
+    반환 [(그림(잘라낸 bbox), x, y)…] — x, y = 그 칸의 원래 칸 왼쪽 위 기준 bbox 위치 (영상의 카메라 위치 그대로)"""
+    import numpy as np
+    from scipy import ndimage
+    arr = np.array(Image.open(path).convert("RGBA"))
+    a = arr[..., 3] > 8
+    H, W = a.shape
+    cw, ch = W / cols, H / rows
+
+    def cut(proj, nominal, r=30):
+        lo, hi = max(0, nominal - r), min(len(proj), nominal + r)
+        return lo + int(np.argmin(proj[lo:hi]))
+    rp = a.sum(1)
+    ys = [0] + [cut(rp, round(ch * i)) for i in range(1, rows)] + [H]
+    out = []
+    for r in range(rows):
+        cp = a[ys[r]:ys[r + 1]].sum(0)
+        xs = [0] + [cut(cp, round(cw * i)) for i in range(1, cols)] + [W]
+        for c in range(cols):
+            sub = arr[ys[r]:ys[r + 1], xs[c]:xs[c + 1]].copy()
+            al = sub[..., 3] > 8
+            lab, n = ndimage.label(al)
+            if n == 0:
+                out.append(None)
+                continue
+            sz = ndimage.sum(al, lab, range(1, n + 1))
+            keep = np.isin(lab, [i + 1 for i in range(n) if sz[i] >= sz.max() * 0.02])
+            sub[..., 3] = np.where(keep, sub[..., 3], 0)
+            yy, xx = np.nonzero(sub[..., 3] > 8)
+            bb = (int(xx.min()), int(yy.min()), int(xx.max()) + 1, int(yy.max()) + 1)
+            out.append((Image.fromarray(sub).crop(bb), xs[c] + bb[0] - round(c * cw), ys[r] + bb[1] - round(r * ch)))
+    return out
+
+
+def _pose_vecs(cells, ground=True):
+    """프레임 비교용 작은 그림 (몸통 가운데·발 기준 정렬)"""
+    import numpy as np
+    vecs = []
+    for cell in cells:
+        if cell is None:
+            vecs.append(None)
+            continue
+        im, x, y = cell
+        a = np.array(im)[..., 3] > 40
+        band = a[int(a.shape[0] * 0.18):int(a.shape[0] * 0.42)].sum(0)
+        tcx = float((np.arange(len(band)) * band).sum() / max(1, band.sum()))
+        can = Image.new("RGBA", (400, 400), (0, 0, 0, 0))
+        can.alpha_composite(im, (int(200 - tcx), int((380 - im.height) if ground else y + 20)))
+        v = np.array(can.resize((80, 80), Image.BILINEAR)).astype(np.float32) / 255
+        vecs.append(np.concatenate([v[..., :3] * v[..., 3:4], v[..., 3:4]], -1))
+    return vecs
+
+
+def cmd_sheet_report(path, grid=(6, 6), ground=True, lo=8, hi=36):
+    """튀는 프레임(앞뒤 프레임 사이로 바로 가는 것보다 크게 돌아가는 프레임)과 이음새가 매끄러운 반복 구간 후보"""
+    import numpy as np
+    cells = _sheet_cells(path, *grid)
+    v = _pose_vecs(cells, ground)
+    n = len(v)
+    D = np.array([[np.abs(v[i] - v[j]).mean() if v[i] is not None and v[j] is not None else 9 for j in range(n)] for i in range(n)])
+    steps = [D[k][k + 1] for k in range(n - 1)]
+    print("프레임 %d개, 이웃 프레임 차이 중앙값 %.1f" % (n, np.median(steps) * 1000))
+    det = sorted(((D[k - 1][k] + D[k][k + 1] - D[k - 1][k + 1]) * 1000, k + 1) for k in range(1, n - 1))[::-1]
+    print("튀는 프레임 후보 (점수 높을수록):", ", ".join("%d(%.0f)" % (k, d) for d, k in det[:8]))
+    cands = []
+    for i in range(n):
+        for L in range(lo, hi + 1):
+            j = i + L
+            if j > n:
+                break
+            cands.append((D[j - 1][i] + 0.3 * max(D[k][k + 1] for k in range(i, j - 1)), i + 1, j, D[j - 1][i]))
+    for sc, a, b, seam in sorted(cands)[:6]:
+        print("  반복 %d..%d (%d장) 이음새 %.0f" % (a, b, b - a + 1, seam * 1000))
+
+
+def _parse_frames(spec, n):
+    """'1-20,22,30-26' → [1..20, 22, 30, 29, …, 26]"""
+    out = []
+    for part in spec.split(","):
+        if "-" in part:
+            a, b = (int(x) for x in part.split("-"))
+            out += list(range(a, b + 1)) if a <= b else list(range(a, b - 1, -1))
+        elif part.strip():
+            out.append(int(part))
+    return [k for k in out if 1 <= k <= n]
+
+
+def cmd_sheet(cid, anim, path, grid=(6, 6), frames=None, fps=12.0, align="ground", ref=1, loop=None, weapon=None, durations=None):
+    """AI 시트 → assets/characters/<캐릭터>/<동작>/0001.png … + anim.json + 조명·선화·눈 마스크.
+    크기: 기준 프레임(ref, 똑바로 선 프레임)의 키 = character.json figure_px. 시트 전체에 같은 배율·이동 (프레임 사이 움직임 그대로).
+    align: ground = 프레임마다 맨 아래를 발 접지선에 (발이 땅에 붙어 있는 동작 — 영상 카메라 흔들림 제거)
+           cell = 칸 안 높이 그대로 (뛰기처럼 공중에 뜨는 동작)
+    그림이 기본 캔버스(image_size)를 넘으면(누운 자세 등) 그 동작만 캔버스를 넓히고 anim.json 에 ground 를 적음"""
+    import numpy as np
+    cdir = os.path.join(CHAR_DIR, cid)
+    info = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    W, H = info["image_size"]
+    gx, gy = info["ground"]
+    fig = float(info.get("figure_px", H))
+    cells = _sheet_cells(path, *grid)
+    pick = _parse_frames(frames, len(cells)) if frames else list(range(1, len(cells) + 1))
+    rim, rx, ry = cells[ref - 1]
+    s = fig / rim.height
+    ra = np.array(rim)[..., 3] > 40
+    feet = np.nonzero(ra[int(ra.shape[0] * 0.94):].any(0))[0]
+    ref_fx = rx + (feet.min() + feet.max()) / 2.0           # 기준 프레임 두 발 가운데 = 접지점 x
+    ref_bottom = ry + rim.height
+    placed = []
+    for k in pick:
+        im, x, y = cells[k - 1]
+        im2 = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
+        px = gx + (x - ref_fx) * s
+        py = gy - im2.height if align == "ground" else gy - (ref_bottom - y) * s
+        placed.append((im2, px, py))
+    x0 = min(0.0, min(p[1] for p in placed) - 4)
+    x1 = max(float(W), max(p[1] + p[0].width for p in placed) + 4)
+    y0 = min(0.0, min(p[2] for p in placed) - 4)
+    sx, sy = -x0, -y0
+    CW, CH = int(np.ceil(x1 - x0)), int(np.ceil(H - y0))
+    adir = os.path.join(cdir, anim)
+    os.makedirs(adir, exist_ok=True)
+    for fn in os.listdir(adir):
+        if fn.endswith(".png") or fn.endswith(".png.import"):
+            os.remove(os.path.join(adir, fn))
+    hr = info.get("head_rect")
+    for i, (im2, px, py) in enumerate(placed):
+        can = Image.new("RGBA", (CW, CH), (0, 0, 0, 0))
+        can.alpha_composite(im2, (round(px + sx), round(py + sy)))
+        stem = os.path.join(adir, "%04d" % (i + 1))
+        can.save(stem + ".png")
+        mr, ml = make_masks(can)
+        mr.save(stem + "_mask_r.png")
+        ml.save(stem + "_mask_l.png")
+        line_mask(can).save(stem + "_line.png")
+        bb = can.getbbox()
+        head = (bb[0], bb[1], bb[2] - bb[0], (hr[3] if hr else fig * 0.2))   # 머리 = 그림 맨 위 띠 (누운 자세면 못 찾음 → 눈 마스크 비어 있음)
+        eye_mask(can, head=head).save(stem + "_eye.png")
+    meta = {"fps": fps, "ground": [round(gx + sx), round(gy + sy)], "figure_px": fig, "hip_y": round(float(info.get("hip_y", gy - fig * 0.55)) + sy),
+            "source": "%s %s 프레임 %s" % (os.path.basename(path), "x".join(map(str, grid)), frames or "전부")}
+    if loop is not None:
+        meta["loop"] = loop
+    if weapon is not None:
+        meta["weapon"] = weapon
+    if durations:
+        meta["durations"] = durations
+    json.dump(meta, open(os.path.join(adir, "anim.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    print(cid, anim, "프레임", len(placed), "배율 %.3f" % s, "캔버스", (CW, CH), meta)
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
@@ -504,6 +662,23 @@ if __name__ == "__main__":
         grid = tuple(int(v) for v in opts["grid"].lower().split("x")) if "grid" in opts else None
         cmd_import(args[1], args[2], rest, grid, float(opts["fps"]) if "fps" in opts else None,
                    float(opts["hold"]) if "hold" in opts else None)
+    elif args[:1] in (["sheet"], ["report"]) and len(args) >= 2:
+        opts = {}
+        rest = []
+        it = iter(args[1:])
+        for a in it:
+            if a.startswith("--"):
+                opts[a[2:]] = next(it)
+            else:
+                rest.append(a)
+        grid = tuple(int(v) for v in opts.get("grid", "6x6").lower().split("x"))
+        if args[0] == "report":
+            lo, hi = (int(v) for v in opts.get("loop", "8-36").split("-"))
+            cmd_sheet_report(rest[0], grid, opts.get("align", "ground") == "ground", lo, hi)
+        else:
+            cmd_sheet(rest[0], rest[1], rest[2], grid, opts.get("frames"), float(opts.get("fps", 12)), opts.get("align", "ground"),
+                      int(opts.get("ref", 1)), {"1": True, "0": False}.get(opts.get("loop", ""), None),
+                      {"1": True, "0": False}.get(opts.get("weapon", ""), None))
     else:
         print(__doc__)
         sys.exit(1)

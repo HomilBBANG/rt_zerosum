@@ -44,6 +44,13 @@ func _ready() -> void:
 				if p.size() >= 2 and (u.data.id == p[0] or u.data.sprite_id == p[0]):
 					u.add_status(StatusCatalog.find(p[1]), int(p[2]) if p.size() > 2 else 2, int(p[3]) if p.size() > 3 else 10)
 		hud._refresh_panel()
+	if Game.cli.has("anim_frame"):   # 확인용: --anim_frame=a_alma:death:19;a_dan:attack:5 (캐릭터 id 또는 스프라이트:동작:프레임 0부터) — 그 프레임에 멈춤
+		for spec in str(Game.cli.anim_frame).split(";", false):
+			var p := spec.split(":")
+			for u in controller.slots.all_units():
+				var sp = view.sprite_of(u) if view.has_method("sprite_of") else null
+				if p.size() >= 3 and (u.data.id == p[0] or u.data.sprite_id == p[0]) and sp != null and sp.chr != null:
+					sp.chr.freeze(p[1], int(p[2]))
 	_run_cli()
 
 
