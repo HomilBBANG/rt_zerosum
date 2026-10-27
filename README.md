@@ -108,7 +108,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![무기고](docs/screenshots/outgame/armory.png)
 
 ## 밸런스 데이터 (엑셀) · AI 에디터 · 스테이지 에디터
-에디터 네 개는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` 이 있습니다.
+에디터는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`, `addons/rtz_sortie_editor`, `addons/rtz_skill_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` · `출정 대사` · `스킬 트리` 가 있습니다.
 **밸런스 수치는 `data/balance.xlsx`** 한 파일에 시트별로 있습니다: `캐릭터` · `몬스터` · `아이템` · `스킬` · `스테이지` (+ 열 설명 `읽어보기`).
 - 엑셀(또는 Numbers·LibreOffice)로 열어 고치고 **저장하면 1초 안에 게임이 다시 읽어 바로 적용** — 진행 중인 전투의 HP·AP·위력·이름까지.
   캐릭터 추가·편성·적 배치처럼 전투 구성이 바뀌는 것은 다음 전투(R 재시작)부터.
@@ -183,18 +183,24 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   - **액티브 스킬**: 전투에서 쓰는 스킬을 강화(강공격·기본 공격·필살기 위력 등)하고, **갈래 끝(3단계)에서 새 스킬**(강타·측면 기습·재정비·고무, 앨마는 강화만 — 기본 스킬 칸 3개가 이미 참).
   - **패시브 스킬**: 늘 적용되는 능력치(최대 HP·속도·AP·AP 회복·방어·모든 공격 위력·회복량).
   - **신앙 스킬**: 믿는 신에 따라 배울 수 있는 스킬이 다름 (아래).
-- 액티브·패시브는 각각 **십자형 트리**: 가운데(처음부터) → **북 = 화력 · 동 = 기동 · 남 = 생존 · 서 = 전술** 네 갈래로 1~3단계. 어느 방향으로 뻗느냐가 빌드.
-  스킬 포인트는 두 트리가 **같이 씀**. 갈래 안에서는 앞 단계부터, **갈래 끝(3단계)은 트리마다 하나만**.
+- 액티브·패시브는 각각 **십자형 트리**: 가운데(처음부터) → **북 = 화력 · 동 = 기동 · 남 = 생존 · 서 = 전술** 네 갈래로 1~4단계(지금 데이터는 3단계). 어느 방향으로 뻗느냐가 빌드.
+  스킬 포인트는 두 트리가 **같이 씀**. 갈래 안에서는 앞 단계부터, **갈래 끝(마지막 단계)은 트리마다 하나만**.
 - **레벨이 모자란 스킬은 회색 + 가운데 붉은 "경험 부족"**. 노드를 누르면 왼쪽에 설명·필요 레벨, `배우기`. `액티브/패시브 초기화` = 그 트리 포인트 돌려받기 (지금은 무료).
 - 효과는 기지에서 출전한 전투에 반영. 레벨도 피해·회복에 반영(레벨/2).
-- 데이터: 밸런스 엑셀 `스킬트리` 시트 (캐릭터·**종류(액티브/패시브)**·방향·단계·필요레벨·효과·값), 새 스킬은 `스킬` 시트. 경험치·레벨 수치는 기지 엑셀 `설정`(xp_win, xp_lose, xp_level_base, xp_level_step, level_max).
+- **스킬 노드는 직접 짬 = Godot 에디터 상단 `스킬 트리` 탭** (`data/skill_tree.json`):
+  캐릭터·액티브/패시브 트리를 고르면 게임과 같은 십자형 그림. **노드를 누르면 오른쪽에서 이름·필요 레벨·효과·값·설명**을 고치고, **갈래 끝의 `+` 칸을 누르면 단계 추가**(갈래마다 최대 4단계, 갈래 길이는 제각각 가능).
+  효과 = 최대 HP · 속도 · 최대 AP · AP 회복 · 방어 · 모든 공격 위력 · 모든 회복량 · **스킬 강화**(고른 스킬 위력·회복·AP 지급 +) · **새 스킬**(스킬 시트에서 고름). 설명은 `설명 자동 채우기` (효과·값을 바꾸면 같이 바뀜).
+  `한 단계 안쪽/바깥으로`(자리 바꾸기) · `이 노드 삭제`(바깥 단계는 당겨짐) · `다른 캐릭터 트리 가져오기` · `필요 레벨 자동`(시작 +0/+2/+4…) · `트리 비우기`.
+  아래 **검사**: 겹친 id · 빈 단계 · 없는 스킬(오류) / 필요 레벨 역전 · 새 스킬이 기본 스킬 칸(3칸)을 넘을 수 있음(주의). 저장(Ctrl/Cmd+S) → 게임 실행 중이면 바로 반영. `기지 스킬 창 테스트 플레이` = 그 대원을 정한 레벨로 올려 기지 스킬 창.
+- 새 스킬 자체(AP·위력 등)는 밸런스 엑셀 `스킬` 시트. 경험치·레벨 수치는 기지 엑셀 `설정`(xp_win, xp_lose, xp_level_base, xp_level_step, level_max).
 - 전투 결과 화면에 출전 대원 경험치·레벨 업 표시.
-- 확인: `godot --path . ++ --scene=base --base_ui=skills:a_dan:2500:dan_a_n1,dan_a_n2,dan_a_n3::active` (경험치 주고 배운 상태로 창, 마지막 칸 active / passive / faith).
+- 확인: `godot --path . ++ --scene=base --base_ui=skills:a_dan:2500:dan_a_n1,dan_a_n2,dan_a_n3::active` (경험치 주고 배운 상태로 창, 셋째 칸 `L9` = 레벨 9 까지, 마지막 칸 active / passive / faith).
 
 - **신앙 스킬**: 캐릭터마다 **믿는 신**이 있고, **신에 따라 배울 수 있는 신앙 스킬이 다름**. 신앙도(0~100)가 필요치 이상이면 포인트 없이 배움, 모자라면 회색 + 붉은 "신앙 부족". 출전할 때마다 신앙도 +5. 아래에 다른 신들의 스킬(배울 수 없음)도 표시.
   데이터 = 밸런스 엑셀 `신`(id·이름·상징색·설명) · `신앙스킬`(신·필요신앙·효과·값) · 캐릭터 시트 `신`·`신앙` 열. **지금 값은 임시** (태양신 솔루스·전쟁신 베이라·밤의 여신 녹트·대지모 테라, 각 4개) — 표를 받으면 교체.
   확인: `godot --path . ++ --scene=base --base_ui=faith:a_dan:15:veyra_1`
 
+![스킬 트리 에디터 (Godot 에디터 상단 탭)](docs/screenshots/skill_editor.png)
 ![액티브 스킬 — 북(화력) 끝 '강타'까지 뻗은 빌드](docs/screenshots/skill_active.png)
 ![패시브 스킬 — 레벨 미달 = 회색 + 경험 부족](docs/screenshots/skill_passive.png)
 ![신앙 스킬 — 전쟁신 베이라 (신앙 부족 = 회색 + 붉은 글씨)](docs/screenshots/skill_faith.png)
@@ -320,7 +326,7 @@ godot --headless --path . -s tests/run_tests.gd
 전투: GDD 8절 "필수 검증 사례" (선공 특례, 2라운드 미적용, 동률 아군/레벨/원거리 우선, AP 상한 버림/이월/0 자동 종료,
 이동/교환 AP 1, 무기 변경 AP 1, AP 부족/무효 대상 시 AP 미소모, 재시작 초기화, 시드 재현성) + 큰 몸집·장착·상태 이상·엑셀·AI 그래프.
 기지([15]~[24], `tests/outgame_tests.gd`): 날짜 전환(23:59→다음 날·월말·연말), 해금(부족/정확/초과/중복), 잠긴 방 경로·7일 이동, 요일별 일정·해금 → 생활 변화,
-대화/엿듣기/요청 구분, 일일 오염·청소·위임, 주간 결산 중복 없음, 월 1회 점검·그 주 보너스, 훈련·제작·강화 → 전투 수치, 저장/불러오기 복구, 출정 대사 고르기·출정 불가 대원([31]), 연구원 로한·무기 연구([32]), 레벨·스킬 트리([33]), 신앙([34]). 현재 341개 통과.
+대화/엿듣기/요청 구분, 일일 오염·청소·위임, 주간 결산 중복 없음, 월 1회 점검·그 주 보너스, 훈련·제작·강화 → 전투 수치, 저장/불러오기 복구, 출정 대사 고르기·출정 불가 대원([31]), 연구원 로한·무기 연구([32]), 레벨·스킬 트리([33]), 신앙([34]), 스킬 트리 데이터·에디터([35]). 현재 353개 통과.
 
 ## 스크린샷 일괄 렌더
 ```
@@ -341,8 +347,8 @@ scripts/ui/        battle_hud, title, main_menu, formation, result
 scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정·단면 좌표), world_clock, room_route_service, npc_schedule_resolver,
                    npc_agent, economy_ledger, base_sim(해금·이동·대화·위생·의뢰·결산·점검·제작·저장) / base_hub(씬)
 scripts/outgame/view/  base_view_3d(3D 단면 건물·조명·카메라), base_overlay(이름표·자물쇠·오염·말풍선 — 화면 좌표), npc_view(대원 스프라이트), outgame_hud(HUD·창)
-addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor (Godot 에디터 상단 탭)
-data/              balance.xlsx(전투), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
+addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor, rtz_sortie_editor, rtz_skill_editor (Godot 에디터 상단 탭)
+data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/characters/ 캐릭터별 base·프레임 애니메이션·마스크·character.json (전투·기지 공통)

@@ -27,6 +27,7 @@ var data: GameData = null
 var stage_id: String = ""
 signal data_reloaded(warnings: PackedStringArray)
 var _balance_mtime: int = 0
+var _tree_mtime: int = 0     # data/skill_tree.json (에디터 '스킬 트리' 탭에서 저장하면 같이 다시 읽음)
 var _poll_t: float = 0.0
 ## 아웃게임 (data/outgame.xlsx + 대원 일정). base = 진행 중인 기지 (없으면 null)
 const SAVE_PATH := "user://outgame_save.json"
@@ -72,6 +73,7 @@ func _ready() -> void:
 	data = GameData.load_from()
 	if data != null:
 		_balance_mtime = FileAccess.get_modified_time(GameData.BALANCE_PATH)
+		_tree_mtime = FileAccess.get_modified_time(SkillTreeData.PATH)
 		allies = data.allies
 		actions = data.actions
 		for w in data.warnings:
@@ -88,6 +90,14 @@ func _ready() -> void:
 					cli["base_focus"] = str(req.get("npc", ""))
 					if req.get("battle_soon", false):   # 전투 발생 탭: 다음 전투 10분 전부터
 						cli["base_battle_soon"] = true
+					if req.get("skills") is Dictionary:   # 스킬 트리 탭: 기지에서 그 대원 스킬 창 (레벨 올린 상태)
+						var sk: Dictionary = req.skills
+						cli["base_ui"] = "skills:%s:L%d:::%s" % [sk.get("char", ""), int(sk.get("level", 1)), sk.get("kind", "active")]
+				if req.get("sortie", false):   # 출정 대사 탭: 새 기지에서 출정 대기 화면 (대원 상태 섞기)
+					cli["editor_base"] = true
+					cli["scene"] = "sortie"
+					if req.get("demo", false):
+						cli["sortie_demo"] = "1"
 	else:
 		push_warning("data/balance.xlsx 를 읽지 못해 내장 테스트 데이터를 씁니다")
 		allies = TestRoster.build_provided_allies()
@@ -255,18 +265,20 @@ func _process(delta: float) -> void:
 	if data == null:
 		return
 	var t := FileAccess.get_modified_time(GameData.BALANCE_PATH)
-	if t == 0 or t == _balance_mtime:
+	var tt := FileAccess.get_modified_time(SkillTreeData.PATH)
+	if t == 0 or (t == _balance_mtime and tt == _tree_mtime):
 		return
 	var newer := GameData.load_from()
 	if newer == null:
 		return   # 저장 중이면 다음 확인 때 다시
 	_balance_mtime = t
+	_tree_mtime = tt
 	data.apply_from(newer)
 	for w in data.warnings:
 		push_warning("balance.xlsx: " + w)
 	for e in _ally_copies:
 		_derive_ally(e.copy, e.base)
-	print("[balance] data/balance.xlsx 다시 읽음")
+	print("[balance] data/balance.xlsx · skill_tree.json 다시 읽음")
 	data_reloaded.emit(data.warnings)
 
 

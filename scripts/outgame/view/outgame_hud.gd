@@ -719,7 +719,7 @@ func open_facility(fid: String) -> void:
 
 # ---------------------------------------------------------------- 스킬 창 (캐릭터마다 액티브 · 패시브 · 신앙)
 const SKILL_MODES := [["active", "액티브 스킬"], ["passive", "패시브 스킬"], ["faith", "신앙 스킬"]]
-const SKILL_MODE_HINT := {"active": "전투에서 쓰는 스킬을 강화 · 갈래 끝(3단계)에서 새 스킬", "passive": "늘 적용되는 능력치 (체력·속도·AP·방어·위력)",
+const SKILL_MODE_HINT := {"active": "전투에서 쓰는 스킬을 강화 · 갈래 끝에서 새 스킬", "passive": "늘 적용되는 능력치 (체력·속도·AP·방어·위력)",
 	"faith": "믿는 신에 따라 배울 수 있는 스킬이 다름"}
 
 

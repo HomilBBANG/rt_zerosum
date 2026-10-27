@@ -53,10 +53,10 @@ SKILLS = [
     ["ultimate", "필살기", "ultimate", 4, "enemy_any", "damage", 18, "열 무관 강력한 일격"],
     ["move", "위치 변경", "move", 1, "slot", "move", 0, "빈 슬롯 이동 / 점유 슬롯 아군과 교환"],
     ["weapon", "무기 변경", "weapon", 1, "none", "weapon_swap", 0, "보조 무기로 교체 (사거리 변경)"],
-    ["brutal_strike", "강타", "heavy", 3, "weapon", "damage", 16, "액티브 트리: 현재 무기로 아주 강하게 공격"],
-    ["flank", "측면 기습", "attack", 2, "enemy_any", "damage", 9, "액티브 트리: 열 무관 적 1명 공격"],
-    ["second_wind", "재정비", "support", 1, "ally_any", "heal", 8, "액티브 트리: 아군 1명(자신 포함) HP 회복"],
-    ["inspire", "고무", "support", 1, "ally_other", "ap_grant", 1, "액티브 트리: 다른 아군 1명 AP +1"],
+    ["brutal_strike", "강타", "heavy", 3, "weapon", "damage", 16, "스킬 트리(액티브): 현재 무기로 아주 강하게 공격"],
+    ["flank", "측면 기습", "attack", 2, "enemy_any", "damage", 9, "스킬 트리(액티브): 열 무관 적 1명 공격"],
+    ["second_wind", "재정비", "support", 1, "ally_any", "heal", 8, "스킬 트리(액티브): 아군 1명(자신 포함) HP 회복"],
+    ["inspire", "고무", "support", 1, "ally_other", "ap_grant", 1, "스킬 트리(액티브): 다른 아군 1명 AP +1"],
 ]
 # 신앙 [임시 데이터 — 나중에 사용자 표로 교체]: 신 종류마다 배울 수 있는 신앙 스킬이 다름
 GOD_COLS = ["id", "이름", "상징색", "설명"]
@@ -85,61 +85,6 @@ FAITH_SKILLS = [
     ["terra", "terra_3", "바위 피부", 60, "defense", 1, "방어 +1"],
     ["terra", "terra_4", "어머니의 품", 80, "hp", 14, "최대 HP +14"],
 ]
-# 스킬 트리: 캐릭터마다 액티브 · 패시브 두 개의 십자형 트리 (중앙 + 동서남북 1~3단계). 방향 = 빌드 성향 (북 화력 / 동 기동 / 남 생존 / 서 전술)
-# 액티브 = 전투에서 쓰는 스킬을 새로 얻거나 강화, 패시브 = 늘 적용되는 능력치. 스킬 포인트는 두 트리가 같이 씀 [임시 데이터]
-TREE_COLS = ["캐릭터", "종류", "방향", "단계", "id", "이름", "필요레벨", "효과", "값", "설명"]
-# (방향, 단계, id 꼬리, 이름, 효과, 값, 설명) — 새 스킬은 액티브 갈래 끝(3단계)에서만 → 트리마다 갈래 끝 하나라 새 스킬은 최대 하나
-ACTIVE_STD = [
-    ("중앙", 0, "core", "기본기", "skill_power:basic_attack", 1, "처음부터 습득 (기본 공격 위력 +1)"),
-    ("북", 1, "n1", "강공 단련", "skill_power:heavy_attack", 2, "강공격 위력 +2"),
-    ("북", 2, "n2", "강공 숙달", "skill_power:heavy_attack", 3, "강공격 위력 +3"),
-    ("북", 3, "n3", "강타", "skill:brutal_strike", 1, "새 스킬: 강타 (AP 3, 위력 16)"),
-    ("동", 1, "e1", "속사", "skill_power:basic_attack", 2, "기본 공격 위력 +2"),
-    ("동", 2, "e2", "연사", "skill_power:basic_attack", 2, "기본 공격 위력 +2"),
-    ("동", 3, "e3", "측면 기습", "skill:flank", 1, "새 스킬: 측면 기습 (AP 2, 열 무관)"),
-    ("남", 1, "s1", "견제 사격", "skill_power:basic_attack", 1, "기본 공격 위력 +1"),
-    ("남", 2, "s2", "반격 자세", "skill_power:heavy_attack", 2, "강공격 위력 +2"),
-    ("남", 3, "s3", "재정비", "skill:second_wind", 1, "새 스킬: 재정비 (AP 1, 회복 8)"),
-    ("서", 1, "w1", "필살 연마", "skill_power:ultimate", 3, "필살기 위력 +3"),
-    ("서", 2, "w2", "필살 숙달", "skill_power:ultimate", 4, "필살기 위력 +4"),
-    ("서", 3, "w3", "고무", "skill:inspire", 1, "새 스킬: 고무 (AP 1, 아군 AP +1)"),
-]
-# 의무병은 기본 스킬 칸(3칸)이 이미 차서 새 스킬 대신 강화만
-ACTIVE_MEDIC = [
-    ("중앙", 0, "core", "응급 처치 숙련", "skill_power:heal", 2, "처음부터 습득 (응급 처치 회복 +2)"),
-    ("북", 1, "n1", "사격 연습", "skill_power:basic_attack", 2, "기본 공격 위력 +2"),
-    ("북", 2, "n2", "조준 사격", "skill_power:basic_attack", 2, "기본 공격 위력 +2"),
-    ("북", 3, "n3", "정밀 사격", "skill_power:basic_attack", 4, "기본 공격 위력 +4"),
-    ("동", 1, "e1", "독려 숙련", "skill_power:rally", 1, "독려 AP 지급 +1"),
-    ("동", 2, "e2", "격려", "skill_power:rally", 1, "독려 AP 지급 +1"),
-    ("동", 3, "e3", "독려 달인", "skill_power:rally", 1, "독려 AP 지급 +1"),
-    ("남", 1, "s1", "지혈", "skill_power:heal", 3, "응급 처치 회복 +3"),
-    ("남", 2, "s2", "봉합", "skill_power:heal", 4, "응급 처치 회복 +4"),
-    ("남", 3, "s3", "외과 처치", "skill_power:heal", 6, "응급 처치 회복 +6"),
-    ("서", 1, "w1", "필살 연마", "skill_power:ultimate", 3, "필살기 위력 +3"),
-    ("서", 2, "w2", "필살 숙달", "skill_power:ultimate", 4, "필살기 위력 +4"),
-    ("서", 3, "w3", "결정타", "skill_power:ultimate", 6, "필살기 위력 +6"),
-]
-PASSIVE_STD = [
-    ("중앙", 0, "core", "기초 훈련", "hp", 4, "처음부터 습득 (최대 HP +4)"),
-    ("북", 1, "n1", "무기 숙련", "power", 1, "모든 공격 위력 +1"),
-    ("북", 2, "n2", "전투 감각", "power", 1, "모든 공격 위력 +1"),
-    ("북", 3, "n3", "전투의 달인", "power", 2, "모든 공격 위력 +2"),
-    ("동", 1, "e1", "빠른 발", "speed", 1, "속도 +1 (행동 순서가 빨라짐)"),
-    ("동", 2, "e2", "전술 호흡", "ap_rec", 1, "턴마다 AP 회복 +1"),
-    ("동", 3, "e3", "기민함", "speed", 2, "속도 +2"),
-    ("남", 1, "s1", "단련된 몸", "hp", 6, "최대 HP +6"),
-    ("남", 2, "s2", "방탄 조끼", "defense", 1, "받는 피해 -1 (방어 +1)"),
-    ("남", 3, "s3", "강인함", "hp", 12, "최대 HP +12"),
-    ("서", 1, "w1", "여유 체력", "ap", 1, "최대 AP +1"),
-    ("서", 2, "w2", "응급 교육", "heal", 2, "모든 회복량 +2"),
-    ("서", 3, "w3", "전술 숙달", "ap", 1, "최대 AP +1"),
-]
-TREE = []
-for _cid, _short, _lv in [("a_dan", "dan", 5), ("a_kira", "kira", 5), ("a_ethan", "ethan", 5), ("a_hana", "hana", 5), ("a_alma", "alma", 4), ("a_nikita", "nikita", 6)]:
-    for _kind, _tag, _rows in [("액티브", "a", ACTIVE_MEDIC if _cid == "a_alma" else ACTIVE_STD), ("패시브", "p", PASSIVE_STD)]:
-        for _d, _t, _id, _nm, _ef, _v, _desc in _rows:
-            TREE.append([_cid, _kind, _d, _t, "%s_%s_%s" % (_short, _tag, _id), _nm, _lv + {0: 0, 1: 0, 2: 2, 3: 4}[_t], _ef, _v, _desc])
 STAGE_COLS = ["id", "이름", "조명", "선공", "적HP배율", "적공격배율", "시드", "설명"]
 STAGES = [
     ["stage_01", "첫 조우", "g1", "동전", 1.0, 1.0, 12345, "구울(전방·중앙) + 늑대(후방). 배치는 스테이지 에디터"],
@@ -147,13 +92,9 @@ STAGES = [
 README = [
     ["시트", "열", "설명"],
     ["신", "id / 이름 / 상징색", "믿는 신 종류 [임시 데이터 — 나중에 교체]. 캐릭터 시트 '신' 열에 id"],
-    ["신앙스킬", "신 / 필요신앙", "그 신을 믿는 캐릭터만 배울 수 있는 스킬. 신앙도가 필요신앙 이상이면 배울 수 있음(포인트 안 씀). 효과·값은 스킬트리와 같은 형식"],
+    ["신앙스킬", "신 / 필요신앙", "그 신을 믿는 캐릭터만 배울 수 있는 스킬. 신앙도가 필요신앙 이상이면 배울 수 있음(포인트 안 씀). 효과·값은 스킬 트리 노드와 같은 형식 (hp·speed·ap·ap_rec·defense·power·heal, skill_power:<스킬 id>, skill:<스킬 id>)"],
+    ["스킬트리", "", "스킬 트리 노드는 엑셀이 아니라 data/skill_tree.json — Godot 에디터 '스킬 트리' 탭에서 짬 (캐릭터별 액티브·패시브 십자형 트리)"],
     ["캐릭터", "신 / 신앙", "믿는 신(신 시트 id, 비우면 무신앙)과 시작 신앙도 0~100. 출전할 때마다 신앙도 + (기지 설정 faith_battle)"],
-    ["스킬트리", "종류", "액티브(전투 스킬을 새로 얻거나 강화) / 패시브(늘 적용되는 능력치). 캐릭터마다 종류별로 십자형 트리 하나씩, 스킬 포인트는 같이 씀. 신앙 스킬은 신앙스킬 시트"],
-    ["스킬트리", "캐릭터 / 방향 / 단계", "십자형 트리: 중앙(0단계, 처음부터 습득) + 동서남북 갈래 1~3단계. 갈래 안에서는 앞 단계를 배워야 다음 단계"],
-    ["스킬트리", "필요레벨", "이 레벨이 되어야 배울 수 있음 (안 되면 스킬 창에 회색 + '경험 부족'). 스킬 포인트 = 레벨 오를 때마다 1 + 처음 1"],
-    ["스킬트리", "효과 / 값", "hp·speed·ap·ap_rec·defense·power(모든 공격 위력)·heal(회복량) +값, skill_power:<스킬 id> = 그 스킬 위력 +값, skill:<스킬 id> = 새 스킬 (기본 스킬 칸 3개까지)"],
-    ["스킬트리", "갈래 끝", "3단계(갈래 끝)는 트리(액티브·패시브)마다 하나만 — 어느 방향으로 뻗을지가 빌드 [임시]"],
     ["공통", "id", "다른 시트·파일에서 참조하는 고유 이름 (영문 권장, 바꾸면 참조도 같이 바꿀 것)"],
     ["캐릭터", "사거리", "근접 / 원거리 — 행동 순서 동률 정렬용 병과 기본 사거리"],
     ["캐릭터", "스킬 / 무기", "쉼표로 구분한 스킬 id / 아이템 id. 무기 첫 번째 = 주무기, 두세 번째 = 보조무기"],
@@ -177,7 +118,7 @@ wb = Workbook()
 first = True
 for name, cols, rows, widths in [
     ("캐릭터", CHAR_COLS, CHARS, None), ("몬스터", MON_COLS, MONS, None), ("아이템", ITEM_COLS, ITEMS, None),
-    ("스킬", SKILL_COLS, SKILLS, None), ("스킬트리", TREE_COLS, TREE, None), ("신", GOD_COLS, GODS, None), ("신앙스킬", FS_COLS, FAITH_SKILLS, None), ("스테이지", STAGE_COLS, STAGES, None), ("읽어보기", README[0], README[1:], [12, 22, 90])]:
+    ("스킬", SKILL_COLS, SKILLS, None), ("신", GOD_COLS, GODS, None), ("신앙스킬", FS_COLS, FAITH_SKILLS, None), ("스테이지", STAGE_COLS, STAGES, None), ("읽어보기", README[0], README[1:], [12, 22, 90])]:
     ws = wb.active if first else wb.create_sheet()
     first = False
     ws.title = name

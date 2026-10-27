@@ -2,7 +2,7 @@
 class_name GameData
 extends RefCounted
 ## 밸런스 데이터 (data/balance.xlsx) → UnitData / ActionData / 아이템 / 스테이지.
-## 시트: 캐릭터(아군) · 몬스터 · 아이템 · 스킬 · 스킬트리 · 신 · 신앙스킬 · 스테이지. 열 이름은 1행 머리글로 찾는다(열 순서 자유).
+## 시트: 캐릭터(아군) · 몬스터 · 아이템 · 스킬 · 신 · 신앙스킬 · 스테이지. 스킬 트리 노드는 data/skill_tree.json (SkillTreeData, 에디터 '스킬 트리' 탭). 열 이름은 1행 머리글로 찾는다(열 순서 자유).
 ## 게임 실행 중 파일이 바뀌면 apply_from() 으로 기존 객체를 제자리 갱신 → 진행 중인 전투에도 즉시 반영.
 
 const BALANCE_PATH := "res://data/balance.xlsx"
@@ -17,11 +17,8 @@ var items: Dictionary = {}          # id → {id, name, kind, range_type, power_
 var actions: Dictionary = {}        # id → ActionData
 var stages: Dictionary = {}         # id → {id, name, preset, ambush, hp_mult, dmg_mult, seed, desc}
 var stage_order: Array[String] = []
-## 스킬 트리: 캐릭터 id → [{id, char, dir(center|n|e|s|w), tier 0~3, name, level, effect, value, desc}] (십자형 — 중앙 + 동서남북 갈래)
+## 스킬 트리: 캐릭터 id → [{id, char, kind(active|passive), dir(center|n|e|s|w), tier, name, level, effect, value, desc}] (data/skill_tree.json)
 var skill_tree: Dictionary = {}
-const TREE_DIRS := {"중앙": "center", "북": "n", "동": "e", "남": "s", "서": "w"}
-## 스킬트리 '종류' 열 → active(전투 스킬 얻기·강화) / passive(능력치). 비우면 효과로 정함 (skill: · skill_power: = 액티브)
-const TREE_KINDS := {"액티브": "active", "패시브": "passive", "active": "active", "passive": "passive"}
 ## 신앙 [임시 데이터]: 신 id → {id, name, color, desc} / 신 id → [{id, god, name, need(필요 신앙도), effect, value, desc}] / 캐릭터 id → {god, faith(시작 신앙도)}
 var gods: Dictionary = {}
 var god_order: Array[String] = []
@@ -116,21 +113,6 @@ func _parse(sheets: Dictionary) -> void:
 			"effect": str(d.get("효과", "")).strip_edges(), "value": _i(d, "값"), "desc": d.get("설명", "")})
 	for g in faith_skills:
 		(faith_skills[g] as Array).sort_custom(func(a, b): return int(a.need) < int(b.need))
-	for d in _table(sheets.get("스킬트리", [])):
-		var cid := str(d.get("캐릭터", ""))
-		var dir: String = TREE_DIRS.get(str(d.get("방향", "")).strip_edges(), "")
-		if cid == "" or dir == "":
-			warnings.append("스킬트리 %s: 캐릭터·방향(중앙/북/동/남/서) 확인" % d.id)
-			continue
-		var ef0 := str(d.get("효과", "")).strip_edges()
-		var kind: String = TREE_KINDS.get(str(d.get("종류", "")).strip_edges(), "")
-		if kind == "":
-			kind = "active" if ef0.begins_with("skill") else "passive"
-		if not skill_tree.has(cid):
-			skill_tree[cid] = []
-		skill_tree[cid].append({"id": d.id, "char": cid, "kind": kind, "dir": dir, "tier": 0 if dir == "center" else clampi(_i(d, "단계", 1), 1, 9),
-			"name": d.get("이름", d.id), "level": _i(d, "필요레벨", 1), "effect": str(d.get("효과", "")).strip_edges(),
-			"value": _i(d, "값"), "desc": d.get("설명", "")})
 	for d in _table(sheets.get("몬스터", [])):
 		monsters[d.id] = _unit(d, "enemy")
 	for d in _table(sheets.get("스테이지", [])):
@@ -153,17 +135,13 @@ func _parse(sheets: Dictionary) -> void:
 			var ef: String = n.effect
 			if (ef.begins_with("skill:") or ef.begins_with("skill_power:")) and not actions.has(ef.split(":")[1]):
 				warnings.append("신앙스킬 %s: 스킬 시트에 없는 '%s'" % [n.id, ef.split(":")[1]])
-	for cid in skill_tree:
-		if _find(allies, cid) == null:
-			warnings.append("스킬트리: 캐릭터 시트에 없는 '%s'" % cid)
-		for n in skill_tree[cid]:
-			var ef: String = n.effect
-			if ef.begins_with("skill:") or ef.begins_with("skill_power:"):
-				var sid := ef.split(":")[1]
-				if not actions.has(sid):
-					warnings.append("스킬트리 %s: 스킬 시트에 없는 '%s'" % [n.id, sid])
-			elif not ef in ["hp", "speed", "ap", "ap_rec", "defense", "power", "heal"]:
-				warnings.append("스킬트리 %s: 모르는 효과 '%s'" % [n.id, ef])
+	# 스킬 트리 (JSON) 검사: 게임에서 틀어지는 오류만 경고
+	var tree_nodes := SkillTreeData.read()
+	skill_tree = SkillTreeData.by_char(tree_nodes)
+	var allies_arr: Array = []
+	allies_arr.assign(allies)
+	for e in SkillTreeData.check(tree_nodes, allies_arr, actions).errors:
+		warnings.append("스킬 트리: " + e)
 
 
 func _unit(d: Dictionary, team: String) -> UnitData:

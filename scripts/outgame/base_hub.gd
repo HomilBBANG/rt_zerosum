@@ -521,10 +521,14 @@ func _cli_ui(spec: String) -> void:
 			if not sim.chats.is_empty():
 				hud.open_overhear(sim.chats[0].key)
 		"facility": hud.open_facility(p[1])
-		"skills":   # skills[:캐릭터 id[:경험치[:배울 노드,노드…[:고를 노드[:active|passive|faith]]]]] — 스킬 창 (경험치 주고 배우기)
+		"skills":   # skills[:캐릭터 id[:경험치 또는 L레벨[:배울 노드,노드…[:고를 노드[:active|passive|faith]]]]] — 스킬 창 (경험치 주고 배우기)
 			var cid := p[1] if p.size() > 1 else ""
 			if p.size() > 2 and cid != "":
-				sim.add_xp(cid, int(p[2]))
+				if p[2].begins_with("L"):   # L9 = 레벨 9 까지
+					while sim.char_level(cid) < mini(int(p[2].substr(1)), sim.level_max()):
+						sim.add_xp(cid, maxi(1, sim.xp_need(cid) - sim.char_xp(cid)))
+				else:
+					sim.add_xp(cid, int(p[2]))
 			if p.size() > 3 and cid != "":
 				for nid in p[3].split(",", false):
 					sim.learn_skill(cid, nid)

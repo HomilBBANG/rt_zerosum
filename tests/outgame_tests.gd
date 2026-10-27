@@ -38,6 +38,7 @@ func run(p_check: Callable) -> void:
 	_test_research()
 	_test_skill_tree()
 	_test_faith()
+	_test_skill_tree_editor()
 
 
 func _sim() -> BaseSim:
@@ -844,3 +845,58 @@ func _test_faith() -> void:
 	_c(copy.power_bonus >= 1, "신앙 스킬 효과 → 전투 복제본 (위력 +%d)" % copy.power_bonus)
 	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
 	_c(sv.faith("a_dan") == s.faith("a_dan") and sv.has_faith_skill("a_dan", lo.id), "저장/불러오기 후 신앙 유지")
+
+
+func _test_skill_tree_editor() -> void:
+	print("[35] 스킬 트리 노드 데이터 (data/skill_tree.json) · 에디터 '스킬 트리' 탭")
+	var nodes := SkillTreeData.read()
+	_c(nodes.size() == 156, "JSON 노드 %d개 (6명 × 액티브·패시브 × 13)" % nodes.size())
+	var allies_arr: Array = []
+	allies_arr.assign(battle.allies)
+	var res := SkillTreeData.check(nodes, allies_arr, battle.actions)
+	_c(res.errors.is_empty(), "기본 데이터 검사 오류 없음 %s" % [res.errors])
+	# 저장 → 다시 읽기 같음
+	var tmp := "user://skill_tree_test.json"
+	_c(SkillTreeData.write(nodes, tmp) == OK and JSON.stringify(SkillTreeData.read(tmp)) == JSON.stringify(SkillTreeData.sorted(nodes)), "저장 → 다시 읽기 그대로")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+	# 검사가 잡는 것
+	var bad: Array = JSON.parse_string(JSON.stringify(nodes))
+	bad[1].effect = "skill_power:nope"
+	bad[14].id = bad[15].id
+	var gap := SkillTreeData.new_node("a_dan", "active", "n", 4)
+	gap.id = "gap_test"
+	var ok_gap: Array = bad.filter(func(n): return not (n.char == "a_dan" and n.kind == "active" and n.dir == "n" and int(n.tier) == 3))
+	ok_gap.append(gap)
+	var r2 := SkillTreeData.check(ok_gap, allies_arr, battle.actions)
+	var txt := "\n".join(r2.errors)
+	_c("nope" in txt and "두 번" in txt and "3단계가 비었" in txt, "검사: 없는 스킬 · 겹친 id · 빈 단계를 잡음")
+	_c(SkillTreeData.auto_desc("skill_power:heavy_attack", 3, battle.actions) == "강공격 위력 +3" and SkillTreeData.auto_desc("hp", 6, battle.actions) == "최대 HP +6", "자동 설명")
+	# 갈래를 4단계로 늘린 트리도 게임 규칙대로 (갈래 끝 = 4단계)
+	var g2 := GameData.load_from()
+	var four := SkillTreeData.new_node("a_dan", "passive", "s", 4)
+	four.id = "dan_p_s4"
+	four.level = 5
+	g2.skill_tree["a_dan"].append(four)
+	var s := BaseSim.create(data, g2)
+	s.add_xp("a_dan", 100000)
+	_c(s.max_tier("a_dan", "s", "passive") == 4, "남 갈래 4단계")
+	for id in ["dan_p_s1", "dan_p_s2", "dan_p_s3"]:
+		s.learn_skill("a_dan", id)
+	_c(s.skill_state("a_dan", "dan_p_s3") == "learned" and s.skill_state("a_dan", "dan_p_s4") == "ready", "3단계는 이제 갈래 끝이 아님, 4단계 배울 수 있음")
+	s.learn_skill("a_dan", "dan_p_s4")
+	s.learn_skill("a_dan", "dan_p_e1")
+	s.learn_skill("a_dan", "dan_p_e2")
+	_c(s.skill_state("a_dan", "dan_p_e3") == "capped", "4단계 갈래 끝을 배우면 다른 갈래 끝 막힘")
+	# 에디터 패널: 노드 추가 · 삭제(뒤 단계 당김)
+	var panel: Control = load("res://addons/rtz_skill_editor/skill_editor_panel.gd").new()
+	panel._ready()   # 에디터 밖(테스트)이라 트리에 붙이지 않고 화면만 만듦
+	_c(panel.nodes.size() == 156 and panel.cid == "a_dan", "에디터 탭 열림 (노드 %d개, %s)" % [panel.nodes.size(), panel.cid])
+	panel.kind = "passive"
+	panel._add_node("s", 4)
+	var added: Dictionary = panel._node(panel.sel)
+	_c(added.dir == "s" and int(added.tier) == 4 and added.id == "dan_p_s4" and int(added.level) == int(panel._at("s", 3).level) + 2, "'+' 칸 → 남 4단계 추가 (id %s, 필요 레벨 앞 단계 +2)" % added.id)
+	panel._delete("dan_p_s2")
+	_c(panel._at("s", 2).id == "dan_p_s3" and panel._at("s", 3).id == "dan_p_s4" and panel._at("s", 4).is_empty(), "중간 단계 삭제 → 바깥 단계가 안으로 당겨짐")
+	panel._swap("dan_p_s3", 1)
+	_c(panel._at("s", 3).id == "dan_p_s3", "단계 자리 바꾸기")
+	panel.free()
