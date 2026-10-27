@@ -263,7 +263,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![시험 캐릭터 — 기지(왼쪽)와 원본](docs/screenshots/test_char_compare.png)
 
 ![키라·니키타 새 그림 — 원본과 기지 화면](docs/screenshots/kira_nikita_new.png)
-![아군 새 그림 — 단·이선·하나·앨마·니키타](docs/screenshots/roster_new.png)
+![현재 캐릭터 그림 전원 — 단·키라·이선·하나·앨마·니키타·로한](docs/screenshots/roster_latest.png)
 ![키라 최종 그림 — 원본·기지 화면·얼굴](docs/screenshots/kira_final.png)
 ![앨마 새 그림 — 원본·기지 화면·얼굴(초록 눈 원본 색)](docs/screenshots/alma_new.png)
 ![하나 최종 그림 — 원본·기지 화면·얼굴(노란 눈 원본 색, 오른쪽 눈 아래 점)](docs/screenshots/hana_new.png)
