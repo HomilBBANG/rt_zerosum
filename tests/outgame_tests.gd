@@ -35,6 +35,7 @@ func run(p_check: Callable) -> void:
 	_test_battle_rules()
 	_test_player_control()
 	_test_sortie_lines()
+	_test_research()
 
 
 func _sim() -> BaseSim:
@@ -425,11 +426,11 @@ func _test_fatigue_objects() -> void:
 	var a := float(s.cstate(kira).fatigue)
 	s.skip(120)
 	_c(float(s.cstate(kira).fatigue) < a, "침대에서 자면 피로 회복 (%.1f → %.1f)" % [a, float(s.cstate(kira).fatigue)])
-	var beds := 0
+	var beds := {}
 	for n in s.npcs.values():
 		if n.seat != "" and s.data.objects[n.seat].kind == "침대":
-			beds += 1
-	_c(beds == 6, "6명 모두 각자 침대 (같은 침대 둘 없음)")
+			beds[n.seat] = true
+	_c(beds.size() == s.npcs.size(), "%d명 모두 각자 침대 (같은 침대 둘 없음, 로한은 연구실 간이침대)" % s.npcs.size())
 	# 오브젝트 없이 자면 회복 없음 / 침대(12) vs 의자(3)
 	var t := _sim()
 	var n: NpcAgent = t.npcs.npc_nikita
@@ -700,3 +701,41 @@ func _test_sortie_lines() -> void:
 	game.campaign = false
 	_c(game.sortie_block_reason("a_ethan") == "" and not game.sortie_state("a_kira").known, "전투 테스트(기지 없음)는 모두 출정 가능, 상태 기본값")
 	game.free()
+
+
+func _test_research() -> void:
+	print("[32] 연구원 로한: 전투 안 함, 연구 → 무기 제작 해금")
+	var s := _sim()
+	_c(s.npcs.has("npc_rohan") and not s.is_combatant(s.npcs.npc_rohan), "로한 = 기지 대원, 전투 캐릭터 없음")
+	_c(battle.allies.all(func(u): return u.id != "npc_rohan" and u.display_name != "로한"), "로한은 전투 아군 목록에 없음")
+	_c(s.is_researcher("npc_rohan") and s.lab_facility() == "b1_lab", "연구원 = 로한, 연구실 기본 개방")
+	_c(not s.issue_train("npc_rohan").ok, "로한은 훈련하지 않음")
+	_c(not s.recipe_unlocked("r_shotgun") and s.recipe_unlocked("r_knife"), "연구 레시피는 잠김, 기존 레시피는 열림")
+	_c(not s.start_craft("r_shotgun").ok, "연구 전에는 산탄총 제작 불가")
+	_c(s.research_state("res_mg") == "locked" and not s.start_research("res_mg").ok, "선행 연구(기관단총) 전에는 경기관총 연구 불가")
+	var cash := s.ledger.cash
+	var r := s.start_research("res_shotgun")
+	_c(r.ok and s.ledger.cash == cash - 60 and s.research_state("res_shotgun") == "active", "산탄총 연구 시작 → -$60 (%s)" % r.msg)
+	_c(not s.start_research("res_smg").ok, "연구는 한 번에 하나")
+	var done := []
+	s.research_completed.connect(func(q): done.append(q))
+	# 로한이 연구실에서 일할 때만 진행 (점심 이동·잠은 멈춤)
+	s.skip(3 * 60)
+	var left := int(s.research.get("remaining", 0))
+	_c(left > 0 and left < 180, "3시간 지나도 점심 이동 동안은 멈춰서 아직 남음 (%d분)" % left)
+	s.skip(24 * 60)
+	_c(done == ["res_shotgun"] and s.researched.has("res_shotgun") and s.research.is_empty(), "연구 완료 신호·기록")
+	_c(s.recipe_unlocked("r_shotgun") and s.start_craft("r_shotgun").ok, "완료 후 무기고에서 산탄총 제작 가능")
+	s.skip(5 * 60)
+	_c(s.inventory.any(func(it): return it.item == "shotgun"), "산탄총 제작 완료 → 무기고 보관")
+	_c(s.research_state("res_launcher") == "ready", "산탄총 연구 후 유탄발사기 연구 가능")
+	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
+	_c(sv.researched.has("res_shotgun") and sv.recipe_unlocked("r_shotgun"), "저장/불러오기 후 연구 기록 유지")
+	var s2 := _sim()
+	s2.ledger.cash = 0
+	_c(not s2.start_research("res_shotgun").ok, "달러가 모자라면 연구 못 함")
+	var s3 := _sim()
+	s3.start_research("res_shotgun")
+	s3.npcs.npc_rohan.state = NpcAgent.UNAVAILABLE
+	_c(s3.research_pause_reason() != "", "로한이 자리를 비우면 연구 멈춤 (%s)" % s3.research_pause_reason())
+	_c(battle.items.has("shotgun") and battle.items.has("launcher"), "새 무기는 밸런스 엑셀 아이템 시트에 있음")

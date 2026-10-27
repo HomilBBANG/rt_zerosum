@@ -32,6 +32,8 @@ var requests: Dictionary = {}       # id → {id, npc, start_day, dialogue, acce
 var request_order: Array[String] = []
 var recipes: Dictionary = {}        # id → {id, name, item, minutes, desc}
 var recipe_order: Array[String] = []
+var research: Dictionary = {}       # id → {id, name, unlocks [제작 id…], cost, minutes, prereq, desc} — 연구 시트 (로한)
+var research_order: Array[String] = []
 var objects: Dictionary = {}        # id → {id, facility, kind, x(방 폭 비율), height(m), fatigue_rate, hp_rate, desc}
 var object_order: Array[String] = []
 var px_items: Dictionary = {}       # id → {id, name, price, base, values: {npc id: 친밀도 상승량}, desc}
@@ -126,9 +128,27 @@ func _parse(sheets: Dictionary) -> void:
 		recipes[r.id] = {"id": r.id, "name": r.get("이름", r.id), "item": r.get("결과무기", ""),
 			"minutes": maxi(1, GameData._i(r, "소요(분)", 60)), "desc": r.get("설명", "")}
 		recipe_order.append(r.id)
+	for r in GameData._table(sheets.get("연구", [])):
+		var un: Array[String] = []
+		for x in str(r.get("해금제작", "")).split(",", false):
+			if x.strip_edges() != "":
+				un.append(x.strip_edges())
+		research[r.id] = {"id": r.id, "name": r.get("이름", r.id), "unlocks": un, "cost": GameData._i(r, "비용"),
+			"minutes": maxi(1, GameData._i(r, "소요(분)", 60)), "prereq": str(r.get("선행연구", "")).strip_edges(), "desc": r.get("설명", "")}
+		research_order.append(r.id)
 
 
 func _validate() -> void:
+	for id in research_order:
+		var q: Dictionary = research[id]
+		for rid in q.unlocks:
+			if not recipes.has(rid):
+				warnings.append("연구 %s: 제작 시트에 없는 '%s'" % [id, rid])
+		if q.prereq != "" and not research.has(q.prereq):
+			warnings.append("연구 %s: 연구 시트에 없는 선행연구 '%s'" % [id, q.prereq])
+	var rn := text("researcher_npc", "")
+	if rn != "" and not npcs.has(rn):
+		warnings.append("설정 researcher_npc: 대원 시트에 없는 '%s'" % rn)
 	for id in facility_order:
 		if floor_order(facilities[id].floor) < 0:
 			warnings.append("시설 %s: 층 시트에 없는 층 '%s'" % [id, facilities[id].floor])

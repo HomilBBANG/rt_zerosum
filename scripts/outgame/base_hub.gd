@@ -100,6 +100,7 @@ func _ready() -> void:
 	sim.notice.connect(_on_notice)
 	sim.statement_ready.connect(func(st): hud.enqueue(func(): hud.open_statement(st)))
 	sim.inspection_completed.connect(func(rec): hud.enqueue(func(): hud.open_inspection(rec)))
+	sim.research_completed.connect(func(qid): hud.show_toast("연구 완료: %s — 무기고에서 제작 가능" % sim.data.research.get(qid, {}).get("name", qid), OutgameHud.GOOD))
 	sim.day_changed.connect(func(_d): Game.save_campaign())
 	sim.room_unlocked.connect(func(fid): v3d.rebuild_room(fid); _rerender())
 	Game.outgame_reloaded.connect(_on_reloaded)
@@ -386,6 +387,9 @@ func _left_click(p: Vector2, dbl: bool = false) -> void:
 		hud.open_overhear(key)
 		return
 	var n := _npc_at(p)
+	if n != "" and sim.is_researcher(n) and not dbl:   # 연구원(로한) 클릭 = 무기 연구 창
+		hud.open_research()
+		return
 	if n != "" and not (dbl and selected != "" and n != selected):
 		if n == selected and not dbl:
 			hud.open_dialogue(n)
@@ -516,6 +520,13 @@ func _cli_ui(spec: String) -> void:
 			if not sim.chats.is_empty():
 				hud.open_overhear(sim.chats[0].key)
 		"facility": hud.open_facility(p[1])
+		"research":   # research[:연구 id[:건너뛸 분]] — 연구 창 (연구 시작 + 시간 건너뛰기)
+			if p.size() > 1:
+				sim.ledger.cash = maxi(sim.ledger.cash, 500)
+				sim.start_research(p[1])
+				if p.size() > 2:
+					sim.skip(int(p[2]))
+			hud.open_research()
 		"character": hud.open_character(p[1])
 		"contracts": hud.open_contracts("")
 		"statement":

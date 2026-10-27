@@ -257,6 +257,8 @@ func _fill_selection() -> void:
 	var card := _status_card(_sel_id)
 	sel_body.add_child(card)
 	var tip := "방 클릭: 걸어서 · 더블클릭: 뛰어서\n도착하면 우클릭: 그 방에서 할 행동 · 대원 다시 클릭: 대화"
+	if sim.is_researcher(_sel_id):
+		tip = "방 클릭: 걸어서 · 더블클릭: 뛰어서\n%s 클릭: 무기 연구 · 우클릭: 대화·행동" % n.name
 	if n.state == NpcAgent.MOVING:
 		tip = "가는 중 — 더블클릭하면 뛰어감\n도착하면 우클릭으로 행동 지시"
 	sel_body.add_child(_label(tip, 12, Color(0.75, 0.8, 0.9)))
@@ -328,8 +330,9 @@ func _status_card(npc_id: String) -> VBoxContainer:
 	var n: NpcAgent = sim.npcs[npc_id]
 	var cs := sim.cstate(n)
 	var v := _vbox(3)
-	var mx := sim.char_max_hp(n.character_id)
-	v.add_child(_gauge("체력", float(cs.hp), mx, HP_COL, "%d / %d" % [floori(float(cs.hp)), mx]))
+	var mx := sim.char_max_hp(sim.ckey(n))
+	if sim.is_combatant(n):   # 전투에 나가지 않는 대원(로한)은 체력 게이지 없음
+		v.add_child(_gauge("체력", float(cs.hp), mx, HP_COL, "%d / %d" % [floori(float(cs.hp)), mx]))
 	var fat := float(cs.fatigue)
 	v.add_child(_gauge("피로도", fat, 100.0, FATIGUE_COL, "%d%s" % [roundi(fat), "  (지침)" if fat >= 80 else ""]))
 	var nxt := sim.next_affinity_need(npc_id)
@@ -696,15 +699,80 @@ func open_facility(fid: String) -> void:
 			var n: NpcAgent = sim.npcs[id]
 			var cs := sim.cstate(n)
 			var sts := (cs.statuses as Array).map(func(x): return StatusCatalog.get_def(str(x)).name)
-			body.add_child(_label("%s — 체력 %d/%d%s%s" % [n.name, floori(float(cs.hp)), sim.char_max_hp(n.character_id), "  상태: " + ", ".join(sts) if not sts.is_empty() else "",
+			body.add_child(_label("%s — 체력 %d/%d%s%s" % [n.name, floori(float(cs.hp)), sim.char_max_hp(sim.ckey(n)), "  상태: " + ", ".join(sts) if not sts.is_empty() else "",
 				"  (%s)" % n.state_name() if n.state in [NpcAgent.TREATMENT, NpcAgent.RECOVERING] else ""], 14,
-				BAD if not sts.is_empty() else (GOLD if float(cs.hp) < sim.char_max_hp(n.character_id) else GOOD)))
+				BAD if not sts.is_empty() else (GOLD if float(cs.hp) < sim.char_max_hp(sim.ckey(n)) else GOOD)))
 	elif f.tag == "행정":
 		var b := _button("의뢰 게시판 열기", Color(0.45, 0.7, 0.9), 15)
 		b.pressed.connect(func(): open_contracts(""))
 		body.add_child(b)
+	elif f.tag == "연구":
+		_research_section(body, win)
 	elif f.tag == "훈련":
 		body.add_child(_label("훈련: 대원 우클릭 → 훈련 (%d분, 끝나면 훈련 단계 +1 → 전투 최대 HP +%d)" % [sim.data.inum("train_minutes", 120), sim.data.inum("train_hp_bonus", 5)], 14, Color(0.85, 0.9, 1)))
+
+
+# ---------------------------------------------------------------- 연구실 (로한): 연구 → 무기고 제작 해금
+func open_research() -> void:
+	var rid := sim.researcher_id()
+	var who := sim.data.npc_name(rid) if rid != "" else "연구원"
+	var win := _window("%s의 무기 연구" % who, 760)
+	_research_section(win.body, win, true)
+
+
+func _research_section(body: VBoxContainer, win: Dictionary, with_talk: bool = false) -> void:
+	var rid := sim.researcher_id()
+	if with_talk and rid != "":
+		var row := _hbox(12)
+		body.add_child(row)
+		row.add_child(_portrait_rect(_sprite_of(rid), 84))
+		var col := _vbox(4)
+		col.size_flags_horizontal = SIZE_EXPAND_FILL
+		row.add_child(col)
+		var line := "새 무기 설계요? 맡겨만 주세요." if sim.research.is_empty() else "지금 연구 중이에요. 조금만 기다려요."
+		col.add_child(_label(sim.data.npc_name(rid), 17, GOLD))
+		col.add_child(_label(line, 16))
+		var talk := _button("대화", Color(0.45, 0.7, 0.9), 13, 70)
+		talk.size_flags_vertical = SIZE_SHRINK_BEGIN
+		talk.pressed.connect(func():
+			close_top()
+			open_dialogue(rid))
+		row.add_child(talk)
+	body.add_child(_label("연구를 끝내면 그 무기를 무기고에서 제작할 수 있습니다 · 한 번에 하나 · 비용은 시작할 때\n%s 이(가) 연구실에서 깨어 있을 때만 진행 (밥 먹으러 가거나 자면 멈춤)" % (sim.data.npc_name(rid) if rid != "" else "연구원"), 13, Color(0.75, 0.8, 0.9)))
+	if not sim.research.is_empty():
+		var q: Dictionary = sim.data.research.get(str(sim.research.id), {})
+		var done := int(sim.research.total) - int(sim.research.remaining)
+		var why := sim.research_pause_reason()
+		body.add_child(_gauge("진행", float(done), maxf(1.0, float(sim.research.total)), Color(0.45, 0.85, 1.0),
+			"%s — 남은 %d분%s" % [q.get("name", ""), int(sim.research.remaining), "  (멈춤: %s)" % why if why != "" else ""]))
+	var list := _scroll(body, 280)
+	for qid in sim.data.research_order:
+		var q: Dictionary = sim.data.research[qid]
+		var st := sim.research_state(qid)
+		var row := _hbox(10)
+		list.add_child(row)
+		var items := PackedStringArray()
+		for rcp in q.unlocks:
+			items.append(sim.item_name(str(sim.data.recipes.get(rcp, {}).get("item", rcp))))
+		var col := _vbox(2)
+		col.size_flags_horizontal = SIZE_EXPAND_FILL
+		row.add_child(col)
+		var head := "%s  →  %s" % [q.name, ", ".join(items)]
+		col.add_child(_label(head, 16, GOOD if st == "done" else (GOLD if st == "active" else (Color(0.55, 0.58, 0.65) if st == "locked" else Color(1, 1, 1)))))
+		var sub := "$%d · %d분" % [int(q.cost), int(q.minutes)]
+		if q.prereq != "":
+			sub += " · 선행: %s" % sim.data.research.get(q.prereq, {}).get("name", q.prereq)
+		if str(q.desc) != "":
+			sub += " · %s" % q.desc
+		col.add_child(_label(sub, 13, Color(0.7, 0.75, 0.85)))
+		var b := _button({"done": "완료 ✓", "active": "연구 중", "locked": "잠김", "ready": "연구 시작"}[st], Color(0.45, 0.85, 1.0), 14, 100)
+		b.disabled = st != "ready" or not sim.research.is_empty() or sim.ledger.cash < int(q.cost)
+		b.pressed.connect(func():
+			var res := sim.start_research(qid)
+			show_toast(res.msg, GOOD if res.ok else BAD)
+			close_top()
+			open_research())
+		row.add_child(b)
 
 
 ## 무기고: 대원별 장착 (주무기/보조1/보조2)
@@ -712,6 +780,8 @@ func _armory_section(body: VBoxContainer) -> void:
 	body.add_child(_label("장착 (전투에 반영)", 16, Color(1, 0.95, 0.75)))
 	for id in sim.data.npc_order:
 		var n: NpcAgent = sim.npcs[id]
+		if not sim.is_combatant(n):
+			continue   # 연구원 등 전투에 나가지 않는 대원
 		var row := _hbox(6)
 		body.add_child(row)
 		var nl := _label(n.name, 14)
@@ -781,9 +851,12 @@ func _workshop_section(body: VBoxContainer) -> void:
 	body.add_child(g)
 	for rid in sim.data.recipe_order:
 		var r: Dictionary = sim.data.recipes[rid]
-		g.add_child(_label("%s → %s (%d분)" % [r.name, sim.item_name(r.item), r.minutes], 14))
-		var b := _button("제작", Color(0.45, 0.7, 0.9), 13, 70)
-		b.disabled = not w.is_empty()
+		var open := sim.recipe_unlocked(rid)
+		var need: String = "" if open else str(sim.data.research.get(sim.recipe_research(rid), {}).get("name", ""))
+		g.add_child(_label("%s → %s (%d분)%s" % [r.name, sim.item_name(r.item), r.minutes, "" if open else "  — 연구 필요: " + need], 14,
+			Color(1, 1, 1) if open else Color(0.55, 0.58, 0.65)))
+		var b := _button("제작" if open else "잠김", Color(0.45, 0.7, 0.9), 13, 70)
+		b.disabled = not w.is_empty() or not open
 		b.pressed.connect(func():
 			var res := sim.start_craft(rid)
 			show_toast(res.msg, GOOD if res.ok else BAD)
@@ -824,7 +897,10 @@ func open_context(npc_id: String, at: Vector2) -> void:
 	pm.add_theme_font_size_override("font_size", 15)
 	pm.add_separator(n.name)
 	pm.add_item("대화", 0)
-	pm.add_item("정보·장비", 4)
+	if sim.is_researcher(npc_id):
+		pm.add_item("무기 연구", 7)
+	if sim.is_combatant(n):
+		pm.add_item("정보·장비", 4)
 	pm.set_item_disabled(pm.get_item_index(0), n.state == NpcAgent.UNAVAILABLE)
 	var room_ids := {}
 	if n.state == NpcAgent.MOVING:
@@ -844,15 +920,17 @@ func open_context(npc_id: String, at: Vector2) -> void:
 	pm.add_separator("어디서나")
 	pm.add_item("청소 지시 → 장소 클릭", 1)
 	pm.add_item("업무·의뢰 지시", 2)
-	pm.add_item("훈련실로 (훈련)", 3)
+	if sim.is_combatant(n):
+		pm.add_item("훈련실로 (훈련)", 3)
 	pm.add_item("의무실로 (치료·휴식)", 5)
 	if not n.command.is_empty() and n.state != NpcAgent.UNAVAILABLE:
 		pm.add_item("지시 그만두기 → 일정대로", 6)
 	for id in [1, 2]:
 		pm.set_item_disabled(pm.get_item_index(id), not n.is_free())
-	pm.set_item_disabled(pm.get_item_index(3), not n.is_free() or sim.training_facility() == "")
+	if sim.is_combatant(n):
+		pm.set_item_disabled(pm.get_item_index(3), not n.is_free() or sim.training_facility() == "")
 	var cs := sim.cstate(n)
-	pm.set_item_disabled(pm.get_item_index(5), not n.is_free() or sim.infirmary_facility() == "" or ((cs.statuses as Array).is_empty() and float(cs.hp) >= sim.char_max_hp(n.character_id)))
+	pm.set_item_disabled(pm.get_item_index(5), not n.is_free() or sim.infirmary_facility() == "" or ((cs.statuses as Array).is_empty() and float(cs.hp) >= sim.char_max_hp(sim.ckey(n))))
 	add_child(pm)
 	pm.id_pressed.connect(func(id): _on_context(id, npc_id, room_ids.get(id, "")))
 	pm.popup_hide.connect(pm.queue_free)
@@ -875,6 +953,8 @@ func _on_context(id: int, npc_id: String, room_act: String = "") -> void:
 			open_contracts(npc_id)
 		"facility":
 			open_facility(sim.npcs[npc_id].facility)
+		"research":
+			open_research()
 	if not r.is_empty():
 		show_toast(r.msg, GOOD if r.ok else BAD)
 		_sel_t = 0.0
@@ -899,6 +979,8 @@ func _on_context(id: int, npc_id: String, room_act: String = "") -> void:
 		6:
 			var r6 := sim.cancel_command(npc_id)
 			show_toast(r6.msg, GOOD if r6.ok else BAD)
+		7:
+			open_research()
 
 
 # ---------------------------------------------------------------- 의뢰 게시판 (업무 지시·외부 의뢰)

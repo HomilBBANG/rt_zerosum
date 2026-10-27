@@ -56,6 +56,7 @@ SETTINGS = [
     ["affinity_start", 20, "시작 친밀도 0~100 [임시]"],
     ["affinity_talk", 1, "하루 첫 직접 대화 시 친밀도 + [임시]"],
     ["affinity_request", 5, "요청 수락 시 그 대원 친밀도 + [임시]"],
+    ["researcher_npc", "npc_rohan", "연구원 대원 id — 클릭하면 연구 창, 이 대원이 연구실(기능=연구)에서 깨어 있을 때만 연구가 진행됨 [임시]"],
 ]
 
 FLOORS = [
@@ -81,6 +82,7 @@ FAC = [
     ["b1_workshop", "무기고", "b1", 6, 2, 0, "O", "무기고", "O", "g3", "무기 강화·제작·장착 (id 는 이전 이름 그대로)"],
     ["b1_training", "훈련실", "b1", 8, 1, 90, "X", "훈련", "O", "g2", "대원 훈련 (더미)"],
     ["b1_stair_e", "동쪽 계단", "b1", 9, 1, 0, "O", "계단", "X", "g1", ""],
+    ["b1_lab", "연구실", "b1", 0, 1, 0, "O", "연구", "O", "g4", "로한이 일하는 곳 — 로한을 클릭하면 새 무기 연구 (지하 1층 서쪽 끝)"],
     ["b2_stair_w", "서쪽 계단", "b2", 1, 1, 40, "X", "계단", "X", "g1", ""],
     ["b2_storage", "창고", "b2", 2, 3, 120, "X", "공용", "O", "g4", "잠금 방 (더미)"],
     ["b2_sealed", "봉쇄 구역", "b2", 5, 4, 200, "X", "미정", "O", "g2", "잠금 방 (더미)"],
@@ -106,6 +108,8 @@ OBJS = [
     ["obj_medbed_1", "b1_infirmary", "의무침대", 0.20, 0.6, 10, 8, "의무실 침대 (체력 회복)"],
     ["obj_medbed_2", "b1_infirmary", "의무침대", 0.50, 0.6, 10, 8, ""],
     ["obj_medbed_3", "b1_infirmary", "의무침대", 0.80, 0.6, 10, 8, ""],
+    ["obj_chair_l1", "b1_lab", "의자", 0.32, 0.5, 3, 0, "연구실 책상 의자"],
+    ["obj_cot_lab", "b1_lab", "침대", 0.78, 0.45, 10, 0, "연구실 간이침대 (로한은 여기서 잠)"],
 ]
 
 # PX 선물: 대원마다 좋아하는 게 다르고, 좋아하는 정도(친밀도 상승량)도 다르다. 빈 칸 = 기본, 기본보다 작으면 '별로'
@@ -120,7 +124,7 @@ PX = [
 ]
 
 # 친밀도 대화: 친밀도가 기준 이상이 되면 해금 → 대원을 클릭하면 아직 안 본 대화부터 (다 봤으면 해금된 것 중 가장 높은 단계)
-AFF_NPCS = [("npc_dan", "단"), ("npc_kira", "키라"), ("npc_ethan", "이선"), ("npc_hana", "하나"), ("npc_alma", "앨마"), ("npc_nikita", "니키타")]
+AFF_NPCS = [("npc_dan", "단"), ("npc_kira", "키라"), ("npc_ethan", "이선"), ("npc_hana", "하나"), ("npc_alma", "앨마"), ("npc_nikita", "니키타"), ("npc_rohan", "로한")]
 AFF_TIERS = [30, 50, 70, 90]
 AFF_TEXT = {
     "npc_dan": ["요즘 기지 분위기 나쁘지 않네요.", "예전 부대 얘기, 언젠가 해 드리죠.", "지휘관님 등은 제가 지킵니다.", "…고맙습니다. 여기가 집 같아요."],
@@ -128,6 +132,7 @@ AFF_TEXT = {
     "npc_ethan": ["무기고 정리는 제 담당이죠.", "이 책, 다 읽으면 빌려 드릴게요.", "지하 2층… 조금 더 알아봤어요.", "지휘관님이라면 믿을 수 있어요."],
     "npc_hana": ["오늘도 무사히 끝났네요.", "단 거 먹으면 기운이 나요.", "가끔은 같이 쉬어요.", "지휘관님 덕분에 버텨요."],
     "npc_alma": ["다친 데 없죠? 확인할게요.", "의무실 커튼 색, 바꿔도 될까요?", "사실 피 보는 거 아직도 무서워요.", "모두 살아서 돌아오게 할게요."],
+    "npc_rohan": ["커피는 블랙. 연구원의 기본이죠.", "이 기지 발전기, 제가 몰래 손봤어요.", "사실 전에 있던 연구소는… 말하기 싫네요.", "지휘관님 무기엔 제 이름 새겨 둘게요."],
     "npc_nikita": ["관측 기록, 이상 없음.", "커피… 고마워요. 이건 진짜예요.", "별 보는 거 좋아해요. 기지 위에서.", "제 기록에 지휘관님 이름, 꼭 남길게요."],
 }
 AFF_TALKS = [["id", "대원", "친밀도", "대사", "설명"]]
@@ -147,6 +152,7 @@ NPCS = [
     ["npc_hana", "하나", "a_hana", "hero2", 176.8, "f1_lounge", "d_talk_hana", ""],
     ["npc_alma", "앨마", "a_alma", "alma", 166, "b1_quarters", "d_talk_alma", ""],
     ["npc_nikita", "니키타", "a_nikita", "nikita_army", 168, "f1_office", "d_talk_nikita", ""],
+    ["npc_rohan", "로한", "", "rohan", 178, "b1_lab", "d_talk_rohan", "연구원 — 전투에 나가지 않음. 클릭하면 무기 연구"],
 ]
 
 JOBS = [
@@ -165,6 +171,8 @@ LINES = [
     ["d_talk_hana", 1, "npc_hana", "[테스트 대사] 부르셨어요?"],
     ["d_talk_alma", 1, "npc_alma", "[테스트 대사] 의무실 물품은 아직 충분해요."],
     ["d_talk_nikita", 1, "npc_nikita", "[테스트 대사] 관측 기록 정리하고 있어요."],
+    ["d_talk_rohan", 1, "npc_rohan", "아, 지휘관님. 마침 설계도 하나 봐 주실래요?"],
+    ["d_talk_rohan", 2, "npc_rohan", "재료랑 돈만 있으면 뭐든 만들어 보죠."],
     ["d_conv_01", 1, "npc_dan", "[일반 대화 테스트] 오늘 저녁 메뉴 들었어?"],
     ["d_conv_01", 2, "npc_kira", "[일반 대화 테스트] 아니. 또 통조림이겠지."],
     ["d_conv_02", 1, "npc_hana", "[일반 대화 테스트] 훈련 끝나고 뭐 해?"],
@@ -197,7 +205,16 @@ RECIPES = [
     ["r_pistol", "권총 제작", "pistol", 180, ""],
     ["r_rifle", "소총 제작", "rifle", 240, ""],
     ["r_axe", "전투도끼 제작", "axe", 240, ""],
+    ["r_shotgun", "산탄총 제작", "shotgun", 240, "연구: 산탄총 설계"],
+    ["r_smg", "기관단총 제작", "smg", 240, "연구: 기관단총 설계"],
+    ["r_blade", "고주파 블레이드 제작", "blade", 300, "연구: 고주파 블레이드"],
+    ["r_mg", "경기관총 제작", "mg", 360, "연구: 경기관총 (기관단총 다음)"],
+    ["r_launcher", "유탄발사기 제작", "launcher", 420, "연구: 유탄발사기 (산탄총 다음)"],
 ]
+
+# 연구 (로한): 완료하면 해금제작 레시피가 무기고에서 제작 가능
+RESEARCH = [["id", "이름", "해금제작", "비용", "소요(분)", "선행연구", "설명"], ["res_shotgun", "산탄총 설계", "r_shotgun", 60, 180, "", "가까운 적에게 강한 원거리 무기 (더미)"], ["res_smg", "기관단총 설계", "r_smg", 80, 240, "", "가벼운 연사 무기 (더미)"], ["res_blade", "고주파 블레이드", "r_blade", 100, 300, "", "근접 위력 최고 (더미)"], ["res_mg", "경기관총 설계", "r_mg", 150, 360, "res_smg", "기관단총 연구 후 (더미)"], ["res_launcher", "유탄발사기 설계", "r_launcher", 200, 480, "res_shotgun", "산탄총 연구 후 (더미)"]]
+
 
 README = [
     ["시트", "열", "설명"],
@@ -268,6 +285,25 @@ def dan_extra(out):
         res.append(b)
     return res
 
+def rohan_week():
+    # 연구원: 연구실에서 일하고 연구실 간이침대에서 잠 (주말 오후는 공용실 휴식)
+    out = []
+    for d in range(7):
+        out.append(blk(d, 0, 7, "b1_lab", "sleep"))
+        out.append(blk(d, 7, 8, "f1_mess", "eat", fb="f1_lounge"))
+        out.append(blk(d, 8, 12, "b1_lab", "work"))
+        out.append(blk(d, 12, 13, "f1_mess", "eat", fb="f1_lounge"))
+        if d >= 5:
+            out.append(blk(d, 13, 16, "f1_lounge", "rest"))
+            out.append(blk(d, 16, 19, "b1_lab", "work"))
+        else:
+            out.append(blk(d, 13, 19, "b1_lab", "work"))
+        out.append(blk(d, 19, 20, "f1_mess", "eat", fb="f1_lounge"))
+        out.append(blk(d, 20, 23, "b1_lab", "work"))
+        out.append(blk(d, 23, 24, "b1_lab", "rest"))
+    return {"npc_id": "npc_rohan", "preferred_facility_ids": ["b1_lab"], "weekly_schedule": out,
+            "delegation_rules": {"can_delegate_cleaning": False}}
+
 SCHEDULES = [
     week("npc_dan", "f1_office", "b1_workshop", ["f1_lounge", "b1_quarters"], extra=dan_extra, nap_fac="f1_lounge",
          delegate={"can_delegate_cleaning": True, "delegate_to": ["npc_hana", "npc_kira"], "chance": 1.0, "self_if_none": True}),
@@ -276,6 +312,7 @@ SCHEDULES = [
     week("npc_hana", "b1_workshop", "f1_office", ["f1_lounge"], nap_fac="f1_lounge"),
     week("npc_alma", "b1_quarters", "f1_lounge", ["b1_quarters", "f1_lounge"], weekend_fac="b1_quarters"),
     week("npc_nikita", "f1_office", "f1_office", ["f1_office"]),
+    rohan_week(),
 ]
 
 HEAD_FILL = PatternFill("solid", fgColor="2E3440")
@@ -283,7 +320,7 @@ wb = Workbook()
 first = True
 for name, table, widths in [("설정", SETTINGS, [22, 14, 70]), ("층", FLOORS, None), ("시설", FAC, None), ("대원", NPCS, None),
                              ("의뢰", JOBS, None), ("대사", LINES + AFF_LINES, [18, 6, 12, 70]), ("대화이벤트", CONVS, None),
-                             ("요청", REQS, None), ("제작", RECIPES, None), ("오브젝트", OBJS, None), ("PX", PX, None), ("친밀도대화", AFF_TALKS, None), ("읽어보기", README, [12, 22, 90])]:
+                             ("요청", REQS, None), ("제작", RECIPES, None), ("연구", RESEARCH, None), ("오브젝트", OBJS, None), ("PX", PX, None), ("친밀도대화", AFF_TALKS, None), ("읽어보기", README, [12, 22, 90])]:
     ws = wb.active if first else wb.create_sheet()
     first = False
     ws.title = name
@@ -310,7 +347,7 @@ for name, table, widths in [("설정", SETTINGS, [22, 14, 70]), ("층", FLOORS, 
     pick("조명", ["g1", "g2", "g3", "g4"])
     pick("층", [f[0] for f in FLOORS[1:]])
     pick("종류", ["작업지시", "외부의뢰"])
-    pick("기능", ["출입", "계단", "행정", "공용", "생활", "식당", "상점", "의무", "무기고", "훈련", "미정"])
+    pick("기능", ["출입", "계단", "행정", "공용", "생활", "식당", "상점", "의무", "무기고", "훈련", "연구", "미정"])
     if name == "오브젝트":
         pick("종류", ["침대", "소파", "의자", "의무침대"])
 os.makedirs(os.path.dirname(OUT), exist_ok=True)

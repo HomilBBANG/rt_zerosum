@@ -18,6 +18,7 @@ signal inspection_completed(record: Dictionary)
 signal statement_ready(statement: Dictionary)
 signal notice(text: String)
 signal battle_triggered(pending: Dictionary)
+signal research_completed(research_id: String)
 
 const SAVE_VERSION := 1
 
@@ -42,6 +43,8 @@ var inspections: Dictionary = {}     # "YYYY-MM" → {month, minute, done, score
 var progression: Dictionary = {}     # 전투 캐릭터 id → {training}
 var inventory: Array = []            # [{uid, item, plus, owner(캐릭터 id 또는 ""), slot}]
 var workshop: Dictionary = {}        # {kind: craft|enhance, recipe?, uid?, remaining, total}
+var researched: Dictionary = {}      # 연구 id → true (완료)
+var research: Dictionary = {}        # 진행 중 연구 {id, remaining, total} (한 번에 하나)
 var counters: Dictionary = {"dirt": 0, "job": 0, "inv": 0, "chat": 0}
 var log_lines: Array = []
 var cleaning_log: Array = []         # [{minute, requested, executing, facility, result}]
@@ -196,6 +199,7 @@ func _on_minute(m: int) -> void:
 	_check_inspection(m)
 	_check_battle_rules(m)
 	_tick_workshop()
+	_tick_research()
 	for id in data.npc_order:
 		if npcs.has(id):
 			_tick_body(npcs[id])
@@ -297,8 +301,8 @@ func _npc_minute(n: NpcAgent, m: int) -> void:
 		NpcAgent.RECOVERING:
 			if n.seat == "":
 				_claim_seat_here(n, "medical")
-			if float(cstate(n).hp) >= char_max_hp(n.character_id):
-				_log("%s 체력 회복 완료 (%d)" % [n.name, char_max_hp(n.character_id)])
+			if float(cstate(n).hp) >= char_max_hp(ckey(n)):
+				_log("%s 체력 회복 완료 (%d)" % [n.name, char_max_hp(ckey(n))])
 				_finish_command(n)
 			return
 	var mod := clock.minute_of_day(m)
@@ -729,11 +733,13 @@ func room_actions(npc_id: String) -> Array:
 		var dirty := float(cleanliness.get(fid, 100.0)) < 100.0 or not dirt_in(fid).is_empty()
 		out.append({"id": "clean_here", "label": "이 방 청소 (청결 %d)" % roundi(float(cleanliness.get(fid, 100.0))),
 			"enabled": free and dirty and cleaner_of(fid) == "", "why": "이미 깨끗함" if not dirty else "다른 대원이 청소 중"})
-	if tag == "훈련":
+	if tag == "연구" and is_researcher(npc_id):
+		out.append({"id": "research", "label": "무기 연구", "enabled": true, "why": ""})
+	if tag == "훈련" and is_combatant(n):
 		out.append({"id": "train", "label": "훈련 (%d분, 전투 HP +%d)" % [data.inum("train_minutes", 120), data.inum("train_hp_bonus", 5)], "enabled": free, "why": ""})
 	if tag == "의무":
 		var cs := cstate(n)
-		var need := not (cs.statuses as Array).is_empty() or float(cs.hp) < char_max_hp(n.character_id)
+		var need := not (cs.statuses as Array).is_empty() or float(cs.hp) < char_max_hp(ckey(n))
 		out.append({"id": "medical", "label": "치료·휴식", "enabled": free and need, "why": "다친 데 없음"})
 	var here_jobs := available_contracts().filter(func(c): return str(data.jobs[c].place) == fid)
 	if tag in ["행정", "출입"] or not here_jobs.is_empty():
@@ -933,6 +939,8 @@ func issue_train(npc_id: String) -> Dictionary:
 	var n: NpcAgent = npcs.get(npc_id)
 	if n == null:
 		return _fail("없는 대원")
+	if not is_combatant(n):
+		return _fail("%s 은(는) 전투원이 아니라 훈련하지 않습니다" % n.name)
 	var fid := training_facility()
 	if fid == "":
 		return _fail("훈련실이 잠겨 있습니다 (먼저 해금)")
@@ -1014,6 +1022,8 @@ func start_craft(rid: String) -> Dictionary:
 	var r: Dictionary = data.recipes.get(rid, {})
 	if r.is_empty():
 		return _fail("없는 레시피")
+	if not recipe_unlocked(rid):
+		return _fail("연구가 필요합니다: %s" % data.research.get(recipe_research(rid), {}).get("name", ""))
 	workshop = {"kind": "craft", "recipe": rid, "remaining": int(r.minutes), "total": int(r.minutes)}
 	_log("제작 시작: %s (%d분)" % [r.name, r.minutes])
 	return {"ok": true, "msg": "제작 시작: %s" % r.name}
@@ -1053,6 +1063,107 @@ func _tick_workshop() -> void:
 		if not it.is_empty():
 			it.plus = int(it.plus) + 1
 			_log("강화 완료: %s +%d" % [item_name(it.item), it.plus])
+
+
+# ================================================================ 연구실 (로한): 연구 → 무기 제작 해금
+func lab_facility() -> String:
+	for fid in data.facilities_with_tag("연구"):
+		if unlocked.has(fid):
+			return fid
+	return ""
+
+
+func researcher_id() -> String:
+	var id := data.text("researcher_npc", "")
+	return id if npcs.has(id) else ""
+
+
+func is_researcher(npc_id: String) -> bool:
+	return npc_id != "" and npc_id == researcher_id()
+
+
+## 이 제작 레시피를 해금하는 연구 id ("" = 처음부터 제작 가능)
+func recipe_research(rid: String) -> String:
+	for qid in data.research_order:
+		if (data.research[qid].unlocks as Array).has(rid):
+			return qid
+	return ""
+
+
+func recipe_unlocked(rid: String) -> bool:
+	var q := recipe_research(rid)
+	return q == "" or researched.has(q)
+
+
+## 연구 상태: "done" 완료 / "active" 진행 중 / "locked" 선행 연구 필요 / "ready" 시작 가능
+func research_state(qid: String) -> String:
+	if researched.has(qid):
+		return "done"
+	if str(research.get("id", "")) == qid:
+		return "active"
+	var pre := str(data.research.get(qid, {}).get("prereq", ""))
+	if pre != "" and not researched.has(pre):
+		return "locked"
+	return "ready"
+
+
+## 연구가 지금 진행되는가: 연구원이 연구실에서 깨어 있음 (이동 중·잠·외출이면 멈춤). 이유 문자열 ("" = 진행)
+func research_pause_reason() -> String:
+	var rid := researcher_id()
+	if rid == "":
+		return "연구원이 없습니다"
+	var n: NpcAgent = npcs[rid]
+	var lab := lab_facility()
+	if lab == "":
+		return "연구실이 잠겨 있습니다"
+	if n.facility != lab or n.state == NpcAgent.MOVING:
+		return "%s — 연구실 밖" % n.name
+	if n.activity == "sleep" or n.state in [NpcAgent.UNAVAILABLE, NpcAgent.TREATMENT, NpcAgent.RECOVERING]:
+		return "%s — 쉬는 중" % n.name
+	return ""
+
+
+func start_research(qid: String) -> Dictionary:
+	var q: Dictionary = data.research.get(qid, {})
+	if q.is_empty():
+		return _fail("없는 연구")
+	if lab_facility() == "":
+		return _fail("연구실이 잠겨 있습니다")
+	match research_state(qid):
+		"done":
+			return _fail("이미 끝낸 연구입니다")
+		"active":
+			return _fail("이미 연구 중입니다")
+		"locked":
+			return _fail("먼저 '%s' 연구가 필요합니다" % data.research.get(q.prereq, {}).get("name", q.prereq))
+	if not research.is_empty():
+		return _fail("다른 연구가 진행 중입니다 (%s)" % data.research.get(str(research.id), {}).get("name", ""))
+	var cost := int(q.cost)
+	if ledger.cash < cost:
+		return _fail("달러가 부족합니다 ($%d 더 필요)" % (cost - ledger.cash))
+	counters["research"] = int(counters.get("research", 0)) + 1
+	if cost > 0 and not ledger.post("research:%s:%d" % [qid, counters.research], _minute, clock.label(_minute), "research", -cost, qid, "%s 연구" % q.name, week_now()):
+		return _fail("이미 처리된 연구 비용입니다")
+	research = {"id": qid, "remaining": int(q.minutes), "total": int(q.minutes)}
+	_log("연구 시작: %s (-$%d, %d분)" % [q.name, cost, q.minutes])
+	return {"ok": true, "msg": "연구 시작: %s" % q.name}
+
+
+func _tick_research() -> void:
+	if research.is_empty() or research_pause_reason() != "":
+		return
+	research.remaining = int(research.remaining) - 1
+	if int(research.remaining) > 0:
+		return
+	var qid := str(research.id)
+	research = {}
+	researched[qid] = true
+	var q: Dictionary = data.research.get(qid, {})
+	var made := PackedStringArray()
+	for rid in q.get("unlocks", []):
+		made.append(item_name(str(data.recipes.get(rid, {}).get("item", rid))))
+	_log("연구 완료: %s → 무기고에서 %s 제작 가능" % [q.get("name", qid), ", ".join(made)])
+	research_completed.emit(qid)
 
 
 ## 캐릭터의 장착 무기 (슬롯 순)
@@ -1119,7 +1230,16 @@ func cstate_of(character_id: String) -> Dictionary:
 
 
 func cstate(n: NpcAgent) -> Dictionary:
-	return cstate_of(n.character_id)
+	return cstate_of(ckey(n))
+
+
+## 몸 상태 키: 전투 캐릭터 id, 전투에 나가지 않는 대원(로한)은 대원 id
+static func ckey(n: NpcAgent) -> String:
+	return n.character_id if n.character_id != "" else n.id
+
+
+func is_combatant(n: NpcAgent) -> bool:
+	return n.character_id != ""
 
 
 ## 전투 최대 HP (훈련 반영)
@@ -1152,7 +1272,7 @@ func _tick_body(n: NpcAgent) -> void:
 		if not o.is_empty():
 			cs.fatigue = float(cs.fatigue) - float(o.fatigue_rate) * per
 			if float(o.hp_rate) > 0.0:
-				cs.hp = minf(float(char_max_hp(n.character_id)), float(cs.hp) + float(o.hp_rate) * per)
+				cs.hp = minf(float(char_max_hp(ckey(n))), float(cs.hp) + float(o.hp_rate) * per)
 	else:
 		var rate := data.num("fatigue_awake_per_hour", 2.0)
 		if n.state in [NpcAgent.CLEANING, NpcAgent.ASSIGNED_WORK, NpcAgent.UNAVAILABLE]:
@@ -1181,8 +1301,9 @@ func _pick_seat(n: NpcAgent, fid: String, activity: String) -> String:
 			kinds = ["의무침대"]
 		_:
 			return ""
+	var cur := ""
 	if n.seat != "" and data.objects.get(n.seat, {}).get("facility", "") == fid and data.objects[n.seat].kind in kinds:
-		return n.seat
+		cur = n.seat
 	var best := ""
 	var best_v := -INF
 	for oid in data.objects_in(fid):
@@ -1195,6 +1316,9 @@ func _pick_seat(n: NpcAgent, fid: String, activity: String) -> String:
 		if v > best_v:
 			best = oid
 			best_v = v
+	# 지금 자리가 더 나쁜 종류가 아니면 그대로 (같은 방에서 자려면 의자 → 침대로 옮김)
+	if cur != "" and (best == "" or kinds.find(data.objects[cur].kind) <= kinds.find(data.objects[best].kind)):
+		return cur
 	return best
 
 
@@ -1320,7 +1444,7 @@ func issue_medical(npc_id: String) -> Dictionary:
 	if fid == "":
 		return _fail("의무실이 잠겨 있습니다")
 	var cs := cstate(n)
-	if (cs.statuses as Array).is_empty() and float(cs.hp) >= char_max_hp(n.character_id):
+	if (cs.statuses as Array).is_empty() and float(cs.hp) >= char_max_hp(ckey(n)):
 		return _fail("%s 은(는) 치료할 것이 없습니다 (체력 가득, 상태 이상 없음)" % n.name)
 	if not n.is_free():
 		return _fail("%s 은(는) 지금 다른 일을 하고 있습니다 (%s)" % [n.name, n.state_name()])
@@ -1489,7 +1613,7 @@ func to_dict() -> Dictionary:
 		"cleanliness": cleanliness, "dirt": dirt, "npcs": nd, "chats": chats, "jobs": jobs, "claimed_contracts": claimed_contracts.keys(),
 		"opened_contracts": opened_contracts.keys(), "request_state": request_state, "conv_counts": conv_counts, "heard": heard,
 		"story_seen": story_seen, "inspections": inspections, "progression": progression, "inventory": inventory,
-		"workshop": workshop, "counters": counters, "log": log_lines.slice(maxi(0, log_lines.size() - 100)), "cleaning_log": cleaning_log,
+		"workshop": workshop, "researched": researched.keys(), "research": research, "counters": counters, "log": log_lines.slice(maxi(0, log_lines.size() - 100)), "cleaning_log": cleaning_log,
 		"chars": chars, "food": food, "gifts": gifts, "pending_battle": pending_battle, "battle_history": battle_history}
 
 
@@ -1531,6 +1655,12 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 		it.plus = int(it.plus)
 		it.slot = int(it.slot)
 	s.workshop = d.get("workshop", {})
+	for q in d.get("researched", []):
+		s.researched[str(q)] = true
+	s.research = d.get("research", {})
+	if not s.research.is_empty():
+		s.research.remaining = int(s.research.remaining)
+		s.research.total = int(s.research.total)
 	var cn: Dictionary = d.get("counters", {})
 	for k in cn:
 		s.counters[k] = int(cn.get(k, 0))
