@@ -174,6 +174,7 @@ func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
 	if not controller.slots.all_units().is_empty():
 		_spawn_units()
 	controller.action_resolved.connect(_on_action_resolved)
+	controller.status_ticked.connect(_on_status_ticked)
 	controller.unit_moved.connect(_on_unit_moved)
 	controller.units_swapped.connect(_on_units_swapped)
 	controller.weapon_changed.connect(_on_weapon_changed)
@@ -369,6 +370,35 @@ func _draw_back_bars() -> void:
 		if u.alive:
 			var ah := maxf(4.0, 5.0 * k)
 			_draw_segments(s.position.x, y + h + 3.0 * k, u.data.max_ap, 7.0 * k, ah, 2.5 * k, float(u.ap), AP_COLOR, AP_EMPTY, a)
+			var head := s.position + s.head_screen_offset() * s.scale.y
+			_draw_status_badges(u, head.x, head.y - 30.0 * k, k)
+
+
+## 머리 위 전투 상태 이상 배지: 한 글자 + 남은 턴 (출혈 = 혈2, 동상은 터지기까지 남은 차례)
+var _badge_font: Font
+func _draw_status_badges(u: UnitRuntime, cx: float, y: float, k: float) -> void:
+	var list := u.statuses.filter(func(sid): return StatusCatalog.get_def(sid).get("battle", false))
+	if list.is_empty():
+		return
+	if _badge_font == null:
+		_badge_font = load("res://assets/fonts/Pretendard-Bold.ttf")
+	var fs := maxi(12, roundi(15.0 * k))
+	var w := 34.0 * k
+	var hgt := 21.0 * k
+	var gap := 4.0 * k
+	var x0 := cx - (list.size() * w + (list.size() - 1) * gap) * 0.5
+	for i in list.size():
+		var sid: String = list[i]
+		var col := StatusCatalog.color_of(sid)
+		var r := Rect2(x0 + i * (w + gap), y, w, hgt)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(col.darkened(0.55), 0.92)
+		sb.border_color = col
+		sb.set_border_width_all(maxi(1, roundi(1.5 * k)))
+		sb.set_corner_radius_all(roundi(4 * k))
+		back_bars.draw_style_box(sb, r)
+		var t := "%s%d" % [StatusCatalog.get_def(sid).get("short", "?"), u.status_turns(sid)]
+		back_bars.draw_string(_badge_font, Vector2(r.position.x, r.position.y + hgt * 0.5 + fs * 0.36), t, HORIZONTAL_ALIGNMENT_CENTER, w, fs, Color.WHITE)
 
 
 ## 가운데 cx 에 n 칸, filled 칸만큼 채움 (소수면 마지막 칸 일부)
@@ -446,6 +476,14 @@ func _on_action_resolved(event: Dictionary) -> void:
 	if tw.is_valid():
 		await tw.finished
 	_end_busy()
+
+
+## 차례 시작 상태 이상 피해 → 맞는 연출
+func _on_status_ticked(event: Dictionary) -> void:
+	for r in event.results:
+		var ts := sprite_of(r.target)
+		if ts != null:
+			ts.play_hit()
 
 
 func _on_unit_moved(unit: UnitRuntime, _from_key: String, _to_key: String) -> void:

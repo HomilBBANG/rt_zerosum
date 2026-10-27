@@ -43,6 +43,28 @@ static func resolve(action: ActionData, actor: UnitRuntime, target: UnitRuntime,
 			event.targets = [target]
 			event.results = [{"target": target, "kind": "ap", "amount": granted, "killed": false}]
 			event.text = "%s → %s: %s AP %d 부여" % [actor.display_name(), target.display_name(), action.display_name, granted]
+		"status":
+			event.targets = [target]
+			event.text = "%s → %s: %s" % [actor.display_name(), target.display_name(), action.display_name]
 		_:
 			event.text = "%s: %s" % [actor.display_name(), action.display_name]
+	_apply_status(action, target, rng, event)
 	return event
+
+
+## 스킬의 상태 이상: 맞은 대상이 살아 있으면 확률로 걸고 바로 한 번 적용 (event.applied, 틱 피해는 event.results 에 덧붙임)
+static func _apply_status(action: ActionData, target: UnitRuntime, rng: RandomNumberGenerator, event: Dictionary) -> void:
+	event["applied"] = []
+	if action.status_id == "" or target == null or not target.alive or action.effect in ["move", "weapon_swap"]:
+		return
+	var roll := rng.randi_range(1, 100) if rng != null else 1
+	var nm: String = StatusCatalog.get_def(action.status_id).name
+	if roll > action.status_chance:
+		event.text += " (%s 실패)" % nm
+		return
+	var ticks := StatusRules.apply(target, action.status_id, action.status_turns, action.status_value)
+	event.applied.append({"target": target, "status": action.status_id})
+	event.text += " → %s %d턴" % [nm, action.status_turns]
+	for r in ticks:
+		event.results.append(r)
+		event.text += " (%s %d 피해%s)" % [nm, r.amount, ", 전투 불능" if r.killed else ""]

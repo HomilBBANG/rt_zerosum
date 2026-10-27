@@ -1,0 +1,175 @@
+{
+	"version": 1,
+	"gods": [
+		{
+			"id": "solus",
+			"name": "태양신 솔루스",
+			"color": "#ffd166",
+			"desc": "빛과 치유의 신 — 회복·체력 (임시)"
+		},
+		{
+			"id": "veyra",
+			"name": "전쟁신 베이라",
+			"color": "#ff5a4e",
+			"desc": "피와 전투의 신 — 공격 위력 (임시)"
+		},
+		{
+			"id": "noct",
+			"name": "밤의 여신 녹트",
+			"color": "#8f7bff",
+			"desc": "그림자와 은밀함의 신 — 속도·AP (임시)"
+		},
+		{
+			"id": "terra",
+			"name": "대지모 테라",
+			"color": "#5fd38a",
+			"desc": "땅과 수호의 신 — 방어·체력 (임시)"
+		}
+	],
+	"skills": [
+		{
+			"id": "solus_1",
+			"god": "solus",
+			"name": "햇살의 손길",
+			"need": 20,
+			"effect": "heal",
+			"value": 2,
+			"desc": "회복량 +2"
+		},
+		{
+			"id": "solus_2",
+			"god": "solus",
+			"name": "빛의 가호",
+			"need": 40,
+			"effect": "hp",
+			"value": 6,
+			"desc": "최대 HP +6"
+		},
+		{
+			"id": "solus_3",
+			"god": "solus",
+			"name": "성광",
+			"need": 60,
+			"effect": "skill_power:heal",
+			"value": 5,
+			"desc": "응급 처치 회복 +5"
+		},
+		{
+			"id": "solus_4",
+			"god": "solus",
+			"name": "태양의 축복",
+			"need": 80,
+			"effect": "hp",
+			"value": 12,
+			"desc": "최대 HP +12"
+		},
+		{
+			"id": "veyra_1",
+			"god": "veyra",
+			"name": "피의 맹세",
+			"need": 20,
+			"effect": "power",
+			"value": 1,
+			"desc": "모든 공격 위력 +1"
+		},
+		{
+			"id": "veyra_2",
+			"god": "veyra",
+			"name": "전쟁의 함성",
+			"need": 40,
+			"effect": "skill_power:heavy_attack",
+			"value": 3,
+			"desc": "강공격 위력 +3"
+		},
+		{
+			"id": "veyra_3",
+			"god": "veyra",
+			"name": "광전사",
+			"need": 60,
+			"effect": "power",
+			"value": 2,
+			"desc": "모든 공격 위력 +2"
+		},
+		{
+			"id": "veyra_4",
+			"god": "veyra",
+			"name": "신의 철퇴",
+			"need": 80,
+			"effect": "skill_power:ultimate",
+			"value": 6,
+			"desc": "필살기 위력 +6"
+		},
+		{
+			"id": "noct_1",
+			"god": "noct",
+			"name": "그림자 걸음",
+			"need": 20,
+			"effect": "speed",
+			"value": 1,
+			"desc": "속도 +1"
+		},
+		{
+			"id": "noct_2",
+			"god": "noct",
+			"name": "밤의 숨결",
+			"need": 40,
+			"effect": "ap_rec",
+			"value": 1,
+			"desc": "턴마다 AP 회복 +1"
+		},
+		{
+			"id": "noct_3",
+			"god": "noct",
+			"name": "암습",
+			"need": 60,
+			"effect": "skill_power:basic_attack",
+			"value": 3,
+			"desc": "기본 공격 위력 +3"
+		},
+		{
+			"id": "noct_4",
+			"god": "noct",
+			"name": "달 없는 밤",
+			"need": 80,
+			"effect": "ap",
+			"value": 1,
+			"desc": "최대 AP +1"
+		},
+		{
+			"id": "terra_1",
+			"god": "terra",
+			"name": "단단한 뿌리",
+			"need": 20,
+			"effect": "defense",
+			"value": 1,
+			"desc": "방어 +1"
+		},
+		{
+			"id": "terra_2",
+			"god": "terra",
+			"name": "대지의 피",
+			"need": 40,
+			"effect": "hp",
+			"value": 8,
+			"desc": "최대 HP +8"
+		},
+		{
+			"id": "terra_3",
+			"god": "terra",
+			"name": "바위 피부",
+			"need": 60,
+			"effect": "defense",
+			"value": 1,
+			"desc": "방어 +1"
+		},
+		{
+			"id": "terra_4",
+			"god": "terra",
+			"name": "어머니의 품",
+			"need": 80,
+			"effect": "hp",
+			"value": 14,
+			"desc": "최대 HP +14"
+		}
+	]
+}

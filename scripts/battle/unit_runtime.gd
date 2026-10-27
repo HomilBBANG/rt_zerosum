@@ -17,6 +17,8 @@ var actions_this_turn: int = 0
 var move_locked: bool = false
 ## 상태 이상 id 목록 (정의는 StatusCatalog)
 var statuses: Array[String] = []
+## 전투 상태 이상의 남은 턴·수치: id → {turns, value} (StatusRules)
+var status_info: Dictionary = {}
 
 
 static func create(p_data: UnitData, p_instance_id: int, p_row: int, p_index: int) -> UnitRuntime:
@@ -38,6 +40,7 @@ func reset() -> void:
 	actions_this_turn = 0
 	move_locked = false
 	statuses.clear()
+	status_info.clear()
 
 
 func slot_key() -> String:
@@ -70,13 +73,34 @@ func can_be_moved() -> bool:
 	return true
 
 
-func add_status(id: String) -> void:
+## 다시 걸리면 남은 턴·수치 중 큰 쪽으로 갱신
+func add_status(id: String, turns: int = 0, value: int = 0) -> void:
 	if not statuses.has(id):
 		statuses.append(id)
+	if turns > 0 or value != 0:
+		var cur: Dictionary = status_info.get(id, {})
+		status_info[id] = {"turns": maxi(turns, int(cur.get("turns", 0))), "value": maxi(value, int(cur.get("value", 0)))}
 
 
 func remove_status(id: String) -> void:
 	statuses.erase(id)
+	status_info.erase(id)
+
+
+func status_turns(id: String) -> int:
+	return int(status_info.get(id, {}).get("turns", 0))
+
+
+## 지금 속도 (감속·가속 반영, 최소 1) — 행동 순서에 씀
+func speed_now() -> int:
+	var pct := 0
+	if statuses.has("haste"):
+		pct += int(status_info.get("haste", {}).get("value", 0))
+	if statuses.has("slow"):
+		pct -= int(status_info.get("slow", {}).get("value", 0))
+	if pct == 0:
+		return data.speed
+	return maxi(1, roundi(data.speed * (100 + pct) / 100.0))
 
 
 func current_weapon() -> Dictionary:
@@ -95,4 +119,4 @@ func display_name() -> String:
 
 func debug_string() -> String:
 	return "%s(spd%d lv%d hp%d/%d ap%d/%d %s)" % [
-		data.display_name, data.speed, data.level, hp, data.max_hp, ap, data.max_ap, slot_key()]
+		data.display_name, speed_now(), data.level, hp, data.max_hp, ap, data.max_ap, slot_key()]

@@ -32,6 +32,13 @@ func _ready() -> void:
 			u.add_status("rallied")
 			u.add_status("injured")
 		hud._refresh_panel()
+	if Game.cli.has("battle_status"):   # 스크린샷·확인용: --battle_status=a_dan:bleed:2:10;wolf:stun:1:0 (캐릭터 id 또는 스프라이트:상태:턴:수치)
+		for spec in str(Game.cli.battle_status).split(";", false):
+			var p := spec.split(":")
+			for u in controller.slots.living_units():
+				if p.size() >= 2 and (u.data.id == p[0] or u.data.sprite_id == p[0]):
+					u.add_status(StatusCatalog.find(p[1]), int(p[2]) if p.size() > 2 else 2, int(p[3]) if p.size() > 3 else 10)
+		hud._refresh_panel()
 	_run_cli()
 
 

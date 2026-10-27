@@ -33,6 +33,7 @@ const TARGETS := {
 	"kill": "처치 가능한 (HP 낮은 순)",
 	"front": "가장 앞 열",
 	"random": "무작위",
+	"no_status": "그 스킬의 상태 이상이 없는 (HP 낮은 순, 모두 걸려 있으면 실패)",
 }
 
 static var _cache: Dictionary = {}   # id → {mtime, graph}
@@ -183,6 +184,12 @@ static func _try_skill(skill: String, rule: String, actor: UnitRuntime, actions:
 					best = t
 		"random":
 			best = targets[(rng.randi() % targets.size()) if rng != null else 0]
+		"no_status":
+			for t in targets:
+				if (a.status_id == "" or not t.statuses.has(a.status_id)) and (best == null or t.hp < best.hp):
+					best = t
+			if best == null:
+				return {}
 		_:
 			for t in targets:
 				if best == null or t.hp < best.hp:

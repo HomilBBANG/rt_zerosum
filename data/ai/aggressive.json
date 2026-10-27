@@ -73,6 +73,30 @@
 				520,
 				420
 			]
+		},
+		{
+			"id": "st1",
+			"type": "act_skill",
+			"params": {
+				"skill": "hamstring",
+				"target": "no_status"
+			},
+			"pos": [
+				660,
+				340
+			]
+		},
+		{
+			"id": "st2",
+			"type": "act_skill",
+			"params": {
+				"skill": "sand_kick",
+				"target": "no_status"
+			},
+			"pos": [
+				800,
+				340
+			]
 		}
 	],
 	"connections": [
@@ -94,7 +118,7 @@
 		{
 			"from": "ult",
 			"port": 0,
-			"to": "heavy"
+			"to": "st1"
 		},
 		{
 			"from": "heavy",
@@ -105,6 +129,16 @@
 			"from": "basic",
 			"port": 0,
 			"to": "end"
+		},
+		{
+			"from": "st1",
+			"port": 0,
+			"to": "st2"
+		},
+		{
+			"from": "st2",
+			"port": 0,
+			"to": "heavy"
 		}
 	]
 }

@@ -68,6 +68,7 @@ func setup(p_controller: BattleController, p_view: BattleViewBase, p_preset: Dic
 	controller.actor_ended.connect(_on_actor_ended)
 	controller.ap_changed.connect(func(_u): _refresh_floating(); _refresh_panel(); _refresh_timeline())
 	controller.action_resolved.connect(_on_action_resolved)
+	controller.status_ticked.connect(_on_status_ticked)
 	controller.unit_died.connect(func(_u): _refresh_floating(); _refresh_timeline())
 	controller.battle_ended.connect(_on_battle_ended)
 	controller.log_message.connect(_on_log)
@@ -511,10 +512,34 @@ func _on_actor_ended(_unit: UnitRuntime, _reason: String) -> void:
 
 
 func _on_action_resolved(event: Dictionary) -> void:
-	for r in event.results:
+	_status_popups(event.results, event.get("applied", []))
+	_refresh_floating()
+	_refresh_panel()
+
+
+## 차례 시작 상태 이상 (출혈·화상 피해, 동상 폭발, 기절)
+func _on_status_ticked(event: Dictionary) -> void:
+	var u: UnitRuntime = event.unit
+	if event.results.is_empty() and u.statuses.has("stun"):
+		_spawn_popup(u, "기절 — 행동 불가", StatusCatalog.color_of("stun"))
+	_status_popups(event.results, [])
+	_refresh_floating()
+	_refresh_panel()
+	_refresh_timeline()
+
+
+## 피해·회복 숫자 + 상태 이상 이름 (같은 대상은 조금씩 늦게·아래로)
+func _status_popups(results: Array, applied: Array) -> void:
+	var n := {}
+	for r in results:
+		var k: int = n.get(r.target, 0)
+		n[r.target] = k + 1
 		var color := Color(1, 0.3, 0.25)
 		var text := "-%d" % r.amount
-		if r.kind == "heal":
+		if r.get("status", "") != "":
+			color = StatusCatalog.color_of(r.status)
+			text = "%s -%d" % [StatusCatalog.get_def(r.status).name, r.amount]
+		elif r.kind == "heal":
 			color = Color(0.4, 1, 0.5)
 			text = "+%d" % r.amount
 		elif r.kind == "ap":
@@ -522,8 +547,11 @@ func _on_action_resolved(event: Dictionary) -> void:
 			text = "AP +%d" % r.amount
 		if r.get("killed", false):
 			text += "  전투 불능"
-		_spawn_popup(r.target, text, color)
-	_refresh_floating()
+		_spawn_popup(r.target, text, color, k)
+	for a in applied:
+		var k2: int = n.get(a.target, 0)
+		n[a.target] = k2 + 1
+		_spawn_popup(a.target, "%s!" % StatusCatalog.get_def(a.status).name, StatusCatalog.color_of(a.status), k2)
 
 
 func _on_battle_ended(winner: String) -> void:
@@ -595,7 +623,11 @@ func _on_unit_clicked(unit: UnitRuntime) -> void:
 		return
 	if pending_action == "":
 		# 대상 지정 중이 아니면 유닛 정보 툴팁
-		show_toast("%s  Lv%d  속도 %d  HP %d/%d  AP %d/%d  %s" % [unit.display_name(), unit.data.level, unit.data.speed, unit.hp, unit.data.max_hp, unit.ap, unit.data.max_ap, _row_text(unit)])
+		var sts := PackedStringArray()
+		for sid in unit.statuses:
+			sts.append("%s %d턴" % [StatusCatalog.get_def(sid).name, unit.status_turns(sid)] if StatusCatalog.get_def(sid).get("battle", false) else StatusCatalog.get_def(sid).name)
+		show_toast("%s  Lv%d  속도 %d  HP %d/%d  AP %d/%d  %s%s" % [unit.display_name(), unit.data.level, unit.speed_now(), unit.hp, unit.data.max_hp, unit.ap, unit.data.max_ap, _row_text(unit),
+			"  상태: " + ", ".join(sts) if not sts.is_empty() else ""])
 		return
 	var reason := controller.get_target_block_reason(pending_action, unit)
 	if reason != "":
@@ -721,6 +753,7 @@ func _refresh_statuses(u: UnitRuntime) -> void:
 	for sid in u.statuses:
 		var d := StatusCatalog.get_def(sid)
 		var good: bool = d.get("positive", false)
+		var info: Dictionary = u.status_info.get(sid, {})
 		var row := PanelContainer.new()
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(0.12, 0.42, 0.22, 0.95) if good else Color(0.5, 0.12, 0.12, 0.95)
@@ -734,8 +767,11 @@ func _refresh_statuses(u: UnitRuntime) -> void:
 		row.add_theme_stylebox_override("panel", sb)
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.mouse_filter = Control.MOUSE_FILTER_STOP
-		row.add_child(_label(d.get("name", sid), 13, Color(1, 1, 1)))
-		var tip := "%s  ·  %s\n%s" % [d.get("name", sid), "긍정" if good else "부정", d.get("desc", "")]
+		var title: String = d.get("name", sid)
+		if d.get("battle", false):
+			title += "  %d턴" % int(info.get("turns", 0)) if sid != "frost" else "  %d턴 뒤" % int(info.get("turns", 0))
+		row.add_child(_label(title, 13, Color(1, 1, 1)))
+		var tip := "%s  ·  %s\n%s" % [d.get("name", sid), "긍정" if good else "부정", StatusCatalog.describe(sid, info)]
 		row.mouse_entered.connect(func():
 			_fade(row, Color(1.5, 1.5, 1.5))
 			_show_slot_tip(row, tip))
@@ -1022,14 +1058,21 @@ func _show_timeline_name(frame: Control, u: UnitRuntime) -> void:
 	hover_label.visible = true
 
 
-func _spawn_popup(target: UnitRuntime, text: String, color: Color) -> void:
-	var l := _label(text, 24, color)
-	l.position = view.get_unit_screen_pos(target) + Vector2(-30, -30)
+## nth = 같은 대상의 몇 번째 숫자인지 (늦게·아래로 띄워 겹치지 않게)
+func _spawn_popup(target: UnitRuntime, text: String, color: Color, nth: int = 0) -> void:
+	var l := _label(text, 24 if nth == 0 else 20, color)
+	l.add_theme_constant_override("outline_size", 6)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	l.position = view.get_unit_screen_pos(target) + Vector2(-30, -30 + 26 * nth)
 	popup_root.add_child(l)
 	var tw := create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(l, "position:y", l.position.y - 50, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.3)
+	var d := 0.35 * nth
+	if nth > 0:
+		l.modulate.a = 0.0
+		tw.tween_property(l, "modulate:a", 1.0, 0.1).set_delay(d)
+	tw.tween_property(l, "position:y", l.position.y - 50, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT).set_delay(d)
+	tw.tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.3 + d + 0.3)
 	tw.chain().tween_callback(l.queue_free)
 
 

@@ -96,6 +96,30 @@
 				520,
 				420
 			]
+		},
+		{
+			"id": "st1",
+			"type": "act_skill",
+			"params": {
+				"skill": "rend",
+				"target": "no_status"
+			},
+			"pos": [
+				1220,
+				360
+			]
+		},
+		{
+			"id": "st2",
+			"type": "act_skill",
+			"params": {
+				"skill": "grave_chill",
+				"target": "no_status"
+			},
+			"pos": [
+				1360,
+				360
+			]
 		}
 	],
 	"connections": [
@@ -132,7 +156,7 @@
 		{
 			"from": "ult",
 			"port": 0,
-			"to": "heavy"
+			"to": "st1"
 		},
 		{
 			"from": "heavy",
@@ -143,6 +167,16 @@
 			"from": "basic",
 			"port": 0,
 			"to": "end"
+		},
+		{
+			"from": "st1",
+			"port": 0,
+			"to": "st2"
+		},
+		{
+			"from": "st2",
+			"port": 0,
+			"to": "heavy"
 		}
 	]
 }

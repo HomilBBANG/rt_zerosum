@@ -22,8 +22,8 @@ CHARS = [
 ]
 MON_COLS = ["id", "이름", "분류", "레벨", "속도", "사거리", "HP", "AP", "AP회복", "방어", "스킬", "무기", "차지칸", "키(cm)", "스프라이트", "원화방향", "AI"]
 MONS = [
-    ["ghoul", "구울", "괴물", 6, 10, "근접", 110, 6, 2, 2, "basic_attack, heavy_attack, ultimate", "claw", 2, 240, "ghoul", "왼쪽", "default"],
-    ["wolf", "늑대", "괴물", 7, 12, "근접", 90, 6, 2, 1, "basic_attack, heavy_attack, ultimate", "claw", 1, 400, "wolf", "오른쪽", "aggressive"],
+    ["ghoul", "구울", "괴물", 6, 10, "근접", 110, 6, 2, 2, "basic_attack, heavy_attack, rend, grave_chill, ultimate", "claw", 2, 240, "ghoul", "왼쪽", "default"],
+    ["wolf", "늑대", "괴물", 7, 12, "근접", 90, 6, 2, 1, "basic_attack, heavy_attack, hamstring, sand_kick, ultimate", "claw", 1, 400, "wolf", "오른쪽", "aggressive"],
     ["slime", "슬라임", "괴물", 4, 5, "근접", 130, 5, 2, 3, "basic_attack, heavy_attack", "slam", 2, 400, "slime", "오른쪽", "default"],
 ]
 ITEM_COLS = ["id", "이름", "종류", "사거리", "위력보너스", "스프라이트", "설명"]
@@ -44,46 +44,25 @@ ITEMS = [
     ["mg", "경기관총", "무기", "원거리", 3, "mg", "연구로 해금 (더미 수치)"],
     ["launcher", "유탄발사기", "무기", "원거리", 4, "launcher", "연구로 해금 (더미 수치)"],
 ]
-SKILL_COLS = ["id", "이름", "종류", "AP비용", "대상", "효과", "위력", "설명"]
+SKILL_COLS = ["id", "이름", "종류", "AP비용", "대상", "효과", "위력", "설명", "상태이상", "상태턴", "상태수치", "상태확률"]
 SKILLS = [
-    ["basic_attack", "기본 공격", "attack", 1, "weapon", "damage", 6, "현재 무기로 공격. 근접: 상대 앞열 우선 / 원거리: 전열 무관"],
-    ["heavy_attack", "강공격", "heavy", 2, "weapon", "damage", 11, "현재 무기로 강하게 공격"],
-    ["heal", "응급 처치", "support", 2, "ally_any", "heal", 10, "아군 1명 HP 회복"],
-    ["rally", "독려", "support", 2, "ally_other", "ap_grant", 2, "다른 아군 1명 AP +2 (상한까지)"],
-    ["ultimate", "필살기", "ultimate", 4, "enemy_any", "damage", 18, "열 무관 강력한 일격"],
-    ["move", "위치 변경", "move", 1, "slot", "move", 0, "빈 슬롯 이동 / 점유 슬롯 아군과 교환"],
-    ["weapon", "무기 변경", "weapon", 1, "none", "weapon_swap", 0, "보조 무기로 교체 (사거리 변경)"],
-    ["brutal_strike", "강타", "heavy", 3, "weapon", "damage", 16, "스킬 트리(액티브): 현재 무기로 아주 강하게 공격"],
-    ["flank", "측면 기습", "attack", 2, "enemy_any", "damage", 9, "스킬 트리(액티브): 열 무관 적 1명 공격"],
-    ["second_wind", "재정비", "support", 1, "ally_any", "heal", 8, "스킬 트리(액티브): 아군 1명(자신 포함) HP 회복"],
-    ["inspire", "고무", "support", 1, "ally_other", "ap_grant", 1, "스킬 트리(액티브): 다른 아군 1명 AP +1"],
-]
-# 신앙 [임시 데이터 — 나중에 사용자 표로 교체]: 신 종류마다 배울 수 있는 신앙 스킬이 다름
-GOD_COLS = ["id", "이름", "상징색", "설명"]
-GODS = [
-    ["solus", "태양신 솔루스", "#ffd166", "빛과 치유의 신 — 회복·체력 (임시)"],
-    ["veyra", "전쟁신 베이라", "#ff5a4e", "피와 전투의 신 — 공격 위력 (임시)"],
-    ["noct", "밤의 여신 녹트", "#8f7bff", "그림자와 은밀함의 신 — 속도·AP (임시)"],
-    ["terra", "대지모 테라", "#5fd38a", "땅과 수호의 신 — 방어·체력 (임시)"],
-]
-FS_COLS = ["신", "id", "이름", "필요신앙", "효과", "값", "설명"]
-FAITH_SKILLS = [
-    ["solus", "solus_1", "햇살의 손길", 20, "heal", 2, "회복량 +2"],
-    ["solus", "solus_2", "빛의 가호", 40, "hp", 6, "최대 HP +6"],
-    ["solus", "solus_3", "성광", 60, "skill_power:heal", 5, "응급 처치 회복 +5"],
-    ["solus", "solus_4", "태양의 축복", 80, "hp", 12, "최대 HP +12"],
-    ["veyra", "veyra_1", "피의 맹세", 20, "power", 1, "모든 공격 위력 +1"],
-    ["veyra", "veyra_2", "전쟁의 함성", 40, "skill_power:heavy_attack", 3, "강공격 위력 +3"],
-    ["veyra", "veyra_3", "광전사", 60, "power", 2, "모든 공격 위력 +2"],
-    ["veyra", "veyra_4", "신의 철퇴", 80, "skill_power:ultimate", 6, "필살기 위력 +6"],
-    ["noct", "noct_1", "그림자 걸음", 20, "speed", 1, "속도 +1"],
-    ["noct", "noct_2", "밤의 숨결", 40, "ap_rec", 1, "턴마다 AP 회복 +1"],
-    ["noct", "noct_3", "암습", 60, "skill_power:basic_attack", 3, "기본 공격 위력 +3"],
-    ["noct", "noct_4", "달 없는 밤", 80, "ap", 1, "최대 AP +1"],
-    ["terra", "terra_1", "단단한 뿌리", 20, "defense", 1, "방어 +1"],
-    ["terra", "terra_2", "대지의 피", 40, "hp", 8, "최대 HP +8"],
-    ["terra", "terra_3", "바위 피부", 60, "defense", 1, "방어 +1"],
-    ["terra", "terra_4", "어머니의 품", 80, "hp", 14, "최대 HP +14"],
+    ["basic_attack", "기본 공격", "attack", 1, "weapon", "damage", 6, "현재 무기로 공격. 근접: 상대 앞열 우선 / 원거리: 전열 무관", "", "", "", ""],
+    ["heavy_attack", "강공격", "heavy", 2, "weapon", "damage", 11, "현재 무기로 강하게 공격", "", "", "", ""],
+    ["heal", "응급 처치", "support", 2, "ally_any", "heal", 10, "아군 1명 HP 회복", "", "", "", ""],
+    ["rally", "독려", "support", 2, "ally_other", "ap_grant", 2, "다른 아군 1명 AP +2 (상한까지)", "", "", "", ""],
+    ["ultimate", "필살기", "ultimate", 4, "enemy_any", "damage", 18, "열 무관 강력한 일격", "", "", "", ""],
+    ["move", "위치 변경", "move", 1, "slot", "move", 0, "빈 슬롯 이동 / 점유 슬롯 아군과 교환", "", "", "", ""],
+    ["weapon", "무기 변경", "weapon", 1, "none", "weapon_swap", 0, "보조 무기로 교체 (사거리 변경)", "", "", "", ""],
+    ["brutal_strike", "강타", "heavy", 3, "weapon", "damage", 16, "스킬 트리(액티브): 현재 무기로 아주 강하게 공격", "기절", 1, 0, 50],
+    ["flank", "측면 기습", "attack", 2, "enemy_any", "damage", 9, "스킬 트리(액티브): 열 무관 적 1명 공격", "출혈", 2, 10, 100],
+    ["second_wind", "재정비", "support", 1, "ally_any", "heal", 8, "스킬 트리(액티브): 아군 1명(자신 포함) HP 회복", "", "", "", ""],
+    ["inspire", "고무", "support", 1, "ally_other", "ap_grant", 1, "스킬 트리(액티브): 다른 아군 1명 AP +1", "가속", 2, 30, 100],
+    ["incendiary", "소이탄", "heavy", 2, "weapon", "damage", 6, "스킬 트리(액티브): 맞으면 화상 (화염 속성 고정 피해)", "화상", 2, 4, 100],
+    ["suppress", "제압 사격", "attack", 2, "enemy_any", "damage", 5, "스킬 트리(액티브): 열 무관, 맞으면 감속", "감속", 2, 30, 100],
+    ["rend", "할퀴기", "heavy", 2, "weapon", "damage", 9, "괴물: 맞으면 출혈", "출혈", 2, 8, 100],
+    ["grave_chill", "무덤의 냉기", "attack", 2, "enemy_any", "damage", 4, "괴물: 열 무관, 맞으면 동상", "동상", 2, 20, 100],
+    ["hamstring", "발목 물기", "attack", 2, "weapon", "damage", 7, "괴물: 맞으면 구속 (자리 이동 불가)", "구속", 2, 0, 100],
+    ["sand_kick", "모래 차기", "attack", 1, "weapon", "damage", 2, "괴물: 맞으면 실명 (대상 무작위)", "실명", 1, 0, 70],
 ]
 STAGE_COLS = ["id", "이름", "조명", "선공", "적HP배율", "적공격배율", "시드", "설명"]
 STAGES = [
@@ -91,10 +70,9 @@ STAGES = [
 ]
 README = [
     ["시트", "열", "설명"],
-    ["신", "id / 이름 / 상징색", "믿는 신 종류 [임시 데이터 — 나중에 교체]. 캐릭터 시트 '신' 열에 id"],
-    ["신앙스킬", "신 / 필요신앙", "그 신을 믿는 캐릭터만 배울 수 있는 스킬. 신앙도가 필요신앙 이상이면 배울 수 있음(포인트 안 씀). 효과·값은 스킬 트리 노드와 같은 형식 (hp·speed·ap·ap_rec·defense·power·heal, skill_power:<스킬 id>, skill:<스킬 id>)"],
     ["스킬트리", "", "스킬 트리 노드는 엑셀이 아니라 data/skill_tree.json — Godot 에디터 '스킬 트리' 탭에서 짬 (캐릭터별 액티브·패시브 십자형 트리)"],
-    ["캐릭터", "신 / 신앙", "믿는 신(신 시트 id, 비우면 무신앙)과 시작 신앙도 0~100. 출전할 때마다 신앙도 + (기지 설정 faith_battle)"],
+    ["신앙", "", "신 종류·신앙 스킬은 엑셀이 아니라 data/faith.json — Godot 에디터 '스킬 트리' 탭 → '신앙' 에서 짬"],
+    ["캐릭터", "신 / 신앙", "믿는 신(data/faith.json 의 신 id, 비우면 무신앙)과 시작 신앙도 0~100. 출전할 때마다 신앙도 + (기지 설정 faith_battle)"],
     ["공통", "id", "다른 시트·파일에서 참조하는 고유 이름 (영문 권장, 바꾸면 참조도 같이 바꿀 것)"],
     ["캐릭터", "사거리", "근접 / 원거리 — 행동 순서 동률 정렬용 병과 기본 사거리"],
     ["캐릭터", "스킬 / 무기", "쉼표로 구분한 스킬 id / 아이템 id. 무기 첫 번째 = 주무기, 두세 번째 = 보조무기"],
@@ -106,7 +84,9 @@ README = [
     ["아이템", "스프라이트", "assets/sprites/w_<스프라이트>.png (비우면 손에 든 무기 그림 없음)"],
     ["스킬", "종류", "attack / heavy / support / ultimate / move / weapon (ultimate = 필살기 칸)"],
     ["스킬", "대상", "weapon(무기 사거리) / enemy_any / ally_any / ally_other / self / slot / none"],
-    ["스킬", "효과", "damage(피해) / heal(회복) / ap_grant(AP 부여) / move / weapon_swap"],
+    ["스킬", "효과", "damage(피해) / heal(회복) / ap_grant(AP 부여) / status(상태 이상만) / move / weapon_swap"],
+    ["스킬", "상태이상 / 상태턴 / 상태수치 / 상태확률", "맞은 대상에게 거는 상태 이상 (비우면 없음): 출혈(최대 HP 수치% / 턴) · 화상(화염 고정 피해 수치 / 턴) · 동상(상태턴 뒤 최대 HP 수치% 1회) · 감속·가속(속도 수치%) · 기절(행동 불가) · 구속(자리 이동 불가) · 실명(대상 무작위). 상태턴 = 그 캐릭터 차례 수, 상태확률 % (비우면 100)"],
+    ["스킬", "상태 이상 적용 시점", "처음 걸릴 때 바로 한 번 + 그 캐릭터 차례가 올 때마다 행동보다 먼저. 차례가 끝날 때 상태턴 1 감소 (동상은 차례 시작에 감소, 0 이면 터짐). 다시 걸리면 남은 턴·수치 중 큰 쪽"],
     ["스테이지", "조명 / 선공", "조명 g1~g4, 선공 동전 / 기습(아군 선공) / 매복(적 선공)"],
     ["스테이지", "적HP배율 / 적공격배율", "이 스테이지의 적 최대 HP·피해에 곱함 (1 = 그대로)"],
     ["스테이지", "배치", "적 배치는 data/stages/<id>.json — 메뉴 → 스테이지 에디터"],
@@ -118,7 +98,7 @@ wb = Workbook()
 first = True
 for name, cols, rows, widths in [
     ("캐릭터", CHAR_COLS, CHARS, None), ("몬스터", MON_COLS, MONS, None), ("아이템", ITEM_COLS, ITEMS, None),
-    ("스킬", SKILL_COLS, SKILLS, None), ("신", GOD_COLS, GODS, None), ("신앙스킬", FS_COLS, FAITH_SKILLS, None), ("스테이지", STAGE_COLS, STAGES, None), ("읽어보기", README[0], README[1:], [12, 22, 90])]:
+    ("스킬", SKILL_COLS, SKILLS, None), ("스테이지", STAGE_COLS, STAGES, None), ("읽어보기", README[0], README[1:], [12, 22, 90])]:
     ws = wb.active if first else wb.create_sheet()
     first = False
     ws.title = name

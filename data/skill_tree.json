@@ -703,11 +703,11 @@
 			"kind": "active",
 			"dir": "e",
 			"tier": 3,
-			"name": "측면 기습",
+			"name": "제압 사격",
 			"level": 9,
-			"effect": "skill:flank",
+			"effect": "skill:suppress",
 			"value": 1,
-			"desc": "새 스킬: 측면 기습 (AP 2, 열 무관)"
+			"desc": "새 스킬: 제압 사격 (AP 2, 위력 5, 감속)"
 		},
 		{
 			"id": "ethan_a_s1",
@@ -979,11 +979,11 @@
 			"kind": "active",
 			"dir": "n",
 			"tier": 3,
-			"name": "강타",
+			"name": "소이탄",
 			"level": 9,
-			"effect": "skill:brutal_strike",
+			"effect": "skill:incendiary",
 			"value": 1,
-			"desc": "새 스킬: 강타 (AP 3, 위력 16)"
+			"desc": "새 스킬: 소이탄 (AP 2, 위력 6, 화상)"
 		},
 		{
 			"id": "hana_a_e1",

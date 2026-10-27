@@ -95,6 +95,8 @@ static func auto_desc(effect: String, value: int, actions: Dictionary) -> String
 		if a == null:
 			return "새 스킬: %s" % effect.substr(6)
 		var what := "위력 %d" % a.power if a.effect == "damage" else ("회복 %d" % a.power if a.effect == "heal" else "AP +%d" % a.power)
+		if a.status_id != "":
+			what += ", %s %d턴" % [StatusCatalog.get_def(a.status_id).name, a.status_turns]
 		return "새 스킬: %s (AP %d, %s)" % [a.display_name, a.ap_cost, what]
 	if effect.begins_with("skill_power:"):
 		var b: ActionData = actions.get(effect.substr(12))

@@ -2,13 +2,13 @@ class_name TurnScheduler
 extends RefCounted
 ## 행동 순서 계산 (GDD 2.2 / 3절).
 ## 1라운드: 선공 진영 최고 속도 1명 → 나머지 전체 속도 내림차순.
-## 2라운드+: 전체 속도 내림차순.
+## 2라운드+: 전체 속도 내림차순. 속도 = 지금 속도 (감속·가속 반영).
 ## 동률: 아군 우선 → 레벨 높은 쪽 → 원거리(병과) 우선 → 슬롯 순서(열, 번호) → 인스턴스 ID.
 
 
 static func compare(a: UnitRuntime, b: UnitRuntime) -> bool:
-	if a.data.speed != b.data.speed:
-		return a.data.speed > b.data.speed
+	if a.speed_now() != b.speed_now():
+		return a.speed_now() > b.speed_now()
 	if a.team != b.team:
 		return a.team == "ally"
 	if a.data.level != b.data.level:

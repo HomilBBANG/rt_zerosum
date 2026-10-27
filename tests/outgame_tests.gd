@@ -887,6 +887,18 @@ func _test_skill_tree_editor() -> void:
 	s.learn_skill("a_dan", "dan_p_e1")
 	s.learn_skill("a_dan", "dan_p_e2")
 	_c(s.skill_state("a_dan", "dan_p_e3") == "capped", "4단계 갈래 끝을 배우면 다른 갈래 끝 막힘")
+	# 전투 전용 상태 이상은 기지로 안 넘어감
+	var s3 := _sim()
+	s3.apply_battle_result({"winner": "ally", "allies": [{"id": "a_kira", "hp": 20, "alive": true, "statuses": ["bleed", "stun", "injured"]}]})
+	_c(s3.cstate_of("a_kira").statuses == ["injured"], "전투 끝: 출혈·기절은 사라지고 부상만 기지로 %s" % [s3.cstate_of("a_kira").statuses])
+	# 신앙 데이터 (data/faith.json)
+	var fd := FaithData.read()
+	_c(fd.gods.size() == 4 and fd.skills.size() == 16 and battle.gods.size() == 4, "faith.json: 신 4 · 신앙 스킬 16")
+	_c(FaithData.check(fd, battle.char_faith, battle.actions).errors.is_empty(), "신앙 데이터 검사 오류 없음")
+	var tmpf := "user://faith_test.json"
+	FaithData.write(fd, tmpf)
+	_c(JSON.stringify(FaithData.by_god(FaithData.read(tmpf))) == JSON.stringify(FaithData.by_god(fd)), "신앙 저장 → 다시 읽기 그대로")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmpf))
 	# 에디터 패널: 노드 추가 · 삭제(뒤 단계 당김)
 	var panel: Control = load("res://addons/rtz_skill_editor/skill_editor_panel.gd").new()
 	panel._ready()   # 에디터 밖(테스트)이라 트리에 붙이지 않고 화면만 만듦
@@ -899,4 +911,17 @@ func _test_skill_tree_editor() -> void:
 	_c(panel._at("s", 2).id == "dan_p_s3" and panel._at("s", 3).id == "dan_p_s4" and panel._at("s", 4).is_empty(), "중간 단계 삭제 → 바깥 단계가 안으로 당겨짐")
 	panel._swap("dan_p_s3", 1)
 	_c(panel._at("s", 3).id == "dan_p_s3", "단계 자리 바꾸기")
+	# 에디터 신앙: 신 추가 → 신앙 스킬 추가 → 신 삭제(그 스킬도)
+	panel.kind = "faith"
+	panel._rebuild()
+	var g0: int = panel.faith.gods.size()
+	panel._add_god()
+	var gid: String = panel.god_sel
+	panel._add_faith_skill()
+	panel._add_faith_skill()
+	var mine: Array = panel._god_skills()
+	_c(panel.faith.gods.size() == g0 + 1 and mine.size() == 2 and int(mine[1].need) == int(mine[0].need) + 20, "에디터: 신 추가 + 신앙 스킬 2개 (필요 신앙도 20 간격)")
+	_c(panel.faith_box.visible and not panel.canvas.visible, "신앙 모드: 신 목록·신앙 스킬 목록")
+	panel._delete_god()
+	_c(panel._god(gid).is_empty() and not panel.faith.skills.any(func(f): return f.god == gid), "신 삭제 → 그 신의 신앙 스킬도 삭제")
 	panel.free()

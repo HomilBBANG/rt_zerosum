@@ -54,6 +54,7 @@ func _init() -> void:
 	_test_large_units()
 	_test_equip_and_move_lock()
 	_test_rally_status()
+	_test_battle_statuses()
 	_test_balance_data_and_ai_graph()
 	load("res://tests/outgame_tests.gd").new().run(_check)
 	print("== %d passed, %d failed ==" % [_passes, _fails])
@@ -387,6 +388,125 @@ func _test_rally_status() -> void:
 	bc.queue_free()
 
 
+func _status_action(base: ActionData, sid: String, turns: int, value: int) -> ActionData:
+	var a := base.duplicate() as ActionData
+	a.status_id = sid
+	a.status_turns = turns
+	a.status_value = value
+	a.status_chance = 100
+	return a
+
+
+func _test_battle_statuses() -> void:
+	print("[13b] 전투 상태 이상: 출혈·화상·동상·감속·가속·기절·구속·실명")
+	var bc := _make("ally")
+	bc.start_battle()
+	var enemies := bc.slots.living_units("enemy")
+	var allies := bc.slots.living_units("ally")
+	var atk: ActionData = bc.actions["basic_attack"]
+	# 출혈: 맞을 때 바로 1회 + 자기 차례마다, n턴 = 차례 n번
+	var t := enemies[0]
+	t.data.max_hp = 100
+	t.hp = 100
+	var ev := ActionResolver.resolve(_status_action(atk, "bleed", 2, 10), allies[0], t, null)
+	var hit: int = ev.results[0].amount
+	_check(t.statuses.has("bleed") and t.status_turns("bleed") == 2 and ev.applied.size() == 1, "출혈 2턴 걸림")
+	_check(t.hp == 100 - hit - 10 and ev.results.size() == 2 and ev.results[1].status == "bleed", "걸릴 때 바로 최대 HP 10%% 피해 (%d → %d)" % [100, t.hp])
+	var hp1 := t.hp
+	var st := StatusRules.turn_start(t)
+	_check(t.hp == hp1 - 10 and not st.skip, "자기 차례 시작: 출혈 피해 먼저")
+	StatusRules.turn_end(t)
+	_check(t.status_turns("bleed") == 1, "차례가 끝나면 1턴 줄어듦")
+	StatusRules.turn_start(t)
+	StatusRules.turn_end(t)
+	_check(not t.statuses.has("bleed") and t.hp == hp1 - 20, "2턴 뒤 풀림 (걸릴 때 + 차례 2번 = 3번 피해)")
+	# 화상: 화염 고정 피해 (방어 무시)
+	t.data.defense = 5
+	var hp2 := t.hp
+	StatusRules.apply(t, "burn", 1, 4)
+	_check(t.hp == hp2 - 4 and StatusCatalog.get_def("burn").element == "fire", "화상: 방어 5 무시 고정 피해 4 (화염 속성)")
+	t.remove_status("burn")
+	# 동상: n턴 뒤 한 번 크게, 그리고 풀림
+	var hp3 := t.hp
+	StatusRules.apply(t, "frost", 2, 20)
+	_check(t.hp == hp3, "동상: 걸릴 때는 피해 없음")
+	StatusRules.turn_start(t)
+	StatusRules.turn_end(t)
+	_check(t.hp == hp3 and t.statuses.has("frost"), "첫 차례: 아직 (남은 1)")
+	StatusRules.turn_start(t)
+	_check(t.hp == hp3 - 20 and not t.statuses.has("frost"), "둘째 차례 시작: 최대 HP 20%% 피해 1회 후 풀림")
+	# 감속·가속: 속도 % → 행동 순서
+	var a0 := allies[0]
+	var spd := a0.data.speed
+	a0.add_status("slow", 2, 50)
+	_check(a0.speed_now() == maxi(1, roundi(spd * 0.5)), "감속 50%%: 속도 %d → %d" % [spd, a0.speed_now()])
+	a0.remove_status("slow")
+	a0.add_status("haste", 2, 100)
+	_check(a0.speed_now() == spd * 2, "가속 100%%: 속도 ×2")
+	var order := TurnScheduler.sort_by_speed(bc.slots.living_units())
+	_check(order[0] == a0 or order[0].speed_now() >= a0.speed_now(), "가속하면 행동 순서가 앞으로")
+	a0.remove_status("haste")
+	# 기절: 자기 차례 행동 불가, 다른 아군은 기절한 캐릭터와 자리 교환 가능 / 구속: 교환·이동 불가
+	var cur := bc.current
+	var mate: UnitRuntime = null
+	for u in allies:
+		if u != cur:
+			mate = u
+			break
+	mate.add_status("stun", 1, 0)
+	var keys := bc.get_move_options().map(func(o): return o.key)
+	_check(keys.has(mate.slot_key()), "기절한 아군 자리는 교환 후보에 있음")
+	mate.remove_status("stun")
+	mate.add_status("root", 1, 0)
+	keys = bc.get_move_options().map(func(o): return o.key)
+	_check(not keys.has(mate.slot_key()) and not bc.slots.move_or_swap(cur, mate.slot_key()).ok, "구속된 아군과는 교환 불가")
+	mate.remove_status("root")
+	cur.add_status("root", 1, 0)
+	_check(bc.get_move_options().is_empty() and not bc.get_command_options().filter(func(o): return o.id == "move")[0].enabled, "구속: 자기 자리 이동 불가 (이동 버튼 꺼짐)")
+	cur.remove_status("root")
+	_check(StatusRules.turn_start(mate).skip == false, "기절 없으면 행동")
+	mate.add_status("stun", 1, 0)
+	_check(StatusRules.turn_start(mate).skip, "기절: 차례 시작에 행동 불가")
+	StatusRules.turn_end(mate)
+	_check(not mate.statuses.has("stun"), "기절 1턴 → 차례 한 번 지나면 풀림")
+	# 컨트롤러: 기절한 유닛 차례는 바로 넘어감
+	var nxt: UnitRuntime = bc.queue[bc.queue_pos] if bc.queue_pos < bc.queue.size() else null
+	if nxt != null and nxt.team == "ally":
+		nxt.add_status("stun", 1, 0)
+		var lines0 := bc.log_lines.size()
+		bc.player_end_turn()
+		var tail := "\n".join(bc.log_lines.slice(lines0))
+		_check("기절" in tail and not nxt.statuses.has("stun") and bc.current != nxt, "기절한 %s 차례: 행동 없이 넘어가고 기절 풀림" % nxt.display_name())
+	# 실명: 고른 대상 대신 유효 대상 중 무작위
+	var blind := allies[0]
+	blind.add_status("blind", 1, 0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var pool := TargetValidator.valid_targets(bc.actions["ultimate"], blind, bc.slots)
+	var seen := {}
+	for i in 30:
+		var tt := StatusRules.blind_target(bc.actions["ultimate"], blind, pool[0], bc.slots, rng)
+		_check_quiet(pool.has(tt))
+		seen[tt] = true
+	_check(seen.size() == pool.size(), "실명: 적 대상 스킬 → 적 %d명 중 무작위 (%d명 나옴)" % [pool.size(), seen.size()])
+	var heal_pool := TargetValidator.valid_targets(bc.actions["heal"], blind, bc.slots) if bc.actions.has("heal") else []
+	if not heal_pool.is_empty():
+		var hseen := {}
+		for i in 30:
+			var ht := StatusRules.blind_target(bc.actions["heal"], blind, heal_pool[0], bc.slots, rng)
+			hseen[ht.team] = true
+		_check(hseen.size() == 1 and hseen.has("ally"), "실명: 아군 대상 스킬 → 아군 중 무작위")
+	blind.remove_status("blind")
+	# 전투 전용 상태는 기지로 안 넘어감
+	_check(StatusCatalog.get_def("bleed").battle and not StatusCatalog.get_def("injured").get("battle", false), "출혈 = 전투 전용, 부상 = 기지까지")
+	bc.queue_free()
+
+
+func _check_quiet(cond: bool) -> void:
+	if not cond:
+		_check(false, "실명 대상이 유효 대상 밖")
+
+
 func _test_balance_data_and_ai_graph() -> void:
 	print("[14] 밸런스 엑셀 읽기 · 스테이지 배치 · 즉시 반영 · AI 그래프")
 	var d := GameData.load_from()
@@ -395,6 +515,9 @@ func _test_balance_data_and_ai_graph() -> void:
 		return
 	_check(d.allies.size() == 6 and d.actions.size() >= 7, "캐릭터 6 · 스킬 7 이상")
 	_check(d.monsters.has("ghoul") and d.monsters.ghoul.row_span == 2 and d.monsters.wolf.ai_id == "aggressive", "몬스터 차지칸·AI 열")
+	_check(d.actions.flank.status_id == "bleed" and d.actions.flank.status_turns == 2 and d.actions.sand_kick.status_chance == 70 and d.actions.hamstring.status_id == "root", "스킬 시트 상태이상·상태턴·상태확률 (한글 이름 → id)")
+	_check(d.monsters.ghoul.skill_ids.has("rend") and d.monsters.wolf.skill_ids.has("sand_kick"), "몬스터 상태 이상 스킬")
+	_check(d.warnings.is_empty(), "밸런스·스킬 트리·신앙 데이터 경고 없음 %s" % [d.warnings])
 	var kira := GameData._find(d.allies, "a_kira")
 	_check(kira != null and kira.weapons[0].sprite == "knife" and kira.weapons.size() == 2, "아이템 시트 → 무기 (스프라이트 포함)")
 	var es := d.build_stage_enemies("stage_01")
@@ -428,10 +551,18 @@ func _test_balance_data_and_ai_graph() -> void:
 		var t: UnitRuntime = by_graph.target
 		ok = by_graph.action.id == "ultimate" and t.hp <= ActionResolver.compute_damage(by_graph.action, ghoul, t, null)
 	_check(ok, "default 그래프: 처치 가능한 대상에 필살기 (%s)" % (by_graph.target.display_name() if by_graph is Dictionary and not by_graph.is_empty() else "-"))
-	ghoul.ap = 3   # 필살기(4) 불가 → 강공격, HP 최저 대상
+	ghoul.ap = 3   # 필살기(4) 불가 → 상태 이상 스킬(할퀴기 = 출혈) 먼저, 출혈 없는 대상
 	var g2: Variant = AIGraph.decide(g, ghoul, bc.actions, bc.slots, bc.rng)
-	var by_rule := EnemyAI.decide_builtin(ghoul, bc.actions, bc.slots)
-	_check(g2 is Dictionary and g2.action == by_rule.action and g2.target == by_rule.target, "AP 3: 그래프 = 기본 규칙 (%s → %s)" % [by_rule.action.id, by_rule.target.display_name()])
+	_check(g2 is Dictionary and g2.action.id == "rend" and not g2.target.statuses.has("bleed"), "AP 3: 할퀴기(출혈) → 출혈 없는 대상 (%s)" % (g2.target.display_name() if g2 is Dictionary else "-"))
+	for u in bc.slots.living_units("ally"):   # 모두 출혈·동상이면 상태 이상 스킬은 건너뜀 → 강공격, HP 최저
+		u.add_status("bleed", 2, 5)
+		u.add_status("frost", 2, 10)
+	var g3: Variant = AIGraph.decide(g, ghoul, bc.actions, bc.slots, bc.rng)
+	var low: UnitRuntime = null
+	for t in TargetValidator.valid_targets(bc.actions.heavy_attack, ghoul, bc.slots):
+		if low == null or t.hp < low.hp:
+			low = t
+	_check(g3 is Dictionary and g3.action.id == "heavy_attack" and g3.target == low, "모두 걸려 있으면 강공격 → HP 최저 (%s)" % (low.display_name() if low else "-"))
 	ghoul.actions_this_turn = 2
 	_check((AIGraph.decide(g, ghoul, bc.actions, bc.slots, bc.rng) as Dictionary).is_empty(), "행동 2회 후 턴 종료")
 	bc.queue_free()

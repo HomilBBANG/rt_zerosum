@@ -1,6 +1,6 @@
 @tool
 extends EditorPlugin
-## Godot 에디터 상단(2D · 3D · Script 옆)의 "스킬 트리" 탭. 캐릭터마다 액티브·패시브 십자형 스킬 트리 노드 (data/skill_tree.json)
+## Godot 에디터 상단(2D · 3D · Script 옆)의 "스킬 트리" 탭. 캐릭터마다 액티브·패시브 십자형 스킬 트리 노드 (data/skill_tree.json) + 신·신앙 스킬 (data/faith.json)
 
 const PANEL := preload("res://addons/rtz_skill_editor/skill_editor_panel.gd")
 var panel: Control

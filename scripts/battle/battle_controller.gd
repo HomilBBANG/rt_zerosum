@@ -19,6 +19,8 @@ signal unit_moved(unit: UnitRuntime, from_key: String, to_key: String)
 signal units_swapped(a: UnitRuntime, b: UnitRuntime)
 signal weapon_changed(unit: UnitRuntime)
 signal unit_died(unit: UnitRuntime)
+## 차례 시작 상태 이상 적용 (출혈·화상 피해, 동상 폭발, 기절): {unit, results, text}
+signal status_ticked(event: Dictionary)
 signal battle_ended(winner: String)
 signal log_message(text: String)
 signal command_rejected(reason: String)
@@ -160,10 +162,25 @@ func _next_actor() -> void:
 func _actor_start() -> void:
 	_set_state(State.ACTOR_START)
 	current.actions_this_turn = 0
+	# 상태 이상 먼저 (출혈·화상 피해 · 동상 · 기절) → 그다음 행동
+	var st := StatusRules.turn_start(current)
+	if not st.results.is_empty() or not st.texts.is_empty():
+		for t in st.texts:
+			_log(t)
+		status_ticked.emit({"unit": current, "results": st.results, "text": "\n".join(st.texts)})
+		for r in st.results:
+			if r.killed:
+				unit_died.emit(r.target)
+	if not current.alive:
+		_end_actor("상태 이상으로 전투 불능")
+		return
 	var recovered := APComponent.start_turn_recover(current)
 	_log("%s 차례 (AP +%d → %d/%d)" % [current.display_name(), recovered, current.ap, current.data.max_ap])
 	actor_started.emit(current, recovered)
 	ap_changed.emit(current)
+	if st.skip:
+		_end_actor("기절 — 행동 불가")
+		return
 	if current.ap <= 0:
 		_end_actor("AP 0 — 자동 종료")
 		return
@@ -192,6 +209,10 @@ func _end_actor(reason: String) -> void:
 	for sid in u.statuses.duplicate():
 		if StatusCatalog.get_def(sid).get("expires", "") == "own_turn_end":
 			u.remove_status(sid)
+	if u.alive:
+		var gone := StatusRules.turn_end(u)
+		if not gone.is_empty():
+			_log("%s: %s 풀림" % [u.display_name(), ", ".join(gone.map(func(x): return StatusCatalog.get_def(x).name))])
 	actor_ended.emit(u, reason)
 	_next_actor()
 
@@ -234,12 +255,19 @@ func _execute(actor: UnitRuntime, action: ActionData, target: UnitRuntime) -> bo
 	if not APComponent.can_pay(actor, action.ap_cost):
 		command_rejected.emit("AP가 부족합니다. (필요 %d)" % action.ap_cost)
 		return false
+	# 실명: 고른 대상 대신 유효 대상 중 무작위
+	var aim := StatusRules.blind_target(action, actor, target, slots, rng)
+	if aim != target:
+		_log("%s: 실명 — 대상이 무작위로 바뀜 (%s → %s)" % [actor.display_name(), target.display_name(), aim.display_name()])
+		target = aim
 	_set_state(State.ACTION_RESOLVE)
 	APComponent.pay(actor, action.ap_cost)
 	actor.actions_this_turn += 1
 	var event := ActionResolver.resolve(action, actor, target, rng)
 	_log(event.text)
 	ap_changed.emit(actor)
+	if (event.applied as Array).any(func(x): return x.status in ["slow", "haste"]):
+		_resort_rest()
 	action_resolved.emit(event)
 	for r in event.results:
 		if r.kind == "ap":
@@ -247,6 +275,18 @@ func _execute(actor: UnitRuntime, action: ActionData, target: UnitRuntime) -> bo
 		if r.get("killed", false):
 			unit_died.emit(r.target)
 	return true
+
+
+## 감속·가속이 걸리면 이번 라운드에 아직 차례가 안 온 유닛들 순서를 지금 속도로 다시 정렬
+func _resort_rest() -> void:
+	if queue_pos >= queue.size():
+		return
+	var rest: Array[UnitRuntime] = []
+	rest.assign(queue.slice(queue_pos))
+	rest = TurnScheduler.sort_by_speed(rest)
+	for i in rest.size():
+		queue[queue_pos + i] = rest[i]
+	round_started.emit(round_no, queue)   # HUD 행동 순서 갱신
 
 
 # ---------------------------------------------------------------- 플레이어 명령 API
@@ -275,11 +315,16 @@ func get_command_options() -> Array[Dictionary]:
 		elif TargetValidator.valid_targets(a, current, slots).is_empty():
 			enabled = false
 			reason = "유효한 대상이 없습니다."
-		out.append({"id": a.id, "name": a.display_name, "cost": a.ap_cost, "enabled": enabled, "reason": reason, "kind": a.kind, "desc": a.description})
+		var desc := a.description
+		if a.status_id != "":
+			desc += "\n상태 이상: %s %d턴%s%s" % [StatusCatalog.get_def(a.status_id).name, a.status_turns,
+				" (수치 %d)" % a.status_value if a.status_value != 0 else "", " · 확률 %d%%" % a.status_chance if a.status_chance < 100 else ""]
+		out.append({"id": a.id, "name": a.display_name, "cost": a.ap_cost, "enabled": enabled, "reason": reason, "kind": a.kind, "desc": desc})
 	var mv: ActionData = actions.get("move", null)
 	if mv != null:
-		var can := APComponent.can_pay(current, mv.ap_cost)
-		out.append({"id": "move", "name": mv.display_name, "cost": mv.ap_cost, "enabled": can, "reason": "" if can else "AP 부족", "kind": "move", "desc": mv.description})
+		var can := APComponent.can_pay(current, mv.ap_cost) and current.can_be_moved()
+		var why := "" if can else ("AP 부족" if current.can_be_moved() else ("구속 — 자리 이동 불가" if current.statuses.has("root") else "자리 이동 불가 (부상·큰 몸집)"))
+		out.append({"id": "move", "name": mv.display_name, "cost": mv.ap_cost, "enabled": can, "reason": why, "kind": "move", "desc": mv.description})
 	var wp: ActionData = actions.get("weapon", null)
 	if wp != null:
 		var can := APComponent.can_pay(current, wp.ap_cost) and current.data.weapons.size() > 1

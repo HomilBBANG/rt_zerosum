@@ -2,7 +2,7 @@
 class_name GameData
 extends RefCounted
 ## 밸런스 데이터 (data/balance.xlsx) → UnitData / ActionData / 아이템 / 스테이지.
-## 시트: 캐릭터(아군) · 몬스터 · 아이템 · 스킬 · 신 · 신앙스킬 · 스테이지. 스킬 트리 노드는 data/skill_tree.json (SkillTreeData, 에디터 '스킬 트리' 탭). 열 이름은 1행 머리글로 찾는다(열 순서 자유).
+## 시트: 캐릭터(아군) · 몬스터 · 아이템 · 스킬 · 스테이지. 스킬 트리 노드는 data/skill_tree.json (SkillTreeData), 신·신앙 스킬은 data/faith.json (FaithData) — 둘 다 에디터 '스킬 트리' 탭. 열 이름은 1행 머리글로 찾는다(열 순서 자유).
 ## 게임 실행 중 파일이 바뀌면 apply_from() 으로 기존 객체를 제자리 갱신 → 진행 중인 전투에도 즉시 반영.
 
 const BALANCE_PATH := "res://data/balance.xlsx"
@@ -96,23 +96,27 @@ func _parse(sheets: Dictionary) -> void:
 		a.effect = d.get("효과", "damage")
 		a.power = _i(d, "위력")
 		a.description = d.get("설명", "")
+		# 상태 이상 (id 또는 한글 이름: 출혈·화상·동상·감속·가속·기절·구속·실명)
+		var sraw := str(d.get("상태이상", "")).strip_edges()
+		if sraw != "":
+			a.status_id = StatusCatalog.find(sraw)
+			if a.status_id == "" or not a.status_id in StatusCatalog.BATTLE:
+				warnings.append("스킬 %s: 모르는 상태이상 '%s' (%s)" % [a.id, sraw, ", ".join(StatusCatalog.BATTLE.map(func(x): return StatusCatalog.DEFS[x].name))])
+				a.status_id = ""
+			a.status_turns = maxi(1, _i(d, "상태턴", 1))
+			a.status_value = _i(d, "상태수치")
+			a.status_chance = clampi(_i(d, "상태확률", 100), 0, 100)
 		actions[a.id] = a
 	for d in _table(sheets.get("캐릭터", [])):
 		allies.append(_unit(d, "ally"))
 	for d in _table(sheets.get("캐릭터", [])):
 		char_faith[d.id] = {"god": str(d.get("신", "")).strip_edges(), "faith": clampi(_i(d, "신앙"), 0, 100)}
-	for d in _table(sheets.get("신", [])):
-		var col := str(d.get("상징색", "")).strip_edges()
-		gods[d.id] = {"id": d.id, "name": d.get("이름", d.id), "color": Color(col) if col.begins_with("#") else Color(0.9, 0.85, 0.6), "desc": d.get("설명", "")}
-		god_order.append(d.id)
-	for d in _table(sheets.get("신앙스킬", [])):
-		var g := str(d.get("신", "")).strip_edges()
-		if not faith_skills.has(g):
-			faith_skills[g] = []
-		faith_skills[g].append({"id": d.id, "god": g, "name": d.get("이름", d.id), "need": _i(d, "필요신앙"),
-			"effect": str(d.get("효과", "")).strip_edges(), "value": _i(d, "값"), "desc": d.get("설명", "")})
-	for g in faith_skills:
-		(faith_skills[g] as Array).sort_custom(func(a, b): return int(a.need) < int(b.need))
+	# 신앙 (data/faith.json — 에디터 '스킬 트리' 탭 → 신앙)
+	var fd := FaithData.read()
+	for g in fd.gods:
+		gods[g.id] = {"id": g.id, "name": g.name, "color": FaithData.color_of(g), "desc": g.desc}
+		god_order.append(g.id)
+	faith_skills = FaithData.by_god(fd)
 	for d in _table(sheets.get("몬스터", [])):
 		monsters[d.id] = _unit(d, "enemy")
 	for d in _table(sheets.get("스테이지", [])):
@@ -124,17 +128,8 @@ func _parse(sheets: Dictionary) -> void:
 			"ambush": amb, "hp_mult": _f(d, "적HP배율", 1.0), "dmg_mult": _f(d, "적공격배율", 1.0),
 			"seed": _i(d, "시드", 12345), "desc": d.get("설명", "")}
 		stage_order.append(d.id)
-	for cid in char_faith:
-		var g: String = char_faith[cid].god
-		if g != "" and not gods.has(g):
-			warnings.append("%s: 신 시트에 없는 신 '%s'" % [cid, g])
-	for g in faith_skills:
-		if not gods.has(g):
-			warnings.append("신앙스킬: 신 시트에 없는 신 '%s'" % g)
-		for n in faith_skills[g]:
-			var ef: String = n.effect
-			if (ef.begins_with("skill:") or ef.begins_with("skill_power:")) and not actions.has(ef.split(":")[1]):
-				warnings.append("신앙스킬 %s: 스킬 시트에 없는 '%s'" % [n.id, ef.split(":")[1]])
+	for e in FaithData.check(fd, char_faith, actions).errors:
+		warnings.append("신앙: " + e)
 	# 스킬 트리 (JSON) 검사: 게임에서 틀어지는 오류만 경고
 	var tree_nodes := SkillTreeData.read()
 	skill_tree = SkillTreeData.by_char(tree_nodes)

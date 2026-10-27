@@ -1,0 +1,106 @@
+@tool
+class_name FaithData
+extends RefCounted
+## 신앙 데이터 (data/faith.json, Godot 에디터 '스킬 트리' 탭의 '신앙' 에서 편집).
+## 신 = {id, name, color(#RRGGBB), desc} / 신앙 스킬 = {id, god, name, need(필요 신앙도 0~100), effect, value, desc}
+## 효과 형식은 스킬 트리 노드와 같음 (SkillTreeData.EFFECTS). 어느 캐릭터가 어느 신을 믿는지는 밸런스 엑셀 캐릭터 시트 '신'·'신앙' 열.
+
+const PATH := "res://data/faith.json"
+const FAITH_MAX := 100
+
+
+static func new_god(id: String) -> Dictionary:
+	return {"id": id, "name": "새 신", "color": "#d8c890", "desc": ""}
+
+
+static func new_skill(id: String, god: String, need: int) -> Dictionary:
+	return {"id": id, "god": god, "name": "새 신앙 스킬", "need": need, "effect": "hp", "value": 1, "desc": ""}
+
+
+static func read(path: String = PATH) -> Dictionary:
+	var out := {"gods": [], "skills": []}
+	if not FileAccess.file_exists(path):
+		return out
+	var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not j is Dictionary:
+		return out
+	for g in j.get("gods", []):
+		if g is Dictionary:
+			out.gods.append({"id": str(g.get("id", "")), "name": str(g.get("name", "")), "color": str(g.get("color", "#d8c890")), "desc": str(g.get("desc", ""))})
+	for s in j.get("skills", []):
+		if s is Dictionary:
+			out.skills.append({"id": str(s.get("id", "")), "god": str(s.get("god", "")), "name": str(s.get("name", "")),
+				"need": clampi(int(s.get("need", 0)), 0, FAITH_MAX), "effect": str(s.get("effect", "")).strip_edges(),
+				"value": int(s.get("value", 0)), "desc": str(s.get("desc", ""))})
+	return out
+
+
+static func write(d: Dictionary, path: String = PATH) -> int:
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return FileAccess.get_open_error()
+	var order := (d.gods as Array).map(func(g): return g.id)
+	var skills: Array = (d.skills as Array).duplicate()
+	skills.sort_custom(func(a, b):
+		if a.god != b.god:
+			return order.find(a.god) < order.find(b.god)
+		return int(a.need) < int(b.need))
+	f.store_string(JSON.stringify({"version": 1, "gods": d.gods, "skills": skills}, "\t", false))
+	return OK
+
+
+## 신 id → 신앙 스킬 목록 (필요 신앙도 오름차순)
+static func by_god(d: Dictionary) -> Dictionary:
+	var out := {}
+	for s in d.skills:
+		if not out.has(s.god):
+			out[s.god] = []
+		out[s.god].append(s)
+	for g in out:
+		(out[g] as Array).sort_custom(func(a, b): return int(a.need) < int(b.need))
+	return out
+
+
+static func color_of(g: Dictionary) -> Color:
+	var c := str(g.get("color", ""))
+	return Color(c) if c.begins_with("#") else Color(0.9, 0.85, 0.6)
+
+
+## 검사 → {errors, notes}. char_faith = 캐릭터 id → {god, faith} (엑셀 캐릭터 시트)
+static func check(d: Dictionary, char_faith: Dictionary, actions: Dictionary) -> Dictionary:
+	var errors := PackedStringArray()
+	var notes := PackedStringArray()
+	var gids := {}
+	for g in d.gods:
+		if str(g.id) == "":
+			errors.append("id 가 빈 신이 있습니다")
+		elif gids.has(g.id):
+			errors.append("신 id '%s' 가 두 번 있습니다" % g.id)
+		gids[g.id] = true
+	var sids := {}
+	for s in d.skills:
+		if str(s.id) == "":
+			errors.append("%s: id 가 빈 신앙 스킬이 있습니다" % s.god)
+		elif sids.has(s.id):
+			errors.append("신앙 스킬 id '%s' 가 두 번 있습니다" % s.id)
+		sids[s.id] = true
+		if not gids.has(s.god):
+			errors.append("%s: 없는 신 '%s'" % [s.id, s.god])
+		var ef: String = s.effect
+		if ef.begins_with("skill:") or ef.begins_with("skill_power:"):
+			if not actions.has(ef.split(":")[1]):
+				errors.append("%s: 스킬 시트에 없는 스킬 '%s'" % [s.id, ef.split(":")[1]])
+		elif not ef in SkillTreeData.EFFECTS:
+			errors.append("%s: 모르는 효과 '%s'" % [s.id, ef])
+		if ef.begins_with("skill:"):
+			notes.append("%s: 새 스킬은 전투 기본 스킬 칸(%d칸)이 차 있으면 안 보입니다" % [s.id, SkillTreeData.SKILL_SLOTS])
+	for cid in char_faith:
+		var g := str(char_faith[cid].god)
+		if g != "" and not gids.has(g):
+			errors.append("%s: 캐릭터 시트 '신' 열의 '%s' 가 없는 신입니다" % [cid, g])
+	for g in d.gods:
+		if not (d.skills as Array).any(func(s): return s.god == g.id):
+			notes.append("%s: 신앙 스킬이 없습니다" % g.name)
+		if not char_faith.values().any(func(cf): return cf.god == g.id):
+			notes.append("%s: 믿는 캐릭터가 없습니다 (캐릭터 시트 '신' 열)" % g.name)
+	return {"errors": errors, "notes": notes}

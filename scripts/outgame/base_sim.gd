@@ -1796,8 +1796,9 @@ func apply_battle_result(result: Dictionary) -> void:
 			continue
 		var cs := cstate_of(cid)
 		var sts: Array = []
-		for sid in a.get("statuses", []):
-			if not StatusCatalog.get_def(str(sid)).get("positive", false):
+		for sid in a.get("statuses", []):   # 전투 전용 상태 이상(출혈·기절 등)은 전투가 끝나면 사라짐
+			var sd := StatusCatalog.get_def(str(sid))
+			if not sd.get("positive", false) and not sd.get("battle", false):
 				sts.append(str(sid))
 		if not a.get("alive", true):
 			cs.hp = 1.0
