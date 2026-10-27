@@ -173,7 +173,21 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 (피치 40°, 거리 15m, 세로 화각 32°, 화면 중심 y 480 — 벽이 더 보이고 바닥이 덜 보이게 구도를 위로)로 배경(바닥 원근·벽·소품·빛 영역 마스크)을 그리고, 같은 값이
 `manifest.json` 의 `camera` 로 저장되어 `BattleView2D` 가 슬롯 위치와 캐릭터 크기(원근 배율)를 계산합니다.
 각도나 거리를 바꾸려면 `CAMERA` 를 수정하고 `python3 tools/gen_sprites.py` 를 다시 실행하면 배경과 배치가 함께 바뀝니다.
-3D 뷰도 같은 각도(40°)로 맞춰 두었습니다.
+배경 3D 방도 같은 각도(40°)로 맞춰 그립니다.
+
+## 레벨 · 스킬 트리
+전투에 나간 대원은 **경험치**(승리 100 · 패배 40)를 받고, 레벨이 오를 때마다 **스킬 포인트 +1** (처음 1).
+기지 위 **`스킬` 버튼**(또는 대원 우클릭 → 스킬 트리, 정보·장비 창)으로 **캐릭터마다 스킬 창**을 엽니다.
+- **십자형 트리**: 가운데 `기초 훈련`(처음부터) → **북 = 화력 · 동 = 기동 · 남 = 생존 · 서 = 전술** 네 갈래로 1~3단계. 어느 방향으로 뻗느냐가 빌드.
+- 갈래 안에서는 앞 단계부터, **갈래 끝(3단계)은 한 캐릭터에 하나만** — 끝에는 새 스킬(강타·측면 기습·재정비·고무, 앨마는 강화)이 있어 전투 스킬 칸에 붙음.
+- **레벨이 모자란 스킬은 회색 + 가운데 붉은 "경험 부족"**. 노드를 누르면 왼쪽에 설명·필요 레벨, `배우기`. `스킬 초기화` = 포인트 돌려받기 (지금은 무료).
+- 효과: 최대 HP·속도·최대 AP·AP 회복·방어·모든 공격 위력·특정 스킬 위력·새 스킬 → 기지에서 출전한 전투에 반영. 레벨도 피해·회복에 반영(레벨/2).
+- 데이터: 밸런스 엑셀 `스킬트리` 시트 (캐릭터·방향·단계·필요레벨·효과·값), 새 스킬은 `스킬` 시트. 경험치·레벨 수치는 기지 엑셀 `설정`(xp_win, xp_lose, xp_level_base, xp_level_step, level_max).
+- 전투 결과 화면에 출전 대원 경험치·레벨 업 표시.
+- 확인: `godot --path . ++ --scene=base --base_ui=skills:a_dan:2000:dan_n1,dan_n2,dan_n3` (경험치 주고 배운 상태로 창).
+
+![스킬 트리 — 새로 시작 (회색 + 경험 부족)](docs/screenshots/skill_tree_fresh.png)
+![스킬 트리 — 북(화력) 끝까지 뻗은 빌드](docs/screenshots/skill_tree_built.png)
 
 ## 출정 대기 (편성 화면)
 기지에서 전투가 발생해 `전투 배치로` 를 누르면 출정 대기 화면이 뜹니다.
@@ -210,7 +224,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - 빛 쪽 얼굴·몸을 그 광원색으로 밝히고 반대편은 셀 그림자.
 - 빛이 뒤(벽의 창·문)에서 오면 **빛 쪽 가장자리에 같은 색 림**을 더함(반대 방향 마스크의 림 구역 사용). 반대편 림은 그쪽에서 실제 빛이 올 때만.
 - 보이지 않는 그림자 대리 물체로 캐릭터 그림자가 바닥에 드리워집니다.
-이전 2D 원화 배경은 `--bg=2d` 로 볼 수 있습니다. 투영 확인용 `--bgdebug=1`(슬롯 위치 빨간 점).
+(예전 2D 배경 판과 3D 캐릭터 전투 씬은 2026-10-27 제거.) 투영 확인용 `--bgdebug=1`(슬롯 위치 빨간 점).
 
 ## 전투 카메라
 전투가 시작되면 먼저 전장 전체 구도를 약 1초 보여준 뒤 2배로 줌인하고, 이후 차례가 온 캐릭터의 몸 중심을 화면 가운데
@@ -296,7 +310,7 @@ godot --headless --path . -s tests/run_tests.gd
 전투: GDD 8절 "필수 검증 사례" (선공 특례, 2라운드 미적용, 동률 아군/레벨/원거리 우선, AP 상한 버림/이월/0 자동 종료,
 이동/교환 AP 1, 무기 변경 AP 1, AP 부족/무효 대상 시 AP 미소모, 재시작 초기화, 시드 재현성) + 큰 몸집·장착·상태 이상·엑셀·AI 그래프.
 기지([15]~[24], `tests/outgame_tests.gd`): 날짜 전환(23:59→다음 날·월말·연말), 해금(부족/정확/초과/중복), 잠긴 방 경로·7일 이동, 요일별 일정·해금 → 생활 변화,
-대화/엿듣기/요청 구분, 일일 오염·청소·위임, 주간 결산 중복 없음, 월 1회 점검·그 주 보너스, 훈련·제작·강화 → 전투 수치, 저장/불러오기 복구, 출정 대사 고르기·출정 불가 대원([31]), 연구원 로한·무기 연구([32]). 현재 296개 통과.
+대화/엿듣기/요청 구분, 일일 오염·청소·위임, 주간 결산 중복 없음, 월 1회 점검·그 주 보너스, 훈련·제작·강화 → 전투 수치, 저장/불러오기 복구, 출정 대사 고르기·출정 불가 대원([31]), 연구원 로한·무기 연구([32]), 레벨·스킬 트리([33]). 현재 319개 통과.
 
 ## 스크린샷 일괄 렌더
 ```
@@ -308,11 +322,11 @@ CLI 인자(`++` 뒤): `--scene=battle|formation|result|menu|title|base --mode=2d
 
 ## 폴더
 ```
-scenes/            title, main_menu(전투 테스트), formation, battle_2d, battle_3d, battle_hud, result, outgame/base_hub
+scenes/            title, main_menu(전투 테스트), formation, battle_2d, battle_hud, result, outgame/base_hub
 scripts/battle/    규칙 계층 (표현 비의존): unit_data, action_data, unit_runtime, slot_manager,
                    turn_scheduler, ap_component, target_validator, action_resolver, enemy_ai, battle_controller
 scripts/presentation/  battle_view_base (공통 인터페이스), battle_view_2d + unit_sprite_2d + character_sprite_2d(프레임 애니메이션) + slot_marker_2d,
-                   battle_view_3d + unit_model_3d, lighting_presets
+                   battle_view_3d(전투 배경 3D 방), lighting_presets
 scripts/ui/        battle_hud, title, main_menu, formation, result
 scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정·단면 좌표), world_clock, room_route_service, npc_schedule_resolver,
                    npc_agent, economy_ledger, base_sim(해금·이동·대화·위생·의뢰·결산·점검·제작·저장) / base_hub(씬)
@@ -320,7 +334,7 @@ scripts/outgame/view/  base_view_3d(3D 단면 건물·조명·카메라), base_o
 addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor (Godot 에디터 상단 탭)
 data/              balance.xlsx(전투), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
-shaders/           cel_zoned_lighting (2D 배경, v0.3), cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
+shaders/           cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/characters/ 캐릭터별 base·프레임 애니메이션·마스크·character.json (전투·기지 공통)
 assets/sprites/    무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + 옛 테스트 캐릭터 + manifest.json
 assets/textures/   배경 플레이트 + 마스크, 3D 얼굴 데칼

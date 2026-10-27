@@ -100,6 +100,7 @@ func _ready() -> void:
 	sim.notice.connect(_on_notice)
 	sim.statement_ready.connect(func(st): hud.enqueue(func(): hud.open_statement(st)))
 	sim.inspection_completed.connect(func(rec): hud.enqueue(func(): hud.open_inspection(rec)))
+	sim.leveled_up.connect(func(cid, lv): hud.show_toast("%s 레벨 업! Lv%d — 스킬 포인트 +1" % [sim._char_label(cid), lv], OutgameHud.GOOD))
 	sim.research_completed.connect(func(qid): hud.show_toast("연구 완료: %s — 무기고에서 제작 가능" % sim.data.research.get(qid, {}).get("name", qid), OutgameHud.GOOD))
 	sim.day_changed.connect(func(_d): Game.save_campaign())
 	sim.room_unlocked.connect(func(fid): v3d.rebuild_room(fid); _rerender())
@@ -520,6 +521,14 @@ func _cli_ui(spec: String) -> void:
 			if not sim.chats.is_empty():
 				hud.open_overhear(sim.chats[0].key)
 		"facility": hud.open_facility(p[1])
+		"skills":   # skills[:캐릭터 id[:경험치[:배울 노드,노드…[:고를 노드]]]] — 스킬 창 (경험치 주고 배우기)
+			var cid := p[1] if p.size() > 1 else ""
+			if p.size() > 2 and cid != "":
+				sim.add_xp(cid, int(p[2]))
+			if p.size() > 3 and cid != "":
+				for nid in p[3].split(",", false):
+					sim.learn_skill(cid, nid)
+			hud.open_skills(cid, p[4] if p.size() > 4 else "")
 		"research":   # research[:연구 id[:건너뛸 분]] — 연구 창 (연구 시작 + 시간 건너뛰기)
 			if p.size() > 1:
 				sim.ledger.cash = maxi(sim.ledger.cash, 500)

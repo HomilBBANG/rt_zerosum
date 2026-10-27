@@ -1,12 +1,12 @@
 class_name BattleView3D
-extends BattleViewBase
-## 경로 B 의 3D 해석: 실제 색광원(SpotLight3D) + 셀 셰이더 단계 분할 + 하드 섀도우.
+extends Node3D
+## 2D 전투의 3D 배경 (병영 방): 실제 색광원(SpotLight3D) + 셀 셰이더 단계 분할 + 하드 섀도우.
 ## 문/창문 개구부를 통과한 빛이 바닥에 '딱딱한 다각형' 광면을 만든다.
+## BattleView2D 가 SubViewport 안에 만들어 배경으로 깐다 (3D 캐릭터 전투 씬은 2026-10-27 제거).
 
 const CEL := preload("res://shaders/cel_3d.gdshader")
 const OUTLINE := preload("res://shaders/outline_3d.gdshader")
 const UNLIT := preload("res://shaders/unlit_3d.gdshader")
-const MODEL := preload("res://scripts/presentation/unit_model_3d.gd")
 
 var camera: Camera3D
 var env: WorldEnvironment
@@ -16,32 +16,10 @@ var accent_light: SpotLight3D
 var accent_light2: SpotLight3D
 var fill_light: DirectionalLight3D
 var room: Node3D
-var units_root: Node3D
-var markers_root: Node3D
-var models: Dictionary = {}
+var preset: Dictionary = {}
 var room_mats: Array[ShaderMaterial] = []
 var exterior_key: ShaderMaterial
 var exterior_accent: ShaderMaterial
-var _markers: Array[Node3D] = []
-
-
-## 유닛 위치: 두 칸 큰 몸집은 차지한 칸들의 가운데
-static func unit_position(u: UnitRuntime) -> Vector3:
-	var w := Vector3.ZERO
-	for r in range(u.row, u.row + u.data.row_span):
-		w += slot_position(u.team, r, u.index)
-	return w / float(u.data.row_span)
-
-
-static func slot_position(team: String, row: int, index: int) -> Vector3:
-	var x: float
-	if team == "ally":
-		x = -1.3 - row * 1.7
-	else:
-		x = 1.3 + row * 1.7
-	var z := 0.1 + index * 1.15
-	x += (-0.35 if team == "ally" else 0.35) * index
-	return Vector3(x, 0.0, z)
 
 
 func _ready() -> void:
@@ -68,10 +46,6 @@ func _ready() -> void:
 	add_child(room)
 	_build_room()
 	_build_lights()
-	units_root = Node3D.new()
-	add_child(units_root)
-	markers_root = Node3D.new()
-	add_child(markers_root)
 
 
 func _room_mat(color: Color, outline_mode: int = 1, outline_w: float = 0.02) -> ShaderMaterial:
@@ -217,32 +191,6 @@ func _spot(pos: Vector3, target: Vector3, angle: float, energy: float) -> SpotLi
 	return l
 
 
-func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
-	super.setup(p_controller, p_preset)
-	controller.battle_started.connect(_spawn_units)
-	if not controller.slots.all_units().is_empty():
-		_spawn_units()
-	controller.action_resolved.connect(_on_action_resolved)
-	controller.unit_moved.connect(_on_unit_moved)
-	controller.units_swapped.connect(_on_units_swapped)
-	controller.weapon_changed.connect(_on_weapon_changed)
-	controller.unit_died.connect(_on_unit_died)
-
-
-## 전투 (재)시작 시 슬롯의 유닛으로 모델 재생성
-func _spawn_units() -> void:
-	for c in units_root.get_children():
-		c.queue_free()
-	models.clear()
-	for u in controller.slots.all_units():
-		var m: UnitModel3D = MODEL.new()
-		units_root.add_child(m)
-		m.build(u)
-		m.position = unit_position(u)
-		m.scale = Vector3.ONE * (u.data.height_cm / 175.0)   # 캐릭터 키 반영
-		models[u.instance_id] = m
-	apply_preset(preset)
-
 func apply_preset(p: Dictionary) -> void:
 	preset = p
 	env.environment.background_color = p.clear
@@ -257,149 +205,6 @@ func apply_preset(p: Dictionary) -> void:
 		m.set_shader_parameter("shadow_tint", p.shadow)
 		m.set_shader_parameter("ambient_tint", p.ambient)
 		m.set_shader_parameter("light_mix", p.key_mix)
-	for id in models:
-		models[id].apply_lighting(p)
-
-
-func model_of(unit: UnitRuntime) -> UnitModel3D:
-	return models.get(unit.instance_id, null)
-
-
-func get_unit_screen_pos(unit: UnitRuntime) -> Vector2:
-	var m := model_of(unit)
-	if m == null:
-		return Vector2.ZERO
-	return camera.unproject_position(m.global_position + Vector3(0, m.head_height + 0.05, 0))
-
-
-func get_slot_screen_pos(key: String) -> Vector2:
-	var info := SlotManager.parse_key(key)
-	return camera.unproject_position(slot_position(info.team, info.row, info.index))
-
-
-func set_highlight(unit: UnitRuntime, kind: String) -> void:
-	var m := model_of(unit)
-	if m:
-		m.set_highlight(kind)
-
-
-func clear_highlights() -> void:
-	for id in models:
-		models[id].set_highlight("none")
-
-
-func show_slot_markers(options: Array[Dictionary]) -> void:
-	clear_slot_markers()
-	for o in options:
-		var info := SlotManager.parse_key(o.key)
-		var n := Node3D.new()
-		n.position = slot_position(info.team, info.row, info.index)
-		var disc := CylinderMesh.new()
-		disc.top_radius = 0.5
-		disc.bottom_radius = 0.5
-		disc.height = 0.04
-		var mi := MeshInstance3D.new()
-		mi.mesh = disc
-		var mat := ShaderMaterial.new()
-		mat.shader = UNLIT
-		mat.set_shader_parameter("tint", Color(0.4, 0.9, 1.0) if o.kind == "move" else Color(1.0, 0.8, 0.3))
-		mi.material_override = mat
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		n.add_child(mi)
-		var area := Area3D.new()
-		area.set_meta("slot", o.key)
-		var cs := CollisionShape3D.new()
-		var sh := CylinderShape3D.new()
-		sh.radius = 0.55
-		sh.height = 0.3
-		cs.shape = sh
-		area.add_child(cs)
-		n.add_child(area)
-		markers_root.add_child(n)
-		_markers.append(n)
-
-
-func clear_slot_markers() -> void:
-	for m in _markers:
-		m.queue_free()
-	_markers.clear()
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		var from := camera.project_ray_origin(event.position)
-		var dir := camera.project_ray_normal(event.position)
-		var space := get_viewport().world_3d.direct_space_state
-		var q := PhysicsRayQueryParameters3D.create(from, from + dir * 60.0)
-		q.collide_with_areas = true
-		q.collide_with_bodies = false
-		var hit := space.intersect_ray(q)
-		if hit.is_empty():
-			return
-		var col: Object = hit.collider
-		if col.has_meta("slot"):
-			slot_clicked.emit(col.get_meta("slot"))
-			get_viewport().set_input_as_handled()
-		elif col.has_meta("unit"):
-			unit_clicked.emit(col.get_meta("unit"))
-			get_viewport().set_input_as_handled()
-
-
-func _on_action_resolved(event: Dictionary) -> void:
-	var actor: UnitRuntime = event.actor
-	var m := model_of(actor)
-	if m == null:
-		return
-	_begin_busy()
-	var ranged: bool = actor.is_ranged_now() or event.action.kind == "ultimate"
-	var tw := m.play_attack(ranged)
-	await get_tree().create_timer(0.12).timeout
-	for r in event.results:
-		var tm := model_of(r.target)
-		if tm == null:
-			continue
-		if r.kind == "damage":
-			tm.play_hit()
-		else:
-			tm.play_heal()
-	if tw.is_valid():
-		await tw.finished
-	_end_busy()
-
-
-func _on_unit_moved(unit: UnitRuntime, _f: String, _t: String) -> void:
-	var m := model_of(unit)
-	_begin_busy()
-	var tw := create_tween()
-	tw.tween_property(m, "position", unit_position(unit), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	await tw.finished
-	_end_busy()
-
-
-func _on_units_swapped(a: UnitRuntime, b: UnitRuntime) -> void:
-	var ma := model_of(a)
-	var mb := model_of(b)
-	_begin_busy()
-	var tw := create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(ma, "position", unit_position(a), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(mb, "position", unit_position(b), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	await tw.finished
-	_end_busy()
-
-
-func _on_weapon_changed(unit: UnitRuntime) -> void:
-	var m := model_of(unit)
-	if m:
-		m.refresh_weapon()
-		m.apply_lighting(preset)
-
-
-func _on_unit_died(unit: UnitRuntime) -> void:
-	var m := model_of(unit)
-	if m:
-		m.play_death()
-
 
 
 # ================================================================ 2D 전투용 3D 배경 모드

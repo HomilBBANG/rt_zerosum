@@ -23,6 +23,10 @@ extends Resource
 @export var row_span: int = 1
 ## 적 AI 그래프 id (data/ai/<id>.json, AI 에디터) — 몬스터 시트 "AI" 열
 @export var ai_id: String = "default"
+## 스킬 트리 보너스 (기지에서 배운 것, 전투용 복제본에만): 모든 공격 위력 + / 회복량 + / 스킬별 위력 {스킬 id: +}
+@export var power_bonus: int = 0
+@export var heal_bonus: int = 0
+@export var skill_power: Dictionary = {}
 ## 주는 피해 배율 (스테이지 적공격배율)
 @export var damage_mult: float = 1.0
 ## 기본 배치 (row 0=전방,1=중앙,2=후방 / index 0,1)

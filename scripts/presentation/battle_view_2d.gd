@@ -1,12 +1,10 @@
 class_name BattleView2D
 extends BattleViewBase
-## 경로 A (02_graphics v0.2 §4): 원화 + 구역 마스크 + cel_zoned_lighting 셰이더.
+## 2D 캐릭터(원화 스프라이트) + 3D 배경 방(BattleView3D 를 SubViewport 로 렌더). 예전 2D 배경 판은 2026-10-27 제거.
 
-const ZONE_SHADER := preload("res://shaders/cel_zoned_lighting.gdshader")
 const UNIT_SCRIPT := preload("res://scripts/presentation/unit_sprite_2d.gd")
 
 @onready var world: Node2D = $World
-@onready var bg: Sprite2D = $World/Background
 @onready var units_root: Node2D = $World/Units
 # ---------------------------------------------------------------- 카메라 (인스펙터에서 조절)
 ## battle_2d.tscn 의 View 노드를 선택하면 인스펙터에 보인다. 값을 바꾸면 캐릭터 위치·크기, 3D 배경, 조명이 그 구도로 다시 맞춰진다.
@@ -70,7 +68,6 @@ var back_bars: Node2D   # 발밑 체력 칸 층: 캐릭터·하이라이트 링�
 
 var manifest: Dictionary = {}
 var sprites: Dictionary = {}   # instance_id -> UnitSprite2D
-var bg_mat: ShaderMaterial
 var _marker_nodes: Array[Node2D] = []
 
 
@@ -159,15 +156,7 @@ func _ready() -> void:
 	var f := FileAccess.open("res://assets/sprites/manifest.json", FileAccess.READ)
 	manifest = JSON.parse_string(f.get_as_text())
 	set_camera(_camera_dict())
-	# 배경은 2배 해상도(레티나 대응)로 생성되어 있으므로 화면 크기에 맞춰 축소
-	bg.scale = Vector2.ONE * (1280.0 / float(bg.texture.get_width()))
-	bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	bg_mat = ShaderMaterial.new()
-	bg_mat.shader = ZONE_SHADER
-	bg_mat.set_shader_parameter("zone_mask", load("res://assets/textures/bg_barracks_mask.png"))
-	bg.material = bg_mat
-	if Game.cli.get("bg", "3d") == "3d":
-		_make_3d_background()
+	_make_3d_background()
 	_make_camera()
 	back_bars = Node2D.new()
 	back_bars.name = "BackBars"
@@ -231,7 +220,6 @@ func _spawn_units() -> void:
 
 func apply_preset(p: Dictionary) -> void:
 	preset = p
-	LightingPresets.apply_to_material(bg_mat, p)
 	clear_rect.color = p.clear
 	if bg3d != null:
 		bg3d.apply_preset(p)
@@ -272,7 +260,6 @@ func _make_3d_background() -> void:
 	bg_vp.add_child(bg3d)
 	bg3d.configure_as_background(cam)
 	# 배경은 화면 공간(카메라 영향 없음)에 화면 크기로 깔고, 3D 카메라가 2D 카메라의 위치·줌을 그대로 따라가 다시 그린다
-	bg.visible = false
 	clear_rect.visible = false   # 화면 공간 3D 배경(레이어 -1)을 덮지 않게
 	var layer := CanvasLayer.new()
 	layer.name = "BackgroundLayer"

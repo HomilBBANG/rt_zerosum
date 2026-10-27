@@ -2,7 +2,7 @@
 class_name GameData
 extends RefCounted
 ## 밸런스 데이터 (data/balance.xlsx) → UnitData / ActionData / 아이템 / 스테이지.
-## 시트: 캐릭터(아군) · 몬스터 · 아이템 · 스킬 · 스테이지. 열 이름은 1행 머리글로 찾는다(열 순서 자유).
+## 시트: 캐릭터(아군) · 몬스터 · 아이템 · 스킬 · 스킬트리 · 스테이지. 열 이름은 1행 머리글로 찾는다(열 순서 자유).
 ## 게임 실행 중 파일이 바뀌면 apply_from() 으로 기존 객체를 제자리 갱신 → 진행 중인 전투에도 즉시 반영.
 
 const BALANCE_PATH := "res://data/balance.xlsx"
@@ -17,6 +17,9 @@ var items: Dictionary = {}          # id → {id, name, kind, range_type, power_
 var actions: Dictionary = {}        # id → ActionData
 var stages: Dictionary = {}         # id → {id, name, preset, ambush, hp_mult, dmg_mult, seed, desc}
 var stage_order: Array[String] = []
+## 스킬 트리: 캐릭터 id → [{id, char, dir(center|n|e|s|w), tier 0~3, name, level, effect, value, desc}] (십자형 — 중앙 + 동서남북 갈래)
+var skill_tree: Dictionary = {}
+const TREE_DIRS := {"중앙": "center", "북": "n", "동": "e", "남": "s", "서": "w"}
 var warnings: PackedStringArray = []
 var _stage_copies: Array = []       # [{copy: UnitData, base: id, stage: id}] 스테이지 배율 적용본
 
@@ -92,6 +95,17 @@ func _parse(sheets: Dictionary) -> void:
 		actions[a.id] = a
 	for d in _table(sheets.get("캐릭터", [])):
 		allies.append(_unit(d, "ally"))
+	for d in _table(sheets.get("스킬트리", [])):
+		var cid := str(d.get("캐릭터", ""))
+		var dir: String = TREE_DIRS.get(str(d.get("방향", "")).strip_edges(), "")
+		if cid == "" or dir == "":
+			warnings.append("스킬트리 %s: 캐릭터·방향(중앙/북/동/남/서) 확인" % d.id)
+			continue
+		if not skill_tree.has(cid):
+			skill_tree[cid] = []
+		skill_tree[cid].append({"id": d.id, "char": cid, "dir": dir, "tier": 0 if dir == "center" else clampi(_i(d, "단계", 1), 1, 9),
+			"name": d.get("이름", d.id), "level": _i(d, "필요레벨", 1), "effect": str(d.get("효과", "")).strip_edges(),
+			"value": _i(d, "값"), "desc": d.get("설명", "")})
 	for d in _table(sheets.get("몬스터", [])):
 		monsters[d.id] = _unit(d, "enemy")
 	for d in _table(sheets.get("스테이지", [])):
@@ -103,6 +117,17 @@ func _parse(sheets: Dictionary) -> void:
 			"ambush": amb, "hp_mult": _f(d, "적HP배율", 1.0), "dmg_mult": _f(d, "적공격배율", 1.0),
 			"seed": _i(d, "시드", 12345), "desc": d.get("설명", "")}
 		stage_order.append(d.id)
+	for cid in skill_tree:
+		if _find(allies, cid) == null:
+			warnings.append("스킬트리: 캐릭터 시트에 없는 '%s'" % cid)
+		for n in skill_tree[cid]:
+			var ef: String = n.effect
+			if ef.begins_with("skill:") or ef.begins_with("skill_power:"):
+				var sid := ef.split(":")[1]
+				if not actions.has(sid):
+					warnings.append("스킬트리 %s: 스킬 시트에 없는 '%s'" % [n.id, sid])
+			elif not ef in ["hp", "speed", "ap", "ap_rec", "defense", "power", "heal"]:
+				warnings.append("스킬트리 %s: 모르는 효과 '%s'" % [n.id, ef])
 
 
 func _unit(d: Dictionary, team: String) -> UnitData:
@@ -221,6 +246,7 @@ func apply_from(newer: GameData) -> void:
 		else:
 			actions[id] = newer.actions[id]
 	items = newer.items
+	skill_tree = newer.skill_tree
 	stages = newer.stages
 	stage_order = newer.stage_order
 	warnings = newer.warnings

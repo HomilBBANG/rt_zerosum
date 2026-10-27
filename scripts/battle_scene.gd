@@ -1,5 +1,5 @@
 extends Node
-## 전투 씬 공통 스크립트 (battle_2d.tscn / battle_3d.tscn 양쪽에서 사용).
+## 전투 씬 스크립트 (battle_2d.tscn).
 ## 컨트롤러 생성 → 뷰/HUD 연결 → 전투 시작 → 결과 전환. 단축키: 1~4 조명 프리셋, L 전투 기록, F1 디버그, F2 HUD, F3 림 라인, R 재시작, Esc 메뉴.
 
 @onready var view: BattleViewBase = $View

@@ -21,9 +21,16 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 12)
 	add_child(box)
 	box.add_child(_label("승리" if win else "패배", 72, Color(1, 0.95, 0.6)))
-	box.add_child(_label("라운드 %d 에 종료 · 모드 %s · 재시작 횟수 %d" % [r.get("rounds", 0), str(r.get("mode", Game.mode)).to_upper(), Game.restart_count], 18))
+	box.add_child(_label("라운드 %d 에 종료 · 재시작 횟수 %d" % [r.get("rounds", 0), Game.restart_count], 18))
+	var log_h := 330
+	if Game.campaign and Game.base != null and not Game.base.growth.is_empty():   # 출전 대원 경험치·레벨 업
+		var g := PackedStringArray()
+		for e in Game.base.growth:
+			g.append("%s +%d 경험치%s" % [e.name, int(e.xp), "  ▲ Lv%d (스킬 포인트 +%d)" % [int(e.level), int(e.ups)] if int(e.ups) > 0 else ""])
+		box.add_child(_label("  ·  ".join(g), 16, Color(0.9, 0.75, 1.0)))
+		log_h = 290
 	var log_box := RichTextLabel.new()
-	log_box.custom_minimum_size = Vector2(760, 330)
+	log_box.custom_minimum_size = Vector2(760, log_h)
 	log_box.add_theme_font_override("normal_font", _font)
 	log_box.add_theme_font_size_override("normal_font_size", 13)
 	var lines: PackedStringArray = r.get("log", PackedStringArray())

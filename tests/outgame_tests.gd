@@ -36,6 +36,7 @@ func run(p_check: Callable) -> void:
 	_test_player_control()
 	_test_sortie_lines()
 	_test_research()
+	_test_skill_tree()
 
 
 func _sim() -> BaseSim:
@@ -352,7 +353,11 @@ func _test_progression() -> void:
 	var copy := UnitData.new()
 	GameData._copy_props(copy, base)
 	s.apply_to_ally(copy, base)
-	_c(copy.max_hp == base.max_hp + 5, "전투 최대 HP +5 (%d → %d)" % [base.max_hp, copy.max_hp])
+	var core_hp := 0
+	for n in s.tree_nodes("a_kira"):
+		if n.dir == "center" and n.effect == "hp":
+			core_hp += int(n.value)
+	_c(copy.max_hp == base.max_hp + 5 + core_hp and copy.max_hp == s.char_max_hp("a_kira"), "전투 최대 HP +5 (+ 스킬 트리 중앙 %d) (%d → %d)" % [core_hp, base.max_hp, copy.max_hp])
 	_c(s.weapons_of("a_kira").size() == base.weapons.size(), "무기고: 전투 캐릭터의 초기 무기")
 	_c(s.start_craft("r_knife").ok and not s.start_craft("r_pistol").ok, "제작 시작 (작업실은 한 번에 하나)")
 	s.skip(125)
@@ -739,3 +744,65 @@ func _test_research() -> void:
 	s3.npcs.npc_rohan.state = NpcAgent.UNAVAILABLE
 	_c(s3.research_pause_reason() != "", "로한이 자리를 비우면 연구 멈춤 (%s)" % s3.research_pause_reason())
 	_c(battle.items.has("shotgun") and battle.items.has("launcher"), "새 무기는 밸런스 엑셀 아이템 시트에 있음")
+
+
+func _test_skill_tree() -> void:
+	print("[33] 레벨·경험치·십자형 스킬 트리")
+	var s := _sim()
+	var cid := "a_dan"
+	var lv0 := s.start_level(cid)
+	_c(s.char_level(cid) == lv0 and s.skill_points(cid) == 1, "시작 = 캐릭터 시트 레벨 Lv%d, 스킬 포인트 1" % lv0)
+	var nodes := s.tree_nodes(cid)
+	var dirs := {}
+	for n in nodes:
+		dirs[n.dir] = true
+	_c(nodes.size() == 13 and dirs.size() == 5, "십자형: 중앙 + 동서남북 × 3단계 = 13칸")
+	_c(s.has_skill(cid, "dan_core") and s.skill_state(cid, "dan_core") == "learned", "중앙은 처음부터 배움")
+	_c(s.skill_state(cid, "dan_n2") == "no_level" and s.skill_state(cid, "dan_n3") == "no_level", "레벨 모자라면 '경험 부족' (2·3단계)")
+	_c(s.skill_state(cid, "dan_n1") == "ready" and s.skill_state(cid, "dan_e1") == "ready", "1단계는 바로 배울 수 있음")
+	var r := s.learn_skill(cid, "dan_n1")
+	_c(r.ok and s.skill_points(cid) == 0 and s.skill_state(cid, "dan_e1") == "no_point", "배우면 포인트 소모 → 다른 갈래는 포인트 부족")
+	# 레벨 업
+	var ups := s.add_xp(cid, s.xp_need(cid))
+	_c(ups == 1 and s.char_level(cid) == lv0 + 1 and s.skill_points(cid) == 1, "경험치 채우면 레벨 업 + 포인트 1")
+	_c(s.skill_state(cid, "dan_n2") == "no_level", "2단계는 시작+2 레벨부터")
+	s.add_xp(cid, 10000)
+	_c(s.char_level(cid) >= lv0 + 4, "경험치 많이 → 여러 레벨 (Lv%d)" % s.char_level(cid))
+	_c(s.skill_state(cid, "dan_s2") == "need_prev", "갈래 안에서는 앞 단계 먼저")
+	_c(s.learn_skill(cid, "dan_n2").ok and s.learn_skill(cid, "dan_n3").ok, "북(화력) 갈래 끝까지")
+	s.learn_skill(cid, "dan_e1")
+	s.learn_skill(cid, "dan_e2")
+	_c(s.skill_state(cid, "dan_e3") == "capped", "갈래 끝은 하나만 (북 끝을 배워서 동 끝은 막힘)")
+	# 전투 반영
+	var base: UnitData = GameData._find(battle.allies, cid)
+	var copy := UnitData.new()
+	GameData._copy_props(copy, base)
+	s.apply_to_ally(copy, base)
+	_c(copy.level == s.char_level(cid), "전투 레벨 = 기지 레벨")
+	_c(copy.skill_ids.has("brutal_strike") and copy.skill_ids.find("brutal_strike") < copy.skill_ids.find("ultimate"), "북 끝 '강타' → 전투 스킬에 추가 (필살기 앞) %s" % [copy.skill_ids])
+	_c(copy.power_bonus == 1 and int(copy.skill_power.get("heavy_attack", 0)) == 3, "무기 숙련 위력 +1, 강공 단련 강공격 +3")
+	_c(copy.speed == base.speed + 1 and copy.ap_recovery == base.ap_recovery + 1, "동 갈래: 속도 +1, AP 회복 +1")
+	_c(not base.skill_ids.has("brutal_strike") and base.power_bonus == 0, "원본 캐릭터 데이터는 그대로 (복제본에만)")
+	# 위력 계산
+	var a: ActionData = battle.actions["heavy_attack"]
+	var me := UnitRuntime.new()
+	me.data = copy
+	var tgt := UnitRuntime.new()
+	var td := UnitData.new()
+	tgt.data = td
+	var me0 := UnitRuntime.new()
+	me0.data = base
+	var d1 := ActionResolver.compute_damage(a, me, tgt, null)
+	var d0 := ActionResolver.compute_damage(a, me0, tgt, null)
+	_c(d1 > d0, "배운 스킬로 강공격 피해 증가 (%d → %d)" % [d0, d1])
+	# 저장·초기화
+	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
+	_c(sv.char_level(cid) == s.char_level(cid) and sv.has_skill(cid, "dan_n3"), "저장/불러오기 후 레벨·스킬 유지")
+	var pts := s.skill_points(cid)
+	_c(s.reset_skills(cid).ok and s.skill_points(cid) == pts + 5 and not s.has_skill(cid, "dan_n1"), "스킬 초기화 → 포인트 돌려받음")
+	# 전투 결과 → 경험치
+	var s2 := _sim()
+	s2.apply_battle_result({"winner": "ally", "allies": [{"id": "a_kira", "hp": 30, "alive": true, "statuses": []}]})
+	_c(s2.char_xp("a_kira") == data.inum("xp_win", 100) or s2.char_level("a_kira") > s2.start_level("a_kira"), "승리 → 출전 대원 경험치")
+	_c(s2.char_xp("a_dan") == 0 and s2.char_level("a_dan") == s2.start_level("a_dan"), "출전 안 한 대원은 경험치 없음")
+	_c(battle.warnings.is_empty(), "밸런스 데이터 참조 오류 없음 %s" % [battle.warnings])

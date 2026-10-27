@@ -5,7 +5,8 @@ extends RefCounted
 
 static func compute_damage(action: ActionData, actor: UnitRuntime, target: UnitRuntime, rng: RandomNumberGenerator) -> int:
 	var weapon := actor.current_weapon()
-	var base: int = action.power + int(weapon.get("power_bonus", 0)) + int(actor.data.level / 2)
+	var base: int = action.power + int(weapon.get("power_bonus", 0)) + int(actor.data.level / 2) \
+		+ actor.data.power_bonus + int(actor.data.skill_power.get(action.id, 0))
 	if not is_equal_approx(actor.data.damage_mult, 1.0):
 		base = int(roundf(base * actor.data.damage_mult))
 	var variance := rng.randi_range(-1, 1) if rng != null else 0
@@ -29,7 +30,7 @@ static func resolve(action: ActionData, actor: UnitRuntime, target: UnitRuntime,
 				actor.display_name(), target.display_name(), action.display_name, dmg,
 				" (전투 불능)" if killed else ""]
 		"heal":
-			var amount: int = action.power + int(actor.data.level / 2)
+			var amount: int = action.power + int(actor.data.level / 2) + actor.data.heal_bonus + int(actor.data.skill_power.get(action.id, 0))
 			var before := target.hp
 			target.hp = mini(target.data.max_hp, target.hp + amount)
 			var healed := target.hp - before
@@ -37,7 +38,7 @@ static func resolve(action: ActionData, actor: UnitRuntime, target: UnitRuntime,
 			event.results = [{"target": target, "kind": "heal", "amount": healed, "killed": false}]
 			event.text = "%s → %s: %s HP %d 회복" % [actor.display_name(), target.display_name(), action.display_name, healed]
 		"ap_grant":
-			var granted := APComponent.grant(target, action.power)
+			var granted := APComponent.grant(target, action.power + int(actor.data.skill_power.get(action.id, 0)))
 			target.add_status("rallied")
 			event.targets = [target]
 			event.results = [{"target": target, "kind": "ap", "amount": granted, "killed": false}]

@@ -1,5 +1,5 @@
 extends Control
-## 메인 메뉴: 2D/3D 모드, 조명 프리셋, 선공 설정, 시드 선택 후 편성 또는 바로 전투.
+## 전투 테스트 메뉴: 조명 프리셋, 선공 설정, 시드 선택 후 편성 또는 바로 전투.
 
 var _font: Font
 var preset_opt: OptionButton

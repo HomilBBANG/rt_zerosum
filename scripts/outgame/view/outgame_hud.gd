@@ -165,7 +165,7 @@ func _build_top() -> void:
 	right.position = Vector2(0, 10)
 	right.set_anchors_preset(PRESET_TOP_RIGHT)
 	add_child(right)
-	var specs := [["의뢰", Color(0.45, 0.7, 0.9), func(): open_contracts("")], ["무기고", Color(0.45, 0.7, 0.9), func(): open_armory()],
+	var specs := [["스킬", Color(0.85, 0.6, 1.0), func(): open_skills("")], ["의뢰", Color(0.45, 0.7, 0.9), func(): open_contracts("")], ["무기고", Color(0.45, 0.7, 0.9), func(): open_armory()],
 		["원장", Color(0.45, 0.7, 0.9), func(): open_ledger()], ["저장", Color(0.45, 0.9, 0.6), func(): hub.save_now()],
 		["전투 출전", Color(1.0, 0.5, 0.3), func(): open_sortie()], ["타이틀", Color(0.6, 0.6, 0.65), func(): hub.to_title()]]
 	for s in specs:
@@ -256,6 +256,11 @@ func _fill_selection() -> void:
 		col.add_child(_label("지시 대기 중 (다음 일정까지)", 12, Color(0.6, 1.0, 0.7)))
 	var card := _status_card(_sel_id)
 	sel_body.add_child(card)
+	if sim.is_combatant(n):
+		var cid := n.character_id
+		var pts := sim.skill_points(cid)
+		sel_body.add_child(_label("Lv%d · 경험치 %d/%d%s" % [sim.char_level(cid), sim.char_xp(cid), sim.xp_need(cid), "  · 스킬 포인트 %d (우클릭 → 스킬 트리)" % pts if pts > 0 else ""],
+			13, Color(0.85, 0.6, 1.0) if pts > 0 else Color(0.8, 0.85, 0.92)))
 	var tip := "방 클릭: 걸어서 · 더블클릭: 뛰어서\n도착하면 우클릭: 그 방에서 할 행동 · 대원 다시 클릭: 대화"
 	if sim.is_researcher(_sel_id):
 		tip = "방 클릭: 걸어서 · 더블클릭: 뛰어서\n%s 클릭: 무기 연구 · 우클릭: 대화·행동" % n.name
@@ -712,6 +717,108 @@ func open_facility(fid: String) -> void:
 		body.add_child(_label("훈련: 대원 우클릭 → 훈련 (%d분, 끝나면 훈련 단계 +1 → 전투 최대 HP +%d)" % [sim.data.inum("train_minutes", 120), sim.data.inum("train_hp_bonus", 5)], 14, Color(0.85, 0.9, 1)))
 
 
+# ---------------------------------------------------------------- 스킬 트리 (캐릭터마다 십자형)
+## cid = "" 이면 첫 대원. 위: 대원 탭(초상화·레벨·포인트) / 왼쪽: 레벨·경험치·포인트·고른 스킬 설명·배우기 / 오른쪽: 십자형 트리
+func open_skills(cid: String = "", pick: String = "") -> void:
+	var allies: Array = sim.battle.allies if sim.battle != null else []
+	if allies.is_empty():
+		return
+	if cid == "":
+		cid = allies[0].id
+	var win := _window("스킬 트리", 1180)
+	var body: VBoxContainer = win.body
+	var tabs := _hbox(6)
+	body.add_child(tabs)
+	for u in allies:
+		var pts := sim.skill_points(u.id)
+		var b := _button("%s  Lv%d%s" % [u.display_name, sim.char_level(u.id), "  ●%d" % pts if pts > 0 else ""],
+			Color(0.85, 0.6, 1.0) if u.id == cid else Color(0.45, 0.55, 0.7), 14, 150)
+		b.icon = UnitArt.portrait(u.sprite_id, manifest)
+		b.expand_icon = true
+		b.custom_minimum_size.y = 46
+		if u.id == cid:
+			b.add_theme_color_override("font_color", Color(1, 0.95, 0.75))
+		var uid: String = u.id
+		b.pressed.connect(func():
+			close_top()
+			open_skills(uid))
+		tabs.add_child(b)
+	var row := _hbox(14)
+	body.add_child(row)
+	# 왼쪽: 정보
+	var info := _vbox(6)
+	info.custom_minimum_size = Vector2(330, 560)
+	row.add_child(info)
+	var unit: UnitData = GameData._find(sim.battle.allies, cid)
+	var head := _hbox(10)
+	info.add_child(head)
+	head.add_child(_portrait_rect(unit.sprite_id, 84))
+	var hc := _vbox(2)
+	head.add_child(hc)
+	hc.add_child(_label(unit.display_name, 22, GOLD))
+	hc.add_child(_label("%s · Lv%d%s" % [unit.role, sim.char_level(cid), "  (최대)" if sim.char_level(cid) >= sim.level_max() else ""], 15, Color(0.85, 0.9, 1)))
+	var pts := sim.skill_points(cid)
+	hc.add_child(_label("스킬 포인트 %d" % pts, 17, Color(0.85, 0.6, 1.0) if pts > 0 else Color(0.7, 0.72, 0.78)))
+	info.add_child(_gauge("경험치", float(sim.char_xp(cid)), maxf(1.0, float(sim.xp_need(cid))), Color(0.85, 0.6, 1.0),
+		"%d / %d" % [sim.char_xp(cid), sim.xp_need(cid)]))
+	info.add_child(_label("전투에 나가면 경험치 (승리 %d · 패배 %d) → 레벨 업마다 포인트 1" % [sim.data.inum("xp_win", 100), sim.data.inum("xp_lose", 40)], 12, Color(0.7, 0.75, 0.85)))
+	info.add_child(_label("갈래 안에서는 앞 단계부터 · 갈래 끝(3단계)은 하나만", 12, Color(0.7, 0.75, 0.85)))
+	var detail := _vbox(4)
+	detail.custom_minimum_size.y = 190
+	info.add_child(detail)
+	var learn := _button("배우기 (포인트 1)", Color(0.85, 0.6, 1.0), 16, 200)
+	info.add_child(learn)
+	var learned_box := _vbox(2)
+	info.add_child(_label("배운 스킬", 15, Color(1, 0.95, 0.75)))
+	info.add_child(learned_box)
+	for nid in sim.learned_skills(cid):
+		var n := sim.tree_node(cid, nid)
+		learned_box.add_child(_label("· %s — %s" % [n.get("name", nid), n.get("desc", "")], 12, SkillTreeView.DIR_COL.get(str(n.get("dir", "center")), Color.WHITE).lightened(0.3)))
+	var reset := _button("스킬 초기화 (포인트 돌려받기)", Color(0.6, 0.6, 0.65), 13)
+	reset.pressed.connect(func():
+		var res := sim.reset_skills(cid)
+		show_toast(res.msg, GOOD if res.ok else BAD)
+		close_top()
+		open_skills(cid))
+	info.add_child(reset)
+	# 오른쪽: 십자형 트리
+	var tree := SkillTreeView.new()
+	tree.custom_minimum_size = Vector2(800, 600)
+	row.add_child(tree)
+	tree.setup(sim, cid, font, bold)
+	var show := func(nid: String):
+		for c in detail.get_children():
+			detail.remove_child(c)
+			c.queue_free()
+		var n := sim.tree_node(cid, nid)
+		if n.is_empty():
+			detail.add_child(_label("트리에서 스킬을 고르세요", 14, Color(0.75, 0.8, 0.9)))
+			learn.disabled = true
+			return
+		var st := sim.skill_state(cid, nid)
+		detail.add_child(_label(str(n.name), 19, SkillTreeView.DIR_COL[n.dir].lightened(0.25)))
+		detail.add_child(_label("%s · %d단계 · 필요 Lv%d" % [SkillTreeView.DIR_NAME.get(n.dir, "중앙"), int(n.tier), int(n.level)], 13, Color(0.8, 0.84, 0.9)))
+		var d := _label(str(n.desc), 15)
+		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		d.custom_minimum_size.x = 320
+		detail.add_child(d)
+		if st == "no_level":
+			detail.add_child(_label("경험 부족 — Lv%d 이 되어야 배울 수 있습니다" % int(n.level), 15, SkillTreeView.RED))
+		elif st != "ready" and st != "learned":
+			detail.add_child(_label(str(BaseSim.SKILL_STATE_MSG.get(st, st)), 14, BAD))
+		learn.disabled = st != "ready"
+		learn.text = "배웠음" if st == "learned" else "배우기 (포인트 1)"
+	tree.node_selected.connect(show)
+	learn.pressed.connect(func():
+		var res := sim.learn_skill(cid, tree.selected)
+		show_toast(res.msg, GOOD if res.ok else BAD)
+		close_top()
+		open_skills(cid, tree.selected))
+	if pick != "":
+		tree.selected = pick
+	show.call(tree.selected)
+
+
 # ---------------------------------------------------------------- 연구실 (로한): 연구 → 무기고 제작 해금
 func open_research() -> void:
 	var rid := sim.researcher_id()
@@ -901,6 +1008,7 @@ func open_context(npc_id: String, at: Vector2) -> void:
 		pm.add_item("무기 연구", 7)
 	if sim.is_combatant(n):
 		pm.add_item("정보·장비", 4)
+		pm.add_item("스킬 트리 (Lv%d%s)" % [sim.char_level(n.character_id), " · 포인트 %d" % sim.skill_points(n.character_id) if sim.skill_points(n.character_id) > 0 else ""], 8)
 	pm.set_item_disabled(pm.get_item_index(0), n.state == NpcAgent.UNAVAILABLE)
 	var room_ids := {}
 	if n.state == NpcAgent.MOVING:
@@ -981,6 +1089,8 @@ func _on_context(id: int, npc_id: String, room_act: String = "") -> void:
 			show_toast(r6.msg, GOOD if r6.ok else BAD)
 		7:
 			open_research()
+		8:
+			open_skills(sim.npcs[npc_id].character_id)
 
 
 # ---------------------------------------------------------------- 의뢰 게시판 (업무 지시·외부 의뢰)
@@ -1052,7 +1162,12 @@ func open_character(npc_id: String) -> void:
 	col.add_child(_status_card(npc_id))
 	var lv := sim.training_level(n.character_id)
 	if u != null:
-		col.add_child(_label("전투: %s · HP %d (+%d 훈련 %d단계) · 속도 %d" % [u.role, u.max_hp + lv * sim.data.inum("train_hp_bonus", 5), lv * sim.data.inum("train_hp_bonus", 5), lv, u.speed], 15, GOLD))
+		col.add_child(_label("전투: %s Lv%d · HP %d (훈련 %d단계) · 속도 %d" % [u.role, sim.char_level(u.id), sim.char_max_hp(u.id), lv, u.speed], 15, GOLD))
+		var sk := _button("스킬 트리  (포인트 %d)" % sim.skill_points(u.id), Color(0.85, 0.6, 1.0), 14)
+		sk.pressed.connect(func():
+			close_top()
+			open_skills(u.id))
+		col.add_child(sk)
 	body.add_child(_label("장비 (전투에 반영 · 주무기 / 보조1 / 보조2)", 16, Color(1, 0.95, 0.75)))
 	for slot in 3:
 		var r := _hbox(10)

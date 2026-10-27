@@ -8,10 +8,9 @@ const SCENE_BASE := "res://scenes/outgame/base_hub.tscn"
 const SCENE_MENU := "res://scenes/main_menu.tscn"
 const SCENE_FORMATION := "res://scenes/formation.tscn"
 const SCENE_BATTLE_2D := "res://scenes/battle_2d.tscn"
-const SCENE_BATTLE_3D := "res://scenes/battle_3d.tscn"
 const SCENE_RESULT := "res://scenes/result.tscn"
 
-var mode: String = "2d"            # 캐릭터는 2D 확정 (3D 전환 제거, 2026-10-26). 3D 씬은 비교 기록용으로만 남김
+var mode: String = "2d"            # 캐릭터 2D + 3D 배경 하나뿐 (3D 전투 씬 2026-10-27 제거). 결과 기록용 이름만 남김
 var preset: String = "g1"          # LightingPresets 키
 var ambush: String = "none"        # "none" | "ally" | "enemy"
 var seed_value: int = 12345

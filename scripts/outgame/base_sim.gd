@@ -19,6 +19,7 @@ signal statement_ready(statement: Dictionary)
 signal notice(text: String)
 signal battle_triggered(pending: Dictionary)
 signal research_completed(research_id: String)
+signal leveled_up(character_id: String, level: int)
 
 const SAVE_VERSION := 1
 
@@ -40,7 +41,7 @@ var conv_counts: Dictionary = {}     # 대화이벤트 id → 발생 횟수
 var heard: Dictionary = {}           # 대화이벤트 id → 엿들은 횟수
 var story_seen: Dictionary = {}      # 스토리 이벤트 id → 처음 엿들은 시각 라벨
 var inspections: Dictionary = {}     # "YYYY-MM" → {month, minute, done, score, grade, bonus, week, date}
-var progression: Dictionary = {}     # 전투 캐릭터 id → {training}
+var progression: Dictionary = {}     # 전투 캐릭터 id → {training, level, xp, skills: [배운 스킬 트리 노드 id]}
 var inventory: Array = []            # [{uid, item, plus, owner(캐릭터 id 또는 ""), slot}]
 var workshop: Dictionary = {}        # {kind: craft|enhance, recipe?, uid?, remaining, total}
 var researched: Dictionary = {}      # 연구 id → true (완료)
@@ -52,6 +53,7 @@ var chars: Dictionary = {}           # 전투 캐릭터 id → {hp, statuses, fa
 var seat_owner: Dictionary = {}      # 오브젝트 id → 대원 id
 var food: int = 0                    # 식재료 (1 = 한 끼)
 var gifts: Dictionary = {}           # PX 선물 id → 개수
+var growth: Array = []               # 마지막 전투 결과의 성장 [{id, name, xp, level, ups}] (결과 화면 표시용, 저장 안 함)
 var pending_battle: Dictionary = {}  # 발생했지만 아직 끝나지 않은 전투 {rule, name, stage, minute, label, allow_skip}
 var battle_history: Array = []       # [{minute, label, stage, rule, winner}]
 var _minute: int = 0                 # 마지막으로 처리한 게임 분
@@ -958,6 +960,189 @@ func training_level(character_id: String) -> int:
 	return int(progression.get(character_id, {}).get("training", 0))
 
 
+# ================================================================ 레벨 · 경험치 · 스킬 트리
+## 전투에 나간 대원은 경험치를 받고 (승리 xp_win / 패배 xp_lose), 레벨이 오르면 스킬 포인트 +1.
+## 스킬 트리 (밸런스 엑셀 '스킬트리'): 십자형 — 중앙(처음부터) + 동서남북 갈래 1~3단계. 갈래 끝(가장 높은 단계)은 한 캐릭터에 하나만.
+func _prog(cid: String) -> Dictionary:
+	if not progression.has(cid):
+		progression[cid] = {"training": 0}
+	var p: Dictionary = progression[cid]
+	if not p.has("level"):
+		p.level = start_level(cid)
+		p.xp = 0
+		p.skills = []
+	return p
+
+
+func start_level(cid: String) -> int:
+	if battle != null:
+		var u: UnitData = GameData._find(battle.allies, cid)
+		if u != null:
+			return u.level
+	return 1
+
+
+func char_level(cid: String) -> int:
+	return int(_prog(cid).level)
+
+
+func char_xp(cid: String) -> int:
+	return int(_prog(cid).xp)
+
+
+## 다음 레벨까지 필요한 경험치 (이 레벨에서)
+func xp_need(cid: String) -> int:
+	return data.inum("xp_level_base", 100) + data.inum("xp_level_step", 50) * maxi(0, char_level(cid) - start_level(cid))
+
+
+func level_max() -> int:
+	return data.inum("level_max", 20)
+
+
+## 경험치 더하기 → 오른 레벨 수
+func add_xp(cid: String, amount: int) -> int:
+	var p := _prog(cid)
+	var ups := 0
+	p.xp = int(p.xp) + maxi(0, amount)
+	while int(p.level) < level_max() and int(p.xp) >= xp_need(cid):
+		p.xp = int(p.xp) - xp_need(cid)
+		p.level = int(p.level) + 1
+		ups += 1
+		_log("%s 레벨 업! Lv%d — 스킬 포인트 +1 (스킬 창에서 배우기)" % [_char_label(cid), p.level])
+		leveled_up.emit(cid, int(p.level))
+	if int(p.level) >= level_max():
+		p.xp = 0
+	return ups
+
+
+func tree_nodes(cid: String) -> Array:
+	return battle.skill_tree.get(cid, []) if battle != null else []
+
+
+func tree_node(cid: String, nid: String) -> Dictionary:
+	for n in tree_nodes(cid):
+		if n.id == nid:
+			return n
+	return {}
+
+
+func max_tier(cid: String, dir: String) -> int:
+	var t := 0
+	for n in tree_nodes(cid):
+		if n.dir == dir:
+			t = maxi(t, int(n.tier))
+	return t
+
+
+## 배운 노드 (중앙은 처음부터)
+func learned_skills(cid: String) -> Array:
+	var out: Array = (_prog(cid).skills as Array).duplicate()
+	for n in tree_nodes(cid):
+		if n.dir == "center" and not out.has(n.id):
+			out.push_front(n.id)
+	return out
+
+
+func has_skill(cid: String, nid: String) -> bool:
+	return learned_skills(cid).has(nid)
+
+
+## 스킬 포인트 = 처음 1 + 오른 레벨 수 - 배운 (중앙 제외) 노드 수
+func skill_points(cid: String) -> int:
+	return 1 + char_level(cid) - start_level(cid) - (_prog(cid).skills as Array).size()
+
+
+## 노드 상태: learned 배움 / ready 배울 수 있음 / no_level 경험 부족 / need_prev 앞 단계 필요 / no_point 포인트 부족 / capped 다른 갈래 끝을 이미 배움
+func skill_state(cid: String, nid: String) -> String:
+	var n := tree_node(cid, nid)
+	if n.is_empty():
+		return ""
+	if has_skill(cid, nid):
+		return "learned"
+	if char_level(cid) < int(n.level):
+		return "no_level"
+	var prev := _prev_node(cid, n)
+	if prev != "" and not has_skill(cid, prev):
+		return "need_prev"
+	if int(n.tier) > 0 and int(n.tier) == max_tier(cid, n.dir):
+		for o in tree_nodes(cid):
+			if o.dir != n.dir and o.dir != "center" and int(o.tier) == max_tier(cid, o.dir) and has_skill(cid, o.id):
+				return "capped"
+	if skill_points(cid) <= 0:
+		return "no_point"
+	return "ready"
+
+
+## 같은 갈래 바로 앞 단계 (1단계면 중앙)
+func _prev_node(cid: String, n: Dictionary) -> String:
+	for o in tree_nodes(cid):
+		if int(n.tier) == 1 and o.dir == "center":
+			return o.id
+		if o.dir == n.dir and int(o.tier) == int(n.tier) - 1:
+			return o.id
+	return ""
+
+
+const SKILL_STATE_MSG := {"no_level": "경험 부족", "need_prev": "앞 단계를 먼저 배워야 합니다", "no_point": "스킬 포인트가 없습니다",
+	"capped": "갈래 끝은 하나만 배울 수 있습니다", "learned": "이미 배웠습니다"}
+
+
+func learn_skill(cid: String, nid: String) -> Dictionary:
+	var st := skill_state(cid, nid)
+	if st == "":
+		return _fail("없는 스킬")
+	if st != "ready":
+		return _fail(SKILL_STATE_MSG.get(st, st))
+	(_prog(cid).skills as Array).append(nid)
+	var n := tree_node(cid, nid)
+	_log("%s 스킬 습득: %s" % [_char_label(cid), n.name])
+	return {"ok": true, "msg": "%s — %s 습득" % [_char_label(cid), n.name]}
+
+
+## 배운 스킬 되돌리기 (포인트 전부 돌려받음) [임시: 무료]
+func reset_skills(cid: String) -> Dictionary:
+	var p := _prog(cid)
+	if (p.skills as Array).is_empty():
+		return _fail("되돌릴 스킬이 없습니다")
+	p.skills = []
+	_log("%s 스킬 초기화" % _char_label(cid))
+	return {"ok": true, "msg": "%s 스킬 초기화 — 포인트를 돌려받았습니다" % _char_label(cid)}
+
+
+## 배운 노드 효과를 전투용 복제본에
+func _apply_skill_tree(copy: UnitData, cid: String) -> void:
+	copy.power_bonus = 0
+	copy.heal_bonus = 0
+	copy.skill_power = {}
+	for nid in learned_skills(cid):
+		var n := tree_node(cid, nid)
+		if n.is_empty():
+			continue
+		var v := int(n.value)
+		var ef: String = n.effect
+		match ef:
+			"hp": copy.max_hp += v
+			"speed": copy.speed += v
+			"ap": copy.max_ap += v
+			"ap_rec": copy.ap_recovery += v
+			"defense": copy.defense += v
+			"power": copy.power_bonus += v
+			"heal": copy.heal_bonus += v
+			_:
+				if ef.begins_with("skill_power:"):
+					var sid := ef.substr(12)
+					copy.skill_power[sid] = int(copy.skill_power.get(sid, 0)) + v
+				elif ef.begins_with("skill:"):
+					var sid2 := ef.substr(6)
+					if not copy.skill_ids.has(sid2):
+						# 필살기 앞에 끼움 (전투 HUD 기본 스킬 칸 순서)
+						var at := copy.skill_ids.find("ultimate")
+						if at < 0:
+							copy.skill_ids.append(sid2)
+						else:
+							copy.skill_ids.insert(at, sid2)
+
+
 func _start_command(n: NpcAgent, cmd: Dictionary) -> void:
 	if n.state == NpcAgent.CHATTING:
 		_end_chat_of(n, _minute)
@@ -1205,6 +1390,8 @@ func equip(character_id: String, slot: int, uid: String) -> Dictionary:
 ## 전투 연계: 훈련·장비·강화를 아군 UnitData 복제본에 반영 (전투 규칙은 그대로, 수치 데이터만)
 func apply_to_ally(copy: UnitData, base: UnitData) -> void:
 	copy.max_hp = base.max_hp + training_level(base.id) * data.inum("train_hp_bonus", 5)
+	copy.level = char_level(base.id)
+	_apply_skill_tree(copy, base.id)
 	var ws := weapons_of(base.id)
 	if ws.is_empty() or battle == null:
 		return
@@ -1249,7 +1436,12 @@ func char_max_hp(character_id: String) -> int:
 		var u: UnitData = GameData._find(battle.allies, character_id)
 		if u != null:
 			base_hp = u.max_hp
-	return base_hp + training_level(character_id) * data.inum("train_hp_bonus", 5)
+	var tree_hp := 0
+	for nid in learned_skills(character_id):
+		var n := tree_node(character_id, nid)
+		if str(n.get("effect", "")) == "hp":
+			tree_hp += int(n.value)
+	return base_hp + training_level(character_id) * data.inum("train_hp_bonus", 5) + tree_hp
 
 
 func _add_affinity(n: NpcAgent, v: float) -> void:
@@ -1505,6 +1697,7 @@ func battle_entry(character_id: String) -> Dictionary:
 ## result.allies = [{id, hp, alive, statuses}]
 func apply_battle_result(result: Dictionary) -> void:
 	var lines := PackedStringArray()
+	growth = []
 	for a in result.get("allies", []):
 		var cid := str(a.get("id", ""))
 		if cid == "":
@@ -1522,6 +1715,9 @@ func apply_battle_result(result: Dictionary) -> void:
 			cs.hp = clampf(float(a.get("hp", cs.hp)), 1.0, float(char_max_hp(cid)))
 		cs.statuses = sts
 		cs.fatigue = clampf(float(cs.fatigue) + data.num("fatigue_battle", 20.0), 0.0, 100.0)
+		var gain := data.inum("xp_win", 100) if str(result.get("winner", "")) == "ally" else data.inum("xp_lose", 40)
+		var ups := add_xp(cid, gain)
+		growth.append({"id": cid, "name": _char_label(cid), "xp": gain, "level": char_level(cid), "ups": ups})
 		lines.append("%s HP %d/%d%s" % [_char_label(cid), floori(float(cs.hp)), char_max_hp(cid), " 부상" if "injured" in sts else ""])
 	var w := str(result.get("winner", ""))
 	battle_history.append({"minute": _minute, "label": clock.label(_minute), "stage": str(result.get("stage", pending_battle.get("stage", ""))),
