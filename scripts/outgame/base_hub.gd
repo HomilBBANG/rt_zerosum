@@ -521,14 +521,14 @@ func _cli_ui(spec: String) -> void:
 			if not sim.chats.is_empty():
 				hud.open_overhear(sim.chats[0].key)
 		"facility": hud.open_facility(p[1])
-		"skills":   # skills[:캐릭터 id[:경험치[:배울 노드,노드…[:고를 노드[:tree|faith]]]]] — 스킬 창 (경험치 주고 배우기)
+		"skills":   # skills[:캐릭터 id[:경험치[:배울 노드,노드…[:고를 노드[:active|passive|faith]]]]] — 스킬 창 (경험치 주고 배우기)
 			var cid := p[1] if p.size() > 1 else ""
 			if p.size() > 2 and cid != "":
 				sim.add_xp(cid, int(p[2]))
 			if p.size() > 3 and cid != "":
 				for nid in p[3].split(",", false):
 					sim.learn_skill(cid, nid)
-			hud.open_skills(cid, p[4] if p.size() > 4 else "", p[5] if p.size() > 5 else "tree")
+			hud.open_skills(cid, p[4] if p.size() > 4 else "", p[5] if p.size() > 5 else "active")
 		"faith":   # faith:캐릭터 id[:더할 신앙도[:배울 신앙 스킬,…]] — 스킬 창 신앙 탭
 			var fc := p[1]
 			if p.size() > 2:

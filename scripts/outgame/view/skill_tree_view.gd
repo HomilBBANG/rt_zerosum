@@ -1,12 +1,12 @@
 class_name SkillTreeView
 extends Control
-## 십자형 스킬 트리 (한 캐릭터): 가운데 중앙 노드, 위 = 북(화력) · 오른쪽 = 동(기동) · 아래 = 남(생존) · 왼쪽 = 서(전술)로 1~3단계.
+## 십자형 스킬 트리 (한 캐릭터의 액티브 또는 패시브 트리): 가운데 중앙 노드, 위 = 북(화력) · 오른쪽 = 동(기동) · 아래 = 남(생존) · 왼쪽 = 서(전술)로 1~3단계.
 ## 레벨이 모자란 노드는 회색 + 가운데 붉은 "경험 부족". 클릭하면 selected 신호 (배우기는 창에서).
 
 signal node_selected(node_id: String)
 
-const NODE := Vector2(104, 62)
-const STEP := Vector2(118, 88)    # 단계 사이 간격 (가로 / 세로)
+const NODE := Vector2(100, 58)
+const STEP := Vector2(106, 84)    # 단계 사이 간격 (가로 / 세로)
 const DIR_VEC := {"center": Vector2.ZERO, "n": Vector2(0, -1), "e": Vector2(1, 0), "s": Vector2(0, 1), "w": Vector2(-1, 0)}
 const DIR_COL := {"center": Color(1.0, 0.85, 0.35), "n": Color(1.0, 0.45, 0.35), "e": Color(0.35, 0.85, 1.0),
 	"s": Color(0.45, 0.95, 0.55), "w": Color(0.8, 0.55, 1.0)}
@@ -16,15 +16,17 @@ const RED := Color(1.0, 0.28, 0.25)
 
 var sim: BaseSim
 var cid := ""
+var kind := "active"
 var selected := ""
 var hovered := ""
 var font: Font
 var bold: Font
 
 
-func setup(p_sim: BaseSim, p_cid: String, p_font: Font, p_bold: Font) -> void:
+func setup(p_sim: BaseSim, p_cid: String, p_kind: String, p_font: Font, p_bold: Font) -> void:
 	sim = p_sim
 	cid = p_cid
+	kind = p_kind
 	font = p_font
 	bold = p_bold
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -39,7 +41,7 @@ func node_rect(n: Dictionary) -> Rect2:
 func _node_at(p: Vector2) -> String:
 	if sim == null:
 		return ""
-	for n in sim.tree_nodes(cid):
+	for n in sim.tree_nodes(cid, kind):
 		if node_rect(n).grow(2).has_point(p):
 			return n.id
 	return ""
@@ -63,7 +65,7 @@ func _gui_input(ev: InputEvent) -> void:
 func _draw() -> void:
 	if sim == null:
 		return
-	var nodes := sim.tree_nodes(cid)
+	var nodes := sim.tree_nodes(cid, kind)
 	var center := size * 0.5
 	# 갈래 선: 배운 칸까지는 갈래 색, 나머지는 회색
 	for n in nodes:
@@ -75,7 +77,7 @@ func _draw() -> void:
 		draw_line(a, b, DIR_COL[n.dir] if lit else Color(0.25, 0.27, 0.31), 6.0 if lit else 4.0, true)
 	# 갈래 이름 (갈래 바깥쪽 끝 옆)
 	for d in DIR_NAME:
-		var tip := center + Vector2(DIR_VEC[d]) * Vector2(STEP) * float(sim.max_tier(cid, d))
+		var tip := center + Vector2(DIR_VEC[d]) * Vector2(STEP) * float(sim.max_tier(cid, d, kind))
 		var at: Vector2
 		match d:
 			"n": at = tip + Vector2(NODE.x * 0.5 + 10, 6)
@@ -129,8 +131,8 @@ func _draw_node(n: Dictionary) -> void:
 		sb.set_border_width_all(3)
 	draw_style_box(sb, r)
 	var cap := r.size.x - 10.0
-	draw_string(bold, r.position + Vector2(5, 22), str(n.name), HORIZONTAL_ALIGNMENT_CENTER, cap, 14, name_col)
-	draw_string(font, r.position + Vector2(5, r.size.y - 10), sub, HORIZONTAL_ALIGNMENT_CENTER, cap, 12, sub_col)
+	draw_string(bold, r.position + Vector2(5, 21), str(n.name), HORIZONTAL_ALIGNMENT_CENTER, cap, 14 if str(n.name).length() <= 6 else 12, name_col)
+	draw_string(font, r.position + Vector2(5, r.size.y - 9), sub, HORIZONTAL_ALIGNMENT_CENTER, cap, 12, sub_col)
 	if st == "no_level":
 		# 레벨 미달: 회색 위에 가운데 붉은 "경험 부족"
 		draw_rect(r.grow(-2), Color(0.1, 0.1, 0.1, 0.35))

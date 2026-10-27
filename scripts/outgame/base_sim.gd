@@ -1018,8 +1018,10 @@ func add_xp(cid: String, amount: int) -> int:
 	return ups
 
 
-func tree_nodes(cid: String) -> Array:
-	return battle.skill_tree.get(cid, []) if battle != null else []
+## kind = "active" / "passive" 면 그 트리만, "" 면 둘 다
+func tree_nodes(cid: String, kind: String = "") -> Array:
+	var all: Array = battle.skill_tree.get(cid, []) if battle != null else []
+	return all if kind == "" else all.filter(func(n): return n.kind == kind)
 
 
 func tree_node(cid: String, nid: String) -> Dictionary:
@@ -1029,15 +1031,15 @@ func tree_node(cid: String, nid: String) -> Dictionary:
 	return {}
 
 
-func max_tier(cid: String, dir: String) -> int:
+func max_tier(cid: String, dir: String, kind: String) -> int:
 	var t := 0
-	for n in tree_nodes(cid):
+	for n in tree_nodes(cid, kind):
 		if n.dir == dir:
 			t = maxi(t, int(n.tier))
 	return t
 
 
-## 배운 노드 (중앙은 처음부터)
+## 배운 노드 (각 트리 중앙은 처음부터)
 func learned_skills(cid: String) -> Array:
 	var out: Array = (_prog(cid).skills as Array).duplicate()
 	for n in tree_nodes(cid):
@@ -1050,12 +1052,13 @@ func has_skill(cid: String, nid: String) -> bool:
 	return learned_skills(cid).has(nid)
 
 
-## 스킬 포인트 = 처음 1 + 오른 레벨 수 - 배운 (중앙 제외) 노드 수
+## 스킬 포인트 (액티브·패시브 트리 공용) = 처음 1 + 오른 레벨 수 - 배운 (중앙 제외) 노드 수
 func skill_points(cid: String) -> int:
-	return 1 + char_level(cid) - start_level(cid) - (_prog(cid).skills as Array).size()
+	var used := (_prog(cid).skills as Array).filter(func(id): return not tree_node(cid, str(id)).is_empty()).size()
+	return 1 + char_level(cid) - start_level(cid) - used
 
 
-## 노드 상태: learned 배움 / ready 배울 수 있음 / no_level 경험 부족 / need_prev 앞 단계 필요 / no_point 포인트 부족 / capped 다른 갈래 끝을 이미 배움
+## 노드 상태: learned 배움 / ready 배울 수 있음 / no_level 경험 부족 / need_prev 앞 단계 필요 / no_point 포인트 부족 / capped 같은 트리의 다른 갈래 끝을 이미 배움
 func skill_state(cid: String, nid: String) -> String:
 	var n := tree_node(cid, nid)
 	if n.is_empty():
@@ -1067,18 +1070,18 @@ func skill_state(cid: String, nid: String) -> String:
 	var prev := _prev_node(cid, n)
 	if prev != "" and not has_skill(cid, prev):
 		return "need_prev"
-	if int(n.tier) > 0 and int(n.tier) == max_tier(cid, n.dir):
-		for o in tree_nodes(cid):
-			if o.dir != n.dir and o.dir != "center" and int(o.tier) == max_tier(cid, o.dir) and has_skill(cid, o.id):
+	if int(n.tier) > 0 and int(n.tier) == max_tier(cid, n.dir, n.kind):
+		for o in tree_nodes(cid, n.kind):
+			if o.dir != n.dir and o.dir != "center" and int(o.tier) == max_tier(cid, o.dir, n.kind) and has_skill(cid, o.id):
 				return "capped"
 	if skill_points(cid) <= 0:
 		return "no_point"
 	return "ready"
 
 
-## 같은 갈래 바로 앞 단계 (1단계면 중앙)
+## 같은 트리·갈래 바로 앞 단계 (1단계면 그 트리 중앙)
 func _prev_node(cid: String, n: Dictionary) -> String:
-	for o in tree_nodes(cid):
+	for o in tree_nodes(cid, n.kind):
 		if int(n.tier) == 1 and o.dir == "center":
 			return o.id
 		if o.dir == n.dir and int(o.tier) == int(n.tier) - 1:
@@ -1102,14 +1105,19 @@ func learn_skill(cid: String, nid: String) -> Dictionary:
 	return {"ok": true, "msg": "%s — %s 습득" % [_char_label(cid), n.name]}
 
 
-## 배운 스킬 되돌리기 (포인트 전부 돌려받음) [임시: 무료]
-func reset_skills(cid: String) -> Dictionary:
+## 배운 스킬 되돌리기 (포인트 돌려받음) [임시: 무료]. kind = "active" / "passive" 면 그 트리만, "" 면 전부
+func reset_skills(cid: String, kind: String = "") -> Dictionary:
 	var p := _prog(cid)
-	if (p.skills as Array).is_empty():
+	var keep := (p.skills as Array).filter(func(id): return kind != "" and str(tree_node(cid, str(id)).get("kind", "")) != kind)
+	if keep.size() == (p.skills as Array).size():
 		return _fail("되돌릴 스킬이 없습니다")
-	p.skills = []
-	_log("%s 스킬 초기화" % _char_label(cid))
-	return {"ok": true, "msg": "%s 스킬 초기화 — 포인트를 돌려받았습니다" % _char_label(cid)}
+	p.skills = keep
+	var what := "%s 스킬" % TREE_KIND_NAME.get(kind, "") if kind != "" else "스킬"
+	_log("%s %s 초기화" % [_char_label(cid), what])
+	return {"ok": true, "msg": "%s %s 초기화 — 포인트를 돌려받았습니다" % [_char_label(cid), what]}
+
+
+const TREE_KIND_NAME := {"active": "액티브", "passive": "패시브"}
 
 
 # ---------------------------------------------------------------- 신앙 [임시 데이터]: 믿는 신에 따라 배울 수 있는 신앙 스킬이 다름

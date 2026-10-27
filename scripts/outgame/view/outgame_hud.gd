@@ -717,107 +717,140 @@ func open_facility(fid: String) -> void:
 		body.add_child(_label("훈련: 대원 우클릭 → 훈련 (%d분, 끝나면 훈련 단계 +1 → 전투 최대 HP +%d)" % [sim.data.inum("train_minutes", 120), sim.data.inum("train_hp_bonus", 5)], 14, Color(0.85, 0.9, 1)))
 
 
-# ---------------------------------------------------------------- 스킬 트리 (캐릭터마다 십자형)
-## cid = "" 이면 첫 대원. 위: 대원 탭(초상화·레벨·포인트) / 왼쪽: 레벨·경험치·포인트·고른 스킬 설명·배우기 / 오른쪽: 십자형 트리
-func open_skills(cid: String = "", pick: String = "", mode: String = "tree") -> void:
+# ---------------------------------------------------------------- 스킬 창 (캐릭터마다 액티브 · 패시브 · 신앙)
+const SKILL_MODES := [["active", "액티브 스킬"], ["passive", "패시브 스킬"], ["faith", "신앙 스킬"]]
+const SKILL_MODE_HINT := {"active": "전투에서 쓰는 스킬을 강화 · 갈래 끝(3단계)에서 새 스킬", "passive": "늘 적용되는 능력치 (체력·속도·AP·방어·위력)",
+	"faith": "믿는 신에 따라 배울 수 있는 스킬이 다름"}
+
+
+## cid = "" 이면 첫 대원. 왼쪽: 대원 목록 (위아래 스크롤) / 위: 액티브 · 패시브 · 신앙 탭
+## 액티브·패시브: 왼쪽 정보(레벨·경험치·포인트·고른 스킬 설명·배우기) + 오른쪽 십자형 트리. mode "tree" = 예전 이름 (액티브)
+func open_skills(cid: String = "", pick: String = "", mode: String = "active") -> void:
 	var allies: Array = sim.battle.allies if sim.battle != null else []
 	if allies.is_empty():
 		return
 	if cid == "":
 		cid = allies[0].id
-	var win := _window("스킬 트리", 1180)
+	if mode == "tree":
+		mode = "active"
+	var win := _window("스킬", 1240)
 	var body: VBoxContainer = win.body
-	var tabs := _hbox(6)
-	body.add_child(tabs)
+	var main := _hbox(12)
+	body.add_child(main)
+	# 왼쪽: 대원 목록 — 대원이 늘어나도 위아래로 스크롤
+	var side := _vbox(6)
+	main.add_child(side)
+	side.add_child(_label("대원", 15, Color(1, 0.95, 0.75)))
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(156, 612)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	side.add_child(sc)
+	var list := _vbox(6)
+	list.size_flags_horizontal = SIZE_EXPAND_FILL
+	sc.add_child(list)
+	var cur_btn: Button = null
 	for u in allies:
 		var pts := sim.skill_points(u.id)
-		var b := _button("%s  Lv%d%s" % [u.display_name, sim.char_level(u.id), "  ●%d" % pts if pts > 0 else ""],
-			Color(0.85, 0.6, 1.0) if u.id == cid else Color(0.45, 0.55, 0.7), 14, 150)
+		var b := _button("%s\nLv%d%s" % [u.display_name, sim.char_level(u.id), "  ●%d" % pts if pts > 0 else ""],
+			Color(0.85, 0.6, 1.0) if u.id == cid else Color(0.45, 0.55, 0.7), 14)
 		b.icon = UnitArt.portrait(u.sprite_id, manifest)
 		b.expand_icon = true
-		b.custom_minimum_size.y = 46
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.custom_minimum_size = Vector2(146, 60)
+		b.add_theme_constant_override("icon_max_width", 48)
+		b.tooltip_text = "%s · %s · Lv%d · 스킬 포인트 %d" % [u.display_name, u.role, sim.char_level(u.id), pts]
 		if u.id == cid:
 			b.add_theme_color_override("font_color", Color(1, 0.95, 0.75))
+			cur_btn = b
 		var uid: String = u.id
 		b.pressed.connect(func():
-			close_top()
-			open_skills(uid, "", mode))
-		tabs.add_child(b)
-	var gap := Control.new()
-	gap.size_flags_horizontal = SIZE_EXPAND_FILL
-	tabs.add_child(gap)
-	for m in [["tree", "스킬 트리"], ["faith", "신앙"]]:
-		var mb := _button(m[1], Color(1.0, 0.85, 0.35) if m[0] == mode else Color(0.45, 0.55, 0.7), 15, 96)
-		mb.custom_minimum_size.y = 46
+			if uid != cid:
+				close_top()
+				open_skills(uid, "", mode))
+		list.add_child(b)
+	if cur_btn != null:
+		sc.ensure_control_visible.call_deferred(cur_btn)
+	# 오른쪽: 탭 + 내용
+	var right := _vbox(10)
+	main.add_child(right)
+	var tabs := _hbox(6)
+	right.add_child(tabs)
+	for m in SKILL_MODES:
+		var mb := _button(m[1], Color(1.0, 0.85, 0.35) if m[0] == mode else Color(0.45, 0.55, 0.7), 15, 120)
+		mb.custom_minimum_size.y = 40
 		var mm: String = m[0]
 		mb.pressed.connect(func():
 			if mm != mode:
 				close_top()
 				open_skills(cid, "", mm))
 		tabs.add_child(mb)
-	var row := _hbox(14)
-	body.add_child(row)
+	var hint := _label(SKILL_MODE_HINT.get(mode, ""), 13, Color(0.75, 0.8, 0.9))
+	hint.size_flags_vertical = SIZE_SHRINK_CENTER
+	tabs.add_child(hint)
+	var row := _hbox(12)
+	right.add_child(row)
 	if mode == "faith":
 		_faith_page(row, cid)
 		return
+	var kname: String = BaseSim.TREE_KIND_NAME.get(mode, "")
 	# 왼쪽: 정보
 	var info := _vbox(6)
-	info.custom_minimum_size = Vector2(330, 560)
+	info.custom_minimum_size = Vector2(280, 560)
 	row.add_child(info)
 	var unit: UnitData = GameData._find(sim.battle.allies, cid)
 	var head := _hbox(10)
 	info.add_child(head)
-	head.add_child(_portrait_rect(unit.sprite_id, 84))
+	head.add_child(_portrait_rect(unit.sprite_id, 76))
 	var hc := _vbox(2)
 	head.add_child(hc)
 	hc.add_child(_label(unit.display_name, 22, GOLD))
 	hc.add_child(_label("%s · Lv%d%s" % [unit.role, sim.char_level(cid), "  (최대)" if sim.char_level(cid) >= sim.level_max() else ""], 15, Color(0.85, 0.9, 1)))
 	var pts := sim.skill_points(cid)
 	hc.add_child(_label("스킬 포인트 %d" % pts, 17, Color(0.85, 0.6, 1.0) if pts > 0 else Color(0.7, 0.72, 0.78)))
-	var gi := sim.god_info(cid)
-	hc.add_child(_label("신앙: %s · %d" % [gi.get("name", "무신앙"), sim.faith(cid)], 13, Color(gi.get("color", Color(0.75, 0.78, 0.85)))))
 	info.add_child(_gauge("경험치", float(sim.char_xp(cid)), maxf(1.0, float(sim.xp_need(cid))), Color(0.85, 0.6, 1.0),
 		"%d / %d" % [sim.char_xp(cid), sim.xp_need(cid)]))
-	info.add_child(_label("전투에 나가면 경험치 (승리 %d · 패배 %d) → 레벨 업마다 포인트 1" % [sim.data.inum("xp_win", 100), sim.data.inum("xp_lose", 40)], 12, Color(0.7, 0.75, 0.85)))
-	info.add_child(_label("갈래 안에서는 앞 단계부터 · 갈래 끝(3단계)은 하나만", 12, Color(0.7, 0.75, 0.85)))
+	info.add_child(_label("레벨 업마다 포인트 1 (액티브·패시브 공용)", 12, Color(0.7, 0.75, 0.85)))
+	info.add_child(_label("갈래 안에서는 앞 단계부터 · 갈래 끝은 트리마다 하나", 12, Color(0.7, 0.75, 0.85)))
 	var detail := _vbox(4)
-	detail.custom_minimum_size.y = 190
+	detail.custom_minimum_size.y = 180
 	info.add_child(detail)
 	var learn := _button("배우기 (포인트 1)", Color(0.85, 0.6, 1.0), 16, 200)
 	info.add_child(learn)
+	info.add_child(_label("배운 %s 스킬" % kname, 15, Color(1, 0.95, 0.75)))
 	var learned_box := _vbox(2)
-	info.add_child(_label("배운 스킬", 15, Color(1, 0.95, 0.75)))
 	info.add_child(learned_box)
 	for nid in sim.learned_skills(cid):
 		var n := sim.tree_node(cid, nid)
+		if n.get("kind", "") != mode:
+			continue
 		learned_box.add_child(_label("· %s — %s" % [n.get("name", nid), n.get("desc", "")], 12, SkillTreeView.DIR_COL.get(str(n.get("dir", "center")), Color.WHITE).lightened(0.3)))
-	var reset := _button("스킬 초기화 (포인트 돌려받기)", Color(0.6, 0.6, 0.65), 13)
+	var reset := _button("%s 초기화 (포인트 돌려받기)" % kname, Color(0.6, 0.6, 0.65), 13)
 	reset.pressed.connect(func():
-		var res := sim.reset_skills(cid)
+		var res := sim.reset_skills(cid, mode)
 		show_toast(res.msg, GOOD if res.ok else BAD)
 		close_top()
-		open_skills(cid))
+		open_skills(cid, "", mode))
 	info.add_child(reset)
 	# 오른쪽: 십자형 트리
 	var tree := SkillTreeView.new()
-	tree.custom_minimum_size = Vector2(800, 600)
+	tree.custom_minimum_size = Vector2(740, 580)
 	row.add_child(tree)
-	tree.setup(sim, cid, font, bold)
+	tree.setup(sim, cid, mode, font, bold)
 	var show := func(nid: String):
 		for c in detail.get_children():
 			detail.remove_child(c)
 			c.queue_free()
 		var n := sim.tree_node(cid, nid)
-		if n.is_empty():
+		if n.is_empty() or n.kind != mode:
 			detail.add_child(_label("트리에서 스킬을 고르세요", 14, Color(0.75, 0.8, 0.9)))
 			learn.disabled = true
 			return
 		var st := sim.skill_state(cid, nid)
 		detail.add_child(_label(str(n.name), 19, SkillTreeView.DIR_COL[n.dir].lightened(0.25)))
-		detail.add_child(_label("%s · %d단계 · 필요 Lv%d" % [SkillTreeView.DIR_NAME.get(n.dir, "중앙"), int(n.tier), int(n.level)], 13, Color(0.8, 0.84, 0.9)))
+		detail.add_child(_label("%s · %s · %d단계 · 필요 Lv%d" % [kname, SkillTreeView.DIR_NAME.get(n.dir, "중앙"), int(n.tier), int(n.level)], 13, Color(0.8, 0.84, 0.9)))
 		var d := _label(str(n.desc), 15)
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		d.custom_minimum_size.x = 320
+		d.custom_minimum_size.x = 270
 		detail.add_child(d)
 		if st == "no_level":
 			detail.add_child(_label("경험 부족 — Lv%d 이 되어야 배울 수 있습니다" % int(n.level), 15, SkillTreeView.RED))
@@ -830,7 +863,7 @@ func open_skills(cid: String = "", pick: String = "", mode: String = "tree") -> 
 		var res := sim.learn_skill(cid, tree.selected)
 		show_toast(res.msg, GOOD if res.ok else BAD)
 		close_top()
-		open_skills(cid, tree.selected))
+		open_skills(cid, tree.selected, mode))
 	if pick != "":
 		tree.selected = pick
 	show.call(tree.selected)
@@ -842,19 +875,19 @@ func _faith_page(row: HBoxContainer, cid: String) -> void:
 	var gi := sim.god_info(cid)
 	var gcol: Color = gi.get("color", Color(0.75, 0.78, 0.85))
 	var info := _vbox(6)
-	info.custom_minimum_size = Vector2(330, 560)
+	info.custom_minimum_size = Vector2(280, 560)
 	row.add_child(info)
 	var head := _hbox(10)
 	info.add_child(head)
-	head.add_child(_portrait_rect(unit.sprite_id, 84))
+	head.add_child(_portrait_rect(unit.sprite_id, 76))
 	var hc := _vbox(2)
 	head.add_child(hc)
 	hc.add_child(_label(unit.display_name, 22, GOLD))
 	hc.add_child(_label("%s · Lv%d" % [unit.role, sim.char_level(cid)], 15, Color(0.85, 0.9, 1)))
 	hc.add_child(_label("신앙도 %d" % sim.faith(cid), 17, gcol))
 	info.add_child(_gauge("신앙도", float(sim.faith(cid)), float(sim.faith_max()), gcol, "%d / %d" % [sim.faith(cid), sim.faith_max()]))
-	info.add_child(_label("전투에 출전할 때마다 신앙도 +%d · 신앙 스킬은 포인트 없이 배움" % sim.data.inum("faith_battle", 5), 12, Color(0.7, 0.75, 0.85)))
-	info.add_child(_label("믿는 신에 따라 배울 수 있는 스킬이 다릅니다 (임시 데이터)", 12, Color(0.7, 0.75, 0.85)))
+	info.add_child(_label("출전할 때마다 신앙도 +%d" % sim.data.inum("faith_battle", 5), 12, Color(0.7, 0.75, 0.85)))
+	info.add_child(_label("신앙 스킬은 포인트 없이 배움 (임시 데이터)", 12, Color(0.7, 0.75, 0.85)))
 	var learned := sim.faith_skill_list(cid).filter(func(fs): return sim.has_faith_skill(cid, fs.id))
 	info.add_child(_label("배운 신앙 스킬", 15, Color(1, 0.95, 0.75)))
 	if learned.is_empty():
@@ -863,7 +896,7 @@ func _faith_page(row: HBoxContainer, cid: String) -> void:
 		info.add_child(_label("· %s — %s" % [fs.name, fs.desc], 12, gcol.lightened(0.3)))
 	# 오른쪽: 신 카드 + 신앙 스킬
 	var right := _vbox(10)
-	right.custom_minimum_size = Vector2(800, 560)
+	right.custom_minimum_size = Vector2(740, 560)
 	row.add_child(right)
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", _panel_style(Color(gcol.darkened(0.8), 0.95), gcol, 10))
@@ -893,7 +926,7 @@ func _faith_page(row: HBoxContainer, cid: String) -> void:
 func _faith_card(cid: String, fs: Dictionary, gcol: Color) -> Control:
 	var st := sim.faith_state(cid, fs.id)
 	var c := Control.new()
-	c.custom_minimum_size = Vector2(191, 200)
+	c.custom_minimum_size = Vector2(176, 200)
 	c.draw.connect(func():
 		var sb := StyleBoxFlat.new()
 		sb.set_corner_radius_all(10)

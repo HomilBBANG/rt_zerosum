@@ -748,41 +748,51 @@ func _test_research() -> void:
 
 
 func _test_skill_tree() -> void:
-	print("[33] 레벨·경험치·십자형 스킬 트리")
+	print("[33] 레벨·경험치·십자형 스킬 트리 (액티브 · 패시브)")
 	var s := _sim()
 	var cid := "a_dan"
 	var lv0 := s.start_level(cid)
 	_c(s.char_level(cid) == lv0 and s.skill_points(cid) == 1, "시작 = 캐릭터 시트 레벨 Lv%d, 스킬 포인트 1" % lv0)
-	var nodes := s.tree_nodes(cid)
-	var dirs := {}
-	for n in nodes:
-		dirs[n.dir] = true
-	_c(nodes.size() == 13 and dirs.size() == 5, "십자형: 중앙 + 동서남북 × 3단계 = 13칸")
-	_c(s.has_skill(cid, "dan_core") and s.skill_state(cid, "dan_core") == "learned", "중앙은 처음부터 배움")
-	_c(s.skill_state(cid, "dan_n2") == "no_level" and s.skill_state(cid, "dan_n3") == "no_level", "레벨 모자라면 '경험 부족' (2·3단계)")
-	_c(s.skill_state(cid, "dan_n1") == "ready" and s.skill_state(cid, "dan_e1") == "ready", "1단계는 바로 배울 수 있음")
-	var r := s.learn_skill(cid, "dan_n1")
-	_c(r.ok and s.skill_points(cid) == 0 and s.skill_state(cid, "dan_e1") == "no_point", "배우면 포인트 소모 → 다른 갈래는 포인트 부족")
+	for kind in ["active", "passive"]:
+		var nodes := s.tree_nodes(cid, kind)
+		var dirs := {}
+		for n in nodes:
+			dirs[n.dir] = true
+		_c(nodes.size() == 13 and dirs.size() == 5, "%s 트리 십자형: 중앙 + 동서남북 × 3단계 = 13칸" % kind)
+	_c(s.tree_nodes(cid).size() == 26, "캐릭터마다 트리 두 개 (액티브 · 패시브)")
+	for cc in battle.skill_tree:
+		var news := (battle.skill_tree[cc] as Array).filter(func(n): return str(n.effect).begins_with("skill:"))
+		_c(news.all(func(n): return n.kind == "active" and int(n.tier) == s.max_tier(cc, n.dir, "active")), "%s: 새 스킬은 액티브 갈래 끝에만 (%d개)" % [cc, news.size()])
+	_c(s.has_skill(cid, "dan_a_core") and s.has_skill(cid, "dan_p_core") and s.skill_state(cid, "dan_p_core") == "learned", "두 트리 중앙은 처음부터 배움")
+	_c(s.skill_state(cid, "dan_a_n2") == "no_level" and s.skill_state(cid, "dan_a_n3") == "no_level", "레벨 모자라면 '경험 부족' (2·3단계)")
+	_c(s.skill_state(cid, "dan_p_n1") == "ready" and s.skill_state(cid, "dan_a_e1") == "ready", "1단계는 바로 배울 수 있음 (두 트리)")
+	var r := s.learn_skill(cid, "dan_p_n1")
+	_c(r.ok and s.skill_points(cid) == 0 and s.skill_state(cid, "dan_a_e1") == "no_point", "포인트는 공용: 패시브에 쓰면 액티브는 포인트 부족")
 	# 레벨 업
 	var ups := s.add_xp(cid, s.xp_need(cid))
 	_c(ups == 1 and s.char_level(cid) == lv0 + 1 and s.skill_points(cid) == 1, "경험치 채우면 레벨 업 + 포인트 1")
-	_c(s.skill_state(cid, "dan_n2") == "no_level", "2단계는 시작+2 레벨부터")
+	_c(s.skill_state(cid, "dan_a_n2") == "no_level", "2단계는 시작+2 레벨부터")
 	s.add_xp(cid, 10000)
-	_c(s.char_level(cid) >= lv0 + 4, "경험치 많이 → 여러 레벨 (Lv%d)" % s.char_level(cid))
-	_c(s.skill_state(cid, "dan_s2") == "need_prev", "갈래 안에서는 앞 단계 먼저")
-	_c(s.learn_skill(cid, "dan_n2").ok and s.learn_skill(cid, "dan_n3").ok, "북(화력) 갈래 끝까지")
-	s.learn_skill(cid, "dan_e1")
-	s.learn_skill(cid, "dan_e2")
-	_c(s.skill_state(cid, "dan_e3") == "capped", "갈래 끝은 하나만 (북 끝을 배워서 동 끝은 막힘)")
+	_c(s.char_level(cid) >= lv0 + 6, "경험치 많이 → 여러 레벨 (Lv%d)" % s.char_level(cid))
+	_c(s.skill_state(cid, "dan_a_s2") == "need_prev", "갈래 안에서는 앞 단계 먼저")
+	_c(s.skill_state(cid, "dan_a_n1") == "need_prev" or s.skill_state(cid, "dan_a_n1") == "ready", "액티브 1단계의 앞 = 액티브 중앙")
+	_c(s.learn_skill(cid, "dan_a_n1").ok and s.learn_skill(cid, "dan_a_n2").ok and s.learn_skill(cid, "dan_a_n3").ok, "액티브 북(화력) 갈래 끝까지")
+	s.learn_skill(cid, "dan_a_e1")
+	s.learn_skill(cid, "dan_a_e2")
+	_c(s.skill_state(cid, "dan_a_e3") == "capped", "갈래 끝은 트리마다 하나 (액티브 북 끝 → 액티브 동 끝 막힘)")
+	s.learn_skill(cid, "dan_p_e1")
+	s.learn_skill(cid, "dan_p_e2")
+	_c(s.skill_state(cid, "dan_p_e3") == "ready", "패시브 트리 갈래 끝은 따로 (액티브 끝과 무관)")
+	_c(s.learn_skill(cid, "dan_p_e3").ok, "패시브 동 끝 배움")
 	# 전투 반영
 	var base: UnitData = GameData._find(battle.allies, cid)
 	var copy := UnitData.new()
 	GameData._copy_props(copy, base)
 	s.apply_to_ally(copy, base)
 	_c(copy.level == s.char_level(cid), "전투 레벨 = 기지 레벨")
-	_c(copy.skill_ids.has("brutal_strike") and copy.skill_ids.find("brutal_strike") < copy.skill_ids.find("ultimate"), "북 끝 '강타' → 전투 스킬에 추가 (필살기 앞) %s" % [copy.skill_ids])
-	_c(copy.power_bonus == 1 and int(copy.skill_power.get("heavy_attack", 0)) == 3, "무기 숙련 위력 +1, 강공 단련 강공격 +3")
-	_c(copy.speed == base.speed + 1 and copy.ap_recovery == base.ap_recovery + 1, "동 갈래: 속도 +1, AP 회복 +1")
+	_c(copy.skill_ids.has("brutal_strike") and copy.skill_ids.find("brutal_strike") < copy.skill_ids.find("ultimate"), "액티브 북 끝 '강타' → 전투 스킬에 추가 (필살기 앞) %s" % [copy.skill_ids])
+	_c(copy.power_bonus == 1 and int(copy.skill_power.get("heavy_attack", 0)) == 5, "무기 숙련(패시브) 위력 +1, 강공 단련·숙달(액티브) 강공격 +5")
+	_c(copy.speed == base.speed + 3 and copy.ap_recovery == base.ap_recovery + 1, "패시브 동 갈래: 속도 +1 +2, AP 회복 +1")
 	_c(not base.skill_ids.has("brutal_strike") and base.power_bonus == 0, "원본 캐릭터 데이터는 그대로 (복제본에만)")
 	# 위력 계산
 	var a: ActionData = battle.actions["heavy_attack"]
@@ -798,9 +808,10 @@ func _test_skill_tree() -> void:
 	_c(d1 > d0, "배운 스킬로 강공격 피해 증가 (%d → %d)" % [d0, d1])
 	# 저장·초기화
 	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
-	_c(sv.char_level(cid) == s.char_level(cid) and sv.has_skill(cid, "dan_n3"), "저장/불러오기 후 레벨·스킬 유지")
+	_c(sv.char_level(cid) == s.char_level(cid) and sv.has_skill(cid, "dan_a_n3"), "저장/불러오기 후 레벨·스킬 유지")
 	var pts := s.skill_points(cid)
-	_c(s.reset_skills(cid).ok and s.skill_points(cid) == pts + 5 and not s.has_skill(cid, "dan_n1"), "스킬 초기화 → 포인트 돌려받음")
+	_c(s.reset_skills(cid, "active").ok and s.skill_points(cid) == pts + 5 and not s.has_skill(cid, "dan_a_n1") and s.has_skill(cid, "dan_p_e3"), "액티브만 초기화 → 액티브 포인트만 돌려받음 (패시브 유지)")
+	_c(s.reset_skills(cid).ok and s.skill_points(cid) == pts + 9 and not s.has_skill(cid, "dan_p_n1"), "전체 초기화 → 포인트 전부 돌려받음")
 	# 전투 결과 → 경험치
 	var s2 := _sim()
 	s2.apply_battle_result({"winner": "ally", "allies": [{"id": "a_kira", "hp": 30, "alive": true, "statuses": []}]})

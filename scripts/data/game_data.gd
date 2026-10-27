@@ -20,6 +20,8 @@ var stage_order: Array[String] = []
 ## 스킬 트리: 캐릭터 id → [{id, char, dir(center|n|e|s|w), tier 0~3, name, level, effect, value, desc}] (십자형 — 중앙 + 동서남북 갈래)
 var skill_tree: Dictionary = {}
 const TREE_DIRS := {"중앙": "center", "북": "n", "동": "e", "남": "s", "서": "w"}
+## 스킬트리 '종류' 열 → active(전투 스킬 얻기·강화) / passive(능력치). 비우면 효과로 정함 (skill: · skill_power: = 액티브)
+const TREE_KINDS := {"액티브": "active", "패시브": "passive", "active": "active", "passive": "passive"}
 ## 신앙 [임시 데이터]: 신 id → {id, name, color, desc} / 신 id → [{id, god, name, need(필요 신앙도), effect, value, desc}] / 캐릭터 id → {god, faith(시작 신앙도)}
 var gods: Dictionary = {}
 var god_order: Array[String] = []
@@ -120,9 +122,13 @@ func _parse(sheets: Dictionary) -> void:
 		if cid == "" or dir == "":
 			warnings.append("스킬트리 %s: 캐릭터·방향(중앙/북/동/남/서) 확인" % d.id)
 			continue
+		var ef0 := str(d.get("효과", "")).strip_edges()
+		var kind: String = TREE_KINDS.get(str(d.get("종류", "")).strip_edges(), "")
+		if kind == "":
+			kind = "active" if ef0.begins_with("skill") else "passive"
 		if not skill_tree.has(cid):
 			skill_tree[cid] = []
-		skill_tree[cid].append({"id": d.id, "char": cid, "dir": dir, "tier": 0 if dir == "center" else clampi(_i(d, "단계", 1), 1, 9),
+		skill_tree[cid].append({"id": d.id, "char": cid, "kind": kind, "dir": dir, "tier": 0 if dir == "center" else clampi(_i(d, "단계", 1), 1, 9),
 			"name": d.get("이름", d.id), "level": _i(d, "필요레벨", 1), "effect": str(d.get("효과", "")).strip_edges(),
 			"value": _i(d, "값"), "desc": d.get("설명", "")})
 	for d in _table(sheets.get("몬스터", [])):
