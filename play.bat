@@ -28,6 +28,14 @@ echo Importing resources after update, up to 1-2 minutes...
 if not exist ".godot" mkdir ".godot"
 >"%STAMP%" echo %REV%
 :run
+rem "play.bat editlog": editor in this console window + log to editor_log.txt (send this file when the editor crashes)
+if /i "%~1"=="editlog" (
+  "%GODOT_CON%" --path . --editor --log-file "%~dp0editor_log.txt"
+  echo.
+  echo Editor closed. Log: %~dp0editor_log.txt
+  pause
+  exit /b 0
+)
 if /i "%~1"=="edit" (
   start "" "%GODOT%" --path . --editor
 ) else (

@@ -14,6 +14,11 @@ if [ ! -d ".godot/imported" ] || [ "$REV" = "nogit" ] || [ "$(cat "$STAMP" 2>/de
   "$GODOT" --headless --path . --import >/dev/null 2>&1 || true
   mkdir -p .godot && echo "$REV" > "$STAMP"
 fi
+if [ "${1:-}" = "editlog" ]; then   # 에디터 + 로그를 editor_log.txt 에 (에디터가 튕기면 이 파일을 보내 주세요)
+  "$GODOT" --path . --editor --log-file "$(pwd)/editor_log.txt"
+  echo "로그: $(pwd)/editor_log.txt"
+  exit 0
+fi
 if [ "${1:-}" = "edit" ]; then
   exec "$GODOT" --path . --editor
 else

@@ -21,7 +21,8 @@ var _rebuilding := false
 var qlist: ItemList
 var form: VBoxContainer
 var cards: Array = []
-var player: CutscenePlayer
+var player: CutscenePlayer             # 미리보기 — 탭을 처음 열 때 만듦 (에디터 시작·임포트 중에는 아무것도 안 읽음)
+var holder: Control
 var flow: VBoxContainer
 var check_label: RichTextLabel
 var status: Label
@@ -121,21 +122,10 @@ func _ready() -> void:
 	right.add_theme_constant_override("separation", 6)
 	body2.add_child(right)
 	right.add_child(_head("미리보기 (게임 재생 화면)"))
-	var holder := Control.new()
+	holder = Control.new()
 	holder.custom_minimum_size = Vector2(400, 225)
 	holder.clip_contents = true
 	right.add_child(holder)
-	player = CutscenePlayer.new()
-	player.keys = false
-	player.dim_alpha = 1.0
-	holder.add_child(player)
-	player.cutscene_started.connect(func(id):
-		if player.playing and id != sel:
-			status.text = "미리보기: '%s' 로 이어짐" % _cut(id).get("name", id))
-	player.finished.connect(func(_id):
-		_previewing = false
-		status.text = "미리보기 끝"
-		_preview_static.call_deferred())
 	right.add_child(_small("배경 그림이 없는 컷은 게임에서 기지 화면이 어둡게 비침 (여기서는 검게)."))
 	right.add_child(_head("흐름"))
 	flow = VBoxContainer.new()
@@ -148,16 +138,42 @@ func _ready() -> void:
 	check_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	check_label.scroll_active = true
 	right.add_child(check_label)
-	reload_data(false)
+	if not Engine.is_editor_hint():   # 에디터 밖(스크린샷 스크립트)에서는 바로. 에디터에서는 탭을 열 때 (plugin._make_visible → reload_data)
+		reload_data(false)
+
+
+func _ensure_player() -> void:
+	if player != null:
+		return
+	player = CutscenePlayer.new()
+	player.keys = false
+	player.dim_alpha = 1.0
+	holder.add_child(player)
+	player.cutscene_started.connect(_on_preview_started)
+	player.finished.connect(_on_preview_finished)
+
+
+func _on_preview_started(id: String) -> void:
+	if player.playing and id != sel:
+		status.text = "미리보기: '%s' 로 이어짐" % _cut(id).get("name", id)
+
+
+func _on_preview_finished(_id: String) -> void:
+	_previewing = false
+	status.text = "미리보기 끝"
+	_preview_static.call_deferred()
 
 
 ## 탭을 열 때마다 대원·퀘스트·그림 목록 다시 읽기 (편집 중인 컷씬은 유지)
 func reload_data(keep_edit: bool = true) -> void:
+	if DisplayServer.get_name() == "headless":   # play.bat 의 --headless --import 중에는 아무것도 안 함
+		return
+	_ensure_player()
 	od = OutgameData.load_from()
 	gd = GameData.load_from()
 	quests = QuestData.read()
-	CutsceneData.clear_cache()
 	images = CutsceneData.images()
+	player.clear_textures()
 	player.npcs = od.npcs if od != null else {}
 	if keep_edit and dirty:
 		_rebuild()
@@ -206,7 +222,7 @@ func _play() -> void:
 
 
 func _preview_play() -> void:
-	if sel == "":
+	if sel == "" or player == null:
 		return
 	player.defs = CutsceneData.by_id(cuts)
 	_previewing = true
@@ -215,6 +231,8 @@ func _preview_play() -> void:
 
 
 func _preview_static() -> void:
+	if player == null:
+		return
 	player.defs = CutsceneData.by_id(cuts)
 	player.show_at(sel, ssel)
 

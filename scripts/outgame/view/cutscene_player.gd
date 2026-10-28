@@ -29,6 +29,7 @@ var _shown := 0.0
 var _typing := false
 var _waiting_choice := false
 var _visited := {}
+var _tex := {}                             # 그림 경로 → 텍스처 (이 재생 화면만의 캐시)
 
 var font: Font
 var bold: Font
@@ -157,11 +158,25 @@ func _small_label(pos: Vector2, col: Color) -> Label:
 	return l
 
 
+func _texture(path: String) -> Texture2D:
+	if path == "":
+		return null
+	if not _tex.has(path):
+		_tex[path] = CutsceneData.texture(path)
+	return _tex[path]
+
+
+## 그림 파일을 바꿨을 때 (에디터 탭을 다시 열 때)
+func clear_textures() -> void:
+	_tex.clear()
+
+
 ## 크기에 맞춰 1280x720 무대를 줄이고 가운데
 func _fit() -> void:
 	if stage == null:
 		return
-	var s := minf(size.x / STAGE.x, size.y / STAGE.y) if size.x > 0 and size.y > 0 else 1.0
+	var s := minf(size.x / STAGE.x, size.y / STAGE.y) if size.x >= 1.0 and size.y >= 1.0 else 1.0
+	s = maxf(s, 0.05)   # 크기 0 (배치 전) 일 때 배율 0 이 되지 않게
 	stage.scale = Vector2(s, s)
 	stage.position = (size - STAGE * s) * 0.5
 
@@ -278,14 +293,14 @@ func _choose(nx: String) -> void:
 func _apply_visual(st: Dictionary) -> void:
 	match str(st.type):
 		"bg":
-			var t := CutsceneData.texture(str(st.image))
+			var t := _texture(str(st.image))
 			bg_rect.texture = t
 			bg_rect.visible = t != null
 			back.color.a = 1.0 if t != null else dim_alpha
 			cg_rect.visible = false   # 배경을 바꾸면 CG 는 꺼짐
 			_update_stands("")
 		"cg":
-			var t2 := CutsceneData.texture(str(st.image))
+			var t2 := _texture(str(st.image))
 			cg_rect.texture = t2
 			cg_rect.visible = t2 != null
 			_update_stands("")

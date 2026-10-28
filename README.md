@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/HomilBBANG/rt_zerosum/main/setup/cl
 cd ~/Game/zerosum && git pull
 ```
 git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신으로 받아옵니다.
-**에디터로 열기**: `play.bat edit` / `./play.sh edit`.
+**에디터로 열기**: `play.bat edit` / `./play.sh edit`. 에디터가 튕기면 `play.bat editlog` / `./play.sh editlog` 로 열어 같은 동작을 하고, 생긴 `editor_log.txt` 를 보내 주세요 (콘솔 창에 오류도 그대로 남음).
 **다른 폴더에 설치**: macOS `curl ... | GAME_DIR=/경로 bash`, Windows `$env:GAME_DIR="D:\Game"` 를 먼저 지정.
 
 > git 이 설치돼 있으면 두 기기 모두 `git pull` 로 같은 코드를 맞출 수 있습니다. 한쪽에서 수정한 뒤 다른 쪽에서 받으려면

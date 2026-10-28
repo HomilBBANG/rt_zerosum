@@ -21,9 +21,6 @@ const ACTIONS := {"start_quest": "퀘스트 시작", "unlock_divine": "신 정�
 const ACTION_ORDER := ["start_quest", "unlock_divine", "affinity", "cash"]
 const SIDES := {"left": "왼쪽", "right": "오른쪽"}
 
-static var _img_cache: Dictionary = {}
-
-
 static func new_cutscene(id: String, kind: String = "event") -> Dictionary:
 	return {"id": id, "name": "새 컷씬", "kind": kind if KINDS.has(kind) else "event", "trigger": {"type": "new_game" if kind == "opening" else "none", "target": "", "value": 1},
 		"once": true, "next": "", "steps": [new_step("narration")]}
@@ -173,12 +170,10 @@ static func images() -> Array:
 	return out
 
 
-## 원본 PNG 를 바로 읽음 (임포트 전에 넣은 그림도). 없으면 null
+## 원본 PNG 를 바로 읽음 (임포트 전에 넣은 그림도). 없으면 null. 캐시는 쓰는 쪽(CutscenePlayer)이 가짐 — @tool 스크립트의 static 변수는 에디터에서 스크립트를 다시 읽을 때 위험
 static func texture(path: String) -> Texture2D:
 	if path == "":
 		return null
-	if _img_cache.has(path):
-		return _img_cache[path]
 	var tex: Texture2D = null
 	if FileAccess.file_exists(path):
 		var img := Image.load_from_file(ProjectSettings.globalize_path(path))
@@ -186,12 +181,7 @@ static func texture(path: String) -> Texture2D:
 			tex = ImageTexture.create_from_image(img)
 	elif ResourceLoader.exists(path):
 		tex = load(path)
-	_img_cache[path] = tex
 	return tex
-
-
-static func clear_cache() -> void:
-	_img_cache.clear()
 
 
 ## 이 컷씬으로 이어지는 곳 [[컷씬 id, "다음" | "선택지 '…'"]]
