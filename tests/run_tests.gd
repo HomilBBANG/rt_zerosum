@@ -580,6 +580,8 @@ func _test_sfx() -> void:
 	_check(Sfx.footsteps("nikita_army", "run").size() == 3, "니키타 뛰기 발자국 3조각")
 	_check(Sfx.footsteps("ethan", "walk").size() == 5 and Sfx.footsteps("ethan", "run").size() == 4, "이선 발자국 걷기 5 · 뛰기 4조각")
 	_check(Sfx.footsteps("hero2", "walk").size() == 4 and Sfx.footsteps("hero2", "run").size() == 6, "하나 발자국 걷기 4 · 뛰기 6조각")
+	_check(Sfx.footsteps("alma", "walk").size() == 5 and Sfx.footsteps("alma", "run").size() == 5, "앨마 발자국 걷기 5 · 뛰기 5조각 (출발 걸음 뺌)")
+	_check(Sfx.footsteps("dan", "walk").size() == 5 and Sfx.footsteps("dan", "run").size() == 6, "단 발자국 걷기 5 · 뛰기 6조각")
 	_check(Sfx.footsteps("rohan", "walk").is_empty(), "소리 없는 캐릭터 = 빈 목록")
 	_check(Sfx.common("dead") != null, "공용 쓰러짐 소리")
 	var d: Dictionary = CharacterSprite2D.anim_data("kira", "walk")

@@ -1,7 +1,7 @@
 """발자국 소리 → 한 걸음씩 자르기 (캐릭터 걷기·뛰기 애니메이션에서 발이 땅에 닿는 프레임마다 한 조각씩 재생).
 
 사용:
-  python3 tools/sfx_steps.py <캐릭터 id> <walk|run> <발자국.mp3>
+  python3 tools/sfx_steps.py <캐릭터 id> <walk|run> <발자국.mp3> [--skip 1,5]   (--skip = 뺄 걸음 번호, 출발 때 끄는 소리 등)
   → assets/characters/<캐릭터>/sfx/<동작>_01.ogg, _02.ogg … (걸음마다 한 조각, 돌아가며 재생)
      원본은 assets/source/sfx/<캐릭터>_<동작>.mp3 로 보관
   python3 tools/sfx_steps.py --common dead <소리.mp3>   공용 소리 → assets/sfx/dead.ogg (원본 보관 같음)
@@ -95,16 +95,28 @@ def main():
     if len(args) == 3 and args[0] == "--common":
         name, src = args[1], args[2]
         os.makedirs(os.path.join(ROOT, "assets", "source", "sfx"), exist_ok=True)
-        shutil.copy(src, os.path.join(ROOT, "assets", "source", "sfx", name + ".mp3"))
+        keep_src = os.path.join(ROOT, "assets", "source", "sfx", name + ".mp3")
+        if os.path.abspath(src) != os.path.abspath(keep_src):
+            shutil.copy(src, keep_src)
         encode(decode(src), os.path.join(ROOT, "assets", "sfx", name + ".ogg"))
         print("공용", name, "→ assets/sfx/%s.ogg" % name)
         return
+    skip = []
+    if "--skip" in args:   # 뺄 걸음 번호 (1부터, 예: 출발 때 끄는 소리처럼 다른 걸음과 다른 것)
+        k = args.index("--skip")
+        skip = [int(v) for v in args[k + 1].split(",")]
+        args = args[:k] + args[k + 2:]
     if len(args) != 3:
         print(__doc__)
         sys.exit(1)
     cid, anim, src = args
     a = decode(src)
     ts, env = onsets(a)
+    if skip:
+        keep = [k for k in range(len(ts)) if k + 1 not in skip]
+        cut = slice_steps(a, ts, env)
+        pieces_all = [cut[k] for k in keep]
+        ts = [ts[k] for k in keep]
     if not ts:
         sys.exit("걸음을 못 찾았습니다")
     out_dir = os.path.join(ROOT, "assets", "characters", cid, "sfx")
@@ -112,11 +124,13 @@ def main():
     for f in os.listdir(out_dir):
         if f.startswith(anim + "_") and (f.endswith(".ogg") or f.endswith(".ogg.import")):
             os.remove(os.path.join(out_dir, f))
-    pieces = level_outliers(slice_steps(a, ts, env))
+    pieces = level_outliers(pieces_all if skip else slice_steps(a, ts, env))
     for k, p in enumerate(pieces):
         encode(p, os.path.join(out_dir, "%s_%02d.ogg" % (anim, k + 1)))
     os.makedirs(os.path.join(ROOT, "assets", "source", "sfx"), exist_ok=True)
-    shutil.copy(src, os.path.join(ROOT, "assets", "source", "sfx", "%s_%s.mp3" % (cid, anim)))
+    keep_src = os.path.join(ROOT, "assets", "source", "sfx", "%s_%s.mp3" % (cid, anim))
+    if os.path.abspath(src) != os.path.abspath(keep_src):   # 보관본으로 다시 자를 때는 그대로
+        shutil.copy(src, keep_src)
     gaps = np.diff(ts)
     print(cid, anim, "걸음 %d개" % len(ts), "시각", [round(t, 2) for t in ts],
           "간격 %.2f초" % (float(np.median(gaps)) if len(gaps) else 0), "조각 길이", [round(len(p) / SR, 2) for p in pieces])

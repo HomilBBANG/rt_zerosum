@@ -339,11 +339,11 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![키라 애니메이션 (idle · walk · run)](docs/screenshots/kira_anims.png)
 
 ### 효과음 (발자국 · 쓰러짐)
-- **발자국**: 캐릭터마다 걷기·뛰기 소리 (현재 **키라 · 니키타 · 이선 · 하나**). 걷기·뛰기 애니메이션에서 **발이 땅에 닿는 프레임**마다 한 걸음씩 재생 → 애니메이션 속도가 달라도 발과 소리가 맞음.
+- **발자국**: 캐릭터마다 걷기·뛰기 소리 (아군 6명 모두: **키라 · 니키타 · 이선 · 하나 · 앨마 · 단**). 걷기·뛰기 애니메이션에서 **발이 땅에 닿는 프레임**마다 한 걸음씩 재생 → 애니메이션 속도가 달라도 발과 소리가 맞음.
   - 기지: 대원이 걷거나 뛸 때. 전투: 자리 이동·자리 바꾸기 때 두 걸음 (전투는 멈춘 그림으로 미끄러지므로).
   - 화면 위치 소리(가운데에서 멀수록 작게, 좌우로 나뉨). 소리 파일이 없는 캐릭터는 조용함.
 - **쓰러짐(dead)**: 공용 — 전투에서 아군·몬스터 누구든 쓰러질 때.
-- 새 소리 넣기: `python3 tools/sfx_steps.py <캐릭터 id> walk|run <발자국.mp3>` → 걸음마다 잘라 `assets/characters/<id>/sfx/walk_01.ogg …` (원본은 `assets/source/sfx/`, 다른 걸음보다 4dB 넘게 작거나 큰 조각은 크기를 맞춤).
+- 새 소리 넣기: `python3 tools/sfx_steps.py <캐릭터 id> walk|run <발자국.mp3> [--skip 1]` → 걸음마다 잘라 `assets/characters/<id>/sfx/walk_01.ogg …` (원본은 `assets/source/sfx/`, 다른 걸음보다 4dB 넘게 작거나 큰 조각은 크기를 맞춤).
   공용: `python3 tools/sfx_steps.py --common <이름> <소리.mp3>` → `assets/sfx/<이름>.ogg`.
   발 닿는 프레임: `python3 tools/char_sprites.py steps <캐릭터>` → anim.json `"steps"` (걷기 = 두 발이 가장 벌어진 프레임, 뛰기 = 가장 낮은 프레임 · 직접 고쳐도 됨).
 - [임시] 음량: `scripts/presentation/sfx.gd` 상단 (`FOOTSTEP_DB` 0 · `DEAD_DB` -3 dB).
