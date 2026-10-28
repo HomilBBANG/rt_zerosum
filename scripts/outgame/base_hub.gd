@@ -512,7 +512,7 @@ func debug_delete_save() -> void:
 	hud.show_toast("저장 파일 삭제 (지금 진행은 그대로)")
 
 
-## CLI 스크린샷용: --base_ui=dialogue:npc_alma | overhear | unlock:f1_mess | facility:b1_workshop | context:npc_dan | statement | character:npc_kira | codex:gods:solus
+## CLI 스크린샷용: --base_ui=dialogue:npc_alma | overhear | unlock:f1_mess | facility:b1_workshop | context:npc_dan | statement | character:npc_kira | codex:gods:solus | quest:q_hana_secret
 func _cli_ui(spec: String) -> void:
 	var p := spec.split(":")
 	match p[0]:
@@ -549,9 +549,22 @@ func _cli_ui(spec: String) -> void:
 					sim.skip(int(p[2]))
 			hud.open_research()
 		"character": hud.open_character(p[1])
-		"divine":   # divine:캐릭터 id — 정체(신) 바로 해금 (확인·에디터 테스트 플레이용)
+		"divine":   # divine:캐릭터 id[:더할 의지] — 정체(신) 바로 해금 (확인·에디터 테스트 플레이용)
 			var r3 := sim.unlock_divine(p[1], "테스트")
+			if p.size() > 2:
+				sim.add_will(p[1], int(p[2]))
 			hud.show_toast(r3.msg, OutgameHud.GOOD if r3.ok else OutgameHud.BAD)
+		"quest":   # quest[:퀘스트 id[:단계까지 진행]] — 퀘스트 창 (시작 안 했으면 시작, 에디터 테스트 플레이용)
+			if p.size() > 1 and p[1] != "":
+				if sim.quest_status(p[1]) == "":
+					sim.start_quest(p[1])
+				if p.size() > 2:   # 앞 단계를 건너뛰어 그 단계(0부터)까지
+					var q := sim.quest_def(p[1])
+					while sim.quest_status(p[1]) == "active" and int(sim.quests[p[1]].step) < mini(int(p[2]), (q.steps as Array).size() - 1):
+						sim.quests[p[1]].step = int(sim.quests[p[1]].step) + 1
+						sim._begin_step(q)
+					sim.check_divine()
+			hud.open_quests(p[1] if p.size() > 1 else "")
 		"codex":   # codex[:탭[:항목 id]] — 세계관 도감 (탭: characters · monsters · statuses · gods · cities)
 			hud.open_codex(p[1] if p.size() > 1 else "characters", p[2] if p.size() > 2 else "")
 		"contracts": hud.open_contracts("")

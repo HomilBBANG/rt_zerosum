@@ -108,7 +108,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![무기고](docs/screenshots/outgame/armory.png)
 
 ## 밸런스 데이터 (엑셀) · AI 에디터 · 스테이지 에디터
-에디터는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`, `addons/rtz_sortie_editor`, `addons/rtz_skill_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` · `출정 대사` · `스킬 트리` 가 있습니다.
+에디터는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`, `addons/rtz_sortie_editor`, `addons/rtz_skill_editor`, `addons/rtz_quest_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` · `출정 대사` · `스킬 트리` · `퀘스트` 가 있습니다.
 **밸런스 수치는 `data/balance.xlsx`** 한 파일에 시트별로 있습니다: `캐릭터` · `몬스터` · `아이템` · `스킬` · `스테이지` (+ 열 설명 `읽어보기`).
 - 엑셀(또는 Numbers·LibreOffice)로 열어 고치고 **저장하면 1초 안에 게임이 다시 읽어 바로 적용** — 진행 중인 전투의 HP·AP·위력·이름까지.
   캐릭터 추가·편성·적 배치처럼 전투 구성이 바뀌는 것은 다음 전투(R 재시작)부터.
@@ -201,10 +201,10 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   **누가 어느 신을 믿는지·시작 신앙도도 같은 화면 아래 `대원 신앙`** (대원마다 믿는 신 고르기 — 무신앙 포함 · 시작 신앙도, `data/faith.json` 의 `believers`). 엑셀 캐릭터 시트의 `신`·`신앙` 열은 없앰.
   신마다 **아이콘 글자**(비우면 이름 끝 단어 첫 글자: 솔·베·녹·테) — 게임에서 상징색 원 아이콘. 신 id 를 바꾸거나 지우면 믿는 대원도 따라감(지우면 무신앙). **지금 값은 임시** (태양신 솔루스·전쟁신 베이라·밤의 여신 녹트·대지모 테라, 각 4개).
   게임 스킬 창 신앙 탭·대원 정보 카드의 **신 아이콘을 누르면 세계관 도감 `종교(신)` 탭**의 그 신.
-- **신 해금 캐릭터 → 기적**: 정체가 신인 캐릭터가 있음. **해금되면 그 캐릭터의 스킬 창 신앙 탭이 `✦ 기적`** 으로 바뀜 — 정체인 신(아이콘 → 도감), 신앙도 대신 **신성도**(같은 값, 출전마다 +), 그 캐릭터만의 **기적**(필요 신성도 이상이면 포인트 없이 배움, 모자라면 회색 + '신성도 부족'). 전에 배운 신앙 스킬 효과는 그대로. 대원 목록·도감에 ✦, 도감 등장인물에 '정체' 표시(잠긴 동안은 안 보임).
-  **에디터 `스킬 트리` 탭 → `기적 (신 해금)`** (`data/faith.json` 의 `divine` · `miracles`): 왼쪽 대원 목록에서 고르고 **`이 캐릭터는 정체가 신`** 을 켜면 신 해금 캐릭터 → 정체인 신 · **`이미 해금됨 (처음부터 신)`** 체크 · 체크 안 하면 **해금 조건**(직접 해금 = 이벤트·대사 / **미션 완료** = 고른 의뢰 업무를 끝냄·고른 전투 승리·고른 연구 완료 / 레벨 / 신앙도 / 친밀도 / n일차 + 값) · "새 게임: 잠김 → …" 확인 줄. 가운데 그 캐릭터의 기적(추가·삭제), 오른쪽 기적 id·이름·필요 신성도·효과·값·설명. 테스트 플레이 = 정체 해금 + 신성도 100 으로 기적 탭.
-  게임에서 상태 확인: `BaseSim.divine_state(캐릭터)` = `""`(신 아님) / `"locked"` / `"unlocked"`, 직접 해금 `BaseSim.unlock_divine(캐릭터)`. 조건은 미션(의뢰·전투·연구)을 끝낼 때·레벨·신앙도·친밀도가 바뀔 때·날이 바뀔 때·불러온 뒤 검사 → 해금되면 기록·알림. 미션 완료 확인 `BaseSim.quest_done("contract:c_ext_escort")`. 확인: `--base_ui=divine:a_hana`.
-  **하나 = 신 (잠김)** — 미션 완료로 해금. **[임시]** 정체 = 대지모 테라, 미션 = 의뢰 '민간인 호위'(앨마의 요청을 수락하면 열리는 외부 의뢰)를 끝내면, 기적 3개 (대지의 맥박 20 · 흔들리지 않는 자 40 · 대지모의 현신 70). 니키타는 신 아님.
+- **신 해금 캐릭터 → 기적**: 정체가 신인 캐릭터가 있음. **해금되면 그 캐릭터의 스킬 창 신앙 탭이 `✦ 기적`** 으로 바뀜 — 정체인 신(아이콘 → 도감), 신앙도 대신 **의지**(해금될 때 `시작 의지`, 출전마다 + 기지 설정 `will_battle`(기본 5) — 신앙도를 올려도 기적에는 안 씀), 그 캐릭터만의 **기적**(필요 의지 이상이면 포인트 없이 배움, 모자라면 회색 + '의지 부족'). 전에 배운 신앙 스킬 효과는 그대로. 대원 목록·도감에 ✦, 도감 등장인물에 '정체' 표시(잠긴 동안은 안 보임).
+  **에디터 `스킬 트리` 탭 → `기적 (신 해금)`** (`data/faith.json` 의 `divine` · `miracles`): 왼쪽 대원 목록에서 고르고 **`이 캐릭터는 정체가 신`** 을 켜면 신 해금 캐릭터 → 정체인 신 · **`이미 해금됨 (처음부터 신)`** 체크 · 체크 안 하면 **해금 조건**(직접 해금 = 이벤트·대사 / **미션 완료** = 고른 의뢰 업무를 끝냄·고른 전투 승리·고른 연구 완료·고른 **퀘스트** 완료 / 레벨 / 신앙도 / 친밀도 / n일차 + 값) · "새 게임: 잠김 → …" 확인 줄. 가운데 그 캐릭터의 기적(추가·삭제), + **시작 의지**. 오른쪽 기적 id·이름·필요 의지·효과·값·설명. 테스트 플레이 = 정체 해금 + 의지 100 으로 기적 탭.
+  게임에서 상태 확인: `BaseSim.divine_state(캐릭터)` = `""`(신 아님) / `"locked"` / `"unlocked"`, 직접 해금 `BaseSim.unlock_divine(캐릭터)`. 조건은 미션(의뢰·전투·연구·퀘스트)을 끝낼 때·레벨·신앙도·친밀도가 바뀔 때·날이 바뀔 때·불러온 뒤 검사 → 해금되면 기록·알림. 미션 완료 확인 `BaseSim.quest_done("quest:q_hana_secret")`. 확인: `--base_ui=divine:a_hana:30` (셋째 칸 = 더할 의지).
+  **하나 = 신 (잠김)** — 미션 완료로 해금. **[임시]** 정체 = 대지모 테라, 미션 = **퀘스트 '하나의 비밀'** 완료(아래 '퀘스트'), 시작 의지 10, 기적 3개 (대지의 맥박 의지 20 · 흔들리지 않는 자 40 · 대지모의 현신 70). 니키타는 신 아님.
   확인: `godot --path . ++ --scene=base --base_ui=faith:a_dan:15:veyra_1`
 
 ![스킬 트리 에디터 (Godot 에디터 상단 탭)](docs/screenshots/skill_editor.png)
@@ -214,6 +214,21 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![신앙 스킬 에디터 (스킬 트리 탭 → 신앙 스킬)](docs/screenshots/faith_editor.png)
 ![기적 탭 (정체가 신으로 드러난 하나)](docs/screenshots/skill_miracle.png)
 ![기적 · 신 해금 에디터 (스킬 트리 탭 → 기적)](docs/screenshots/miracle_editor.png)
+
+## 퀘스트 (에디터)
+- 게임: 기지 상단 **`퀘스트`** 버튼 → 퀘스트 창 (진행 중 → 완료, 시작 안 한 퀘스트는 안 보임). 카드마다 의뢰인 얼굴 · 설명 · 단계(✓ 끝냄 / ▶ 지금 + 진행 횟수 / 뒤 단계는 `???`) · 보상. 시작·다음 단계·완료 때 알림, 기지 기록에 `◆`.
+- 규칙(`BaseSim`): **시작 조건**을 채우면 자동 시작 (처음부터 / 직접 시작 = 이벤트·대사에서 `BaseSim.start_quest(id)` / 미션 완료 후(의뢰·전투·연구·다른 퀘스트) / 의뢰인 레벨·신앙도·친밀도 / n일차) → **단계를 앞에서부터 하나씩** → 마지막 단계를 끝내면 완료 + **보상**(현금은 주간 결산 때, 친밀도는 의뢰인).
+  단계 종류: 의뢰 완료 · 전투 승리(스테이지 또는 아무 전투) · 대원과 대화 · 연구 완료 · 대원 친밀도 · 대원 레벨 · 일차 도달 · 다른 퀘스트 완료. **횟수 단계(의뢰·전투·대화)는 그 단계가 시작된 뒤부터 셈** — 전에 한 것은 안 셈.
+  완료한 퀘스트는 **신 해금 조건 `미션 완료 → 퀘스트`** 로 씀 (`quest:퀘스트 id`). 저장 파일에 진행 단계·대화 횟수 저장.
+- **에디터 = Godot 에디터 상단 `퀘스트` 탭** (`addons/rtz_quest_editor` → `data/quests.json`):
+  왼쪽 퀘스트 목록(추가 · 복제 · 삭제 · ↑↓ 순서, ✦ = 신 해금에 쓰임) · 가운데 id(바꾸면 다른 퀘스트·신 해금 조건도 따라감) · 이름 · 의뢰인 · 설명 · 시작 조건 · **단계 카드**(종류 · 대상 · 횟수/값 · 표시 글 — 비우면 자동 설명, ↑↓ · 삭제) · 보상(현금 · 의뢰인 친밀도).
+  오른쪽 **게임 퀘스트 창 미리보기** · 연결(이 퀘스트로 해금되는 신 · 이 퀘스트를 쓰는 퀘스트 · **`이 퀘스트로 신 해금`** = 신 해금 캐릭터의 해금 조건을 이 퀘스트 완료로 → `faith.json`) · 검사(없는 대상 · 중복 id · 의뢰인 없는 조건 등).
+  **`기지 테스트 플레이`** = 저장 → 새 기지에서 그 퀘스트를 시작(`시작 단계` 까지 건너뛰기)하고 퀘스트 창. 저장하면 게임 실행 중에도 다시 읽음.
+- **[임시] 퀘스트 2개**: `하나의 비밀`(처음부터 · 의뢰인 하나 — 민간인 호위 의뢰 완료 → 전투 승리 → 하나와 대화, 보상 $60 · 친밀도 +10 · **하나의 정체(신) 해금**) / `로한의 첫 연구`(2일차부터 — 산탄총 설계 연구 → 로한과 대화, $40 · +5).
+- 확인: `godot --path . ++ --scene=base --base_ui=quest:q_hana_secret:1` (그 퀘스트 시작, 셋째 칸 = 그 단계(0부터)까지 건너뛰기).
+
+![퀘스트 창 (기지 상단 '퀘스트')](docs/screenshots/quest_log.png)
+![퀘스트 에디터 (Godot 에디터 상단 '퀘스트' 탭)](docs/screenshots/quest_editor.png)
 
 ## 세계관 도감
 기지 상단 **`도감`** 버튼 (또는 신 아이콘 클릭). 탭 = **등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경**. 왼쪽 목록(위아래 스크롤) → 오른쪽 그림·이름·부제·설명 + 게임 기록.
@@ -454,8 +469,8 @@ scripts/ui/        battle_hud, title, main_menu, formation, result
 scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정·단면 좌표), world_clock, room_route_service, npc_schedule_resolver,
                    npc_agent, economy_ledger, base_sim(해금·이동·대화·위생·의뢰·결산·점검·제작·저장) / base_hub(씬)
 scripts/outgame/view/  base_view_3d(3D 단면 건물·조명·카메라), base_overlay(이름표·자물쇠·오염·말풍선 — 화면 좌표), npc_view(대원 스프라이트), outgame_hud(HUD·창)
-addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor, rtz_sortie_editor, rtz_skill_editor (Godot 에디터 상단 탭)
-data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), faith.json(신·신앙 스킬·믿는 신·신 해금 캐릭터·기적), codex.json(세계관 도감), statuses.json(상태 정의: 이름 → 효과), skill_status.json(스킬 상태 이상), monster_skills.json(몬스터 스킬), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
+addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor, rtz_sortie_editor, rtz_skill_editor, rtz_quest_editor (Godot 에디터 상단 탭)
+data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), faith.json(신·신앙 스킬·믿는 신·신 해금 캐릭터·기적), codex.json(세계관 도감), quests.json(퀘스트), statuses.json(상태 정의: 이름 → 효과), skill_status.json(스킬 상태 이상), monster_skills.json(몬스터 스킬), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/characters/ 캐릭터별 base·프레임 애니메이션·마스크·character.json (전투·기지 공통)

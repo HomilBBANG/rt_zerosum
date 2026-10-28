@@ -39,6 +39,7 @@ func run(p_check: Callable) -> void:
 	_test_skill_tree()
 	_test_faith()
 	_test_divine()
+	_test_quests()
 	_test_skill_tree_editor()
 
 
@@ -848,32 +849,44 @@ func _test_faith() -> void:
 	_c(sv.faith("a_dan") == s.faith("a_dan") and sv.has_faith_skill("a_dan", lo.id), "저장/불러오기 후 신앙 유지")
 
 
-## 신 해금 캐릭터 (하나 = 대지모 테라, 잠김 — 미션 '민간인 호위' 의뢰를 끝내면 해금 · 임시 데이터) · 기적
+## 신 해금 캐릭터 (하나 = 대지모 테라, 잠김 — 퀘스트 '하나의 비밀' 을 끝내면 해금 · 임시 데이터) · 기적
 func _test_divine() -> void:
 	print("[34b] 신 해금 캐릭터 · 기적 · 해금 조건 (미션 완료)")
 	var s := _sim()
 	_c(s.divine_state("a_nikita") == "" and s.divine_state("a_dan") == "", "니키타·단 = 신 아님")
 	_c(s.divine_state("a_hana") == "locked" and not s.is_divine("a_hana"), "하나 = 신 해금 캐릭터 · 잠김")
 	var cond: Dictionary = battle.divine.a_hana.condition
-	_c(cond.type == "quest" and cond.target == "contract:c_ext_escort", "해금 조건 = 미션 완료 (의뢰 민간인 호위)")
+	_c(cond.type == "quest" and cond.target == "quest:q_hana_secret", "해금 조건 = 미션 완료 (퀘스트 하나의 비밀)")
 	var mid: String = s.miracle_list("a_hana")[0].id
 	_c(s.miracle_state("a_hana", mid) == "locked" and not s.learn_miracle("a_hana", mid).ok, "잠긴 동안 기적 못 배움")
 	var got := []
 	s.divine_revealed.connect(func(c): got.append(c))
-	# 다른 의뢰를 끝내도 그대로, 그 의뢰를 끝내면 해금
+	# 퀘스트 '하나의 비밀' (호위 의뢰 → 전투 승리 → 하나와 대화) 을 끝내면 해금
+	_c(s.quest_status("q_hana_secret") == "active" and int(s.quest_progress("q_hana_secret").step) == 0, "퀘스트 '하나의 비밀' = 처음부터 진행 중 (1단계)")
 	s.jobs.append({"uid": "t1", "contract": "c_ext_supply", "npc": "npc_dan", "state": "assigned", "minute": 0})
 	s._complete_job("t1", s.npcs.npc_dan)
-	_c(not s.is_divine("a_hana") and not s.quest_done("contract:c_ext_escort") and s.quest_done("contract:c_ext_supply"), "다른 의뢰(보급품 운반) 완료 → 아직 잠김")
+	_c(not s.is_divine("a_hana") and int(s.quest_progress("q_hana_secret").step) == 0 and s.quest_done("contract:c_ext_supply"), "다른 의뢰(보급품 운반) 완료 → 단계 그대로")
 	s.jobs.append({"uid": "t2", "contract": "c_ext_escort", "npc": "npc_kira", "state": "assigned", "minute": 0})
 	_c(not s.quest_done("contract:c_ext_escort"), "맡기기만 하면 미완료")
 	s._complete_job("t2", s.npcs.npc_kira)
-	_c(s.is_divine("a_hana") and got == ["a_hana"] and s.divine_god("a_hana").name == battle.gods.terra.name, "민간인 호위 완료 → 하나 정체 해금 (테라), 알림 1번")
+	_c(not s.is_divine("a_hana") and int(s.quest_progress("q_hana_secret").step) == 1, "민간인 호위 완료 → 2단계 (아직 잠김)")
+	s.apply_battle_result({"winner": "ally", "allies": [{"id": "a_dan", "hp": 30, "alive": true, "statuses": []}]})
+	_c(int(s.quest_progress("q_hana_secret").step) == 2 and not s.is_divine("a_hana"), "전투 승리 → 3단계 (하나와 대화)")
+	s.begin_dialogue("npc_hana")
+	s.end_dialogue("npc_hana")
+	_c(s.quest_status("q_hana_secret") == "done" and s.quest_done("quest:q_hana_secret"), "하나와 대화 → 퀘스트 완료")
+	_c(s.is_divine("a_hana") and got == ["a_hana"] and s.divine_god("a_hana").name == battle.gods.terra.name, "퀘스트 완료 → 하나 정체 해금 (테라), 알림 1번")
 	var need := int(s.miracle_list("a_hana")[0].need)
-	_c(s.miracle_state("a_hana", mid) == ("ready" if s.faith("a_hana") >= need else "no_faith"), "해금 뒤 기적 = 신성도로 (지금 %d, 필요 %d)" % [s.faith("a_hana"), need])
-	s.add_faith("a_hana", need)
-	_c(s.learn_miracle("a_hana", mid).ok and s.miracle_state("a_hana", mid) == "learned", "신성도 충분 → 기적 배움")
+	_c(s.will("a_hana") == int(battle.divine.a_hana.will) and s.miracle_state("a_hana", mid) == "no_faith", "해금 = 시작 의지 %d, 기적은 의지로 (필요 %d → 의지 부족)" % [s.will("a_hana"), need])
+	s.add_faith("a_hana", 100)
+	_c(s.miracle_state("a_hana", mid) == "no_faith", "신앙도를 올려도 기적은 못 배움 (신앙이 아니라 의지)")
+	var w0 := s.will("a_hana")
+	s.apply_battle_result({"winner": "ally", "allies": [{"id": "a_hana", "hp": 30, "alive": true, "statuses": []}, {"id": "a_dan", "hp": 30, "alive": true, "statuses": []}]})
+	_c(s.will("a_hana") == w0 + data.inum("will_battle", 5) and s.will("a_dan") == 0, "출전하면 의지 +%d (신 캐릭터만)" % data.inum("will_battle", 5))
+	s.add_will("a_hana", need)
+	_c(s.learn_miracle("a_hana", mid).ok and s.miracle_state("a_hana", mid) == "learned", "의지 충분 → 기적 배움")
 	var hi: Dictionary = s.miracle_list("a_hana").back()
-	_c(s.miracle_state("a_hana", hi.id) == "no_faith", "신성도 모자라면 '신성도 부족'")
+	_c(s.miracle_state("a_hana", hi.id) == "no_faith", "의지 모자라면 '의지 부족'")
 	var base: UnitData = GameData._find(battle.allies, "a_hana")
 	var copy := UnitData.new()
 	GameData._copy_props(copy, base)
@@ -881,7 +894,7 @@ func _test_divine() -> void:
 	s.apply_to_ally(copy, base)
 	_c(copy.max_hp >= base.max_hp + 10, "기적 효과 → 전투 복제본 (최대 HP %d → %d)" % [base.max_hp, copy.max_hp])
 	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
-	_c(sv.is_divine("a_hana") and sv.miracle_state("a_hana", mid) == "learned", "저장/불러오기 후 정체·기적 유지")
+	_c(sv.is_divine("a_hana") and sv.miracle_state("a_hana", mid) == "learned" and sv.will("a_hana") == s.will("a_hana"), "저장/불러오기 후 정체·기적·의지 유지")
 	_c(not s.unlock_divine("a_hana").ok and not s.unlock_divine("a_nikita").ok, "이미 해금 · 신 아님 = 직접 해금 실패")
 	# 미션 종류: 전투 승리 · 연구
 	var st: String = battle.stage_order[0]
@@ -899,8 +912,8 @@ func _test_divine() -> void:
 	_c(s.cond_met({"type": "day", "value": 1}, "a_dan") and not s.cond_met({"type": "day", "value": 99}, "a_dan"), "조건: n일차부터")
 	_c(not s.cond_met({"type": "manual", "value": 0}, "a_dan") and s.cond_met({"type": "always", "value": 0}, "a_dan"), "조건: 직접(자동 해금 안 됨) · 처음부터")
 	var names := UnlockCond.mission_names(data, battle)
-	_c(UnlockCond.describe(cond, names) == "미션 완료: 의뢰 민간인 호위" and UnlockCond.norm({"type": "zzz"}).type == "manual", "조건 설명 '%s' · 모르는 조건 = 직접 해금" % UnlockCond.describe(cond, names))
-	_c(UnlockCond.missions(data, battle).size() == data.job_order.size() + battle.stage_order.size() + data.research_order.size(), "미션 목록 = 의뢰 + 전투 스테이지 + 연구")
+	_c(UnlockCond.describe(cond, names) == "미션 완료: 퀘스트 하나의 비밀" and UnlockCond.norm({"type": "zzz"}).type == "manual", "조건 설명 '%s' · 모르는 조건 = 직접 해금" % UnlockCond.describe(cond, names))
+	_c(UnlockCond.missions(data, battle).size() == data.job_order.size() + battle.stage_order.size() + data.research_order.size() + battle.quests.size(), "미션 목록 = 의뢰 + 전투 스테이지 + 연구 + 퀘스트")
 	# 처음부터 해금 (데이터는 그대로 두고 복사본으로)
 	var b2 := GameData.load_from()
 	b2.divine["a_kira"] = {"god": "veyra", "unlocked": true, "condition": {"type": "manual", "value": 0}}
@@ -908,6 +921,68 @@ func _test_divine() -> void:
 	_c(s3.is_divine("a_kira") and s3.divine_state("a_kira") == "unlocked", "'이미 해금됨' = 새 게임부터 기적 탭")
 	var fd := FaithData.read()
 	_c(FaithData.check(fd, battle.char_faith, battle.actions).errors.is_empty(), "faith.json 신 해금·기적 검사 오류 없음")
+
+
+## 퀘스트 (data/quests.json — 에디터 '퀘스트' 탭 · 임시 데이터)
+func _test_quests() -> void:
+	print("[34c] 퀘스트 — 시작 조건 · 단계 · 보상 · 저장")
+	var qs := QuestData.read()
+	_c(qs.size() >= 2 and battle.quests.size() == qs.size(), "quests.json 퀘스트 %d개 → GameData.quests" % qs.size())
+	var res := QuestData.check(qs, data, battle)
+	_c(res.errors.is_empty(), "기본 데이터 검사 오류 없음 %s" % [res.errors])
+	var tmp := "user://quests_test.json"
+	_c(QuestData.write(qs, tmp) == OK and JSON.stringify(QuestData.read(tmp)) == JSON.stringify(qs), "저장 → 다시 읽기 그대로")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+	var names := QuestData.target_names(data, battle, qs)
+	_c(QuestData.step_text(qs[0].steps[0], names) == "의뢰 '민간인 호위' 완료" and QuestData.step_text({"kind": "stage", "target": "", "count": 2}) == "전투 승리 ×2", "단계 설명 '%s'" % QuestData.step_text(qs[0].steps[0], names))
+	# 검사가 잡는 것
+	var bad := QuestData.read()
+	bad.append(QuestData.new_quest(bad[0].id))
+	bad[0].steps.append({"kind": "talk", "target": "npc_없음", "count": 1, "desc": ""})
+	bad[1].start = {"type": "level", "value": 3, "target": ""}
+	bad[1].giver = ""
+	var e2: PackedStringArray = QuestData.check(bad, data, battle).errors
+	_c(e2.size() >= 3, "검사: 중복 id · 없는 대상 · 의뢰인 없는 레벨 조건 (%d개)" % e2.size())
+	# 로한의 첫 연구: 2일차 시작 → 연구 → 로한과 대화 → 보상
+	var s := _sim()
+	var started := []
+	var done := []
+	s.quest_started.connect(func(q): started.append(q))
+	s.quest_completed.connect(func(q): done.append(q))
+	_c(s.quest_status("q_rohan_lab") == "", "로한의 첫 연구: 1일차엔 아직 시작 안 함")
+	s.skip_to_next_day()
+	_c(s.quest_status("q_rohan_lab") == "active" and started.has("q_rohan_lab"), "2일차 → 자동 시작 (알림)")
+	var rq: String = qs[1].steps[0].target
+	s.researched[rq] = true
+	s.check_divine()
+	_c(int(s.quest_progress("q_rohan_lab").step) == 1, "연구 완료 → 2단계")
+	var pend := s.ledger.pending_total()
+	var aff0 := float(s.cstate(s.npcs.npc_rohan).affinity)
+	s.begin_dialogue("npc_rohan")
+	s.end_dialogue("npc_rohan")
+	_c(s.quest_status("q_rohan_lab") == "done" and done == ["q_rohan_lab"], "로한과 대화 → 완료 (알림 1번)")
+	_c(s.ledger.pending_total() == pend + int(qs[1].rewards.cash), "보상 현금 $%d → 주간 결산 대기" % int(qs[1].rewards.cash))
+	_c(float(s.cstate(s.npcs.npc_rohan).affinity) >= aff0 + float(qs[1].rewards.affinity), "보상 친밀도 → 의뢰인 로한")
+	# 횟수 단계는 그 단계가 시작된 뒤부터 셈
+	var b2 := GameData.load_from()
+	b2.quests = [{"id": "q_t", "name": "테스트", "giver": "", "desc": "", "start": {"type": "manual", "value": 0, "target": ""},
+		"steps": [{"kind": "stage", "target": "", "count": 2, "desc": ""}], "rewards": {"cash": 0, "affinity": 0}}]
+	var s2 := BaseSim.create(data, b2)
+	s2.battle_history.append({"stage": "x", "winner": "ally"})
+	s2.check_divine()
+	_c(s2.quest_status("q_t") == "", "직접 시작 퀘스트는 조건이 없으면 시작 안 함")
+	_c(s2.start_quest("q_t").ok and not s2.start_quest("q_t").ok and not s2.start_quest("없음").ok, "start_quest: 시작 / 두 번째·없는 퀘스트 실패")
+	var p0 := s2.quest_progress("q_t")
+	_c(int(p0.have) == 0 and int(p0.need) == 2, "시작 전 승리는 세지 않음 (0/2)")
+	s2.battle_history.append({"stage": "x", "winner": "ally"})
+	s2.battle_history.append({"stage": "x", "winner": "enemy"})
+	s2.check_divine()
+	_c(int(s2.quest_progress("q_t").have) == 1 and s2.quest_status("q_t") == "active", "승리 1번 · 패배는 안 셈 (1/2)")
+	var sv := BaseSim.from_dict(data, b2, JSON.parse_string(JSON.stringify(s2.to_dict())))
+	_c(sv.quest_status("q_t") == "active" and int(sv.quest_progress("q_t").have) == 1, "저장/불러오기 후 진행 유지")
+	sv.battle_history.append({"stage": "x", "winner": "ally"})
+	sv.check_divine()
+	_c(sv.quest_status("q_t") == "done", "승리 2번 → 완료")
 
 
 func _test_skill_tree_editor() -> void:

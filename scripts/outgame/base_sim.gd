@@ -19,6 +19,9 @@ signal statement_ready(statement: Dictionary)
 signal notice(text: String)
 ## 신 해금 캐릭터의 정체가 드러남 (신앙 탭 → 기적)
 signal divine_revealed(character_id: String)
+signal quest_started(quest_id: String)
+signal quest_step(quest_id: String, step: int)
+signal quest_completed(quest_id: String)
 signal battle_triggered(pending: Dictionary)
 signal research_completed(research_id: String)
 signal leveled_up(character_id: String, level: int)
@@ -45,6 +48,9 @@ var story_seen: Dictionary = {}      # 스토리 이벤트 id → 처음 엿들�
 var inspections: Dictionary = {}     # "YYYY-MM" → {month, minute, done, score, grade, bonus, week, date}
 var progression: Dictionary = {}     # 전투 캐릭터 id → {training, level, xp, skills: [배운 스킬 트리 노드 id], faith, faith_skills: [배운 신앙 스킬 id], miracles: [배운 기적 id]}
 var divine_unlocked: Dictionary = {}  # 정체(신)가 드러난 캐릭터 id → true (처음부터 해금인 캐릭터는 넣지 않아도 신)
+var quests: Dictionary = {}          # 퀘스트 id → {state: active|done, step(지금 단계 번호), base(그 단계 시작 때 횟수), started, finished(일차)}
+var talk_counts: Dictionary = {}     # 대원 id → 지휘관과 대화한 횟수 (퀘스트 '대원과 대화' 단계)
+var _questing := false
 var inventory: Array = []            # [{uid, item, plus, owner(캐릭터 id 또는 ""), slot}]
 var workshop: Dictionary = {}        # {kind: craft|enhance, recipe?, uid?, remaining, total}
 var researched: Dictionary = {}      # 연구 id → true (완료)
@@ -92,6 +98,7 @@ func _new_game() -> void:
 	_log("기지 운영 시작")
 	for id in data.npc_order:
 		_npc_minute(npcs[id], _minute)
+	check_divine()   # 처음부터 시작하는 퀘스트 · 이미 조건을 채운 신
 
 
 func _add_missing_npcs() -> void:
@@ -448,6 +455,8 @@ func begin_dialogue(npc_id: String) -> Dictionary:
 		n.resume_state = n.state
 		n.state = NpcAgent.PLAYER_DIALOGUE
 	npc_state_changed.emit(n.id)
+	talk_counts[npc_id] = int(talk_counts.get(npc_id, 0)) + 1
+	check_divine()   # 퀘스트 '대원과 대화' 단계
 	var cs := cstate(n)
 	if int(cs.get("talk_day", -1)) != _day:   # 하루 첫 대화 → 친밀도 조금
 		cs.talk_day = _day
@@ -1151,10 +1160,7 @@ func add_faith(cid: String, v: int) -> void:
 	p.faith = clampi(before + v, 0, faith_max())
 	check_divine()
 	if is_divine(cid):
-		for m in miracle_list(cid):
-			if before < int(m.need) and int(p.faith) >= int(m.need):
-				_log("%s 신성도 %d — 기적 '%s' 을(를) 일으킬 수 있습니다" % [_char_label(cid), p.faith, m.name])
-		return
+		return   # 신은 신앙 스킬 대신 기적 (의지)
 	var g := god_of(cid)
 	if g == "":
 		return
@@ -1206,7 +1212,7 @@ func learn_faith_skill(cid: String, sid: String) -> Dictionary:
 
 
 # ---------------------------------------------------------------- 신 해금 캐릭터 · 기적 [임시 데이터]
-## 정체가 신인 캐릭터: 해금 조건(UnlockCond)을 채우면 신앙 탭이 '기적' 으로 (신앙도 = 신성도, 그 캐릭터만의 기적)
+## 정체가 신인 캐릭터: 해금 조건(UnlockCond)을 채우면 신앙 탭이 '기적' 으로 — 기적은 신앙도가 아니라 의지로 배움 (해금될 때 시작 의지, 출전마다 + will_battle)
 func divine_info(cid: String) -> Dictionary:
 	return battle.divine.get(cid, {}) if battle != null else {}
 
@@ -1247,7 +1253,7 @@ func cond_met(c: Dictionary, cid: String) -> bool:
 	return false
 
 
-## 미션 완료: "contract:id" = 그 의뢰 업무를 끝냄 / "stage:id" = 그 전투 승리 / "research:id" = 연구 완료
+## 미션 완료: "contract:id" = 그 의뢰 업무를 끝냄 / "stage:id" = 그 전투 승리 / "research:id" = 연구 완료 / "quest:id" = 퀘스트 완료
 func quest_done(target: String) -> bool:
 	var p := target.split(":")
 	if p.size() < 2:
@@ -1260,6 +1266,8 @@ func quest_done(target: String) -> bool:
 			return battle_history.any(func(b): return str(b.get("stage", "")) == id and str(b.get("winner", "")) == "ally")
 		"research":
 			return researched.has(id)
+		"quest":
+			return quest_status(id) == "done"
 	return false
 
 
@@ -1270,6 +1278,9 @@ func unlock_divine(cid: String, why: String = "") -> Dictionary:
 	if is_divine(cid):
 		return _fail("이미 해금")
 	divine_unlocked[cid] = true
+	var p := _prog(cid)
+	if not p.has("will"):
+		p.will = int(divine_info(cid).get("will", 0))
 	var g: Dictionary = battle.gods.get(str(divine_info(cid).god), {})
 	_log("✦ %s 의 정체 — %s! 신앙 탭이 '기적' 으로 바뀝니다%s" % [_char_label(cid), g.get("name", "신"), " (%s)" % why if why != "" else ""])
 	divine_revealed.emit(cid)
@@ -1280,9 +1291,148 @@ func unlock_divine(cid: String, why: String = "") -> Dictionary:
 func check_divine() -> void:
 	if battle == null:
 		return
+	update_quests()
 	for cid in battle.divine:
 		if divine_state(cid) == "locked" and cond_met(battle.divine[cid].condition, cid):
 			unlock_divine(cid, UnlockCond.describe(battle.divine[cid].condition, UnlockCond.mission_names(data, battle)))
+
+
+# ---------------------------------------------------------------- 퀘스트 (data/quests.json — 에디터 '퀘스트' 탭) [임시 데이터]
+## 시작 조건을 채우면 자동 시작 (직접 시작은 start_quest) → 단계를 앞에서부터 하나씩 → 마지막 단계면 완료 + 보상 (현금은 주간 결산 때, 친밀도는 의뢰인)
+func quest_defs() -> Array:
+	return battle.quests if battle != null else []
+
+
+func quest_def(qid: String) -> Dictionary:
+	for q in quest_defs():
+		if q.id == qid:
+			return q
+	return {}
+
+
+## "" = 아직 시작 안 함 / "active" = 진행 중 / "done" = 완료
+func quest_status(qid: String) -> String:
+	return str(quests.get(qid, {}).get("state", ""))
+
+
+## 의뢰인 대원의 전투 캐릭터 id (시작 조건 레벨·신앙도·친밀도용)
+func _giver_char(q: Dictionary) -> String:
+	return str(data.npcs.get(str(q.get("giver", "")), {}).get("character_id", ""))
+
+
+## 이벤트·대사·디버그에서 직접 시작. 반환 {ok, msg}
+func start_quest(qid: String) -> Dictionary:
+	var q := quest_def(qid)
+	if q.is_empty():
+		return _fail("없는 퀘스트")
+	if quest_status(qid) != "":
+		return _fail("이미 시작한 퀘스트")
+	quests[qid] = {"state": "active", "step": 0, "base": 0, "started": _day + 1, "finished": -1}
+	_begin_step(q)
+	_log("◆ 퀘스트 시작: %s" % q.name)
+	quest_started.emit(qid)
+	update_quests()
+	return {"ok": true, "msg": "퀘스트 시작 — %s" % q.name}
+
+
+## 횟수 단계의 지금까지 횟수 (의뢰 완료 · 전투 승리 · 대화)
+func _step_count(st: Dictionary) -> int:
+	var t := str(st.target)
+	match str(st.kind):
+		"contract":
+			return jobs.filter(func(j): return str(j.get("contract", "")) == t and str(j.get("state", "")) == "done").size()
+		"stage":
+			return battle_history.filter(func(b): return str(b.get("winner", "")) == "ally" and (t == "" or str(b.get("stage", "")) == t)).size()
+		"talk":
+			return int(talk_counts.get(t, 0))
+	return 0
+
+
+func _begin_step(q: Dictionary) -> void:
+	var qs: Dictionary = quests[q.id]
+	var steps: Array = q.steps
+	qs.base = _step_count(steps[qs.step]) if int(qs.step) < steps.size() else 0
+
+
+## 지금 단계 진행 {step(0부터), total, have, need, done(이 단계를 채움)}
+func quest_progress(qid: String) -> Dictionary:
+	var q := quest_def(qid)
+	var qs: Dictionary = quests.get(qid, {})
+	if q.is_empty() or qs.is_empty():
+		return {}
+	var steps: Array = q.steps
+	var i := int(qs.step)
+	if qs.state == "done" or i >= steps.size():
+		return {"step": steps.size(), "total": steps.size(), "have": 1, "need": 1, "done": true}
+	var st: Dictionary = steps[i]
+	var t := str(st.target)
+	var n := int(st.count)
+	var have := 0
+	var need := 1
+	match str(st.kind):
+		"contract", "stage", "talk":
+			have = _step_count(st) - int(qs.base)
+			need = n
+		"research":
+			have = 1 if researched.has(t) else 0
+		"affinity":
+			have = int(cstate(npcs[t]).get("affinity", 0.0)) if npcs.has(t) else 0
+			need = n
+		"level":
+			have = char_level(t)
+			need = n
+		"day":
+			have = _day + 1
+			need = n
+		"quest":
+			have = 1 if quest_status(t) == "done" else 0
+	return {"step": i, "total": steps.size(), "have": mini(have, need), "need": need, "done": have >= need}
+
+
+## 시작 조건을 채운 퀘스트 시작 · 채운 단계 넘기기 · 완료 (check_divine 에서 — 레벨·신앙도·친밀도·날·의뢰·연구·전투·대화가 바뀔 때)
+func update_quests() -> void:
+	if _questing or battle == null:
+		return
+	_questing = true
+	var changed := true
+	while changed:
+		changed = false
+		for q in quest_defs():
+			var qid: String = q.id
+			var stt := quest_status(qid)
+			if stt == "" and q.start.type != "manual" and cond_met(q.start, _giver_char(q)):
+				quests[qid] = {"state": "active", "step": 0, "base": 0, "started": _day + 1, "finished": -1}
+				_begin_step(q)
+				_log("◆ 퀘스트 시작: %s" % q.name)
+				quest_started.emit(qid)
+				changed = true
+			elif stt == "active" and quest_progress(qid).get("done", false):
+				var qs: Dictionary = quests[qid]
+				qs.step = int(qs.step) + 1
+				changed = true
+				if int(qs.step) >= (q.steps as Array).size():
+					_complete_quest(q)
+				else:
+					_begin_step(q)
+					quest_step.emit(qid, int(qs.step))
+	_questing = false
+
+
+func _complete_quest(q: Dictionary) -> void:
+	var qs: Dictionary = quests[q.id]
+	qs.state = "done"
+	qs.finished = _day + 1
+	var rw: Dictionary = q.rewards
+	var got := PackedStringArray()
+	if int(rw.cash) > 0:
+		ledger.add_pending("quest:" + q.id, "quest", int(rw.cash), q.id, "퀘스트 보상 (%s)" % q.name, week_now())
+		got.append("$%d (주간 결산)" % int(rw.cash))
+	var giver: NpcAgent = npcs.get(str(q.giver))
+	if int(rw.affinity) != 0 and giver != null:
+		_add_affinity(giver, float(rw.affinity))
+		got.append("%s 친밀도 %+d" % [giver.name, int(rw.affinity)])
+	_log("◆ 퀘스트 완료: %s%s" % [q.name, " — 보상 " + ", ".join(got) if not got.is_empty() else ""])
+	quest_completed.emit(q.id)
 
 
 func miracle_list(cid: String) -> Array:
@@ -1296,7 +1446,28 @@ func miracle(cid: String, mid: String) -> Dictionary:
 	return {}
 
 
-## learned 배움 / ready 배울 수 있음 / no_faith 신성도 부족 / locked 정체가 아직 안 드러남 / other 그 캐릭터 기적 아님
+## 의지 (신 캐릭터만, 기적을 배우는 데 씀): 해금될 때 divine.will, 출전마다 + will_battle
+func will(cid: String) -> int:
+	var p := _prog(cid)
+	return int(p.get("will", divine_info(cid).get("will", 0)))
+
+
+func will_max() -> int:
+	return FaithData.FAITH_MAX
+
+
+func add_will(cid: String, v: int) -> void:
+	if not is_divine(cid):
+		return
+	var p := _prog(cid)
+	var before := will(cid)
+	p.will = clampi(before + v, 0, will_max())
+	for m in miracle_list(cid):
+		if before < int(m.need) and int(p.will) >= int(m.need):
+			_log("%s 의지 %d — 기적 '%s' 을(를) 일으킬 수 있습니다" % [_char_label(cid), p.will, m.name])
+
+
+## learned 배움 / ready 배울 수 있음 / no_faith 의지 부족 / locked 정체가 아직 안 드러남 / other 그 캐릭터 기적 아님
 func miracle_state(cid: String, mid: String) -> String:
 	var m := miracle(cid, mid)
 	if m.is_empty():
@@ -1305,7 +1476,7 @@ func miracle_state(cid: String, mid: String) -> String:
 		return "locked"
 	if (_prog(cid).miracles as Array).has(mid):
 		return "learned"
-	if faith(cid) < int(m.need):
+	if will(cid) < int(m.need):
 		return "no_faith"
 	return "ready"
 
@@ -1319,7 +1490,7 @@ func learn_miracle(cid: String, mid: String) -> Dictionary:
 		"learned":
 			return _fail("이미 배웠습니다")
 		"no_faith":
-			return _fail("신성도 부족 — 신성도 %d 필요" % int(miracle(cid, mid).need))
+			return _fail("의지 부족 — 의지 %d 필요" % int(miracle(cid, mid).need))
 	(_prog(cid).miracles as Array).append(mid)
 	var m := miracle(cid, mid)
 	_log("%s 기적 습득: %s" % [_char_label(cid), m.name])
@@ -1953,6 +2124,7 @@ func apply_battle_result(result: Dictionary) -> void:
 		var gain := data.inum("xp_win", 100) if str(result.get("winner", "")) == "ally" else data.inum("xp_lose", 40)
 		var ups := add_xp(cid, gain)
 		add_faith(cid, data.inum("faith_battle", 5))
+		add_will(cid, data.inum("will_battle", 5))   # 신 캐릭터만
 		growth.append({"id": cid, "name": _char_label(cid), "xp": gain, "level": char_level(cid), "ups": ups})
 		lines.append("%s HP %d/%d%s" % [_char_label(cid), floori(float(cs.hp)), char_max_hp(cid), " 부상" if "injured" in sts else ""])
 	var w := str(result.get("winner", ""))
@@ -2047,7 +2219,8 @@ func to_dict() -> Dictionary:
 		"opened_contracts": opened_contracts.keys(), "request_state": request_state, "conv_counts": conv_counts, "heard": heard,
 		"story_seen": story_seen, "inspections": inspections, "progression": progression, "inventory": inventory,
 		"workshop": workshop, "researched": researched.keys(), "research": research, "counters": counters, "log": log_lines.slice(maxi(0, log_lines.size() - 100)), "cleaning_log": cleaning_log,
-		"chars": chars, "food": food, "gifts": gifts, "pending_battle": pending_battle, "battle_history": battle_history, "divine_unlocked": divine_unlocked.keys()}
+		"chars": chars, "food": food, "gifts": gifts, "pending_battle": pending_battle, "battle_history": battle_history, "divine_unlocked": divine_unlocked.keys(),
+		"quests": quests, "talk_counts": talk_counts}
 
 
 static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) -> BaseSim:
@@ -2085,6 +2258,14 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 	s.progression = d.get("progression", {})
 	for c in d.get("divine_unlocked", []):
 		s.divine_unlocked[str(c)] = true
+	var qd: Dictionary = d.get("quests", {})
+	for k in qd:
+		var e: Dictionary = qd[k]
+		s.quests[str(k)] = {"state": str(e.get("state", "active")), "step": int(e.get("step", 0)), "base": int(e.get("base", 0)),
+			"started": int(e.get("started", 1)), "finished": int(e.get("finished", -1))}
+	var tc: Dictionary = d.get("talk_counts", {})
+	for k in tc:
+		s.talk_counts[str(k)] = int(tc[k])
 	s.inventory = d.get("inventory", [])
 	for it in s.inventory:
 		it.plus = int(it.plus)

@@ -7,8 +7,8 @@ extends RefCounted
 ## 믿는 신 = believers {캐릭터 id → {god(신 id, "" = 무신앙), faith(시작 신앙도)}} — 같은 에디터 화면에서 고침.
 ## (예전에는 밸런스 엑셀 캐릭터 시트 '신'·'신앙' 열 — believers 가 없는 옛 파일이면 그 열을 씀)
 ## 세계관 설명(도감)은 data/codex.json 의 gods.
-## 신 해금 캐릭터 = divine {캐릭터 id → {god(정체인 신 id), unlocked(처음부터 해금), condition(UnlockCond)}}:
-##   해금되면 그 캐릭터의 신앙 탭이 '기적' 으로 — 신앙도 대신 신성도(같은 값), 그 캐릭터만의 기적 = miracles [{id, char, name, need(필요 신성도), effect, value, desc}]
+## 신 해금 캐릭터 = divine {캐릭터 id → {god(정체인 신 id), unlocked(처음부터 해금), condition(UnlockCond), will(해금될 때 시작 의지)}}:
+##   해금되면 그 캐릭터의 신앙 탭이 '기적' 으로 — 신앙도가 아니라 **의지** 로 배움, 그 캐릭터만의 기적 = miracles [{id, char, name, need(필요 의지), effect, value, desc}]
 
 const PATH := "res://data/faith.json"
 const FAITH_MAX := 100
@@ -28,7 +28,7 @@ static func symbol_of(g: Dictionary) -> String:
 
 
 static func new_divine(god: String) -> Dictionary:
-	return {"god": god, "unlocked": false, "condition": {"type": "faith", "value": 60}}
+	return {"god": god, "unlocked": false, "condition": {"type": "manual", "value": 0, "target": ""}, "will": 0}
 
 
 static func new_miracle(id: String, cid: String, need: int) -> Dictionary:
@@ -62,7 +62,8 @@ static func read(path: String = PATH) -> Dictionary:
 		for cid in dv:
 			var e2: Variant = dv[cid]
 			if e2 is Dictionary:
-				out.divine[str(cid)] = {"god": str(e2.get("god", "")), "unlocked": bool(e2.get("unlocked", false)), "condition": UnlockCond.norm(e2.get("condition", {}))}
+				out.divine[str(cid)] = {"god": str(e2.get("god", "")), "unlocked": bool(e2.get("unlocked", false)), "condition": UnlockCond.norm(e2.get("condition", {})),
+					"will": clampi(int(e2.get("will", 0)), 0, FAITH_MAX)}
 	for m in j.get("miracles", []):
 		if m is Dictionary:
 			out.miracles.append({"id": str(m.get("id", "")), "char": str(m.get("char", "")), "name": str(m.get("name", "")),
@@ -93,7 +94,7 @@ static func write(d: Dictionary, path: String = PATH) -> int:
 	return OK
 
 
-## 캐릭터 id → 기적 목록 (필요 신성도 오름차순)
+## 캐릭터 id → 기적 목록 (필요 의지 오름차순)
 static func miracles_by_char(d: Dictionary) -> Dictionary:
 	var out := {}
 	for m in d.get("miracles", []):

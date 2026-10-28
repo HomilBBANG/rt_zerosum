@@ -1,0 +1,30 @@
+{
+	"version": 1,
+	"quests": [
+		{
+			"id": "q_hana_secret",
+			"name": "하나의 비밀",
+			"giver": "npc_hana",
+			"desc": "[임시] 하나가 무언가 숨기고 있다. 그녀가 부탁한 일을 끝까지 도와주면 이야기를 들려줄지도 모른다.",
+			"start": {"type": "always", "value": 0, "target": ""},
+			"steps": [
+				{"kind": "contract", "target": "c_ext_escort", "count": 1, "desc": "하나가 부탁한 민간인 호위 의뢰를 끝내자"},
+				{"kind": "stage", "target": "", "count": 1, "desc": "출전해서 전투에서 이기기"},
+				{"kind": "talk", "target": "npc_hana", "count": 1, "desc": "하나와 이야기하기"}
+			],
+			"rewards": {"cash": 60, "affinity": 10}
+		},
+		{
+			"id": "q_rohan_lab",
+			"name": "로한의 첫 연구",
+			"giver": "npc_rohan",
+			"desc": "[임시] 연구실을 맡은 로한이 첫 성과를 보여주고 싶어 한다.",
+			"start": {"type": "day", "value": 2, "target": ""},
+			"steps": [
+				{"kind": "research", "target": "res_shotgun", "count": 1, "desc": "산탄총 설계 연구 끝내기"},
+				{"kind": "talk", "target": "npc_rohan", "count": 1, "desc": "로한에게 결과 듣기"}
+			],
+			"rewards": {"cash": 40, "affinity": 5}
+		}
+	]
+}

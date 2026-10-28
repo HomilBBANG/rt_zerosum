@@ -9,6 +9,7 @@ const PANEL_LINE := Color(0.32, 0.46, 0.58)
 const GOOD := Color(0.45, 1.0, 0.6)
 const BAD := Color(1.0, 0.42, 0.35)
 const GOLD := Color(1.0, 0.85, 0.35)
+const QUEST_COL := Color(0.95, 0.75, 0.4)
 const HP_COL := Color(0.95, 0.25, 0.25)
 const FATIGUE_COL := Color(0.62, 0.55, 1.0)
 const AFFINITY_COL := Color(1.0, 0.93, 0.6)   # 친밀도 = 파스텔 노랑
@@ -73,6 +74,9 @@ func setup(p_hub: Node, p_sim: BaseSim) -> void:
 	add_child(banner)
 	sim.divine_revealed.connect(func(cid):
 		show_toast("✦ %s 의 정체 — %s! 스킬 창 신앙 탭이 '기적' 으로" % [_char_name(cid), sim.divine_god(cid).get("name", "신")], Color(1, 0.9, 0.5)))
+	sim.quest_started.connect(func(qid): show_toast("◆ 퀘스트 시작: %s" % sim.quest_def(qid).get("name", qid), QUEST_COL))
+	sim.quest_step.connect(func(qid, _i): show_toast("◆ %s — 다음: %s" % [sim.quest_def(qid).get("name", qid), _quest_step_line(qid, int(_i))], QUEST_COL))
+	sim.quest_completed.connect(func(qid): show_toast("◆ 퀘스트 완료: %s" % sim.quest_def(qid).get("name", qid), GOOD))
 
 
 # ================================================================ 공통 위젯
@@ -167,7 +171,7 @@ func _build_top() -> void:
 	right.position = Vector2(0, 10)
 	right.set_anchors_preset(PRESET_TOP_RIGHT)
 	add_child(right)
-	var specs := [["스킬", Color(0.85, 0.6, 1.0), func(): open_skills("")], ["도감", Color(1.0, 0.85, 0.45), func(): open_codex()], ["의뢰", Color(0.45, 0.7, 0.9), func(): open_contracts("")], ["무기고", Color(0.45, 0.7, 0.9), func(): open_armory()],
+	var specs := [["스킬", Color(0.85, 0.6, 1.0), func(): open_skills("")], ["도감", Color(1.0, 0.85, 0.45), func(): open_codex()], ["퀘스트", QUEST_COL, func(): open_quests()], ["의뢰", Color(0.45, 0.7, 0.9), func(): open_contracts("")], ["무기고", Color(0.45, 0.7, 0.9), func(): open_armory()],
 		["원장", Color(0.45, 0.7, 0.9), func(): open_ledger()], ["저장", Color(0.45, 0.9, 0.6), func(): hub.save_now()],
 		["전투 출전", Color(1.0, 0.5, 0.3), func(): open_sortie()], ["타이틀", Color(0.6, 0.6, 0.65), func(): hub.to_title()]]
 	for s in specs:
@@ -722,7 +726,7 @@ func open_facility(fid: String) -> void:
 # ---------------------------------------------------------------- 스킬 창 (캐릭터마다 액티브 · 패시브 · 신앙)
 const SKILL_MODES := [["active", "액티브 스킬"], ["passive", "패시브 스킬"], ["faith", "신앙 스킬"]]
 const SKILL_MODE_HINT := {"active": "전투에서 쓰는 스킬을 강화 · 갈래 끝에서 새 스킬", "passive": "늘 적용되는 능력치 (체력·속도·AP·방어·위력)",
-	"faith": "믿는 신에 따라 배울 수 있는 스킬이 다름", "miracle": "정체가 신 — 신성도로 기적을 일으킴 (그 캐릭터만의 기적)"}
+	"faith": "믿는 신에 따라 배울 수 있는 스킬이 다름", "miracle": "정체가 신 — 의지로 기적을 일으킴 (그 캐릭터만의 기적)"}
 
 
 ## cid = "" 이면 첫 대원. 왼쪽: 대원 목록 (위아래 스크롤) / 위: 액티브 · 패시브 · 신앙 탭
@@ -946,10 +950,10 @@ func _faith_page(row: HBoxContainer, cid: String) -> void:
 		orow.add_child(ol)
 
 
-## 신앙 스킬 카드 (miracle = true 면 기적 카드: 신성도 · '신성도 부족')
+## 신앙 스킬 카드 (miracle = true 면 기적 카드: 필요 의지 · '의지 부족')
 func _faith_card(cid: String, fs: Dictionary, gcol: Color, miracle: bool = false) -> Control:
 	var st := sim.miracle_state(cid, fs.id) if miracle else sim.faith_state(cid, fs.id)
-	var word := "신성" if miracle else "신앙"
+	var word := "의지" if miracle else "신앙"
 	var c := Control.new()
 	c.custom_minimum_size = Vector2(176, 200)
 	c.draw.connect(func():
@@ -995,7 +999,7 @@ func _faith_card(cid: String, fs: Dictionary, gcol: Color, miracle: bool = false
 	return c
 
 
-## 기적 탭 (정체가 신인 캐릭터): 정체인 신 · 신성도(= 신앙도 값) · 그 캐릭터만의 기적. 전에 배운 신앙 스킬 효과는 그대로
+## 기적 탭 (정체가 신인 캐릭터): 정체인 신 · 의지 · 그 캐릭터만의 기적. 전에 배운 신앙 스킬 효과는 그대로
 func _miracle_page(row: HBoxContainer, cid: String) -> void:
 	var unit: UnitData = GameData._find(sim.battle.allies, cid)
 	var gi := sim.divine_god(cid)
@@ -1010,9 +1014,9 @@ func _miracle_page(row: HBoxContainer, cid: String) -> void:
 	head.add_child(hc)
 	hc.add_child(_label(unit.display_name + " ✦", 22, GOLD))
 	hc.add_child(_label("%s · Lv%d" % [unit.role, sim.char_level(cid)], 15, Color(0.85, 0.9, 1)))
-	hc.add_child(_label("신성도 %d" % sim.faith(cid), 17, gcol))
-	info.add_child(_gauge("신성도", float(sim.faith(cid)), float(sim.faith_max()), gcol, "%d / %d" % [sim.faith(cid), sim.faith_max()]))
-	info.add_child(_label("출전할 때마다 신성도 +%d" % sim.data.inum("faith_battle", 5), 12, Color(0.7, 0.75, 0.85)))
+	hc.add_child(_label("의지 %d" % sim.will(cid), 17, gcol))
+	info.add_child(_gauge("의지", float(sim.will(cid)), float(sim.will_max()), gcol, "%d / %d" % [sim.will(cid), sim.will_max()]))
+	info.add_child(_label("출전할 때마다 의지 +%d · 기적은 신앙이 아니라 의지로 배움" % sim.data.inum("will_battle", 5), 12, Color(0.7, 0.75, 0.85)))
 	info.add_child(_label("기적은 포인트 없이 배움 (임시 데이터)", 12, Color(0.7, 0.75, 0.85)))
 	info.add_child(_label("배운 기적", 15, Color(1, 0.95, 0.75)))
 	var learned := sim.miracle_list(cid).filter(func(m): return sim.miracle_state(cid, m.id) == "learned")
@@ -1376,6 +1380,93 @@ func open_contracts(npc_id: String) -> void:
 				"이동 중" if jb.state == "assigned" else "작업 중", int(n.busy) if n else 0], 14, Color(0.85, 0.9, 1)))
 
 
+# ---------------------------------------------------------------- 퀘스트 (data/quests.json — 에디터 '퀘스트' 탭, 진행은 BaseSim)
+## 단계 i 의 표시 글 (desc 가 있으면 그것, 없으면 자동 설명)
+func _quest_step_line(qid: String, i: int) -> String:
+	var q := sim.quest_def(qid)
+	if q.is_empty() or i >= (q.steps as Array).size():
+		return ""
+	var st: Dictionary = q.steps[i]
+	return str(st.desc) if str(st.desc) != "" else QuestData.step_text(st, QuestData.target_names(sim.data, sim.battle, sim.quest_defs()))
+
+
+## 퀘스트 기록: 진행 중 → 완료 (시작 안 한 퀘스트는 안 보임). pick = 펼쳐 둘 퀘스트 id
+func open_quests(pick: String = "") -> void:
+	var win := _window("퀘스트", 820)
+	var body: VBoxContainer = win.body
+	var names := QuestData.target_names(sim.data, sim.battle, sim.quest_defs())
+	var active := sim.quest_defs().filter(func(q): return sim.quest_status(q.id) == "active")
+	var done := sim.quest_defs().filter(func(q): return sim.quest_status(q.id) == "done")
+	body.add_child(_label("진행 중 %d · 완료 %d — 단계는 앞에서부터 하나씩, 마지막 단계를 끝내면 보상 (현금은 주간 결산 때 지급)" % [active.size(), done.size()], 13, Color(0.75, 0.8, 0.9)))
+	var list := _scroll(body, 540)
+	if active.is_empty() and done.is_empty():
+		list.add_child(_label("아직 받은 퀘스트가 없습니다", 16, Color(0.75, 0.8, 0.9)))
+	for q in active + done:
+		list.add_child(_quest_card(q, names, pick == "" or pick == q.id))
+
+
+func _quest_card(q: Dictionary, names: Dictionary, open: bool) -> Control:
+	var fin := sim.quest_status(q.id) == "done"
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", _panel_style(Color(0.09, 0.1, 0.13, 0.96) if not fin else Color(0.07, 0.09, 0.08, 0.9),
+		QUEST_COL.darkened(0.25) if not fin else Color(0.3, 0.5, 0.36), 8))
+	var row := _hbox(12)
+	pc.add_child(row)
+	var giver: Dictionary = sim.data.npcs.get(str(q.giver), {})
+	if not giver.is_empty():
+		row.add_child(_portrait_rect(str(giver.sprite), 64))
+	var col := _vbox(4)
+	col.size_flags_horizontal = SIZE_EXPAND_FILL
+	row.add_child(col)
+	var head := _hbox(8)
+	col.add_child(head)
+	head.add_child(_label(("✓ " if fin else "◆ ") + str(q.name), 18, GOOD if fin else QUEST_COL))
+	var pr := sim.quest_progress(q.id)
+	head.add_child(_label("완료 (%d일차)" % int(sim.quests[q.id].finished) if fin else "%d / %d 단계" % [int(pr.step) + 1, int(pr.total)], 13, Color(0.75, 0.8, 0.9)))
+	if not giver.is_empty():
+		head.add_child(_label("의뢰인 " + str(giver.name), 13, Color(0.7, 0.85, 1.0)))
+	if str(q.desc) != "" and (open or not fin):
+		var d := _label(str(q.desc), 13, Color(0.85, 0.88, 0.95))
+		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		d.custom_minimum_size.x = 640
+		col.add_child(d)
+	if open or not fin:
+		var steps: Array = q.steps
+		for i in steps.size():
+			var st: Dictionary = steps[i]
+			var txt := str(st.desc) if str(st.desc) != "" else QuestData.step_text(st, names)
+			var cur := not fin and i == int(pr.step)
+			var mark := "✓" if fin or i < int(pr.step) else ("▶" if cur else "·")
+			var extra := ""
+			if cur and int(pr.need) > 1:
+				extra = "  (%d / %d)" % [int(pr.have), int(pr.need)]
+			var c := GOOD.darkened(0.15) if fin or i < int(pr.step) else (Color(1, 0.95, 0.75) if cur else Color(0.55, 0.58, 0.65))
+			var l := _label("  %s %d. %s%s" % [mark, i + 1, txt if i <= int(pr.step) or fin else "???", extra], 14, c)
+			col.add_child(l)
+		var rw: Dictionary = q.rewards
+		var got := PackedStringArray()
+		if int(rw.cash) > 0:
+			got.append("$%d" % int(rw.cash))
+		if int(rw.affinity) != 0 and not giver.is_empty():
+			got.append("%s 친밀도 %+d" % [giver.name, int(rw.affinity)])
+		for cid in _quest_divine(q.id):
+			got.append("??? (%s의 비밀)" % _char_name(cid) if not sim.is_divine(cid) else "✦ %s의 정체" % _char_name(cid))
+		if not got.is_empty():
+			col.add_child(_label("보상: " + " · ".join(got), 13, GOLD))
+	return pc
+
+
+## 이 퀘스트를 끝내면 정체가 드러나는 신 해금 캐릭터
+func _quest_divine(qid: String) -> Array:
+	var out := []
+	if sim.battle != null:
+		for cid in sim.battle.divine:
+			var c: Dictionary = sim.battle.divine[cid].condition
+			if str(c.type) == "quest" and str(c.get("target", "")) == "quest:" + qid:
+				out.append(cid)
+	return out
+
+
 # ---------------------------------------------------------------- 대원 정보·장비
 func open_character(npc_id: String) -> void:
 	var n: NpcAgent = sim.npcs[npc_id]
@@ -1574,7 +1665,7 @@ func _codex_detail(det: VBoxContainer, tab: String, e: Dictionary) -> void:
 						close_top()
 						open_codex("gods", dgid))
 					dr.add_child(dic)
-					var dl := _label("%s (신) · 신성도 %d" % [dg.get("name", "?"), sim.faith(u.id)], 15, Color(dg.get("color", GOLD)).lightened(0.2))
+					var dl := _label("%s (신) · 의지 %d" % [dg.get("name", "?"), sim.will(u.id)], 15, Color(dg.get("color", GOLD)).lightened(0.2))
 					dl.size_flags_vertical = SIZE_SHRINK_CENTER
 					dr.add_child(dl)
 				var gi := sim.god_info(u.id)

@@ -63,8 +63,9 @@
 			"condition": {
 				"type": "quest",
 				"value": 0,
-				"target": "contract:c_ext_escort"
-			}
+				"target": "quest:q_hana_secret"
+			},
+			"will": 10
 		}
 	},
 	"skills": [

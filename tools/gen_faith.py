@@ -19,8 +19,8 @@ GODS = [
 # 누가 어느 신을 믿는지 · 시작 신앙도 (0~100, 출전마다 + 기지 설정 faith_battle)
 BELIEVERS = {"a_dan": {"god": "veyra", "faith": 30}, "a_kira": {"god": "noct", "faith": 20}, "a_ethan": {"god": "solus", "faith": 40},
              "a_hana": {"god": "terra", "faith": 10}, "a_alma": {"god": "solus", "faith": 50}, "a_nikita": {"god": "noct", "faith": 25}}
-# [임시] 신 해금 캐릭터: 정체가 신 — 조건을 채우면 신앙 탭이 '기적' 으로 / 그 캐릭터만의 기적 (필요 신성도 = 신앙도 값)
-DIVINE = {"a_hana": {"god": "terra", "unlocked": False, "condition": {"type": "quest", "value": 0, "target": "contract:c_ext_escort"}}}
+# [임시] 신 해금 캐릭터: 정체가 신 — 조건을 채우면 신앙 탭이 '기적' 으로 / 그 캐릭터만의 기적 (필요 의지 — 해금될 때 시작 의지, 출전마다 + will_battle)
+DIVINE = {"a_hana": {"god": "terra", "unlocked": False, "condition": {"type": "quest", "value": 0, "target": "quest:q_hana_secret"}, "will": 10}}
 MIRACLES = [
     {"id": "hana_m1", "char": "a_hana", "name": "대지의 맥박", "need": 20, "effect": "hp", "value": 10, "desc": "최대 HP +10"},
     {"id": "hana_m2", "char": "a_hana", "name": "흔들리지 않는 자", "need": 40, "effect": "defense", "value": 2, "desc": "받는 피해 -2 (방어 +2)"},

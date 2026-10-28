@@ -27,7 +27,7 @@ var data: GameData = null
 var stage_id: String = ""
 signal data_reloaded(warnings: PackedStringArray)
 var _balance_mtime: int = 0
-var _tree_mtime: int = 0     # data/skill_tree.json + faith.json + skill_status.json + statuses.json + monster_skills.json (에디터 '스킬 트리' 탭에서 저장하면 같이 다시 읽음)
+var _tree_mtime: int = 0     # data/skill_tree.json + faith.json + quests.json + skill_status.json + statuses.json + monster_skills.json (에디터 '스킬 트리' 탭에서 저장하면 같이 다시 읽음)
 var _poll_t: float = 0.0
 ## 아웃게임 (data/outgame.xlsx + 대원 일정). base = 진행 중인 기지 (없으면 null)
 const SAVE_PATH := "user://outgame_save.json"
@@ -73,7 +73,7 @@ func _ready() -> void:
 	data = GameData.load_from()
 	if data != null:
 		_balance_mtime = FileAccess.get_modified_time(GameData.BALANCE_PATH)
-		_tree_mtime = FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
+		_tree_mtime = FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(QuestData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
 		allies = data.allies
 		actions = data.actions
 		for w in data.warnings:
@@ -93,8 +93,11 @@ func _ready() -> void:
 					if req.get("skills") is Dictionary:   # 스킬 트리 탭: 기지에서 그 대원 스킬 창 (레벨 올린 상태)
 						var sk: Dictionary = req.skills
 						cli["base_ui"] = "skills:%s:L%d:::%s" % [sk.get("char", ""), int(sk.get("level", 1)), sk.get("kind", "active")]
-						if bool(sk.get("divine", false)):   # 기적 탭 테스트: 정체 해금 + 신성도 올려 둠
-							cli["base_ui"] = "divine:%s;faith:%s:%d" % [sk.get("char", ""), sk.get("char", ""), int(sk.get("faith", 0))]
+						if bool(sk.get("divine", false)):   # 기적 탭 테스트: 정체 해금 + 의지 올려 둠
+							cli["base_ui"] = "divine:%s:%d;faith:%s" % [sk.get("char", ""), int(sk.get("will", 0)), sk.get("char", "")]
+				if req.get("quest") is String:   # 퀘스트 탭: 새 기지에서 그 퀘스트를 시작(필요하면 단계 건너뛰기)하고 퀘스트 창
+					cli["editor_base"] = true
+					cli["base_ui"] = "quest:%s:%d" % [req.quest, int(req.get("step", 0))]
 				if str(req.get("try_skill", "")) != "":   # 스킬 트리 탭 '상태 이상': 그 스킬을 아군 모두의 첫 스킬 칸에
 					cli["try_skill"] = str(req.try_skill)
 				if req.get("sortie", false):   # 출정 대사 탭: 새 기지에서 출정 대기 화면 (대원 상태 섞기)
@@ -269,7 +272,7 @@ func _process(delta: float) -> void:
 	if data == null:
 		return
 	var t := FileAccess.get_modified_time(GameData.BALANCE_PATH)
-	var tt := FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
+	var tt := FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(QuestData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
 	if t == 0 or (t == _balance_mtime and tt == _tree_mtime):
 		return
 	var newer := GameData.load_from()
@@ -282,7 +285,7 @@ func _process(delta: float) -> void:
 		push_warning("balance.xlsx: " + w)
 	for e in _ally_copies:
 		_derive_ally(e.copy, e.base)
-	print("[balance] data/balance.xlsx · skill_tree.json · faith.json · skill_status.json · statuses.json · monster_skills.json 다시 읽음")
+	print("[balance] data/balance.xlsx · skill_tree.json · faith.json · quests.json · skill_status.json · statuses.json · monster_skills.json 다시 읽음")
 	data_reloaded.emit(data.warnings)
 
 
