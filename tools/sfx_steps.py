@@ -8,6 +8,7 @@
 
 걸음 찾기: 소리 크기(RMS)가 최대의 25% 를 넘는 순간 = 발 닿음, 걸음 사이 최소 0.18초.
 조각 = 발 닿기 20ms 전 ~ 다음 걸음 20ms 전 (마지막은 소리가 잦아들 때까지), 끝 30ms 페이드.
+다른 걸음보다 4dB 넘게 작거나 큰 조각은 중간값 크기로 맞춤.
 """
 import os
 import shutil
@@ -76,6 +77,19 @@ def slice_steps(a, ts, env):
     return pieces
 
 
+def level_outliers(pieces, tol_db=4.0):
+    """다른 걸음보다 tol_db 넘게 작거나 큰 조각(녹음 처음의 작은 걸음 등)은 중간값 크기로 — 돌아가며 재생할 때 튀지 않게"""
+    peaks = [float(np.abs(p).max()) + 1e-9 for p in pieces]
+    med = float(np.median(peaks))
+    out = []
+    for p, pk in zip(pieces, peaks):
+        diff = 20 * np.log10(pk / med)
+        out.append(p * (med / pk) if abs(diff) > tol_db else p)
+        if abs(diff) > tol_db:
+            print("  조각 크기 맞춤: %+.1f dB → 0" % diff)
+    return out
+
+
 def main():
     args = sys.argv[1:]
     if len(args) == 3 and args[0] == "--common":
@@ -98,7 +112,7 @@ def main():
     for f in os.listdir(out_dir):
         if f.startswith(anim + "_") and (f.endswith(".ogg") or f.endswith(".ogg.import")):
             os.remove(os.path.join(out_dir, f))
-    pieces = slice_steps(a, ts, env)
+    pieces = level_outliers(slice_steps(a, ts, env))
     for k, p in enumerate(pieces):
         encode(p, os.path.join(out_dir, "%s_%02d.ogg" % (anim, k + 1)))
     os.makedirs(os.path.join(ROOT, "assets", "source", "sfx"), exist_ok=True)

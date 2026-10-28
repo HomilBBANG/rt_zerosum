@@ -578,6 +578,8 @@ func _test_balance_data_and_ai_graph() -> void:
 func _test_sfx() -> void:
 	_check(Sfx.footsteps("kira", "walk").size() == 5, "키라 걷기 발자국 5조각 [got %d]" % Sfx.footsteps("kira", "walk").size())
 	_check(Sfx.footsteps("nikita_army", "run").size() == 3, "니키타 뛰기 발자국 3조각")
+	_check(Sfx.footsteps("ethan", "walk").size() == 5 and Sfx.footsteps("ethan", "run").size() == 4, "이선 발자국 걷기 5 · 뛰기 4조각")
+	_check(Sfx.footsteps("hero2", "walk").size() == 4 and Sfx.footsteps("hero2", "run").size() == 6, "하나 발자국 걷기 4 · 뛰기 6조각")
 	_check(Sfx.footsteps("rohan", "walk").is_empty(), "소리 없는 캐릭터 = 빈 목록")
 	_check(Sfx.common("dead") != null, "공용 쓰러짐 소리")
 	var d: Dictionary = CharacterSprite2D.anim_data("kira", "walk")
