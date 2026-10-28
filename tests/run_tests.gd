@@ -586,6 +586,9 @@ func _test_sfx() -> void:
 	_check(Sfx.common("dead") != null, "공용 쓰러짐 소리")
 	var d: Dictionary = CharacterSprite2D.anim_data("kira", "walk")
 	_check((d.get("steps", []) as Array).map(func(v): return int(v)) == [9, 18], "키라 걷기 발 닿는 프레임 [9, 18] [got %s]" % str(d.get("steps", [])))
+	for h in ["hamster_gray", "hamster_brown", "hamster_glasses", "hamster_white"]:
+		var hw: Dictionary = CharacterSprite2D.anim_data(h, "walk")
+		_check((hw.frames as Array).size() == 12 and (CharacterSprite2D.anim_data(h, "idle").frames as Array).size() == 24, "%s 걷기 12장 · idle 24장" % h)
 	var c := CharacterSprite2D.new()
 	c.build("kira")
 	c.play("walk")

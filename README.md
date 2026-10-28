@@ -338,6 +338,14 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![해상도: AI 시트 그대로 키움 vs 4배 AI 확대](docs/screenshots/sr_compare.png)
 ![키라 애니메이션 (idle · walk · run)](docs/screenshots/kira_anims.png)
 
+### 햄스터 4마리 (회색 · 갈색(졸린 눈) · 안경 · 흰색)
+`assets/characters/hamster_gray`, `hamster_brown`, `hamster_glasses`, `hamster_white` — 사용자 그림 한 장씩. 걷기 그림이 없어 **원화 한 장으로 걷기를 만듦**:
+`python3 tools/char_sprites.py critter <캐릭터>` → `idle` 24장 12fps (숨쉬기) · `walk` 12장 14fps (햄스터 뒤뚱 걸음: 한 발씩 들어 털 밑으로 쏙, 몸은 딛은 발 위를 중심으로 기울어 들린 발 쪽이 올라감, 두 발이 닿을 때 살짝 눌림).
+발 = 맨 아래 살구빛 분홍 발바닥 두 덩어리(+외곽선)를 자동으로 찾음. 아직 게임 어디에도 배치하지 않음 (그림·동작만).
+
+![햄스터 걷기](docs/screenshots/hamster_walk.gif)
+![햄스터 걷기 프레임](docs/screenshots/hamster_anims.png)
+
 ### 효과음 (발자국 · 쓰러짐)
 - **발자국**: 캐릭터마다 걷기·뛰기 소리 (아군 6명 모두: **키라 · 니키타 · 이선 · 하나 · 앨마 · 단**). 걷기·뛰기 애니메이션에서 **발이 땅에 닿는 프레임**마다 한 걸음씩 재생 → 애니메이션 속도가 달라도 발과 소리가 맞음.
   - 기지: 대원이 걷거나 뛸 때. 전투: 자리 이동·자리 바꾸기 때 두 걸음 (전투는 멈춘 그림으로 미끄러지므로).

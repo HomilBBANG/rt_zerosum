@@ -37,6 +37,7 @@ assets/characters/<id>/
       AI 시트(영상에서 뽑은 칸 배열) → <동작>/0001.png … 칸 경계는 그림이 가장 적은 줄로 자름, 쓸 프레임만 골라 순서대로
       크기: 기준 프레임(--ref, 똑바로 선 칸)의 키 = figure_px. ground = 프레임마다 발을 접지선에(카메라 흔들림 제거), cell = 칸 높이 그대로(뛰기처럼 뜨는 동작)
       누운 자세처럼 캔버스를 넘으면 그 동작만 캔버스를 넓힘 (anim.json 의 ground). 조명·선화·눈 마스크도 프레임마다
+  python3 tools/char_sprites.py critter <캐릭터>   작은 동물(햄스터 등, 두 발로 선 그림): idle(숨쉬기) + walk(한 발씩 들며 뒤뚱 걷기) — 원화 한 장에서
   python3 tools/char_sprites.py steps <캐릭터> [walk run]   걷기·뛰기에서 발이 땅에 닿는 프레임 2개 → anim.json "steps" (발자국 소리 맞추기)
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
@@ -991,6 +992,154 @@ def cmd_head(cid, anim, cut=None, src=None, max_deg=14, scales=(0.85, 1.15)):
     print(cid, anim, "머리 바꿔 붙임:", ", ".join(log))
 
 
+# ---------------------------------------------------------------- 작은 동물(햄스터 등) idle · 걷기 (원화 한 장 → 몸·두 발 나눠 움직임)
+def _critter_feet(base):
+    """원화 발(맨 아래 분홍 발바닥 두 덩어리) 마스크 2개 (왼쪽, 오른쪽) — bool 배열.
+    발 = 분홍 영역의 위 끝부터 아래로 (+ 둘레 외곽선). 발 위의 털 외곽선은 몸에 남김"""
+    import numpy as np
+    from scipy import ndimage
+    a = np.array(base).astype(np.float32)
+    al = a[..., 3] > 40
+    H, W = al.shape
+    ys = np.nonzero(al.any(1))[0]
+    top, bot = int(ys.min()), int(ys.max())
+    fig = bot - top
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    # 발바닥 = 살구빛 분홍(파랑 < 초록). 털 아래 분홍 그늘은 라벤더빛(파랑 ≥ 초록)이라 빠짐
+    pink = al & (r > 215) & (r - g > 40) & (b < g + 2) & (g > 120)
+    pink[:bot - int(fig * 0.16)] = False
+    lab, n = ndimage.label(pink)
+    if n < 2:
+        sys.exit("발(분홍 발바닥 두 덩어리)을 못 찾았습니다")
+    sz = ndimage.sum(pink, lab, range(1, n + 1))
+    big = sorted(range(n), key=lambda i: -sz[i])[:2]
+    feet = []
+    for i in big:
+        m = lab == i + 1
+        xs = np.nonzero(m.any(0))[0]
+        tops = np.full(W, H, float)
+        for x in xs:
+            tops[x] = np.nonzero(m[:, x])[0].min()
+        gr = max(4, int(fig * 0.016))   # 발 둘레 외곽선 두께까지
+        tops = ndimage.grey_erosion(tops, size=2 * gr + 1)   # 가장자리 열은 이웃 열의 위 끝
+        rows = np.arange(H)[:, None]
+        grow = ndimage.binary_dilation(m, iterations=gr)
+        f = grow & al & (rows >= tops[None, :] - 1)
+        feet.append((float(xs.mean()), float(np.nonzero(m.any(1))[0].min()), f))
+    feet.sort(key=lambda t: t[0])
+    return feet, fig, top, bot
+
+
+def _affine(img, M, size):
+    """M = 3x3 (원래 → 새 위치). PIL 은 새 → 원래 역행렬"""
+    import numpy as np
+    inv = np.linalg.inv(M)
+    return img.transform(size, Image.AFFINE, tuple(inv[:2].ravel()), resample=Image.BICUBIC)
+
+
+def cmd_critter(cid, walk_frames=12, walk_fps=14.0, idle_frames=24, idle_fps=12.0):
+    """작은 동물 idle(숨쉬기) + walk(뒤뚱 걷기) → <캐릭터>/idle/, walk/ (원화 한 장에서).
+    걷기: 한 발씩 들어 올림(들린 발은 털 밑으로 쏙), 몸은 딛은 발 쪽으로 기울며(딛은 발 위가 회전 중심 → 들린 발 쪽이 올라감),
+    두 발이 다 닿는 순간 살짝 눌림. 발 닿는 프레임 = 0, 칸 수/2 (anim.json steps). 조명·선화·눈 마스크도 같은 움직임."""
+    import math
+    import numpy as np
+    from scipy import ndimage
+    cdir = os.path.join(CHAR_DIR, cid)
+    base = Image.open(os.path.join(cdir, "base.png")).convert("RGBA")
+    W, H = base.size
+    feet, fig, top, bot = _critter_feet(base)
+    (xl, tl, fl), (xr, tr, fr) = feet
+    layers = {"": base}
+    for suf in ("_mask_r", "_mask_l", "_line", "_eye"):
+        pth = os.path.join(cdir, "base%s.png" % suf)
+        if os.path.exists(pth):
+            layers[suf] = Image.open(pth).convert("L")
+    body_m = ~(fl | fr)
+    gx = (xl + xr) / 2.0
+
+    def part(img, m):
+        arr = np.array(img).copy()
+        if arr.ndim == 3:
+            arr[..., 3] = np.where(m, arr[..., 3], 0)
+        else:
+            arr = np.where(m, arr, 0).astype(np.uint8)
+        return Image.fromarray(arr)
+    parts = {k: (part(v, body_m), part(v, fl), part(v, fr)) for k, v in layers.items()}
+
+    def T(dx, dy):
+        return np.array([[1, 0, dx], [0, 1, dy], [0, 0, 1]], float)
+
+    def R(deg, cx, cy):   # 화면 좌표(y 아래)에서 +deg = 오른쪽이 올라감
+        a = math.radians(deg)
+        return T(cx, cy) @ np.array([[math.cos(a), math.sin(a), 0], [-math.sin(a), math.cos(a), 0], [0, 0, 1]]) @ T(-cx, -cy)
+
+    def S(sx, sy, cx, cy):
+        return T(cx, cy) @ np.array([[sx, 0, 0], [0, sy, 0], [0, 0, 1]], float) @ T(-cx, -cy)
+
+    def render(adir, i, Mb, Ml, Mr):
+        stem = os.path.join(adir, "%04d" % (i + 1))
+        for k, (pb, pl, pr) in parts.items():
+            b_, l_, r_ = _affine(pb, Mb, (W, H)), _affine(pl, Ml, (W, H)), _affine(pr, Mr, (W, H))
+            if k == "":
+                out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                out.alpha_composite(l_)
+                out.alpha_composite(r_)
+                out.alpha_composite(b_)   # 몸이 발 위 (들린 발은 털 밑으로)
+                oa = np.array(out)
+                lab_c, n_c = ndimage.label(oa[..., 3] > 20)   # 발을 떼고 남은 외곽선 부스러기(떨어진 작은 섬) 지움
+                if n_c > 1:
+                    sz = ndimage.sum(np.ones_like(lab_c), lab_c, range(1, n_c + 1))
+                    crumbs = np.isin(lab_c, [j + 1 for j in range(n_c) if sz[j] < fig * fig * 0.0005])
+                    crumbs = ndimage.binary_dilation(crumbs, iterations=1) & (oa[..., 3] <= 20) | crumbs
+                    oa[..., 3] = np.where(crumbs, 0, oa[..., 3])
+                    out = Image.fromarray(oa)
+                out.save(stem + ".png")
+                ba = np.array(b_)[..., 3].astype(np.float32) / 255
+            else:
+                v = np.maximum(np.array(l_), np.array(r_)).astype(np.float32)
+                v = np.array(b_).astype(np.float32) * ba + v * (1 - ba)
+                Image.fromarray(np.clip(v, 0, 255).astype(np.uint8)).save(stem + k + ".png")
+
+    def fresh(anim):
+        adir = os.path.join(cdir, anim)
+        os.makedirs(adir, exist_ok=True)
+        for fn in os.listdir(adir):
+            if fn.endswith(".png") or fn.endswith(".png.import"):
+                os.remove(os.path.join(adir, fn))
+        return adir
+
+    # idle: 숨쉬기 (몸이 위아래로 살짝 늘었다 줄었다, 좌우로 아주 조금 흔들림), 발 고정
+    adir = fresh("idle")
+    for i in range(idle_frames):
+        ph = 2 * math.pi * i / idle_frames
+        Mb = R(0.6 * math.sin(ph + 0.8), gx, bot) @ S(1 - 0.004 * math.sin(ph), 1 + 0.009 * math.sin(ph), gx, bot)
+        render(adir, i, Mb, np.eye(3), np.eye(3))
+    json.dump({"fps": idle_fps, "source": "critter: base.png 숨쉬기 idle (%d장)" % idle_frames},
+              open(os.path.join(adir, "anim.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    # walk: 뒤뚱 걷기
+    adir = fresh("walk")
+    lift = fig * 0.035
+    span = max(10.0, xr - xl)
+    for i in range(walk_frames):
+        p = i / walk_frames
+        sv = math.sin(2 * math.pi * p)          # > 0: 오른발 들림(왼발 딛음), < 0: 왼발 들림
+        k2 = 1 - abs(sv)                        # 두 발 다 닿음 = 1
+        up = abs(sv) * lift
+        deg = math.degrees(math.atan2(up * 0.55, span)) * (1 if sv > 0 else -1)
+        piv = (xl, tl) if sv > 0 else (xr, tr)
+        # 몸은 딛은 발 위를 중심으로만 기울임 (몸을 띄우면 딛은 발과 털 사이가 벌어짐) + 두 발이 닿을 때 살짝 눌림
+        Mb = S(1 + 0.012 * k2, 1 - 0.016 * k2, gx, bot) @ R(deg, *piv)
+        Ml = T(0, -up) if sv < 0 else np.eye(3)
+        Mr = T(0, -up) if sv > 0 else np.eye(3)
+        render(adir, i, Mb, Ml, Mr)
+    json.dump({"fps": walk_fps, "steps": [0, walk_frames // 2], "source": "critter: base.png 뒤뚱 걷기 (%d장)" % walk_frames},
+              open(os.path.join(adir, "anim.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    for fn in os.listdir(cdir):   # 예전 숨쉬기 시트는 지움
+        if fn.startswith("idle_4x4") or fn == "idle.json":
+            os.remove(os.path.join(cdir, fn))
+    print(cid, "idle %d장 · walk %d장 %.0ffps" % (idle_frames, walk_frames, walk_fps), "발", (round(xl), round(tl)), (round(xr), round(tr)))
+
+
 # ---------------------------------------------------------------- 발 닿는 프레임 (발자국 소리 맞추기)
 def cmd_steps(cid, anims=("walk", "run")):
     """걷기·뛰기 한 주기에서 발이 땅에 닿는 프레임 2개 → anim.json "steps" (0부터).
@@ -1059,6 +1208,8 @@ if __name__ == "__main__":
         opt = {a[2:]: args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
         cmd_head(args[1], args[2], opt.get("cut"), None, int(opt.get("deg", 14)),
                  tuple(float(v) for v in opt.get("scale", "0.85-1.15").split("-")))
+    elif args[:1] == ["critter"] and len(args) >= 2:
+        cmd_critter(args[1])
     elif args[:1] == ["steps"] and len(args) >= 2:
         cmd_steps(args[1], tuple(args[2:]) or ("walk", "run"))
     elif args[:1] == ["rig"] and len(args) >= 2:
