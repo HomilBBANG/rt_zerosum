@@ -10,6 +10,7 @@ const SCENE_FORMATION := "res://scenes/formation.tscn"
 const SCENE_BATTLE_2D := "res://scenes/battle_2d.tscn"
 const SCENE_RESULT := "res://scenes/result.tscn"
 
+var _quitting := false
 var mode: String = "2d"            # 캐릭터 2D + 3D 배경 하나뿐 (3D 전투 씬 2026-10-27 제거). 결과 기록용 이름만 남김
 var preset: String = "g1"          # LightingPresets 키
 var ambush: String = "none"        # "none" | "ally" | "enemy"
@@ -66,7 +67,31 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		win.mode = Window.MODE_WINDOWED if win.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
 
 
+## 끝날 때 static 캐시(캐릭터 그림 · 발자국 소리)를 비움 — 안 비우면 종료 때 "ObjectDB instances were leaked" · "resources still in use" 경고
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:   # 창 닫기 버튼도 quit_game 으로 (auto_accept_quit 끔)
+		quit_game()
+
+
+func _exit_tree() -> void:
+	Sfx.shutdown(get_tree())
+	CharacterSprite2D.clear_cache()
+
+
+## 게임 끝내기: 소리를 먼저 멈추고 오디오가 한 번 돈 뒤 끝냄 (재생 중에 끝내면 소리 객체가 남았다는 경고)
+func quit_game() -> void:
+	if _quitting:
+		return
+	_quitting = true
+	Sfx.shutdown(get_tree())
+	CharacterSprite2D.clear_cache()
+	for i in 3:
+		await get_tree().process_frame
+	get_tree().quit()
+
+
 func _ready() -> void:
+	get_tree().auto_accept_quit = false
 	call_deferred("_fit_window")
 	_parse_cli()
 	# 게임 기본: 밸런스 엑셀의 캐릭터·스킬·몬스터·스테이지 (읽지 못하면 코드 내장 테스트 데이터)
@@ -472,4 +497,4 @@ func maybe_cli_capture(extra_wait_frames: int = 0) -> void:
 	var err := img.save_png(path)
 	print("[shot] saved %s (%s) err=%d" % [path, img.get_size(), err])
 	if cli.get("keep", "0") != "1":
-		get_tree().quit()
+		quit_game()

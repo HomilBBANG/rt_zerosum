@@ -62,7 +62,7 @@ func _ready() -> void:
 	test.pressed.connect(func(): Game.go_menu_test())
 	box.add_child(test)
 	var quit := _button("종료", Color(0.5, 0.5, 0.55))
-	quit.pressed.connect(func(): get_tree().quit())
+	quit.pressed.connect(func(): Game.quit_game())
 	box.add_child(quit)
 	if Game.outgame_data == null:
 		start.disabled = true

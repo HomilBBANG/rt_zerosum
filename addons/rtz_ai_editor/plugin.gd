@@ -13,6 +13,7 @@ func _enter_tree() -> void:
 
 
 func _exit_tree() -> void:
+	CharacterSprite2D.clear_cache()   # 그림·발자국 소리 static 캐시 비우기 (에디터를 닫을 때 "resources still in use" 방지)
 	if panel != null:
 		panel.queue_free()
 

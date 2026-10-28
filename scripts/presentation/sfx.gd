@@ -11,6 +11,7 @@ const FOOTSTEP_DB := 0.0
 const DEAD_DB := -3.0
 const MAX_DISTANCE := 2200.0
 
+const GROUP := "rtz_sfx"
 static var enabled := true
 static var _cache: Dictionary = {}   # 경로 → AudioStream (없으면 null)
 
@@ -63,9 +64,20 @@ static func play_at(node: Node2D, stream: AudioStream, volume_db: float = 0.0) -
 	p.volume_db = volume_db
 	p.max_distance = MAX_DISTANCE
 	p.attenuation = 1.0
+	p.add_to_group(GROUP)
 	node.add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()
+
+
+## 게임을 끝낼 때: 재생 중인 소리를 멈추고 캐시를 비움 (재생 중에 끝나면 소리 객체가 남았다는 경고)
+static func shutdown(tree: SceneTree) -> void:
+	enabled = false
+	if tree != null:
+		for p in tree.get_nodes_in_group(GROUP):
+			p.stop()
+			p.stream = null
+	_cache.clear()
 
 
 static func clear_cache() -> void:
