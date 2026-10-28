@@ -20,7 +20,7 @@ var stages: Dictionary = {}         # id → {id, name, preset, ambush, hp_mult,
 var stage_order: Array[String] = []
 ## 스킬 트리: 캐릭터 id → [{id, char, kind(active|passive), dir(center|n|e|s|w), tier, name, level, effect, value, desc}] (data/skill_tree.json)
 var skill_tree: Dictionary = {}
-## 신앙 [임시 데이터]: 신 id → {id, name, color, desc} / 신 id → [{id, god, name, need(필요 신앙도), effect, value, desc}] / 캐릭터 id → {god, faith(시작 신앙도)}
+## 신앙 [임시 데이터]: 신 id → {id, name, color, symbol, desc} / 신 id → [{id, god, name, need(필요 신앙도), effect, value, desc}] / 캐릭터 id → {god, faith(시작 신앙도)} (faith.json believers)
 var gods: Dictionary = {}
 var god_order: Array[String] = []
 var faith_skills: Dictionary = {}
@@ -117,12 +117,15 @@ func _parse(sheets: Dictionary) -> void:
 					(actions[sid] as ActionData).statuses.append(st)
 	for d in _table(sheets.get("캐릭터", [])):
 		allies.append(_unit(d, "ally"))
-	for d in _table(sheets.get("캐릭터", [])):
-		char_faith[d.id] = {"god": str(d.get("신", "")).strip_edges(), "faith": clampi(_i(d, "신앙"), 0, 100)}
-	# 신앙 (data/faith.json — 에디터 '스킬 트리' 탭 → 신앙)
+	# 신앙 (data/faith.json — 에디터 '스킬 트리' 탭 → 신앙): 신 · 신앙 스킬 · 믿는 신(believers)
 	var fd := FaithData.read()
+	for d in _table(sheets.get("캐릭터", [])):
+		if fd.has_believers:
+			char_faith[d.id] = fd.believers.get(d.id, {"god": "", "faith": 0})
+		else:   # 옛 파일: 엑셀 캐릭터 시트 '신'·'신앙' 열
+			char_faith[d.id] = {"god": str(d.get("신", "")).strip_edges(), "faith": clampi(_i(d, "신앙"), 0, 100)}
 	for g in fd.gods:
-		gods[g.id] = {"id": g.id, "name": g.name, "color": FaithData.color_of(g), "desc": g.desc}
+		gods[g.id] = {"id": g.id, "name": g.name, "color": FaithData.color_of(g), "symbol": FaithData.symbol_of(g), "desc": g.desc}
 		god_order.append(g.id)
 	faith_skills = FaithData.by_god(fd)
 	for d in _table(sheets.get("몬스터", [])):

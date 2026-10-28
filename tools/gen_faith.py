@@ -16,6 +16,9 @@ GODS = [
     ["noct", "밤의 여신 녹트", "#8f7bff", "그림자와 은밀함의 신 — 속도·AP (임시)"],
     ["terra", "대지모 테라", "#5fd38a", "땅과 수호의 신 — 방어·체력 (임시)"],
 ]
+# 누가 어느 신을 믿는지 · 시작 신앙도 (0~100, 출전마다 + 기지 설정 faith_battle)
+BELIEVERS = {"a_dan": {"god": "veyra", "faith": 30}, "a_kira": {"god": "noct", "faith": 20}, "a_ethan": {"god": "solus", "faith": 40},
+             "a_hana": {"god": "terra", "faith": 10}, "a_alma": {"god": "solus", "faith": 50}, "a_nikita": {"god": "noct", "faith": 25}}
 FS_COLS = ["신", "id", "이름", "필요신앙", "효과", "값", "설명"]
 FAITH_SKILLS = [
     ["solus", "solus_1", "햇살의 손길", 20, "heal", 2, "회복량 +2"],
@@ -36,8 +39,8 @@ FAITH_SKILLS = [
     ["terra", "terra_4", "어머니의 품", 80, "hp", 14, "최대 HP +14"],
 ]
 
-gods = [{"id": g[0], "name": g[1], "color": g[2], "desc": g[3]} for g in GODS]
+gods = [{"id": g[0], "name": g[1], "color": g[2], "symbol": "", "desc": g[3]} for g in GODS]
 skills = [{"id": f[1], "god": f[0], "name": f[2], "need": f[3], "effect": f[4], "value": f[5], "desc": f[6]} for f in FAITH_SKILLS]
 with open(OUT, "w", encoding="utf-8") as f:
-    f.write(json.dumps({"version": 1, "gods": gods, "skills": skills}, ensure_ascii=False, indent="\t"))
+    f.write(json.dumps({"version": 1, "gods": gods, "believers": BELIEVERS, "skills": skills}, ensure_ascii=False, indent="\t"))
 print(OUT, len(gods), len(skills))

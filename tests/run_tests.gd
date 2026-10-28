@@ -56,6 +56,7 @@ func _init() -> void:
 	_test_rally_status()
 	_test_battle_statuses()
 	_test_status_effects()
+	_test_codex()
 	_test_balance_data_and_ai_graph()
 	_test_sfx()
 	load("res://tests/outgame_tests.gd").new().run(_check)
@@ -718,4 +719,26 @@ func _test_status_effects() -> void:
 	_check(not dm.ok, "맨 뒤 열은 더 안 밀림")
 	_check(SkillStatusData.summary({"id": "knockback", "turns": 1, "value": 1, "chance": 100}) == "넉백 (칸 수 1)", "넉백 요약은 턴 없이")
 	bc.queue_free()
+
+
+## 세계관 도감 (data/codex.json) + 믿는 신 (data/faith.json believers)
+func _test_codex() -> void:
+	print("[13d] 세계관 도감 · 믿는 신")
+	var gd := GameData.load_from()
+	var fd := FaithData.read()
+	_check(fd.has_believers and fd.believers.a_dan.god == "veyra" and gd.char_faith.a_alma.god == "solus" and int(gd.char_faith.a_alma.faith) == 50, "믿는 신 = faith.json believers (단 베이라, 앨마 솔루스 50)")
+	_check(FaithData.symbol_of({"name": "태양신 솔루스"}) == "솔" and FaithData.symbol_of({"name": "x", "symbol": "☀빛"}) == "☀", "신 아이콘 글자: 이름 끝 단어 첫 글자 / symbol")
+	var cx := CodexData.read()
+	_check(CodexData.TABS.size() == 5 and CodexData.check(cx).is_empty(), "도감 탭 5개 (등장인물·몬스터·상태이상·종교(신)·도시 배경), id 중복 없음")
+	var gods := CodexData.entries(cx, "gods", gd)
+	_check(gods.size() == gd.god_order.size() and gods[0].id == "solus" and str(gods[0].body).begins_with("[임시]") and gods[0].title == "태양신 솔루스", "종교(신): 신마다 항목, 제목 = faith.json 이름, 설명 = 도감")
+	var chars := CodexData.entries(cx, "characters", gd, {"npc_rohan": {"name": "로한", "sprite": "rohan", "character_id": ""}, "npc_dan": {"name": "단", "character_id": "a_dan"}})
+	var cids := chars.map(func(e): return e.id)
+	_check(cids.has("a_alma") and cids.has("npc_rohan") and not cids.has("npc_dan") and chars[0].sprite == "dan", "등장인물: 아군 + 전투에 안 나가는 대원(로한), 그림 = 스프라이트")
+	var sts := CodexData.entries(cx, "statuses", gd)
+	var sids := sts.map(func(e): return e.id)
+	_check(sids.has("regen_2") and sids.has("injured") and sts.filter(func(e): return e.id == "regen_2")[0].title == "진통제", "상태이상: 상태 정의 + 게임 상태 (진통제 = regen_2)")
+	_check(CodexData.entries(cx, "monsters", gd).size() == gd.monsters.size() and CodexData.entries(cx, "cities", gd).size() == 4, "몬스터 = 몬스터 시트, 도시 배경 = 도감에만 (4곳)")
+	var ghost := {"gods": [{"id": "nope", "title": "", "subtitle": "", "body": "x", "sprite": "", "color": ""}]}
+	_check(CodexData.entries(ghost, "gods", gd).size() == gd.god_order.size() and CodexData.entries(ghost, "gods", gd)[0].body.begins_with("(기록 없음"), "게임에 없는 항목은 빼고, 설명 없는 신은 '기록 없음'")
 

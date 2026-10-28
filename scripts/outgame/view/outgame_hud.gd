@@ -165,7 +165,7 @@ func _build_top() -> void:
 	right.position = Vector2(0, 10)
 	right.set_anchors_preset(PRESET_TOP_RIGHT)
 	add_child(right)
-	var specs := [["스킬", Color(0.85, 0.6, 1.0), func(): open_skills("")], ["의뢰", Color(0.45, 0.7, 0.9), func(): open_contracts("")], ["무기고", Color(0.45, 0.7, 0.9), func(): open_armory()],
+	var specs := [["스킬", Color(0.85, 0.6, 1.0), func(): open_skills("")], ["도감", Color(1.0, 0.85, 0.45), func(): open_codex()], ["의뢰", Color(0.45, 0.7, 0.9), func(): open_contracts("")], ["무기고", Color(0.45, 0.7, 0.9), func(): open_armory()],
 		["원장", Color(0.45, 0.7, 0.9), func(): open_ledger()], ["저장", Color(0.45, 0.9, 0.6), func(): hub.save_now()],
 		["전투 출전", Color(1.0, 0.5, 0.3), func(): open_sortie()], ["타이틀", Color(0.6, 0.6, 0.65), func(): hub.to_title()]]
 	for s in specs:
@@ -904,10 +904,19 @@ func _faith_page(row: HBoxContainer, cid: String) -> void:
 	var cv := _vbox(4)
 	card.add_child(cv)
 	if gi.is_empty():
-		cv.add_child(_label("무신앙 — 믿는 신이 없습니다 (밸런스 엑셀 캐릭터 시트 '신' 열)", 18, Color(0.8, 0.82, 0.88)))
+		cv.add_child(_label("무신앙 — 믿는 신이 없습니다", 18, Color(0.8, 0.82, 0.88)))
 		return
-	cv.add_child(_label("✦ %s" % gi.name, 24, gcol.lightened(0.2)))
-	cv.add_child(_label(str(gi.desc), 14, Color(0.88, 0.9, 0.95)))
+	var gh := _hbox(12)
+	cv.add_child(gh)
+	var gid: String = sim.god_of(cid)
+	var icon := GodIcon.make(gi, 64, "%s — 눌러서 세계관 도감" % gi.name)
+	icon.pressed.connect(func(): open_codex("gods", gid))
+	gh.add_child(icon)
+	var gt := _vbox(2)
+	gh.add_child(gt)
+	gt.add_child(_label(str(gi.name), 24, gcol.lightened(0.2)))
+	gt.add_child(_label(str(gi.desc), 14, Color(0.88, 0.9, 0.95)))
+	gt.add_child(_label("아이콘을 누르면 세계관 도감", 12, Color(0.65, 0.7, 0.8)))
 	var grid := HBoxContainer.new()
 	grid.add_theme_constant_override("separation", 12)
 	right.add_child(grid)
@@ -920,7 +929,15 @@ func _faith_page(row: HBoxContainer, cid: String) -> void:
 			continue
 		var og: Dictionary = sim.battle.gods[g]
 		var names := (sim.battle.faith_skills.get(g, []) as Array).map(func(x): return "%s(%d)" % [x.name, int(x.need)])
-		right.add_child(_label("%s — %s" % [og.name, " · ".join(names)], 12, Color(og.color).darkened(0.15)))
+		var orow := _hbox(8)
+		right.add_child(orow)
+		var oi := GodIcon.make(og, 28, "%s — 눌러서 세계관 도감" % og.name)
+		var gg: String = g
+		oi.pressed.connect(func(): open_codex("gods", gg))
+		orow.add_child(oi)
+		var ol := _label("%s — %s" % [og.name, " · ".join(names)], 12, Color(og.color).darkened(0.15))
+		ol.size_flags_vertical = SIZE_SHRINK_CENTER
+		orow.add_child(ol)
 
 
 func _faith_card(cid: String, fs: Dictionary, gcol: Color) -> Control:
@@ -1314,6 +1331,17 @@ func open_character(npc_id: String) -> void:
 	var lv := sim.training_level(n.character_id)
 	if u != null:
 		col.add_child(_label("전투: %s Lv%d · HP %d (훈련 %d단계) · 속도 %d" % [u.role, sim.char_level(u.id), sim.char_max_hp(u.id), lv, u.speed], 15, GOLD))
+		var gi := sim.god_info(u.id)
+		if not gi.is_empty():
+			var grow := _hbox(8)
+			col.add_child(grow)
+			var gic := GodIcon.make(gi, 30, "%s — 눌러서 세계관 도감" % gi.name)
+			var ug: String = sim.god_of(u.id)
+			gic.pressed.connect(func(): open_codex("gods", ug))
+			grow.add_child(gic)
+			var gl := _label("믿는 신: %s · 신앙도 %d" % [gi.name, sim.faith(u.id)], 14, Color(gi.color).lightened(0.2))
+			gl.size_flags_vertical = SIZE_SHRINK_CENTER
+			grow.add_child(gl)
 		var sk := _button("스킬 트리  (포인트 %d)" % sim.skill_points(u.id), Color(0.85, 0.6, 1.0), 14)
 		sk.pressed.connect(func():
 			close_top()
@@ -1356,6 +1384,187 @@ func open_character(npc_id: String) -> void:
 	body.add_child(_label("오늘(%s) 일정 — 편집은 Godot 에디터 '일정' 탭" % OutgameData.WEEKDAYS[wd], 15, Color(1, 0.95, 0.75)))
 	var t := _label("\n".join(today), 13, Color(0.82, 0.88, 0.96))
 	body.add_child(t)
+
+
+# ---------------------------------------------------------------- 세계관 도감 (data/codex.json · 탭: 등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경)
+const CODEX_COL := {"characters": Color(0.55, 0.8, 1.0), "monsters": Color(1.0, 0.5, 0.4), "statuses": Color(0.85, 0.6, 1.0), "gods": Color(1.0, 0.85, 0.45), "cities": Color(0.5, 0.95, 0.7)}
+
+
+## tab = CodexData.TABS id, pick = 항목 id ("" = 첫 항목). 신 아이콘을 누르면 open_codex("gods", 신 id)
+func open_codex(tab: String = "characters", pick: String = "") -> void:
+	var codex := CodexData.read()
+	var list := CodexData.entries(codex, tab, sim.battle, sim.data.npcs)
+	var cur: Dictionary = {}
+	for e in list:
+		if e.id == pick:
+			cur = e
+	if cur.is_empty() and not list.is_empty():
+		cur = list[0]
+	var win := _window("세계관 도감", 1140)
+	var body: VBoxContainer = win.body
+	var tabs := _hbox(6)
+	body.add_child(tabs)
+	for t in CodexData.TABS:
+		var tb := _button(t[1], CODEX_COL[t[0]] if t[0] == tab else Color(0.45, 0.55, 0.7), 15, 130)
+		tb.custom_minimum_size.y = 40
+		var tt: String = t[0]
+		tb.pressed.connect(func():
+			if tt != tab:
+				close_top()
+				open_codex(tt))
+		tabs.add_child(tb)
+	var main := _hbox(12)
+	body.add_child(main)
+	# 왼쪽: 항목 목록 (위아래 스크롤)
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(260, 560)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	main.add_child(sc)
+	var lv := _vbox(4)
+	lv.size_flags_horizontal = SIZE_EXPAND_FILL
+	sc.add_child(lv)
+	var cur_btn: Button = null
+	for e in list:
+		var sel: bool = e.id == cur.get("id", "")
+		var b := _button(str(e.title), CODEX_COL[tab] if sel else Color(0.4, 0.48, 0.62), 15)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.custom_minimum_size = Vector2(244, 46)
+		if str(e.get("sprite", "")) != "":
+			b.icon = UnitArt.portrait(e.sprite, manifest)
+			b.expand_icon = true
+			b.add_theme_constant_override("icon_max_width", 38)
+		if str(e.get("color", "")).begins_with("#"):
+			b.add_theme_color_override("font_color", Color.html(e.color).lightened(0.25))
+		if sel:
+			cur_btn = b
+		var eid: String = e.id
+		b.pressed.connect(func():
+			close_top()
+			open_codex(tab, eid))
+		lv.add_child(b)
+	if cur_btn != null:
+		sc.ensure_control_visible.call_deferred(cur_btn)
+	# 오른쪽: 내용
+	var rs := ScrollContainer.new()
+	rs.custom_minimum_size = Vector2(840, 560)
+	rs.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	main.add_child(rs)
+	var det := _vbox(10)
+	det.size_flags_horizontal = SIZE_EXPAND_FILL
+	rs.add_child(det)
+	if cur.is_empty():
+		det.add_child(_label("항목이 없습니다 (data/codex.json)", 16, Color(0.75, 0.8, 0.9)))
+		return
+	_codex_detail(det, tab, cur)
+
+
+func _codex_badge(text: String, col: Color, size: float) -> PanelContainer:
+	var pc := PanelContainer.new()
+	pc.custom_minimum_size = Vector2(size, size)
+	pc.add_theme_stylebox_override("panel", _panel_style(Color(col.darkened(0.6), 0.95), col, 12))
+	var l := _label(text, int(size * 0.42), col.lightened(0.3))
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	pc.add_child(l)
+	return pc
+
+
+func _codex_detail(det: VBoxContainer, tab: String, e: Dictionary) -> void:
+	var gd: GameData = sim.battle
+	var head := _hbox(16)
+	det.add_child(head)
+	var col: Color = Color.html(e.color) if str(e.get("color", "")).begins_with("#") else CODEX_COL[tab]
+	match tab:
+		"characters", "monsters":
+			head.add_child(_portrait_rect(str(e.get("sprite", "")), 120))
+		"gods":
+			head.add_child(GodIcon.make(gd.gods.get(e.id, {"name": e.title}), 120, str(e.title)))
+		"statuses":
+			head.add_child(_codex_badge(str(StatusCatalog.get_def(e.id).get("short", str(e.title).substr(0, 1))), col, 110))
+		_:
+			head.add_child(_codex_badge(str(e.title).substr(0, 1), col, 110))
+	var hv := _vbox(4)
+	hv.size_flags_vertical = SIZE_SHRINK_CENTER
+	head.add_child(hv)
+	hv.add_child(_label(str(e.title), 28, col.lightened(0.2) if tab in ["gods", "statuses", "cities"] else GOLD))
+	if str(e.subtitle) != "":
+		hv.add_child(_label(str(e.subtitle), 16, Color(0.8, 0.85, 0.95)))
+	var bl := _label(str(e.body), 16, Color(0.92, 0.94, 0.98))
+	bl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bl.custom_minimum_size.x = 800
+	det.add_child(bl)
+	det.add_child(HSeparator.new())
+	match tab:
+		"characters":
+			var u: UnitData = GameData._find(gd.allies, e.id) if gd != null else null
+			if u != null:
+				det.add_child(_label("기록", 17, Color(1, 0.95, 0.75)))
+				det.add_child(_label("%s · Lv%d · 키 %dcm · HP %d · 속도 %d · AP %d · 방어 %d · %s" % [u.role, sim.char_level(u.id), roundi(u.height_cm), sim.char_max_hp(u.id), u.speed, u.max_ap, u.defense,
+					"원거리" if u.range_type == "ranged" else "근접"], 15, Color(0.85, 0.9, 1)))
+				var gi := sim.god_info(u.id)
+				var gr := _hbox(10)
+				det.add_child(gr)
+				gr.add_child(_label("믿는 신", 15, Color(0.8, 0.84, 0.92)))
+				if gi.is_empty():
+					gr.add_child(_label("무신앙", 15, Color(0.7, 0.72, 0.78)))
+				else:
+					var ic := GodIcon.make(gi, 36, "%s — 종교(신) 탭" % gi.name)
+					var g: String = sim.god_of(u.id)
+					ic.pressed.connect(func():
+						close_top()
+						open_codex("gods", g))
+					gr.add_child(ic)
+					var gl := _label("%s · 신앙도 %d" % [gi.name, sim.faith(u.id)], 15, Color(gi.color).lightened(0.2))
+					gl.size_flags_vertical = SIZE_SHRINK_CENTER
+					gr.add_child(gl)
+			elif sim.data.npcs.has(e.id):
+				det.add_child(_label(str(sim.data.npcs[e.id].get("desc", "")), 15, Color(0.85, 0.9, 1)))
+		"monsters":
+			var m: UnitData = gd.monsters.get(e.id) if gd != null else null
+			if m != null:
+				det.add_child(_label("기록", 17, Color(1, 0.95, 0.75)))
+				det.add_child(_label("Lv%d · HP %d · 속도 %d · AP %d · 방어 %d · 차지 %d칸" % [m.level, m.max_hp, m.speed, m.max_ap, m.defense, m.row_span], 15, Color(0.85, 0.9, 1)))
+				var names := m.skill_ids.map(func(sid): return gd.actions[sid].display_name if gd.actions.has(sid) else sid)
+				det.add_child(_label("쓰는 기술: " + " · ".join(names), 15, Color(0.85, 0.9, 1)))
+		"statuses":
+			var sd := StatusCatalog.get_def(e.id)
+			var eff := StatusCatalog.effect_of(e.id)
+			det.add_child(_label("효과: %s (%s)" % [StatusCatalog.EFFECTS.get(eff, {}).get("name", eff), "긍정" if sd.get("positive", false) else "부정"], 17, Color(1, 0.95, 0.75)))
+			var rl := _label(str(sd.get("desc", "")).replace("{t}", "n").replace("{v}", "v"), 15, Color(0.85, 0.9, 1))
+			rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			rl.custom_minimum_size.x = 800
+			det.add_child(rl)
+			if gd != null:
+				var users := PackedStringArray()
+				for sid in gd.actions:
+					if (gd.actions[sid] as ActionData).status_ids().has(e.id):
+						users.append(gd.actions[sid].display_name)
+				det.add_child(_label("이 상태를 거는 기술: " + (" · ".join(users) if not users.is_empty() else "없음"), 15, Color(0.85, 0.9, 1)))
+		"gods":
+			if gd != null and gd.gods.has(e.id):
+				det.add_child(_label(str(gd.gods[e.id].desc), 15, Color(0.85, 0.9, 1)))
+				det.add_child(_label("믿는 대원", 17, Color(1, 0.95, 0.75)))
+				var br := _hbox(8)
+				det.add_child(br)
+				var any := false
+				for u in gd.allies:
+					if sim.god_of(u.id) != e.id:
+						continue
+					any = true
+					var b := _button("%s  신앙 %d" % [u.display_name, sim.faith(u.id)], Color(0.45, 0.6, 0.8), 14)
+					b.icon = UnitArt.portrait(u.sprite_id, manifest)
+					b.expand_icon = true
+					b.add_theme_constant_override("icon_max_width", 34)
+					var uid: String = u.id
+					b.pressed.connect(func():
+						close_top()
+						open_codex("characters", uid))
+					br.add_child(b)
+				if not any:
+					br.add_child(_label("없음", 15, Color(0.7, 0.72, 0.78)))
+				det.add_child(_label("신앙 스킬", 17, Color(1, 0.95, 0.75)))
+				for fs in gd.faith_skills.get(e.id, []):
+					det.add_child(_label("신앙 %d · %s — %s" % [int(fs.need), fs.name, fs.desc], 15, col.lightened(0.3)))
 
 
 # ---------------------------------------------------------------- 무기고 · 원장

@@ -512,7 +512,7 @@ func debug_delete_save() -> void:
 	hud.show_toast("저장 파일 삭제 (지금 진행은 그대로)")
 
 
-## CLI 스크린샷용: --base_ui=dialogue:npc_alma | overhear | unlock:f1_mess | facility:b1_workshop | context:npc_dan | statement | character:npc_kira
+## CLI 스크린샷용: --base_ui=dialogue:npc_alma | overhear | unlock:f1_mess | facility:b1_workshop | context:npc_dan | statement | character:npc_kira | codex:gods:solus
 func _cli_ui(spec: String) -> void:
 	var p := spec.split(":")
 	match p[0]:
@@ -549,6 +549,8 @@ func _cli_ui(spec: String) -> void:
 					sim.skip(int(p[2]))
 			hud.open_research()
 		"character": hud.open_character(p[1])
+		"codex":   # codex[:탭[:항목 id]] — 세계관 도감 (탭: characters · monsters · statuses · gods · cities)
+			hud.open_codex(p[1] if p.size() > 1 else "characters", p[2] if p.size() > 2 else "")
 		"contracts": hud.open_contracts("")
 		"statement":
 			if not sim.ledger.statements.is_empty():

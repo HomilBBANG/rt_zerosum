@@ -2,15 +2,27 @@
 class_name FaithData
 extends RefCounted
 ## 신앙 데이터 (data/faith.json, Godot 에디터 '스킬 트리' 탭의 '신앙' 에서 편집).
-## 신 = {id, name, color(#RRGGBB), desc} / 신앙 스킬 = {id, god, name, need(필요 신앙도 0~100), effect, value, desc}
-## 효과 형식은 스킬 트리 노드와 같음 (SkillTreeData.EFFECTS). 어느 캐릭터가 어느 신을 믿는지는 밸런스 엑셀 캐릭터 시트 '신'·'신앙' 열.
+## 신 = {id, name, color(#RRGGBB), symbol(아이콘 글자, 비우면 이름 끝 단어 첫 글자), desc} / 신앙 스킬 = {id, god, name, need(필요 신앙도 0~100), effect, value, desc}
+## 효과 형식은 스킬 트리 노드와 같음 (SkillTreeData.EFFECTS).
+## 믿는 신 = believers {캐릭터 id → {god(신 id, "" = 무신앙), faith(시작 신앙도)}} — 같은 에디터 화면에서 고침.
+## (예전에는 밸런스 엑셀 캐릭터 시트 '신'·'신앙' 열 — believers 가 없는 옛 파일이면 그 열을 씀)
+## 세계관 설명(도감)은 data/codex.json 의 gods.
 
 const PATH := "res://data/faith.json"
 const FAITH_MAX := 100
 
 
 static func new_god(id: String) -> Dictionary:
-	return {"id": id, "name": "새 신", "color": "#d8c890", "desc": ""}
+	return {"id": id, "name": "새 신", "color": "#d8c890", "symbol": "", "desc": ""}
+
+
+## 신 아이콘 글자: symbol, 없으면 이름 끝 단어 첫 글자 ("태양신 솔루스" → "솔")
+static func symbol_of(g: Dictionary) -> String:
+	var sy := str(g.get("symbol", "")).strip_edges()
+	if sy != "":
+		return sy.substr(0, 1)
+	var words := str(g.get("name", "?")).split(" ", false)
+	return words[words.size() - 1].substr(0, 1) if not words.is_empty() else "?"
 
 
 static func new_skill(id: String, god: String, need: int) -> Dictionary:
@@ -18,7 +30,7 @@ static func new_skill(id: String, god: String, need: int) -> Dictionary:
 
 
 static func read(path: String = PATH) -> Dictionary:
-	var out := {"gods": [], "skills": []}
+	var out := {"gods": [], "skills": [], "believers": {}, "has_believers": false}
 	if not FileAccess.file_exists(path):
 		return out
 	var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
@@ -26,7 +38,15 @@ static func read(path: String = PATH) -> Dictionary:
 		return out
 	for g in j.get("gods", []):
 		if g is Dictionary:
-			out.gods.append({"id": str(g.get("id", "")), "name": str(g.get("name", "")), "color": str(g.get("color", "#d8c890")), "desc": str(g.get("desc", ""))})
+			out.gods.append({"id": str(g.get("id", "")), "name": str(g.get("name", "")), "color": str(g.get("color", "#d8c890")),
+				"symbol": str(g.get("symbol", "")), "desc": str(g.get("desc", ""))})
+	var b: Variant = j.get("believers", null)
+	if b is Dictionary:
+		out.has_believers = true
+		for cid in b:
+			var e: Variant = b[cid]
+			if e is Dictionary:
+				out.believers[str(cid)] = {"god": str(e.get("god", "")).strip_edges(), "faith": clampi(int(e.get("faith", 0)), 0, FAITH_MAX)}
 	for s in j.get("skills", []):
 		if s is Dictionary:
 			out.skills.append({"id": str(s.get("id", "")), "god": str(s.get("god", "")), "name": str(s.get("name", "")),
@@ -45,7 +65,7 @@ static func write(d: Dictionary, path: String = PATH) -> int:
 		if a.god != b.god:
 			return order.find(a.god) < order.find(b.god)
 		return int(a.need) < int(b.need))
-	f.store_string(JSON.stringify({"version": 1, "gods": d.gods, "skills": skills}, "\t", false))
+	f.store_string(JSON.stringify({"version": 1, "gods": d.gods, "believers": d.get("believers", {}), "skills": skills}, "\t", false))
 	return OK
 
 
@@ -66,7 +86,7 @@ static func color_of(g: Dictionary) -> Color:
 	return Color(c) if c.begins_with("#") else Color(0.9, 0.85, 0.6)
 
 
-## 검사 → {errors, notes}. char_faith = 캐릭터 id → {god, faith} (엑셀 캐릭터 시트)
+## 검사 → {errors, notes}. char_faith = 캐릭터 id → {god, faith} (believers)
 static func check(d: Dictionary, char_faith: Dictionary, actions: Dictionary) -> Dictionary:
 	var errors := PackedStringArray()
 	var notes := PackedStringArray()
@@ -97,10 +117,10 @@ static func check(d: Dictionary, char_faith: Dictionary, actions: Dictionary) ->
 	for cid in char_faith:
 		var g := str(char_faith[cid].god)
 		if g != "" and not gids.has(g):
-			errors.append("%s: 캐릭터 시트 '신' 열의 '%s' 가 없는 신입니다" % [cid, g])
+			errors.append("%s: 믿는 신 '%s' 가 없는 신입니다" % [cid, g])
 	for g in d.gods:
 		if not (d.skills as Array).any(func(s): return s.god == g.id):
 			notes.append("%s: 신앙 스킬이 없습니다" % g.name)
 		if not char_faith.values().any(func(cf): return cf.god == g.id):
-			notes.append("%s: 믿는 캐릭터가 없습니다 (캐릭터 시트 '신' 열)" % g.name)
+			notes.append("%s: 믿는 캐릭터가 없습니다" % g.name)
 	return {"errors": errors, "notes": notes}

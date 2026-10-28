@@ -5,27 +5,57 @@
 			"id": "solus",
 			"name": "태양신 솔루스",
 			"color": "#ffd166",
-			"desc": "빛과 치유의 신 — 회복·체력 (임시)"
+			"desc": "빛과 치유의 신 — 회복·체력 (임시)",
+			"symbol": ""
 		},
 		{
 			"id": "veyra",
 			"name": "전쟁신 베이라",
 			"color": "#ff5a4e",
-			"desc": "피와 전투의 신 — 공격 위력 (임시)"
+			"desc": "피와 전투의 신 — 공격 위력 (임시)",
+			"symbol": ""
 		},
 		{
 			"id": "noct",
 			"name": "밤의 여신 녹트",
 			"color": "#8f7bff",
-			"desc": "그림자와 은밀함의 신 — 속도·AP (임시)"
+			"desc": "그림자와 은밀함의 신 — 속도·AP (임시)",
+			"symbol": ""
 		},
 		{
 			"id": "terra",
 			"name": "대지모 테라",
 			"color": "#5fd38a",
-			"desc": "땅과 수호의 신 — 방어·체력 (임시)"
+			"desc": "땅과 수호의 신 — 방어·체력 (임시)",
+			"symbol": ""
 		}
 	],
+	"believers": {
+		"a_dan": {
+			"god": "veyra",
+			"faith": 30
+		},
+		"a_kira": {
+			"god": "noct",
+			"faith": 20
+		},
+		"a_ethan": {
+			"god": "solus",
+			"faith": 40
+		},
+		"a_hana": {
+			"god": "terra",
+			"faith": 10
+		},
+		"a_alma": {
+			"god": "solus",
+			"faith": 50
+		},
+		"a_nikita": {
+			"god": "noct",
+			"faith": 25
+		}
+	},
 	"skills": [
 		{
 			"id": "solus_1",

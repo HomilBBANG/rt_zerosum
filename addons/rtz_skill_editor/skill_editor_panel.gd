@@ -2,7 +2,7 @@
 extends Control
 ## 스킬 트리 에디터 (Godot 에디터 상단 "스킬 트리" 탭, addons/rtz_skill_editor) → data/skill_tree.json + data/faith.json.
 ## 위: 캐릭터 · 액티브/패시브/신앙 고르기 · 다른 캐릭터 트리 가져오기 · 필요 레벨 자동.
-## 신앙: 왼쪽 신 목록(추가·삭제) · 가운데 그 신의 신앙 스킬(필요 신앙도 순) · 오른쪽 신·스킬 고치기. 누가 어느 신을 믿는지는 엑셀 캐릭터 시트.
+## 신앙: 왼쪽 신 목록(추가·삭제) · 가운데 그 신의 신앙 스킬(필요 신앙도 순) · 오른쪽 신·스킬 고치기 + 대원별 믿는 신·시작 신앙도 (data/faith.json believers).
 ## 상태 이상: 왼쪽 스킬 목록(누가 쓰는지·달린 상태 이상) · 오른쪽 그 스킬에 상태 이상 달기(여러 개, 턴·수치·확률) → data/skill_status.json.
 ## 상태 정의: 상태 이상 이름·머리 위 글자·색 + 쓰는 효과(규칙) → data/statuses.json. 같은 효과를 이름만 다르게 여러 개 (예: 진통제·자가 치유 = 재생).
 ## 가운데: 게임과 같은 십자형 그림 — 노드 클릭 = 고르기, "+" 칸 = 그 갈래 끝에 단계 추가(최대 SkillTreeData.MAX_TIER).
@@ -21,7 +21,7 @@ var kind := "active"
 var sel := ""                        # 고른 노드 id
 ## 신앙 (kind == "faith")
 var faith: Dictionary = {"gods": [], "skills": []}
-var char_faith: Dictionary = {}      # 캐릭터 id → {god, faith} (엑셀 캐릭터 시트)
+var char_faith: Dictionary = {}      # 캐릭터 id → {god, faith} (= faith.believers, 이 화면에서 고침)
 var god_sel := ""
 var fsel := ""                       # 고른 신앙 스킬 id
 var faith_box: Control
@@ -226,6 +226,12 @@ func reload_data(keep_edit: bool = true) -> void:
 func _load() -> void:
 	nodes = SkillTreeData.read()
 	faith = FaithData.read()
+	if not faith.has_believers:   # 옛 파일: 엑셀 캐릭터 시트 '신'·'신앙' 열 값으로 시작
+		faith.believers = char_faith.duplicate(true)
+	for u in allies:
+		if not faith.believers.has(u.id):
+			faith.believers[u.id] = {"god": "", "faith": 0}
+	char_faith = faith.believers
 	sstat = SkillStatusData.read()
 	sdefs = StatusCatalog.read()
 	StatusCatalog.refresh(sdefs)
@@ -1229,7 +1235,7 @@ func _build_faith_box() -> Control:
 	gc.add_child(gb)
 	gb.add_child(_btn("신 추가", _add_god))
 	gb.add_child(_btn("신 삭제", _delete_god))
-	gc.add_child(_small("누가 어느 신을 믿는지·시작 신앙도는 밸런스 엑셀 캐릭터 시트 '신'·'신앙' 열 (신 id)."))
+	gc.add_child(_small("누가 어느 신을 믿는지·시작 신앙도는 오른쪽 아래 '대원 신앙'."))
 	var sc := VBoxContainer.new()
 	sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(sc)
@@ -1331,7 +1337,10 @@ func _delete_god() -> void:
 	faith.skills = (faith.skills as Array).filter(func(f): return f.god != g.id)
 	god_sel = faith.gods[0].id if not faith.gods.is_empty() else ""
 	fsel = ""
-	status.text = "'%s' 와 그 신앙 스킬을 지웠습니다 (그 신을 믿던 캐릭터는 엑셀에서 바꿔야 함)" % g.name
+	for cid2 in char_faith:   # 그 신을 믿던 대원 = 무신앙
+		if char_faith[cid2].god == g.id:
+			char_faith[cid2].god = ""
+	status.text = "'%s' 와 그 신앙 스킬을 지웠습니다 (믿던 대원은 무신앙, 저장 안 함)" % g.name
 	dirty = true
 	_rebuild()
 
@@ -1381,7 +1390,10 @@ func _build_faith_form() -> void:
 				f.god = v
 		g.id = v
 		god_sel = v
-		status.text = "신 id 바꿈 — 엑셀 캐릭터 시트 '신' 열도 '%s' 로 바꾸세요" % v
+		for cid2 in char_faith:   # 믿는 대원도 새 id 로
+			if char_faith[cid2].god == g.id:
+				char_faith[cid2].god = v
+		status.text = "신 id 바꿈 → '%s' (믿는 대원도 따라감, 저장 안 함)" % v
 		dirty = true
 		_rebuild()
 	gid.text_submitted.connect(apply_gid)
@@ -1398,9 +1410,13 @@ func _build_faith_form() -> void:
 		_mark())
 	cp.popup_closed.connect(func(): _fill_faith_lists())
 	_row(grid, "상징색", cp)
+	var on_sym := func(v): g.symbol = v
+	_row(grid, "아이콘 글자", _line(str(g.get("symbol", "")), on_sym, "비우면 '%s' (이름 끝 단어 첫 글자)" % FaithData.symbol_of({"name": g.name})))
 	_row(grid, "설명", _line(str(g.desc), func(v): g.desc = v))
 	var bl := _believers(str(g.id))
-	_row(grid, "믿는 대원", _small(", ".join(bl) if not bl.is_empty() else "(없음 — 엑셀 캐릭터 시트 '신' 열)"))
+	_row(grid, "믿는 대원", _small(", ".join(bl) if not bl.is_empty() else "(없음 — 아래 '대원 신앙')"))
+	form.add_child(_small("세계관 설명(도감 '종교(신)' 탭)은 data/codex.json 의 gods."))
+	_believer_rows()
 	var f := _fskill(fsel)
 	form.add_child(HSeparator.new())
 	if f.is_empty() or f.god != g.id:
@@ -1439,6 +1455,36 @@ func _build_faith_form() -> void:
 	_row(g2, "필요 신앙도", need)
 	_effect_rows(g2, f)
 	form.add_child(_small("효과는 스킬 트리 노드와 같은 형식 — 전투에 나갈 때 복제본에 더해짐. ※ id 를 바꾸면 이미 배운 저장 파일에서는 배운 것이 풀립니다."))
+
+
+## 대원마다 믿는 신 · 시작 신앙도 (모든 대원, data/faith.json believers)
+func _believer_rows() -> void:
+	form.add_child(HSeparator.new())
+	form.add_child(_head("대원 신앙 (믿는 신 · 시작 신앙도)"))
+	var gods := [["", "무신앙"]]
+	for g in faith.gods:
+		gods.append([g.id, g.name])
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	form.add_child(grid)
+	for u in allies:
+		var cf: Dictionary = char_faith.get(u.id, {"god": "", "faith": 0})
+		char_faith[u.id] = cf
+		grid.add_child(_lab(u.display_name))
+		var o := _option(gods, cf.god, func(v):
+			cf.god = str(v)
+			_mark()
+			_rebuild())
+		o.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(o)
+		var sp := _spin(0, FaithData.FAITH_MAX, 1, int(cf.faith), "")
+		sp.tooltip_text = "시작 신앙도 (출전마다 + 기지 설정 faith_battle)"
+		sp.value_changed.connect(func(v):
+			if not _rebuilding:
+				cf.faith = int(v)
+				_mark())
+		grid.add_child(sp)
 
 
 func _build_form() -> void:

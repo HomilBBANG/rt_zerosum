@@ -831,7 +831,7 @@ func _test_faith() -> void:
 	_c(not dan.is_empty() and dan.all(func(x): return not kira.has(x)), "신이 다르면 배울 수 있는 스킬이 다름")
 	_c(s.faith_state("a_dan", kira[0]) == "other_god" and not s.learn_faith_skill("a_dan", kira[0]).ok, "다른 신의 스킬은 못 배움")
 	var f0 := s.faith("a_dan")
-	_c(f0 == int(battle.char_faith.a_dan.faith), "시작 신앙도 = 캐릭터 시트 (%d)" % f0)
+	_c(f0 == int(battle.char_faith.a_dan.faith), "시작 신앙도 = faith.json believers (%d)" % f0)
 	var hi: Dictionary = s.faith_skill_list("a_dan").back()
 	_c(s.faith_state("a_dan", hi.id) == "no_faith", "신앙도 모자라면 '신앙 부족'")
 	var lo: Dictionary = s.faith_skill_list("a_dan").front()

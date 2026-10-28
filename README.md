@@ -198,7 +198,9 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 - **신앙 스킬**: 캐릭터마다 **믿는 신**이 있고, **신에 따라 배울 수 있는 신앙 스킬이 다름**. 신앙도(0~100)가 필요치 이상이면 포인트 없이 배움, 모자라면 회색 + 붉은 "신앙 부족". 출전할 때마다 신앙도 +5. 아래에 다른 신들의 스킬(배울 수 없음)도 표시.
   **신·신앙 스킬 = Godot 에디터 `스킬 트리` 탭 → `신앙 스킬`** (`data/faith.json`): 왼쪽 신 목록(추가·삭제, id·이름·상징색·설명, 믿는 대원 표시) · 가운데 그 신의 신앙 스킬(필요 신앙도 순, 추가·삭제) · 오른쪽 id·이름·필요 신앙도·효과·값·설명(자동 채우기) · 아래 검사.
-  누가 어느 신을 믿는지·시작 신앙도는 밸런스 엑셀 캐릭터 시트 `신`·`신앙` 열. **지금 값은 임시** (태양신 솔루스·전쟁신 베이라·밤의 여신 녹트·대지모 테라, 각 4개).
+  **누가 어느 신을 믿는지·시작 신앙도도 같은 화면 아래 `대원 신앙`** (대원마다 믿는 신 고르기 — 무신앙 포함 · 시작 신앙도, `data/faith.json` 의 `believers`). 엑셀 캐릭터 시트의 `신`·`신앙` 열은 없앰.
+  신마다 **아이콘 글자**(비우면 이름 끝 단어 첫 글자: 솔·베·녹·테) — 게임에서 상징색 원 아이콘. 신 id 를 바꾸거나 지우면 믿는 대원도 따라감(지우면 무신앙). **지금 값은 임시** (태양신 솔루스·전쟁신 베이라·밤의 여신 녹트·대지모 테라, 각 4개).
+  게임 스킬 창 신앙 탭·대원 정보 카드의 **신 아이콘을 누르면 세계관 도감 `종교(신)` 탭**의 그 신.
   확인: `godot --path . ++ --scene=base --base_ui=faith:a_dan:15:veyra_1`
 
 ![스킬 트리 에디터 (Godot 에디터 상단 탭)](docs/screenshots/skill_editor.png)
@@ -206,6 +208,19 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![패시브 스킬 — 레벨 미달 = 회색 + 경험 부족](docs/screenshots/skill_passive.png)
 ![신앙 스킬 — 전쟁신 베이라 (신앙 부족 = 회색 + 붉은 글씨)](docs/screenshots/skill_faith.png)
 ![신앙 스킬 에디터 (스킬 트리 탭 → 신앙 스킬)](docs/screenshots/faith_editor.png)
+
+## 세계관 도감
+기지 상단 **`도감`** 버튼 (또는 신 아이콘 클릭). 탭 = **등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경**. 왼쪽 목록(위아래 스크롤) → 오른쪽 그림·이름·부제·설명 + 게임 기록.
+- 등장인물: 아군 + 전투에 안 나가는 대원(로한) — 병과·레벨·키·HP·속도·AP·방어·사거리, **믿는 신 아이콘(누르면 그 신)**.
+- 몬스터: 레벨·HP·속도·AP·방어·차지 칸·쓰는 기술. 상태이상: 효과(긍정/부정)·규칙·그 상태를 거는 기술. 종교(신): 설명·**믿는 대원(누르면 그 대원)**·신앙 스킬. 도시 배경: 설명만.
+- **데이터 = `data/codex.json`** — 탭마다 `{id, title, subtitle, body}` (등장인물 `sprite`, 도시 `color`). 등장인물·몬스터·상태이상·신은 게임 데이터(엑셀·statuses.json·faith.json)에 있는 것이 자동으로 들어가고 이 파일은 설명·부제·순서만 덧붙임 (제목을 비우면 게임 이름, 설명이 없으면 "기록 없음"). 도시 배경은 이 파일에만.
+- **지금 설명은 모두 임의로 넣은 `[임시]`** (도시: 헤이븐 기지 · 잿빛 항구 애시포트 · 옛 수도 칼드라 · 하층 구역).
+- 확인: `--scene=base --base_ui=codex:gods:solus` (탭: characters · monsters · statuses · gods · cities).
+
+![도감 — 종교(신)](docs/screenshots/outgame/codex_gods.png)
+![도감 — 등장인물 (믿는 신 아이콘)](docs/screenshots/outgame/codex_characters.png)
+![도감 — 상태이상](docs/screenshots/outgame/codex_statuses.png)
+![도감 — 도시 배경](docs/screenshots/outgame/codex_cities.png)
 
 ## 전투 상태 이상
 **상태 = 이름 + 효과(규칙)**. 같은 효과를 이름만 다르게 여러 상태로 씁니다 — 예: 앨마 `진통제 투여` → 상태 `진통제`(`regen_2`), 하나 `자가 치유` → 상태 `자가 치유`(`regen_3`), 둘 다 효과 **재생**(`regen`).
@@ -412,7 +427,7 @@ godot --headless --path . -s tests/run_tests.gd
 전투: GDD 8절 "필수 검증 사례" (선공 특례, 2라운드 미적용, 동률 아군/레벨/원거리 우선, AP 상한 버림/이월/0 자동 종료,
 이동/교환 AP 1, 무기 변경 AP 1, AP 부족/무효 대상 시 AP 미소모, 재시작 초기화, 시드 재현성) + 큰 몸집·장착·상태 이상·엑셀·AI 그래프.
 기지([15]~[24], `tests/outgame_tests.gd`): 날짜 전환(23:59→다음 날·월말·연말), 해금(부족/정확/초과/중복), 잠긴 방 경로·7일 이동, 요일별 일정·해금 → 생활 변화,
-대화/엿듣기/요청 구분, 일일 오염·청소·위임, 주간 결산 중복 없음, 월 1회 점검·그 주 보너스, 훈련·제작·강화 → 전투 수치, 저장/불러오기 복구, 출정 대사 고르기·출정 불가 대원([31]), 연구원 로한·무기 연구([32]), 레벨·스킬 트리([33]), 신앙([34]), 스킬 트리 데이터·에디터·신앙 데이터([35]), 전투 상태 이상([13b]), 상태 id → 효과 · 넉백·끌어당김·표식·도발·취약·재생·보호막([13c]), 몬스터 스킬([35]). 현재 436개 통과.
+대화/엿듣기/요청 구분, 일일 오염·청소·위임, 주간 결산 중복 없음, 월 1회 점검·그 주 보너스, 훈련·제작·강화 → 전투 수치, 저장/불러오기 복구, 출정 대사 고르기·출정 불가 대원([31]), 연구원 로한·무기 연구([32]), 레벨·스킬 트리([33]), 신앙([34]), 스킬 트리 데이터·에디터·신앙 데이터([35]), 전투 상태 이상([13b]), 상태 id → 효과 · 넉백·끌어당김·표식·도발·취약·재생·보호막([13c]), 몬스터 스킬([35]), 세계관 도감·믿는 신([13d]). 현재 446개 통과.
 
 ## 스크린샷 일괄 렌더
 ```
@@ -434,7 +449,7 @@ scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정
                    npc_agent, economy_ledger, base_sim(해금·이동·대화·위생·의뢰·결산·점검·제작·저장) / base_hub(씬)
 scripts/outgame/view/  base_view_3d(3D 단면 건물·조명·카메라), base_overlay(이름표·자물쇠·오염·말풍선 — 화면 좌표), npc_view(대원 스프라이트), outgame_hud(HUD·창)
 addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor, rtz_sortie_editor, rtz_skill_editor (Godot 에디터 상단 탭)
-data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), faith.json(신·신앙 스킬), statuses.json(상태 정의: 이름 → 효과), skill_status.json(스킬 상태 이상), monster_skills.json(몬스터 스킬), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
+data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), faith.json(신·신앙 스킬·믿는 신), codex.json(세계관 도감), statuses.json(상태 정의: 이름 → 효과), skill_status.json(스킬 상태 이상), monster_skills.json(몬스터 스킬), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/characters/ 캐릭터별 base·프레임 애니메이션·마스크·character.json (전투·기지 공통)
