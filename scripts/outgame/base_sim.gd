@@ -1055,19 +1055,11 @@ func tree_node(cid: String, nid: String) -> Dictionary:
 	return {}
 
 
-func max_tier(cid: String, dir: String, kind: String) -> int:
-	var t := 0
-	for n in tree_nodes(cid, kind):
-		if n.dir == dir:
-			t = maxi(t, int(n.tier))
-	return t
-
-
-## 배운 노드 (각 트리 중앙은 처음부터)
+## 배운 노드 (각 트리의 시작 노드는 처음부터)
 func learned_skills(cid: String) -> Array:
 	var out: Array = (_prog(cid).skills as Array).duplicate()
 	for n in tree_nodes(cid):
-		if n.dir == "center" and not out.has(n.id):
+		if bool(n.start) and not out.has(n.id):
 			out.push_front(n.id)
 	return out
 
@@ -1076,13 +1068,15 @@ func has_skill(cid: String, nid: String) -> bool:
 	return learned_skills(cid).has(nid)
 
 
-## 스킬 포인트 (액티브·패시브 트리 공용) = 처음 1 + 오른 레벨 수 - 배운 (중앙 제외) 노드 수
+## 스킬 포인트 (액티브·패시브 트리 공용) = 처음 1 + 오른 레벨 수 - 배운 (시작 노드 제외) 노드 수
 func skill_points(cid: String) -> int:
-	var used := (_prog(cid).skills as Array).filter(func(id): return not tree_node(cid, str(id)).is_empty()).size()
+	var used := (_prog(cid).skills as Array).filter(func(id):
+		var n := tree_node(cid, str(id))
+		return not n.is_empty() and not bool(n.start)).size()
 	return 1 + char_level(cid) - start_level(cid) - used
 
 
-## 노드 상태: learned 배움 / ready 배울 수 있음 / no_level 경험 부족 / need_prev 앞 단계 필요 / no_point 포인트 부족 / capped 같은 트리의 다른 갈래 끝을 이미 배움
+## 노드 상태: learned 배움 / ready 배울 수 있음 / no_level 경험 부족 / need_prev 선행 필요 / no_point 포인트 부족 / capped 같은 택일 그룹의 다른 노드를 이미 배움
 func skill_state(cid: String, nid: String) -> String:
 	var n := tree_node(cid, nid)
 	if n.is_empty():
@@ -1091,30 +1085,29 @@ func skill_state(cid: String, nid: String) -> String:
 		return "learned"
 	if char_level(cid) < int(n.level):
 		return "no_level"
-	var prev := _prev_node(cid, n)
-	if prev != "" and not has_skill(cid, prev):
+	if not prereq_met(cid, n):
 		return "need_prev"
-	if int(n.tier) > 0 and int(n.tier) == max_tier(cid, n.dir, n.kind):
+	if str(n.group) != "":
 		for o in tree_nodes(cid, n.kind):
-			if o.dir != n.dir and o.dir != "center" and int(o.tier) == max_tier(cid, o.dir, n.kind) and has_skill(cid, o.id):
+			if o.id != n.id and str(o.group) == str(n.group) and has_skill(cid, o.id):
 				return "capped"
 	if skill_points(cid) <= 0:
 		return "no_point"
 	return "ready"
 
 
-## 같은 트리·갈래 바로 앞 단계 (1단계면 그 트리 중앙)
-func _prev_node(cid: String, n: Dictionary) -> String:
-	for o in tree_nodes(cid, n.kind):
-		if int(n.tier) == 1 and o.dir == "center":
-			return o.id
-		if o.dir == n.dir and int(o.tier) == int(n.tier) - 1:
-			return o.id
-	return ""
+## 선행을 채웠나 — req_all = 모두 / 아니면 하나라도 (선행이 없으면 바로)
+func prereq_met(cid: String, n: Dictionary) -> bool:
+	var reqs: Array = (n.get("req", []) as Array).filter(func(q): return not tree_node(cid, str(q)).is_empty())
+	if reqs.is_empty():
+		return true
+	if bool(n.get("req_all", false)):
+		return reqs.all(func(q): return has_skill(cid, str(q)))
+	return reqs.any(func(q): return has_skill(cid, str(q)))
 
 
-const SKILL_STATE_MSG := {"no_level": "경험 부족", "need_prev": "앞 단계를 먼저 배워야 합니다", "no_point": "스킬 포인트가 없습니다",
-	"capped": "갈래 끝은 하나만 배울 수 있습니다", "learned": "이미 배웠습니다"}
+const SKILL_STATE_MSG := {"no_level": "경험 부족", "need_prev": "선행 스킬을 먼저 배워야 합니다", "no_point": "스킬 포인트가 없습니다",
+	"capped": "택일 — 같은 그룹의 다른 스킬을 이미 배웠습니다", "learned": "이미 배웠습니다"}
 
 
 func learn_skill(cid: String, nid: String) -> Dictionary:

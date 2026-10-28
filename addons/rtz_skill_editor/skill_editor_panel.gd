@@ -1,14 +1,14 @@
 @tool
 extends Control
 ## 스킬 트리 에디터 (Godot 에디터 상단 "스킬 트리" 탭, addons/rtz_skill_editor) → data/skill_tree.json + data/faith.json.
-## 위: 캐릭터 · 액티브/패시브/신앙 고르기 · 다른 캐릭터 트리 가져오기 · 필요 레벨 자동.
+## 위: 캐릭터 · 액티브/패시브/신앙 고르기 · 다른 캐릭터 트리 가져오기(모양째) · 필요 레벨 자동 · 모양 틀(십자형·두 갈래·일자·나무·그물).
 ## 신앙: 왼쪽 신 목록(추가·삭제) · 가운데 그 신의 신앙 스킬(필요 신앙도 순) · 오른쪽 신·스킬 고치기 + 대원별 믿는 신·시작 신앙도 (data/faith.json believers).
 ## 상태 이상: 왼쪽 스킬 목록(누가 쓰는지·달린 상태 이상) · 오른쪽 그 스킬에 상태 이상 달기(여러 개, 턴·수치·확률) → data/skill_status.json.
 ## 기적: 신 해금 캐릭터 고르기(정체인 신 · 처음부터 해금 / 해금 조건 · 시작 의지) + 그 캐릭터만의 기적(필요 의지) → data/faith.json divine · miracles.
 ## 상태 정의: 상태 이상 이름·머리 위 글자·색 + 쓰는 효과(규칙) → data/statuses.json. 같은 효과를 이름만 다르게 여러 개 (예: 진통제·자가 치유 = 재생).
-## 가운데: 게임과 같은 십자형 그림 — 노드 클릭 = 고르기, "+" 칸 = 그 갈래 끝에 단계 추가(최대 SkillTreeData.MAX_TIER).
-## 오른쪽: 고른 노드의 id · 이름 · 필요 레벨 · 효과 · 값 · 설명, 단계 옮기기 · 삭제, 아래 검사.
-## 게임 규칙(BaseSim): 중앙은 처음부터 습득, 갈래 안은 앞 단계부터, 갈래 끝(마지막 단계)은 트리마다 하나만, 스킬 포인트는 두 트리 공용.
+## 가운데: 격자 위 자유 모양 (캐릭터마다 다르게) — 빈 칸 클릭 = 새 노드(고른 노드에서 이어짐), 끌기 = 옮기기, Shift+클릭 = 선행 잇기/끊기, Delete = 삭제.
+## 오른쪽: 고른 노드의 id · 이름 · 갈래 색 · 시작 노드 · 필요 레벨 · 선행(하나라도/모두) · 택일 그룹 · 효과 · 값 · 설명, 옮기기 · 삭제, 아래 검사.
+## 게임 규칙(BaseSim): 시작 노드는 처음부터 습득, 선행을 배워야 다음, 같은 택일 그룹은 트리마다 하나만, 스킬 포인트는 두 트리 공용.
 
 const CANVAS := preload("res://addons/rtz_skill_editor/skill_tree_canvas.gd")
 
@@ -66,6 +66,7 @@ var kit_add: OptionButton
 var char_opt: OptionButton
 var kind_btns: Dictionary = {}
 var copy_opt: OptionButton
+var tpl_opt: OptionButton
 var play_level: SpinBox
 var play_btn: Button
 var level_lab: Label
@@ -143,9 +144,17 @@ func _ready() -> void:
 	cp.tooltip_text = "고른 캐릭터의 같은 종류 트리를 복사해서 지금 트리를 덮어씀 (id 는 새로, 필요 레벨은 시작 레벨 차이만큼)"
 	var sep2 := VSeparator.new()
 	var auto := _btn("필요 레벨 자동", _auto_levels)
-	auto.tooltip_text = "이 트리의 필요 레벨을 캐릭터 시작 레벨 + 2 × (단계 - 1) 로 (중앙 = 시작 레벨)"
+	auto.tooltip_text = "이 트리의 필요 레벨을 캐릭터 시작 레벨 + 2 × (단계 - 1) 로 — 단계 = 시작 노드에서 선을 따라 몇 번째인지 (시작 노드 = 시작 레벨)"
 	var clr := _btn("트리 비우기", _clear_tree)
-	for c in [sep1, cl2, copy_opt, cp, sep2, auto, clr]:
+	var sep3 := VSeparator.new()
+	var tl := _lab("모양 틀")
+	tpl_opt = OptionButton.new()
+	for t in SkillTreeData.TEMPLATE_ORDER:
+		tpl_opt.add_item(SkillTreeData.TEMPLATES[t].name)
+		tpl_opt.set_item_metadata(tpl_opt.item_count - 1, t)
+	var tb := _btn("틀로 새로 짜기", func(): _apply_template(str(tpl_opt.get_item_metadata(maxi(0, tpl_opt.selected)))))
+	tb.tooltip_text = "지금 트리를 지우고 고른 모양의 빈 노드로 새로 짬 (이름·효과는 '새 스킬' — 하나씩 고쳐 쓰기). 되돌리기 = 저장 전 '되돌리기'"
+	for c in [sep1, cl2, copy_opt, cp, sep2, auto, clr, sep3, tl, tpl_opt, tb]:
 		bar.add_child(c)
 		tree_only.append(c)
 	info_label = _lab("")
@@ -162,9 +171,13 @@ func _ready() -> void:
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas.custom_minimum_size = Vector2(560, 420)
 	canvas.node_clicked.connect(func(id):
-		sel = id
-		_rebuild())
-	canvas.add_clicked.connect(_add_node)
+		if id != sel:
+			sel = id
+			_rebuild())
+	canvas.cell_clicked.connect(_add_node)
+	canvas.node_moved.connect(_move_node)
+	canvas.link_toggled.connect(_toggle_link)
+	canvas.delete_pressed.connect(_delete)
 	holder.add_child(canvas)
 	faith_box = _build_faith_box()
 	faith_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -356,9 +369,9 @@ func _node(id: String) -> Dictionary:
 	return {}
 
 
-func _at(dir: String, tier: int) -> Dictionary:
+func _cell(x: int, y: int) -> Dictionary:
 	for n in _tree():
-		if n.dir == dir and int(n.tier) == tier:
+		if int(n.x) == x and int(n.y) == y:
 			return n
 	return {}
 
@@ -368,23 +381,34 @@ func _start_level() -> int:
 	return u.level if u != null else 1
 
 
-## 겹치지 않는 새 id: <캐릭터>_<a|p>_<방향><단계>
-func _new_id(dir: String, tier: int) -> String:
-	var short := cid.trim_prefix("a_")
-	var base := "%s_%s_%s" % [short, "a" if kind == "active" else "p", "core" if dir == "center" else "%s%d" % [dir, tier]]
-	var id := base
-	var i := 2
-	while not _node(id).is_empty():
-		id = "%s_%d" % [base, i]
+## 겹치지 않는 새 id: <캐릭터>_<a|p>_<번호>
+func _new_id() -> String:
+	var base := "%s_%s_" % [cid.trim_prefix("a_"), "a" if kind == "active" else "p"]
+	var i := 1
+	while not _node(base + str(i)).is_empty():
 		i += 1
-	return id
+	return base + str(i)
 
 
-func _add_node(dir: String, tier: int) -> void:
-	var n := SkillTreeData.new_node(cid, kind, dir, tier)
-	n.id = _new_id(dir, tier)
-	var prev := _at(dir, tier - 1) if dir != "center" else {}
-	n.level = int(prev.level) + 2 if not prev.is_empty() else _start_level()
+## 빈 칸에 새 노드. 고른 노드(같은 트리)가 있으면 그 노드에서 이어짐 (선행 · 같은 갈래 색 · 필요 레벨 +2), 트리가 비었으면 시작 노드
+func _add_node(x: int, y: int) -> void:
+	if not _cell(x, y).is_empty():
+		return
+	var n := SkillTreeData.new_node(cid, kind, x, y)
+	n.id = _new_id()
+	var parent := _node(sel)
+	if parent.is_empty() or parent.char != cid or parent.kind != kind:
+		parent = {}
+	if _tree().is_empty():
+		n.start = true
+		n.branch = "core"
+		n.level = _start_level()
+	elif not parent.is_empty():
+		n.req = [parent.id]
+		n.branch = parent.branch if parent.branch != "core" else _branch_toward(x - int(parent.x), y - int(parent.y))
+		n.level = int(parent.level) + 2
+	else:
+		n.level = _start_level()
 	n.desc = SkillTreeData.auto_desc(n.effect, int(n.value), actions)
 	nodes.append(n)
 	sel = n.id
@@ -392,32 +416,57 @@ func _add_node(dir: String, tier: int) -> void:
 	_rebuild()
 
 
+## 중앙에서 뻗을 때 방향으로 갈래 색 (위 화력 · 오른쪽 기동 · 아래 생존 · 왼쪽 전술)
+func _branch_toward(dx: int, dy: int) -> String:
+	if absi(dy) >= absi(dx):
+		return "fire" if dy < 0 else "guard"
+	return "move" if dx > 0 else "tactic"
+
+
 func _delete(id: String) -> void:
 	var n := _node(id)
 	if n.is_empty():
 		return
 	nodes.erase(n)
-	# 뒤 단계는 한 칸씩 당김
-	if n.dir != "center":
-		for o in _tree():
-			if o.dir == n.dir and int(o.tier) > int(n.tier):
-				o.tier = int(o.tier) - 1
+	for o in nodes:   # 이 노드를 선행으로 쓰던 노드는 그 선행을 이어받음 (사슬이 끊기지 않게)
+		if (o.req as Array).has(id):
+			o.req.erase(id)
+			for q in n.req:
+				if not o.req.has(q) and q != o.id:
+					o.req.append(q)
 	sel = ""
 	_mark()
 	_rebuild()
 
 
-## 같은 갈래 이웃 단계와 자리 바꾸기 (d = -1 앞으로 / +1 뒤로)
-func _swap(id: String, d: int) -> void:
+func _move_node(id: String, x: int, y: int) -> void:
 	var n := _node(id)
-	if n.is_empty() or n.dir == "center":
+	if n.is_empty() or not _cell(x, y).is_empty():
 		return
-	var o := _at(n.dir, int(n.tier) + d)
-	if o.is_empty():
-		return
-	o.tier = int(n.tier)
-	n.tier = int(n.tier) + d
+	n.x = clampi(x, -SkillTreeData.GRID, SkillTreeData.GRID)
+	n.y = clampi(y, -SkillTreeData.GRID, SkillTreeData.GRID)
+	sel = id
 	_mark()
+	_rebuild()
+
+
+## from → to 선행 잇기/끊기 (to 가 from 을 먼저 배워야). 고리가 생기면 안 이음
+func _toggle_link(from: String, to: String) -> void:
+	var t := _node(to)
+	if t.is_empty() or from == to:
+		return
+	if (t.req as Array).has(from):
+		t.req.erase(from)
+		status.text = "선 끊음: %s → %s" % [_node(from).get("name", from), t.name]
+	else:
+		t.req.append(from)
+		if not SkillTreeData.cycles(_tree()).is_empty():
+			t.req.erase(from)
+			status.text = "잇지 않음 — 선행이 돌고 돌게 됩니다"
+			return
+		status.text = "선 이음: %s → %s" % [_node(from).get("name", from), t.name]
+	dirty = true
+	_refresh_view()
 	_rebuild()
 
 
@@ -432,22 +481,43 @@ func _copy_from() -> void:
 	var dl := _start_level() - (su.level if su != null else 1)
 	for n in _tree():
 		nodes.erase(n)
+	var remap := {}
+	var copies := []
 	for n in nodes.filter(func(x): return x.char == src and x.kind == kind):
-		var c: Dictionary = n.duplicate()
+		var c: Dictionary = n.duplicate(true)
 		c.char = cid
-		c.id = _new_id(c.dir, int(c.tier))
+		c.id = _new_id_from(str(n.id), src)
+		remap[n.id] = c.id
 		c.level = maxi(1, int(c.level) + dl)
 		nodes.append(c)
+		copies.append(c)
+	for c in copies:
+		c.req = (c.req as Array).map(func(q): return remap.get(q, q))
 	sel = ""
-	status.text = "%s 의 %s 트리를 가져왔습니다 (필요 레벨은 시작 레벨 차이 %+d 만큼)" % [su.display_name if su != null else src, SkillTreeData.KIND_NAME[kind], dl]
+	status.text = "%s 의 %s 트리 모양·노드를 가져왔습니다 (필요 레벨은 시작 레벨 차이 %+d 만큼)" % [su.display_name if su != null else src, SkillTreeData.KIND_NAME[kind], dl]
 	dirty = true
 	_rebuild()
 
 
+## 다른 캐릭터 노드 id → 이 캐릭터 id (dan_a_n1 → kira_a_n1, 겹치면 번호)
+func _new_id_from(old: String, src: String) -> String:
+	var base := old.replace(src.trim_prefix("a_") + "_", cid.trim_prefix("a_") + "_")
+	if base == old:
+		return _new_id()
+	var id := base
+	var i := 2
+	while not _node(id).is_empty():
+		id = "%s_%d" % [base, i]
+		i += 1
+	return id
+
+
 func _auto_levels() -> void:
 	var lv := _start_level()
+	var dep := SkillTreeData.depths(_tree())
 	for n in _tree():
-		n.level = lv if n.dir == "center" else lv + 2 * (int(n.tier) - 1)
+		var d := int(dep.get(n.id, 1))
+		n.level = lv if d == 0 else lv + 2 * (d - 1)
 	_mark()
 	_rebuild()
 
@@ -458,6 +528,31 @@ func _clear_tree() -> void:
 	sel = ""
 	_mark()
 	_rebuild()
+
+
+## 모양 틀로 새로 짜기 (지금 트리는 지움, 필요 레벨은 단계대로)
+func _apply_template(t: String) -> void:
+	var cells: Array = SkillTreeData.TEMPLATES.get(t, {}).get("cells", [])
+	if cells.is_empty():
+		return
+	for n in _tree():
+		nodes.erase(n)
+	var ids := []
+	for c in cells:
+		var n := SkillTreeData.new_node(cid, kind, int(c.x), int(c.y))
+		n.id = _new_id()
+		n.branch = str(c.get("branch", "core"))
+		n.start = bool(c.get("start", false))
+		n.group = str(c.get("group", ""))
+		n.req_all = bool(c.get("all", false))
+		n.req = (c.get("req", []) as Array).map(func(i): return ids[int(i)])
+		n.name = "시작" if n.start else "새 스킬"
+		n.desc = SkillTreeData.auto_desc(n.effect, int(n.value), actions)
+		nodes.append(n)
+		ids.append(n.id)
+	sel = ids[0]
+	_auto_levels()
+	status.text = "'%s' 틀로 새로 짰습니다 — 노드를 눌러 이름·효과를 고치세요 (저장 전 '되돌리기' 로 취소)" % SkillTreeData.TEMPLATES[t].name
 
 
 # ================================================================ 화면
@@ -536,10 +631,12 @@ func _refresh_view() -> void:
 	canvas.show_tree(_tree(), sel)
 	var u := _unit(cid)
 	var t := _tree()
-	var ends := []
-	for d in ["n", "e", "s", "w"]:
-		ends.append(SkillTreeData.branch_end(nodes, cid, kind, d))
-	info_label.text = "노드 %d개 · 갈래 길이 북 %d / 동 %d / 남 %d / 서 %d · 시작 Lv%d" % [t.size(), ends[0], ends[1], ends[2], ends[3], u.level if u != null else 1]
+	var groups := {}
+	for n in t:
+		if str(n.group) != "":
+			groups[n.group] = true
+	var b := SkillTreeData.bounds(t)
+	info_label.text = "노드 %d개 · 시작 노드 %d · 택일 그룹 %d · 크기 %d×%d칸 · 시작 Lv%d" % [t.size(), t.filter(func(n): return bool(n.start)).size(), groups.size(), b.size.x, b.size.y, u.level if u != null else 1]
 	var res := SkillTreeData.check(nodes, allies, actions)
 	var txt := ""
 	for e in res.errors:
@@ -1778,15 +1875,13 @@ func _build_form() -> void:
 	var n := _node(sel)
 	if n.is_empty() or n.char != cid or n.kind != kind:
 		form.add_child(_head("노드를 고르세요"))
-		form.add_child(_small("가운데 그림에서 노드를 누르면 여기서 고칩니다.\n'+' 칸을 누르면 그 갈래 끝에 새 단계를 붙입니다 (갈래마다 최대 %d단계, 중앙이 없으면 가운데 '+').\n\n" % SkillTreeData.MAX_TIER
-			+ "게임 규칙\n· 중앙은 처음부터 배운 상태\n· 갈래 안에서는 앞 단계를 배워야 다음 단계\n· 갈래 끝(마지막 단계)은 트리마다 하나만 배울 수 있음 → 어느 방향으로 뻗을지가 빌드\n"
+		form.add_child(_small("트리 모양은 캐릭터마다 자유롭게 — 가운데 그림에서\n· 빈 칸 클릭 = 그 칸에 새 노드 (노드를 골라 둔 채면 그 노드에서 이어짐)\n· 노드 끌기 = 다른 빈 칸으로 옮기기\n"
+			+ "· Shift+클릭 = 고른 노드 → 누른 노드로 선 잇기/끊기 (누른 노드가 고른 노드를 먼저 배워야)\n· Delete = 고른 노드 삭제\n· 위 '모양 틀' = 십자형 · 두 갈래 · 일자 · 나무 · 그물 모양으로 새로 짜기, '다른 캐릭터 트리 가져오기' = 모양째 복사\n\n"
+			+ "게임 규칙\n· 시작 노드는 처음부터 배운 상태\n· 선행이 있으면 선행을 먼저 (하나라도 / '모두 필요' 면 전부)\n· 같은 택일 그룹은 트리마다 하나만 → 어느 쪽으로 뻗을지가 빌드\n"
 			+ "· 레벨이 필요 레벨보다 낮으면 게임에서 회색 + '경험 부족'\n· 스킬 포인트는 액티브·패시브 공용 (레벨 업마다 1, 처음 1)\n"
-			+ "· 액티브 = 전투 스킬 강화·새 스킬, 패시브 = 능력치 (종류는 탭 구분일 뿐, 효과는 어느 쪽에도 넣을 수 있음)"))
+			+ "· 갈래 색은 보이기만 (규칙과 무관)"))
 		return
-	var where := "%s · %s" % [SkillTreeData.KIND_NAME[kind], SkillTreeData.DIR_NAME[n.dir]]
-	if n.dir != "center":
-		where += " · %d단계%s" % [int(n.tier), " (갈래 끝)" if int(n.tier) == SkillTreeData.branch_end(nodes, cid, kind, n.dir) else ""]
-	form.add_child(_head(where))
+	form.add_child(_head("%s · (%d, %d) 칸%s" % [SkillTreeData.KIND_NAME[kind], int(n.x), int(n.y), " · 시작 노드" if bool(n.start) else ""]))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 8)
@@ -1801,30 +1896,100 @@ func _build_form() -> void:
 	_row(grid, "이름", _line(str(n.name), func(v):
 		n.name = v
 		canvas.queue_redraw()))
+	var brs := []
+	for b in SkillTreeData.BRANCHES:
+		brs.append([b, SkillTreeData.BRANCH_NAME[b]])
+	_row(grid, "갈래 (색)", _option(brs, n.branch, func(v):
+		n.branch = str(v)
+		_mark()))
+	var st := CheckBox.new()
+	st.text = "시작 노드 (처음부터 배운 상태, 포인트 안 씀)"
+	st.button_pressed = bool(n.start)
+	st.toggled.connect(func(v):
+		if not _rebuilding:
+			n.start = v
+			_mark()
+			_rebuild())
+	_row(grid, "시작", st)
 	var lv := _spin(1, 99, 1, int(n.level), "")
 	lv.value_changed.connect(func(v):
 		if not _rebuilding:
 			n.level = int(v)
 			_mark())
 	_row(grid, "필요 레벨", lv)
+	# 선행
+	if not bool(n.start):
+		var rv := VBoxContainer.new()
+		for q in n.req:
+			var rr := HBoxContainer.new()
+			var qn := _node(str(q))
+			var ql := _lab("← %s (%s)" % [qn.get("name", "?"), q])
+			ql.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			rr.add_child(ql)
+			var qq: String = q
+			rr.add_child(_btn("✕", func():
+				n.req.erase(qq)
+				_mark()
+				_rebuild()))
+			rv.add_child(rr)
+		var cands := [["", "(선행 추가…)"]]
+		for o in _tree():
+			if o.id != n.id and not (n.req as Array).has(o.id):
+				cands.append([o.id, "%s (%s)" % [o.name, o.id]])
+		rv.add_child(_option(cands, "", func(v):
+			if str(v) != "":
+				_toggle_link(str(v), str(n.id))))
+		if (n.req as Array).size() > 1:
+			var all := CheckBox.new()
+			all.text = "선행을 모두 배워야 (끄면 하나라도)"
+			all.button_pressed = bool(n.req_all)
+			all.toggled.connect(func(v):
+				if not _rebuilding:
+					n.req_all = v
+					_mark())
+			rv.add_child(all)
+		if (n.req as Array).is_empty():
+			rv.add_child(_small("선행 없음 — 레벨만 되면 바로 배울 수 있음"))
+		_row(grid, "선행", rv)
+	# 택일 그룹
+	var gv := HBoxContainer.new()
+	var set_group := func(v):
+		n.group = str(v).strip_edges()
+		canvas.queue_redraw()
+	var gl := _line(str(n.group), set_group, "비우면 없음 (같은 이름끼리 하나만)")
+	gl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gv.add_child(gl)
+	var used := {}
+	for o in _tree():
+		if str(o.group) != "":
+			used[o.group] = true
+	if not used.is_empty():
+		var gi := [["", "기존 그룹…"]]
+		for g in used:
+			gi.append([g, g])
+		gv.add_child(_option(gi, "", func(v):
+			if str(v) != "":
+				n.group = str(v)
+				_mark()
+				_rebuild()))
+	_row(grid, "택일 그룹", gv)
 	_effect_rows(grid, n)
 	form.add_child(_small("설명이 자동 문장 그대로면 효과·값을 바꿀 때 같이 바뀝니다."))
 	if str(n.effect).begins_with("skill:"):
-		form.add_child(_small("새 스킬은 전투 HUD 기본 스킬 칸(%d칸, 필살기 제외)에 붙습니다. 칸이 넘치면 안 보이므로 갈래 끝에 두는 것을 권장." % SkillTreeData.SKILL_SLOTS))
+		form.add_child(_small("새 스킬은 전투 HUD 기본 스킬 칸(%d칸, 필살기 제외)에 붙습니다. 칸이 넘치면 안 보이므로 택일 그룹으로 묶는 것을 권장." % SkillTreeData.SKILL_SLOTS))
 	var mv := HBoxContainer.new()
-	mv.add_theme_constant_override("separation", 6)
+	mv.add_theme_constant_override("separation", 4)
 	form.add_child(mv)
-	if n.dir != "center":
-		var back := _btn("◀ 한 단계 안쪽으로", func(): _swap(str(n.id), -1))
-		back.disabled = _at(n.dir, int(n.tier) - 1).is_empty()
-		mv.add_child(back)
-		var fwd := _btn("한 단계 바깥으로 ▶", func(): _swap(str(n.id), 1))
-		fwd.disabled = _at(n.dir, int(n.tier) + 1).is_empty()
-		mv.add_child(fwd)
+	mv.add_child(_lab("옮기기"))
+	for d in [[Vector2i(-1, 0), "←"], [Vector2i(0, -1), "↑"], [Vector2i(0, 1), "↓"], [Vector2i(1, 0), "→"]]:
+		var dv: Vector2i = d[0]
+		var mb := _btn(str(d[1]), func(): _move_node(str(n.id), int(n.x) + dv.x, int(n.y) + dv.y))
+		mb.disabled = not _cell(int(n.x) + dv.x, int(n.y) + dv.y).is_empty()
+		mv.add_child(mb)
 	var del := _btn("이 노드 삭제", func(): _delete(str(n.id)))
-	del.tooltip_text = "바깥 단계는 한 칸씩 안으로 당겨집니다"
+	del.tooltip_text = "이 노드를 선행으로 쓰던 노드는 이 노드의 선행을 이어받습니다"
 	mv.add_child(del)
-	form.add_child(_small("※ id 를 바꾸면 이미 그 스킬을 배운 저장 파일에서는 배운 것이 풀립니다 (포인트는 돌려받음)."))
+	form.add_child(_small("※ id 를 바꾸면 이미 그 스킬을 배운 저장 파일에서는 배운 것이 풀립니다 (포인트는 돌려받음). 선행 목록의 id 는 같이 바뀝니다."))
 
 
 ## 효과 · 스킬 · 값 · 설명 줄 + '설명 자동 채우기' (스킬 트리 노드·신앙 스킬 공용 — 둘 다 effect/value/desc)
@@ -1883,6 +2048,10 @@ func _rename(n: Dictionary, v: String) -> void:
 	if not _node(v).is_empty():
 		status.text = "id '%s' 는 이미 있습니다" % v
 		return
+	for o in nodes:   # 선행 목록도 새 id 로
+		var i: int = (o.get("req", []) as Array).find(n.id)
+		if i >= 0:
+			o.req[i] = v
 	n.id = v
 	sel = v
 	_mark()

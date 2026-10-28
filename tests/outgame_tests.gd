@@ -360,9 +360,9 @@ func _test_progression() -> void:
 	s.apply_to_ally(copy, base)
 	var core_hp := 0
 	for n in s.tree_nodes("a_kira"):
-		if n.dir == "center" and n.effect == "hp":
+		if bool(n.start) and n.effect == "hp":
 			core_hp += int(n.value)
-	_c(copy.max_hp == base.max_hp + 5 + core_hp and copy.max_hp == s.char_max_hp("a_kira"), "전투 최대 HP +5 (+ 스킬 트리 중앙 %d) (%d → %d)" % [core_hp, base.max_hp, copy.max_hp])
+	_c(copy.max_hp == base.max_hp + 5 + core_hp and copy.max_hp == s.char_max_hp("a_kira"), "전투 최대 HP +5 (+ 스킬 트리 시작 노드 %d) (%d → %d)" % [core_hp, base.max_hp, copy.max_hp])
 	_c(s.weapons_of("a_kira").size() == base.weapons.size(), "무기고: 전투 캐릭터의 초기 무기")
 	_c(s.start_craft("r_knife").ok and not s.start_craft("r_pistol").ok, "제작 시작 (작업실은 한 번에 하나)")
 	s.skip(125)
@@ -752,22 +752,21 @@ func _test_research() -> void:
 
 
 func _test_skill_tree() -> void:
-	print("[33] 레벨·경험치·십자형 스킬 트리 (액티브 · 패시브)")
+	print("[33] 레벨·경험치·스킬 트리 (액티브 · 패시브, 기본 데이터 = 십자형 모양)")
 	var s := _sim()
 	var cid := "a_dan"
 	var lv0 := s.start_level(cid)
 	_c(s.char_level(cid) == lv0 and s.skill_points(cid) == 1, "시작 = 캐릭터 시트 레벨 Lv%d, 스킬 포인트 1" % lv0)
 	for kind in ["active", "passive"]:
 		var nodes := s.tree_nodes(cid, kind)
-		var dirs := {}
-		for n in nodes:
-			dirs[n.dir] = true
-		_c(nodes.size() == 13 and dirs.size() == 5, "%s 트리 십자형: 중앙 + 동서남북 × 3단계 = 13칸" % kind)
+		var starts := nodes.filter(func(n): return bool(n.start))
+		var ends := nodes.filter(func(n): return n.group == SkillTreeData.LEGACY_END_GROUP)
+		_c(nodes.size() == 13 and starts.size() == 1 and ends.size() == 4 and int(starts[0].x) == 0 and int(starts[0].y) == 0, "%s 트리 십자형: 시작(0,0) + 네 갈래 × 3 = 13칸, 갈래 끝 4개 = 택일 그룹" % kind)
 	_c(s.tree_nodes(cid).size() == 26, "캐릭터마다 트리 두 개 (액티브 · 패시브)")
 	for cc in battle.skill_tree:
 		var news := (battle.skill_tree[cc] as Array).filter(func(n): return str(n.effect).begins_with("skill:"))
-		_c(news.all(func(n): return n.kind == "active" and int(n.tier) == s.max_tier(cc, n.dir, "active")), "%s: 새 스킬은 액티브 갈래 끝에만 (%d개)" % [cc, news.size()])
-	_c(s.has_skill(cid, "dan_a_core") and s.has_skill(cid, "dan_p_core") and s.skill_state(cid, "dan_p_core") == "learned", "두 트리 중앙은 처음부터 배움")
+		_c(news.all(func(n): return n.kind == "active" and n.group == SkillTreeData.LEGACY_END_GROUP), "%s: 새 스킬은 액티브 갈래 끝(택일 그룹)에만 (%d개)" % [cc, news.size()])
+	_c(s.has_skill(cid, "dan_a_core") and s.has_skill(cid, "dan_p_core") and s.skill_state(cid, "dan_p_core") == "learned", "두 트리 시작 노드(중앙)는 처음부터 배움")
 	_c(s.skill_state(cid, "dan_a_n2") == "no_level" and s.skill_state(cid, "dan_a_n3") == "no_level", "레벨 모자라면 '경험 부족' (2·3단계)")
 	_c(s.skill_state(cid, "dan_p_n1") == "ready" and s.skill_state(cid, "dan_a_e1") == "ready", "1단계는 바로 배울 수 있음 (두 트리)")
 	var r := s.learn_skill(cid, "dan_p_n1")
@@ -778,12 +777,12 @@ func _test_skill_tree() -> void:
 	_c(s.skill_state(cid, "dan_a_n2") == "no_level", "2단계는 시작+2 레벨부터")
 	s.add_xp(cid, 10000)
 	_c(s.char_level(cid) >= lv0 + 6, "경험치 많이 → 여러 레벨 (Lv%d)" % s.char_level(cid))
-	_c(s.skill_state(cid, "dan_a_s2") == "need_prev", "갈래 안에서는 앞 단계 먼저")
-	_c(s.skill_state(cid, "dan_a_n1") == "need_prev" or s.skill_state(cid, "dan_a_n1") == "ready", "액티브 1단계의 앞 = 액티브 중앙")
+	_c(s.skill_state(cid, "dan_a_s2") == "need_prev", "선행(앞 단계) 먼저")
+	_c(s.skill_state(cid, "dan_a_n1") == "need_prev" or s.skill_state(cid, "dan_a_n1") == "ready", "액티브 1단계의 선행 = 액티브 시작 노드")
 	_c(s.learn_skill(cid, "dan_a_n1").ok and s.learn_skill(cid, "dan_a_n2").ok and s.learn_skill(cid, "dan_a_n3").ok, "액티브 북(화력) 갈래 끝까지")
 	s.learn_skill(cid, "dan_a_e1")
 	s.learn_skill(cid, "dan_a_e2")
-	_c(s.skill_state(cid, "dan_a_e3") == "capped", "갈래 끝은 트리마다 하나 (액티브 북 끝 → 액티브 동 끝 막힘)")
+	_c(s.skill_state(cid, "dan_a_e3") == "capped", "택일 그룹은 트리마다 하나 (액티브 북 끝 → 액티브 동 끝 막힘)")
 	s.learn_skill(cid, "dan_p_e1")
 	s.learn_skill(cid, "dan_p_e2")
 	_c(s.skill_state(cid, "dan_p_e3") == "ready", "패시브 트리 갈래 끝은 따로 (액티브 끝과 무관)")
@@ -1091,30 +1090,65 @@ func _test_skill_tree_editor() -> void:
 	var bad: Array = JSON.parse_string(JSON.stringify(nodes))
 	bad[1].effect = "skill_power:nope"
 	bad[14].id = bad[15].id
-	var gap := SkillTreeData.new_node("a_dan", "active", "n", 4)
-	gap.id = "gap_test"
-	var ok_gap: Array = bad.filter(func(n): return not (n.char == "a_dan" and n.kind == "active" and n.dir == "n" and int(n.tier) == 3))
-	ok_gap.append(gap)
-	var r2 := SkillTreeData.check(ok_gap, allies_arr, battle.actions)
+	var lost := SkillTreeData.new_node("a_dan", "active", 5, 5)
+	lost.id = "lost_test"
+	lost.req = ["없는_노드"]
+	bad.append(lost)
+	var loop_a := SkillTreeData.new_node("a_dan", "passive", 6, 6)
+	loop_a.id = "loop_a"
+	var loop_b := SkillTreeData.new_node("a_dan", "passive", 6, 5)
+	loop_b.id = "loop_b"
+	loop_a.req = ["loop_b"]
+	loop_b.req = ["loop_a"]
+	bad.append_array([loop_a, loop_b])
+	var same := SkillTreeData.new_node("a_dan", "passive", 6, 6)
+	same.id = "same_cell"
+	bad.append(same)
+	var r2 := SkillTreeData.check(bad, allies_arr, battle.actions)
 	var txt := "\n".join(r2.errors)
-	_c("nope" in txt and "두 번" in txt and "3단계가 비었" in txt, "검사: 없는 스킬 · 겹친 id · 빈 단계를 잡음")
+	_c("nope" in txt and "두 번" in txt and "없는 선행" in txt and "돌고" in txt and "같은 칸" in txt, "검사: 없는 스킬 · 겹친 id · 없는 선행 · 돌고 도는 선행 · 같은 칸")
+	# 옛 십자형 파일(dir · tier) → 자유 모양으로 읽힘
+	var legacy := [{"id": "x_c", "char": "a_dan", "kind": "passive", "dir": "center", "tier": 0, "name": "c", "level": 1, "effect": "hp", "value": 1},
+		{"id": "x_n1", "char": "a_dan", "kind": "passive", "dir": "n", "tier": 1, "name": "n1", "level": 1, "effect": "hp", "value": 1},
+		{"id": "x_n2", "char": "a_dan", "kind": "passive", "dir": "n", "tier": 2, "name": "n2", "level": 1, "effect": "hp", "value": 1},
+		{"id": "x_e1", "char": "a_dan", "kind": "passive", "dir": "e", "tier": 1, "name": "e1", "level": 1, "effect": "hp", "value": 1}]
+	var tmpl := "user://skill_tree_legacy.json"
+	var fl := FileAccess.open(tmpl, FileAccess.WRITE)
+	fl.store_string(JSON.stringify({"version": 1, "nodes": legacy}))
+	fl.close()
+	var conv: Array = SkillTreeData.by_char(SkillTreeData.read(tmpl)).a_dan
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmpl))
+	var cv := {}
+	for n in conv:
+		cv[n.id] = n
+	_c(cv.x_c.start and int(cv.x_n2.y) == -2 and cv.x_n2.req == ["x_n1"] and cv.x_n1.req == ["x_c"] and cv.x_n2.group == SkillTreeData.LEGACY_END_GROUP and cv.x_e1.group == SkillTreeData.LEGACY_END_GROUP and int(cv.x_e1.x) == 1 and cv.x_n2.branch == "fire",
+		"옛 십자형 → 칸(0,-2) · 선행 · 갈래 끝 = 택일 그룹 · 갈래 색")
+	_c(SkillTreeData.depths(conv).x_n2 == 2 and SkillTreeData.depths(conv).x_c == 0, "단계(깊이) 계산: 시작 0 → 2단계")
 	_c(SkillTreeData.auto_desc("skill_power:heavy_attack", 3, battle.actions) == "강공격 위력 +3" and SkillTreeData.auto_desc("hp", 6, battle.actions) == "최대 HP +6", "자동 설명")
-	# 갈래를 4단계로 늘린 트리도 게임 규칙대로 (갈래 끝 = 4단계)
+	# 자유 모양: 갈래 끝 뒤에 하나 더 · 선행 '모두' · 선행 없는 노드
 	var g2 := GameData.load_from()
-	var four := SkillTreeData.new_node("a_dan", "passive", "s", 4)
+	var four := SkillTreeData.new_node("a_dan", "passive", 0, 4)
 	four.id = "dan_p_s4"
 	four.level = 5
-	g2.skill_tree["a_dan"].append(four)
+	four.req = ["dan_p_s3"]
+	var both := SkillTreeData.new_node("a_dan", "passive", 1, 1)
+	both.id = "dan_p_both"
+	both.req = ["dan_p_s1", "dan_p_e1"]
+	both.req_all = true
+	var free := SkillTreeData.new_node("a_dan", "passive", -3, 3)
+	free.id = "dan_p_free"
+	g2.skill_tree["a_dan"].append_array([four, both, free])
 	var s := BaseSim.create(data, g2)
 	s.add_xp("a_dan", 100000)
-	_c(s.max_tier("a_dan", "s", "passive") == 4, "남 갈래 4단계")
+	_c(s.skill_state("a_dan", "dan_p_free") == "ready", "선행 없는 노드 = 레벨만 되면 바로")
 	for id in ["dan_p_s1", "dan_p_s2", "dan_p_s3"]:
 		s.learn_skill("a_dan", id)
-	_c(s.skill_state("a_dan", "dan_p_s3") == "learned" and s.skill_state("a_dan", "dan_p_s4") == "ready", "3단계는 이제 갈래 끝이 아님, 4단계 배울 수 있음")
-	s.learn_skill("a_dan", "dan_p_s4")
+	_c(s.skill_state("a_dan", "dan_p_s3") == "learned" and s.skill_state("a_dan", "dan_p_s4") == "ready", "갈래 끝(택일) 다음 노드도 선행만 있으면 배울 수 있음")
+	_c(s.skill_state("a_dan", "dan_p_both") == "need_prev", "선행 '모두': 하나만 배우면 아직")
 	s.learn_skill("a_dan", "dan_p_e1")
+	_c(s.skill_state("a_dan", "dan_p_both") == "ready", "선행 '모두' 다 배우면 배울 수 있음")
 	s.learn_skill("a_dan", "dan_p_e2")
-	_c(s.skill_state("a_dan", "dan_p_e3") == "capped", "4단계 갈래 끝을 배우면 다른 갈래 끝 막힘")
+	_c(s.skill_state("a_dan", "dan_p_e3") == "capped", "택일 그룹: 남 끝을 배웠으면 동 끝 막힘")
 	# 전투 전용 상태 이상은 기지로 안 넘어감
 	var s3 := _sim()
 	s3.apply_battle_result({"winner": "ally", "allies": [{"id": "a_kira", "hp": 20, "alive": true, "statuses": ["bleed", "stun", "injured"]}]})
@@ -1132,13 +1166,32 @@ func _test_skill_tree_editor() -> void:
 	panel._ready()   # 에디터 밖(테스트)이라 트리에 붙이지 않고 화면만 만듦
 	_c(panel.nodes.size() == 156 and panel.cid == "a_dan", "에디터 탭 열림 (노드 %d개, %s)" % [panel.nodes.size(), panel.cid])
 	panel.kind = "passive"
-	panel._add_node("s", 4)
+	panel.sel = "dan_p_s3"
+	panel._add_node(0, 4)
 	var added: Dictionary = panel._node(panel.sel)
-	_c(added.dir == "s" and int(added.tier) == 4 and added.id == "dan_p_s4" and int(added.level) == int(panel._at("s", 3).level) + 2, "'+' 칸 → 남 4단계 추가 (id %s, 필요 레벨 앞 단계 +2)" % added.id)
+	var ps3: Dictionary = panel._node("dan_p_s3")
+	_c(int(added.x) == 0 and int(added.y) == 4 and added.req == ["dan_p_s3"] and int(added.level) == int(ps3.level) + 2 and added.branch == ps3.branch, "빈 칸 클릭 → 고른 노드(남 3)에서 이어진 새 노드 (id %s, 필요 레벨 +2, 같은 색)" % added.id)
+	panel._add_node(0, 4)
+	_c(panel._tree().size() == 14, "노드가 있는 칸에는 안 생김")
 	panel._delete("dan_p_s2")
-	_c(panel._at("s", 2).id == "dan_p_s3" and panel._at("s", 3).id == "dan_p_s4" and panel._at("s", 4).is_empty(), "중간 단계 삭제 → 바깥 단계가 안으로 당겨짐")
-	panel._swap("dan_p_s3", 1)
-	_c(panel._at("s", 3).id == "dan_p_s3", "단계 자리 바꾸기")
+	_c(ps3.req == ["dan_p_s1"], "중간 노드 삭제 → 뒤 노드가 그 선행을 이어받음")
+	panel._move_node(added.id, 2, 4)
+	panel._move_node(added.id, 0, 0)
+	_c(int(added.x) == 2 and int(added.y) == 4, "끌어서 옮기기 (빈 칸으로만)")
+	panel._toggle_link("dan_p_e1", added.id)
+	_c(added.req.has("dan_p_e1"), "Shift+클릭 → 선행 잇기")
+	panel._toggle_link(added.id, "dan_p_s3")
+	_c(not ps3.req.has(added.id), "선행이 돌고 돌게 되면 안 이음")
+	panel._rename(added, "dan_p_tail")
+	panel._toggle_link("dan_p_e1", "dan_p_tail")
+	_c(not panel._node("dan_p_tail").req.has("dan_p_e1"), "다시 Shift+클릭 → 끊기")
+	panel._apply_template("diamond")
+	var tt: Array = panel._tree()
+	var rt := SkillTreeData.check(panel.nodes, allies_arr, battle.actions)
+	_c(tt.size() == 8 and tt.filter(func(n): return n.start).size() == 1 and tt.any(func(n): return n.req_all) and rt.errors.is_empty(), "모양 틀 '그물' → 8칸 · 시작 1 · 합류(모두) · 검사 오류 없음")
+	var dep := SkillTreeData.depths(tt)
+	_c(tt.all(func(n): return int(n.level) == (panel._start_level() if int(dep[n.id]) == 0 else panel._start_level() + 2 * (int(dep[n.id]) - 1))), "틀의 필요 레벨 = 단계대로 자동")
+	panel._load()
 	# 에디터 신앙: 신 추가 → 신앙 스킬 추가 → 신 삭제(그 스킬도)
 	panel.kind = "faith"
 	panel._rebuild()

@@ -98,7 +98,7 @@ func _ready() -> void:
 	data = GameData.load_from()
 	if data != null:
 		_balance_mtime = FileAccess.get_modified_time(GameData.BALANCE_PATH)
-		_tree_mtime = FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(QuestData.PATH) + FileAccess.get_modified_time(CutsceneData.PATH) + FileAccess.get_modified_time(CutsceneData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
+		_tree_mtime = FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(QuestData.PATH) + FileAccess.get_modified_time(CutsceneData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
 		allies = data.allies
 		actions = data.actions
 		for w in data.warnings:
@@ -300,7 +300,7 @@ func _process(delta: float) -> void:
 	if data == null:
 		return
 	var t := FileAccess.get_modified_time(GameData.BALANCE_PATH)
-	var tt := FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(QuestData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
+	var tt := FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(QuestData.PATH) + FileAccess.get_modified_time(CutsceneData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
 	if t == 0 or (t == _balance_mtime and tt == _tree_mtime):
 		return
 	var newer := GameData.load_from()

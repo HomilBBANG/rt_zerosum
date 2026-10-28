@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """스킬 트리 초기 데이터(data/skill_tree.json) 생성. 처음 한 번만 — 이후에는 Godot 에디터 '스킬 트리' 탭에서 고치는 파일이 원본.
+옛 십자형(dir · tier) 형식으로 만듦 — 게임·에디터가 읽을 때 자유 모양(x, y · 선행 · 택일 그룹)으로 바뀌고, 에디터에서 저장하면 새 형식.
 주의: 다시 실행하면 에디터에서 고친 노드를 덮어씀. (사용: python3 tools/gen_skill_tree.py --force)"""
 import os, sys, json
 

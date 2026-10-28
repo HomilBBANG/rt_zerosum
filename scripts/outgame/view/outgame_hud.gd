@@ -738,12 +738,12 @@ func open_facility(fid: String) -> void:
 
 # ---------------------------------------------------------------- 스킬 창 (캐릭터마다 액티브 · 패시브 · 신앙)
 const SKILL_MODES := [["active", "액티브 스킬"], ["passive", "패시브 스킬"], ["faith", "신앙 스킬"]]
-const SKILL_MODE_HINT := {"active": "전투에서 쓰는 스킬을 강화 · 갈래 끝에서 새 스킬", "passive": "늘 적용되는 능력치 (체력·속도·AP·방어·위력)",
+const SKILL_MODE_HINT := {"active": "전투에서 쓰는 스킬을 강화 · 새 스킬도 배움", "passive": "늘 적용되는 능력치 (체력·속도·AP·방어·위력)",
 	"faith": "믿는 신에 따라 배울 수 있는 스킬이 다름", "miracle": "정체가 신 — 의지로 기적을 일으킴 (그 캐릭터만의 기적)"}
 
 
 ## cid = "" 이면 첫 대원. 왼쪽: 대원 목록 (위아래 스크롤) / 위: 액티브 · 패시브 · 신앙 탭
-## 액티브·패시브: 왼쪽 정보(레벨·경험치·포인트·고른 스킬 설명·배우기) + 오른쪽 십자형 트리. mode "tree" = 예전 이름 (액티브)
+## 액티브·패시브: 왼쪽 정보(레벨·경험치·포인트·고른 스킬 설명·배우기) + 오른쪽 스킬 트리(캐릭터마다 모양 다름). mode "tree" = 예전 이름 (액티브)
 func open_skills(cid: String = "", pick: String = "", mode: String = "active") -> void:
 	var allies: Array = sim.battle.allies if sim.battle != null else []
 	if allies.is_empty():
@@ -833,7 +833,7 @@ func open_skills(cid: String = "", pick: String = "", mode: String = "active") -
 	info.add_child(_gauge("경험치", float(sim.char_xp(cid)), maxf(1.0, float(sim.xp_need(cid))), Color(0.85, 0.6, 1.0),
 		"%d / %d" % [sim.char_xp(cid), sim.xp_need(cid)]))
 	info.add_child(_label("레벨 업마다 포인트 1 (액티브·패시브 공용)", 12, Color(0.7, 0.75, 0.85)))
-	info.add_child(_label("갈래 안에서는 앞 단계부터 · 갈래 끝은 트리마다 하나", 12, Color(0.7, 0.75, 0.85)))
+	info.add_child(_label("선을 따라 선행 스킬부터 · '택1' 은 그중 하나만", 12, Color(0.7, 0.75, 0.85)))
 	var detail := _vbox(4)
 	detail.custom_minimum_size.y = 180
 	info.add_child(detail)
@@ -846,7 +846,7 @@ func open_skills(cid: String = "", pick: String = "", mode: String = "active") -
 		var n := sim.tree_node(cid, nid)
 		if n.get("kind", "") != mode:
 			continue
-		learned_box.add_child(_label("· %s — %s" % [n.get("name", nid), n.get("desc", "")], 12, SkillTreeView.DIR_COL.get(str(n.get("dir", "center")), Color.WHITE).lightened(0.3)))
+		learned_box.add_child(_label("· %s — %s" % [n.get("name", nid), n.get("desc", "")], 12, SkillTreeView.col_of(n).lightened(0.3)))
 	var reset := _button("%s 초기화 (포인트 돌려받기)" % kname, Color(0.6, 0.6, 0.65), 13)
 	reset.pressed.connect(func():
 		var res := sim.reset_skills(cid, mode)
@@ -854,7 +854,7 @@ func open_skills(cid: String = "", pick: String = "", mode: String = "active") -
 		close_top()
 		open_skills(cid, "", mode))
 	info.add_child(reset)
-	# 오른쪽: 십자형 트리
+	# 오른쪽: 스킬 트리 (캐릭터마다 모양이 다름)
 	var tree := SkillTreeView.new()
 	tree.custom_minimum_size = Vector2(740, 580)
 	row.add_child(tree)
@@ -869,8 +869,12 @@ func open_skills(cid: String = "", pick: String = "", mode: String = "active") -
 			learn.disabled = true
 			return
 		var st := sim.skill_state(cid, nid)
-		detail.add_child(_label(str(n.name), 19, SkillTreeView.DIR_COL[n.dir].lightened(0.25)))
-		detail.add_child(_label("%s · %s · %d단계 · 필요 Lv%d" % [kname, SkillTreeView.DIR_NAME.get(n.dir, "중앙"), int(n.tier), int(n.level)], 13, Color(0.8, 0.84, 0.9)))
+		detail.add_child(_label(str(n.name), 19, SkillTreeView.col_of(n).lightened(0.25)))
+		detail.add_child(_label("%s · %s · 필요 Lv%d%s%s" % [kname, SkillTreeData.BRANCH_NAME.get(n.branch, ""), int(n.level), " · 처음부터" if bool(n.start) else "",
+			" · 택일 '%s'" % n.group if str(n.group) != "" else ""], 13, Color(0.8, 0.84, 0.9)))
+		var reqs: Array = (n.req as Array).map(func(q): return str(sim.tree_node(cid, str(q)).get("name", q)))
+		if not reqs.is_empty() and not bool(n.start):
+			detail.add_child(_label("선행: %s%s" % [", ".join(PackedStringArray(reqs)), " (모두)" if bool(n.req_all) and reqs.size() > 1 else (" (하나라도)" if reqs.size() > 1 else "")], 13, Color(0.75, 0.8, 0.9)))
 		var d := _label(str(n.desc), 15)
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		d.custom_minimum_size.x = 270
