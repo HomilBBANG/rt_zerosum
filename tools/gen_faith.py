@@ -19,6 +19,13 @@ GODS = [
 # 누가 어느 신을 믿는지 · 시작 신앙도 (0~100, 출전마다 + 기지 설정 faith_battle)
 BELIEVERS = {"a_dan": {"god": "veyra", "faith": 30}, "a_kira": {"god": "noct", "faith": 20}, "a_ethan": {"god": "solus", "faith": 40},
              "a_hana": {"god": "terra", "faith": 10}, "a_alma": {"god": "solus", "faith": 50}, "a_nikita": {"god": "noct", "faith": 25}}
+# [임시] 신 해금 캐릭터: 정체가 신 — 조건을 채우면 신앙 탭이 '기적' 으로 / 그 캐릭터만의 기적 (필요 신성도 = 신앙도 값)
+DIVINE = {"a_nikita": {"god": "noct", "unlocked": False, "condition": {"type": "faith", "value": 60}}}
+MIRACLES = [
+    {"id": "nikita_m1", "char": "a_nikita", "name": "달 없는 눈", "need": 60, "effect": "skill_power:basic_attack", "value": 4, "desc": "기본 공격 위력 +4"},
+    {"id": "nikita_m2", "char": "a_nikita", "name": "밤의 장막", "need": 75, "effect": "ap", "value": 1, "desc": "최대 AP +1"},
+    {"id": "nikita_m3", "char": "a_nikita", "name": "그림자 강림", "need": 90, "effect": "skill_power:ultimate", "value": 8, "desc": "필살기 위력 +8"},
+]
 FS_COLS = ["신", "id", "이름", "필요신앙", "효과", "값", "설명"]
 FAITH_SKILLS = [
     ["solus", "solus_1", "햇살의 손길", 20, "heal", 2, "회복량 +2"],
@@ -42,5 +49,5 @@ FAITH_SKILLS = [
 gods = [{"id": g[0], "name": g[1], "color": g[2], "symbol": "", "desc": g[3]} for g in GODS]
 skills = [{"id": f[1], "god": f[0], "name": f[2], "need": f[3], "effect": f[4], "value": f[5], "desc": f[6]} for f in FAITH_SKILLS]
 with open(OUT, "w", encoding="utf-8") as f:
-    f.write(json.dumps({"version": 1, "gods": gods, "believers": BELIEVERS, "skills": skills}, ensure_ascii=False, indent="\t"))
+    f.write(json.dumps({"version": 1, "gods": gods, "believers": BELIEVERS, "divine": DIVINE, "skills": skills, "miracles": MIRACLES}, ensure_ascii=False, indent="\t"))
 print(OUT, len(gods), len(skills))

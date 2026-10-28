@@ -7,6 +7,8 @@ extends RefCounted
 ## 믿는 신 = believers {캐릭터 id → {god(신 id, "" = 무신앙), faith(시작 신앙도)}} — 같은 에디터 화면에서 고침.
 ## (예전에는 밸런스 엑셀 캐릭터 시트 '신'·'신앙' 열 — believers 가 없는 옛 파일이면 그 열을 씀)
 ## 세계관 설명(도감)은 data/codex.json 의 gods.
+## 신 해금 캐릭터 = divine {캐릭터 id → {god(정체인 신 id), unlocked(처음부터 해금), condition(UnlockCond)}}:
+##   해금되면 그 캐릭터의 신앙 탭이 '기적' 으로 — 신앙도 대신 신성도(같은 값), 그 캐릭터만의 기적 = miracles [{id, char, name, need(필요 신성도), effect, value, desc}]
 
 const PATH := "res://data/faith.json"
 const FAITH_MAX := 100
@@ -25,12 +27,20 @@ static func symbol_of(g: Dictionary) -> String:
 	return words[words.size() - 1].substr(0, 1) if not words.is_empty() else "?"
 
 
+static func new_divine(god: String) -> Dictionary:
+	return {"god": god, "unlocked": false, "condition": {"type": "faith", "value": 60}}
+
+
+static func new_miracle(id: String, cid: String, need: int) -> Dictionary:
+	return {"id": id, "char": cid, "name": "새 기적", "need": need, "effect": "power", "value": 1, "desc": ""}
+
+
 static func new_skill(id: String, god: String, need: int) -> Dictionary:
 	return {"id": id, "god": god, "name": "새 신앙 스킬", "need": need, "effect": "hp", "value": 1, "desc": ""}
 
 
 static func read(path: String = PATH) -> Dictionary:
-	var out := {"gods": [], "skills": [], "believers": {}, "has_believers": false}
+	var out := {"gods": [], "skills": [], "believers": {}, "has_believers": false, "divine": {}, "miracles": []}
 	if not FileAccess.file_exists(path):
 		return out
 	var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
@@ -47,6 +57,17 @@ static func read(path: String = PATH) -> Dictionary:
 			var e: Variant = b[cid]
 			if e is Dictionary:
 				out.believers[str(cid)] = {"god": str(e.get("god", "")).strip_edges(), "faith": clampi(int(e.get("faith", 0)), 0, FAITH_MAX)}
+	var dv: Variant = j.get("divine", {})
+	if dv is Dictionary:
+		for cid in dv:
+			var e2: Variant = dv[cid]
+			if e2 is Dictionary:
+				out.divine[str(cid)] = {"god": str(e2.get("god", "")), "unlocked": bool(e2.get("unlocked", false)), "condition": UnlockCond.norm(e2.get("condition", {}))}
+	for m in j.get("miracles", []):
+		if m is Dictionary:
+			out.miracles.append({"id": str(m.get("id", "")), "char": str(m.get("char", "")), "name": str(m.get("name", "")),
+				"need": clampi(int(m.get("need", 0)), 0, FAITH_MAX), "effect": str(m.get("effect", "")).strip_edges(),
+				"value": int(m.get("value", 0)), "desc": str(m.get("desc", ""))})
 	for s in j.get("skills", []):
 		if s is Dictionary:
 			out.skills.append({"id": str(s.get("id", "")), "god": str(s.get("god", "")), "name": str(s.get("name", "")),
@@ -65,8 +86,23 @@ static func write(d: Dictionary, path: String = PATH) -> int:
 		if a.god != b.god:
 			return order.find(a.god) < order.find(b.god)
 		return int(a.need) < int(b.need))
-	f.store_string(JSON.stringify({"version": 1, "gods": d.gods, "believers": d.get("believers", {}), "skills": skills}, "\t", false))
+	var miracles: Array = (d.get("miracles", []) as Array).duplicate()
+	miracles.sort_custom(func(a, b): return a.char < b.char if a.char != b.char else int(a.need) < int(b.need))
+	f.store_string(JSON.stringify({"version": 1, "gods": d.gods, "believers": d.get("believers", {}), "divine": d.get("divine", {}),
+		"skills": skills, "miracles": miracles}, "\t", false))
 	return OK
+
+
+## 캐릭터 id → 기적 목록 (필요 신성도 오름차순)
+static func miracles_by_char(d: Dictionary) -> Dictionary:
+	var out := {}
+	for m in d.get("miracles", []):
+		if not out.has(m.char):
+			out[m.char] = []
+		out[m.char].append(m)
+	for c in out:
+		(out[c] as Array).sort_custom(func(a, b): return int(a.need) < int(b.need))
+	return out
 
 
 ## 신 id → 신앙 스킬 목록 (필요 신앙도 오름차순)
@@ -118,6 +154,31 @@ static func check(d: Dictionary, char_faith: Dictionary, actions: Dictionary) ->
 		var g := str(char_faith[cid].god)
 		if g != "" and not gids.has(g):
 			errors.append("%s: 믿는 신 '%s' 가 없는 신입니다" % [cid, g])
+	for cid in d.get("divine", {}):
+		var dv: Dictionary = d.divine[cid]
+		if not char_faith.is_empty() and not char_faith.has(cid):
+			errors.append("신 해금: 캐릭터 시트에 없는 캐릭터 '%s'" % cid)
+		if not gids.has(str(dv.god)):
+			errors.append("신 해금 %s: 정체인 신 '%s' 가 없습니다" % [cid, dv.god])
+		if str(char_faith.get(cid, {}).get("god", "")) == str(dv.god) and str(dv.god) != "":
+			notes.append("신 해금 %s: 자기 자신(%s)을 믿는 상태입니다 — 해금 뒤에는 신앙 대신 기적" % [cid, dv.god])
+		if not (d.get("miracles", []) as Array).any(func(m): return m.char == cid):
+			notes.append("신 해금 %s: 기적이 없습니다" % cid)
+		if str(dv.condition.type) == "manual":
+			notes.append("신 해금 %s: 직접 해금 — 이벤트·대사에서 BaseSim.unlock_divine 을 불러야 해금" % cid)
+	var mids := {}
+	for m in d.get("miracles", []):
+		if str(m.id) == "" or mids.has(m.id) or sids.has(m.id):
+			errors.append("기적 id '%s' 가 비었거나 겹칩니다 (신앙 스킬 id 와도 달라야 함)" % m.id)
+		mids[m.id] = true
+		if not (d.get("divine", {}) as Dictionary).has(m.char):
+			errors.append("기적 %s: 신 해금 캐릭터가 아닌 '%s'" % [m.id, m.char])
+		var mf: String = m.effect
+		if mf.begins_with("skill:") or mf.begins_with("skill_power:"):
+			if not actions.has(mf.split(":")[1]):
+				errors.append("기적 %s: 스킬 시트에 없는 스킬 '%s'" % [m.id, mf.split(":")[1]])
+		elif not mf in SkillTreeData.EFFECTS:
+			errors.append("기적 %s: 모르는 효과 '%s'" % [m.id, mf])
 	for g in d.gods:
 		if not (d.skills as Array).any(func(s): return s.god == g.id):
 			notes.append("%s: 신앙 스킬이 없습니다" % g.name)

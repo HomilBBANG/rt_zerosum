@@ -17,6 +17,8 @@ signal job_completed(job: Dictionary)
 signal inspection_completed(record: Dictionary)
 signal statement_ready(statement: Dictionary)
 signal notice(text: String)
+## 신 해금 캐릭터의 정체가 드러남 (신앙 탭 → 기적)
+signal divine_revealed(character_id: String)
 signal battle_triggered(pending: Dictionary)
 signal research_completed(research_id: String)
 signal leveled_up(character_id: String, level: int)
@@ -41,7 +43,8 @@ var conv_counts: Dictionary = {}     # 대화이벤트 id → 발생 횟수
 var heard: Dictionary = {}           # 대화이벤트 id → 엿들은 횟수
 var story_seen: Dictionary = {}      # 스토리 이벤트 id → 처음 엿들은 시각 라벨
 var inspections: Dictionary = {}     # "YYYY-MM" → {month, minute, done, score, grade, bonus, week, date}
-var progression: Dictionary = {}     # 전투 캐릭터 id → {training, level, xp, skills: [배운 스킬 트리 노드 id], faith, faith_skills: [배운 신앙 스킬 id]}
+var progression: Dictionary = {}     # 전투 캐릭터 id → {training, level, xp, skills: [배운 스킬 트리 노드 id], faith, faith_skills: [배운 신앙 스킬 id], miracles: [배운 기적 id]}
+var divine_unlocked: Dictionary = {}  # 정체(신)가 드러난 캐릭터 id → true (처음부터 해금인 캐릭터는 넣지 않아도 신)
 var inventory: Array = []            # [{uid, item, plus, owner(캐릭터 id 또는 ""), slot}]
 var workshop: Dictionary = {}        # {kind: craft|enhance, recipe?, uid?, remaining, total}
 var researched: Dictionary = {}      # 연구 id → true (완료)
@@ -211,6 +214,7 @@ func _on_minute(m: int) -> void:
 
 
 func _new_day(d: int) -> void:
+	check_divine()
 	day_changed.emit(d)
 	if d % week_days() == 0:
 		_settle(floori(d / float(week_days())) - 1)
@@ -974,6 +978,8 @@ func _prog(cid: String) -> Dictionary:
 	if not p.has("faith"):
 		p.faith = int(battle.char_faith.get(cid, {}).get("faith", 0)) if battle != null else 0
 		p.faith_skills = []
+	if not p.has("miracles"):
+		p.miracles = []
 	return p
 
 
@@ -1015,6 +1021,7 @@ func add_xp(cid: String, amount: int) -> int:
 		leveled_up.emit(cid, int(p.level))
 	if int(p.level) >= level_max():
 		p.xp = 0
+	check_divine()
 	return ups
 
 
@@ -1141,6 +1148,12 @@ func add_faith(cid: String, v: int) -> void:
 	var p := _prog(cid)
 	var before := int(p.faith)
 	p.faith = clampi(before + v, 0, faith_max())
+	check_divine()
+	if is_divine(cid):
+		for m in miracle_list(cid):
+			if before < int(m.need) and int(p.faith) >= int(m.need):
+				_log("%s 신성도 %d — 기적 '%s' 을(를) 일으킬 수 있습니다" % [_char_label(cid), p.faith, m.name])
+		return
 	var g := god_of(cid)
 	if g == "":
 		return
@@ -1191,6 +1204,109 @@ func learn_faith_skill(cid: String, sid: String) -> Dictionary:
 	return {"ok": true, "msg": "%s — %s 습득" % [_char_label(cid), fs.name]}
 
 
+# ---------------------------------------------------------------- 신 해금 캐릭터 · 기적 [임시 데이터]
+## 정체가 신인 캐릭터: 해금 조건(UnlockCond)을 채우면 신앙 탭이 '기적' 으로 (신앙도 = 신성도, 그 캐릭터만의 기적)
+func divine_info(cid: String) -> Dictionary:
+	return battle.divine.get(cid, {}) if battle != null else {}
+
+
+## "" = 신 해금 캐릭터 아님 / "locked" = 아직 잠김 / "unlocked" = 정체가 드러남
+func divine_state(cid: String) -> String:
+	var dv := divine_info(cid)
+	if dv.is_empty():
+		return ""
+	return "unlocked" if bool(dv.get("unlocked", false)) or divine_unlocked.has(cid) or str(dv.condition.type) == "always" else "locked"
+
+
+func is_divine(cid: String) -> bool:
+	return divine_state(cid) == "unlocked"
+
+
+## 정체인 신 정보 (gods 항목) — 신이 아니면 {}
+func divine_god(cid: String) -> Dictionary:
+	return battle.gods.get(str(divine_info(cid).get("god", "")), {}) if is_divine(cid) else {}
+
+
+## 해금 조건을 채웠나 (UnlockCond: always · manual · level · faith · affinity · day)
+func cond_met(c: Dictionary, cid: String) -> bool:
+	var v := int(c.get("value", 0))
+	match str(c.get("type", "manual")):
+		"always":
+			return true
+		"level":
+			return char_level(cid) >= v
+		"faith":
+			return faith(cid) >= v
+		"affinity":
+			return float(cstate_of(cid).get("affinity", 0.0)) >= v
+		"day":
+			return _day + 1 >= v
+	return false
+
+
+## 이벤트·대사·디버그에서 직접 해금. 반환 {ok, msg}
+func unlock_divine(cid: String, why: String = "") -> Dictionary:
+	if divine_state(cid) == "":
+		return _fail("신 해금 캐릭터가 아닙니다")
+	if is_divine(cid):
+		return _fail("이미 해금")
+	divine_unlocked[cid] = true
+	var g: Dictionary = battle.gods.get(str(divine_info(cid).god), {})
+	_log("✦ %s 의 정체 — %s! 신앙 탭이 '기적' 으로 바뀝니다%s" % [_char_label(cid), g.get("name", "신"), " (%s)" % why if why != "" else ""])
+	divine_revealed.emit(cid)
+	return {"ok": true, "msg": "%s — 정체는 %s" % [_char_label(cid), g.get("name", "신")]}
+
+
+## 잠긴 신 해금 캐릭터 중 조건을 채운 캐릭터를 해금 (레벨·신앙도·친밀도가 바뀔 때, 날이 바뀔 때, 불러온 뒤)
+func check_divine() -> void:
+	if battle == null:
+		return
+	for cid in battle.divine:
+		if divine_state(cid) == "locked" and cond_met(battle.divine[cid].condition, cid):
+			unlock_divine(cid, UnlockCond.describe(battle.divine[cid].condition))
+
+
+func miracle_list(cid: String) -> Array:
+	return battle.miracles.get(cid, []) if battle != null else []
+
+
+func miracle(cid: String, mid: String) -> Dictionary:
+	for m in miracle_list(cid):
+		if m.id == mid:
+			return m
+	return {}
+
+
+## learned 배움 / ready 배울 수 있음 / no_faith 신성도 부족 / locked 정체가 아직 안 드러남 / other 그 캐릭터 기적 아님
+func miracle_state(cid: String, mid: String) -> String:
+	var m := miracle(cid, mid)
+	if m.is_empty():
+		return "other"
+	if not is_divine(cid):
+		return "locked"
+	if (_prog(cid).miracles as Array).has(mid):
+		return "learned"
+	if faith(cid) < int(m.need):
+		return "no_faith"
+	return "ready"
+
+
+func learn_miracle(cid: String, mid: String) -> Dictionary:
+	match miracle_state(cid, mid):
+		"other":
+			return _fail("이 캐릭터의 기적이 아닙니다")
+		"locked":
+			return _fail("아직 정체가 드러나지 않았습니다")
+		"learned":
+			return _fail("이미 배웠습니다")
+		"no_faith":
+			return _fail("신성도 부족 — 신성도 %d 필요" % int(miracle(cid, mid).need))
+	(_prog(cid).miracles as Array).append(mid)
+	var m := miracle(cid, mid)
+	_log("%s 기적 습득: %s" % [_char_label(cid), m.name])
+	return {"ok": true, "msg": "%s — 기적 %s" % [_char_label(cid), m.name]}
+
+
 ## 배운 스킬 트리 노드 + 신앙 스킬 (효과 계산용) [{effect, value}]
 func _learned_effects(cid: String) -> Array:
 	var out: Array = []
@@ -1202,6 +1318,11 @@ func _learned_effects(cid: String) -> Array:
 		var fs := faith_skill(cid, str(sid))
 		if not fs.is_empty():
 			out.append(fs)
+	if is_divine(cid):   # 기적 (정체가 드러난 뒤에만)
+		for mid in _prog(cid).miracles:
+			var m := miracle(cid, str(mid))
+			if not m.is_empty():
+				out.append(m)
 	return out
 
 
@@ -1540,6 +1661,7 @@ func _add_affinity(n: NpcAgent, v: float) -> void:
 	var cs := cstate(n)
 	var before := float(cs.affinity)
 	cs.affinity = clampf(before + v, 0.0, 100.0)
+	check_divine()
 	for t in data.affinity_talks.get(n.id, []):
 		if before < float(t.need) and float(cs.affinity) >= float(t.need):
 			_log("%s 친밀도 %d — 새 대화 해금! (클릭해서 대화)" % [n.name, int(t.need)])
@@ -1904,7 +2026,7 @@ func to_dict() -> Dictionary:
 		"opened_contracts": opened_contracts.keys(), "request_state": request_state, "conv_counts": conv_counts, "heard": heard,
 		"story_seen": story_seen, "inspections": inspections, "progression": progression, "inventory": inventory,
 		"workshop": workshop, "researched": researched.keys(), "research": research, "counters": counters, "log": log_lines.slice(maxi(0, log_lines.size() - 100)), "cleaning_log": cleaning_log,
-		"chars": chars, "food": food, "gifts": gifts, "pending_battle": pending_battle, "battle_history": battle_history}
+		"chars": chars, "food": food, "gifts": gifts, "pending_battle": pending_battle, "battle_history": battle_history, "divine_unlocked": divine_unlocked.keys()}
 
 
 static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) -> BaseSim:
@@ -1940,6 +2062,8 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 	for k in s.inspections:
 		s.inspections[k].minute = int(s.inspections[k].minute)
 	s.progression = d.get("progression", {})
+	for c in d.get("divine_unlocked", []):
+		s.divine_unlocked[str(c)] = true
 	s.inventory = d.get("inventory", [])
 	for it in s.inventory:
 		it.plus = int(it.plus)
@@ -2005,4 +2129,5 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 			n.dest = ""
 			if not s._go(n, target):
 				n.state = NpcAgent.STAYING
+	s.check_divine()   # 불러온 뒤 이미 조건을 채운 캐릭터
 	return s

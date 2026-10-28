@@ -38,6 +38,7 @@ func run(p_check: Callable) -> void:
 	_test_research()
 	_test_skill_tree()
 	_test_faith()
+	_test_divine()
 	_test_skill_tree_editor()
 
 
@@ -845,6 +846,46 @@ func _test_faith() -> void:
 	_c(copy.power_bonus >= 1, "신앙 스킬 효과 → 전투 복제본 (위력 +%d)" % copy.power_bonus)
 	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
 	_c(sv.faith("a_dan") == s.faith("a_dan") and sv.has_faith_skill("a_dan", lo.id), "저장/불러오기 후 신앙 유지")
+
+
+## 신 해금 캐릭터 (니키타 = 밤의 여신 녹트, 신앙도 60 이상에서 해금 — 임시 데이터) · 기적
+func _test_divine() -> void:
+	print("[34b] 신 해금 캐릭터 · 기적 · 해금 조건")
+	var s := _sim()
+	_c(s.divine_state("a_dan") == "" and s.divine_state("a_nikita") == "locked" and not s.is_divine("a_nikita"), "단 = 신 아님, 니키타 = 신 해금 캐릭터 · 잠김")
+	var mid: String = s.miracle_list("a_nikita")[0].id
+	_c(s.miracle_state("a_nikita", mid) == "locked" and not s.learn_miracle("a_nikita", mid).ok, "잠긴 동안 기적 못 배움")
+	var got := []
+	s.divine_revealed.connect(func(c): got.append(c))
+	var need := int(battle.divine.a_nikita.condition.value)
+	s.add_faith("a_nikita", need - 1 - s.faith("a_nikita"))
+	_c(not s.is_divine("a_nikita"), "신앙도 %d — 아직 잠김" % s.faith("a_nikita"))
+	s.add_faith("a_nikita", 1)
+	_c(s.is_divine("a_nikita") and got == ["a_nikita"] and s.divine_god("a_nikita").name == battle.gods.noct.name, "신앙도 %d → 정체 해금 (녹트), 알림 1번" % need)
+	_c(s.miracle_state("a_nikita", mid) == "ready" and s.learn_miracle("a_nikita", mid).ok and s.miracle_state("a_nikita", mid) == "learned", "해금 뒤 신성도 충분 → 기적 배움")
+	var hi: Dictionary = s.miracle_list("a_nikita").back()
+	_c(s.miracle_state("a_nikita", hi.id) == "no_faith", "신성도 모자라면 '신성도 부족'")
+	var base: UnitData = GameData._find(battle.allies, "a_nikita")
+	var copy := UnitData.new()
+	GameData._copy_props(copy, base)
+	s.apply_to_ally(copy, base)
+	_c(int(copy.skill_power.get("basic_attack", 0)) >= 4, "기적 효과 → 전투 복제본 (기본 공격 +%d)" % int(copy.skill_power.get("basic_attack", 0)))
+	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
+	_c(sv.is_divine("a_nikita") and sv.miracle_state("a_nikita", mid) == "learned", "저장/불러오기 후 정체·기적 유지")
+	_c(not s.unlock_divine("a_nikita").ok and not s.unlock_divine("a_dan").ok, "이미 해금 · 신 아님 = 직접 해금 실패")
+	# 조건 종류
+	_c(s.cond_met({"type": "level", "value": s.char_level("a_dan")}, "a_dan") and not s.cond_met({"type": "level", "value": s.char_level("a_dan") + 1}, "a_dan"), "조건: 레벨 이상")
+	_c(s.cond_met({"type": "day", "value": 1}, "a_dan") and not s.cond_met({"type": "day", "value": 99}, "a_dan"), "조건: n일차부터")
+	_c(not s.cond_met({"type": "manual", "value": 0}, "a_dan") and s.cond_met({"type": "always", "value": 0}, "a_dan"), "조건: 직접(자동 해금 안 됨) · 처음부터")
+	_c(s.cond_met({"type": "affinity", "value": 0}, "a_dan"), "조건: 친밀도 이상")
+	_c(UnlockCond.describe({"type": "faith", "value": 60}) == "신앙도 60 이상" and UnlockCond.norm({"type": "zzz"}).type == "manual", "조건 설명 · 모르는 조건 = 직접 해금")
+	# 처음부터 해금 (데이터 그대로 두고 복사본으로)
+	var b2 := GameData.load_from()
+	b2.divine["a_kira"] = {"god": "veyra", "unlocked": true, "condition": {"type": "manual", "value": 0}}
+	var s3 := BaseSim.create(data, b2)
+	_c(s3.is_divine("a_kira") and s3.divine_state("a_kira") == "unlocked", "'이미 해금됨' = 새 게임부터 기적 탭")
+	var fd := FaithData.read()
+	_c(FaithData.check(fd, battle.char_faith, battle.actions).errors.is_empty(), "faith.json 신 해금·기적 검사 오류 없음")
 
 
 func _test_skill_tree_editor() -> void:

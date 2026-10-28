@@ -4,6 +4,7 @@ extends Control
 ## 위: 캐릭터 · 액티브/패시브/신앙 고르기 · 다른 캐릭터 트리 가져오기 · 필요 레벨 자동.
 ## 신앙: 왼쪽 신 목록(추가·삭제) · 가운데 그 신의 신앙 스킬(필요 신앙도 순) · 오른쪽 신·스킬 고치기 + 대원별 믿는 신·시작 신앙도 (data/faith.json believers).
 ## 상태 이상: 왼쪽 스킬 목록(누가 쓰는지·달린 상태 이상) · 오른쪽 그 스킬에 상태 이상 달기(여러 개, 턴·수치·확률) → data/skill_status.json.
+## 기적: 신 해금 캐릭터 고르기(정체인 신 · 처음부터 해금 / 해금 조건) + 그 캐릭터만의 기적(필요 신성도) → data/faith.json divine · miracles.
 ## 상태 정의: 상태 이상 이름·머리 위 글자·색 + 쓰는 효과(규칙) → data/statuses.json. 같은 효과를 이름만 다르게 여러 개 (예: 진통제·자가 치유 = 재생).
 ## 가운데: 게임과 같은 십자형 그림 — 노드 클릭 = 고르기, "+" 칸 = 그 갈래 끝에 단계 추가(최대 SkillTreeData.MAX_TIER).
 ## 오른쪽: 고른 노드의 id · 이름 · 필요 레벨 · 효과 · 값 · 설명, 단계 옮기기 · 삭제, 아래 검사.
@@ -36,6 +37,13 @@ var skill_sel := ""
 var skill_filter := "all"
 var status_box: Control
 var skill_list: ItemList
+## 기적 · 신 해금 (kind == "miracle") — faith.divine · faith.miracles
+var mchar := ""                      # 고른 캐릭터
+var mir_sel := ""                    # 고른 기적 id
+var miracle_box: Control
+var mchar_list: ItemList
+var mir_list: ItemList
+var mir_head: Label
 ## 상태 정의 (kind == "statusdef")
 var sdefs: Array = []                # data/statuses.json [{id, name, effect, short, color, desc}]
 var sdef_sel := ""
@@ -113,9 +121,9 @@ func _ready() -> void:
 		_rebuild())
 	bar.add_child(char_opt)
 	tree_only.append(char_opt)
-	for k in SkillTreeData.KINDS + ["faith", "status", "statusdef", "monster"]:
+	for k in SkillTreeData.KINDS + ["faith", "miracle", "status", "statusdef", "monster"]:
 		var b := Button.new()
-		b.text = "%s 트리" % SkillTreeData.KIND_NAME[k] if k in SkillTreeData.KINDS else {"faith": "신앙 스킬", "status": "상태 이상", "statusdef": "상태 정의", "monster": "몬스터 스킬"}[k]
+		b.text = "%s 트리" % SkillTreeData.KIND_NAME[k] if k in SkillTreeData.KINDS else {"faith": "신앙 스킬", "miracle": "기적 (신 해금)", "status": "상태 이상", "statusdef": "상태 정의", "monster": "몬스터 스킬"}[k]
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
 		var kk: String = k
@@ -164,6 +172,10 @@ func _ready() -> void:
 	status_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	status_box.custom_minimum_size = Vector2(560, 420)
 	holder.add_child(status_box)
+	miracle_box = _build_miracle_box()
+	miracle_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	miracle_box.custom_minimum_size = Vector2(560, 420)
+	holder.add_child(miracle_box)
 	sdef_box = _build_sdef_box()
 	sdef_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sdef_box.custom_minimum_size = Vector2(560, 420)
@@ -302,6 +314,12 @@ func _play() -> void:
 			if str(char_faith.get(u.id, {}).get("god", "")) == god_sel:
 				who = u.id
 				break
+	if kind == "miracle":   # 그 캐릭터 정체 해금 + 신성도 100 → 기적 탭
+		f.store_string(JSON.stringify({"base": true, "skills": {"char": mchar, "kind": "faith", "level": int(play_level.value), "divine": true, "faith": 100}}))
+		f.close()
+		if Engine.is_editor_hint():
+			EditorInterface.play_custom_scene("res://scenes/outgame/base_hub.tscn")
+		return
 	f.store_string(JSON.stringify({"base": true, "skills": {"char": who, "kind": kind, "level": int(play_level.value)}}))
 	f.close()
 	if Engine.is_editor_hint():
@@ -449,17 +467,19 @@ func _rebuild() -> void:
 	var is_s := kind == "status"
 	var is_m := kind == "monster"
 	var is_d := kind == "statusdef"
-	var tree_mode := not is_f and not is_s and not is_m and not is_d
+	var is_mi := kind == "miracle"
+	var tree_mode := not is_f and not is_s and not is_m and not is_d and not is_mi
 	canvas.visible = tree_mode
 	faith_box.visible = is_f
 	status_box.visible = is_s
 	sdef_box.visible = is_d
+	miracle_box.visible = is_mi
 	monster_box.visible = is_m
 	for c in tree_only:
 		c.visible = tree_mode
 	play_level.visible = not is_s and not is_m and not is_d
 	level_lab.visible = play_level.visible
-	play_btn.text = "전투 테스트 플레이 (이 스킬 쥐여 주기)" if is_s else ("전투 테스트 플레이 (첫 스테이지)" if is_m else ("전투 테스트 플레이 (이 상태가 달린 스킬)" if is_d else "기지 스킬 창 테스트 플레이"))
+	play_btn.text = "전투 테스트 플레이 (이 스킬 쥐여 주기)" if is_s else ("전투 테스트 플레이 (첫 스테이지)" if is_m else ("전투 테스트 플레이 (이 상태가 달린 스킬)" if is_d else ("기지 기적 탭 테스트 플레이 (정체 해금 · 신성도 100)" if is_mi else "기지 스킬 창 테스트 플레이")))
 	for c in form.get_children():
 		form.remove_child(c)
 		c.queue_free()
@@ -476,6 +496,9 @@ func _rebuild() -> void:
 	elif is_d:
 		_fill_sdef_list()
 		_build_sdef_form()
+	elif is_mi:
+		_fill_miracle_lists()
+		_build_miracle_form()
 	else:
 		_build_form()
 	_rebuilding = false
@@ -493,6 +516,10 @@ func _refresh_view() -> void:
 	if kind == "status":
 		info_label.text = "상태 이상 %d개 · 달린 스킬 %d개" % [sstat.size(), SkillStatusData.by_skill(sstat).size()]
 		_show_check(SkillStatusData.check(sstat, actions))
+		return
+	if kind == "miracle":
+		info_label.text = "신 해금 캐릭터 %d · 기적 %d" % [faith.divine.size(), faith.miracles.size()]
+		_show_check(FaithData.check(faith, char_faith, actions))
 		return
 	if kind == "statusdef":
 		var effs := {}
@@ -736,6 +763,245 @@ func _status_cards(skill_id: String, effect: String) -> void:
 	form.add_child(add)
 	if effect in ["heal", "ap_grant"]:
 		form.add_child(_small("아군 대상 스킬이라 상태 이상도 아군에게 걸립니다 (가속 같은 긍정 상태에 쓰세요)."))
+
+
+# ================================================================ 기적 · 신 해금 캐릭터
+func _build_miracle_box() -> Control:
+	var box := HBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 10)
+	var lc := VBoxContainer.new()
+	lc.custom_minimum_size.x = 280
+	box.add_child(lc)
+	lc.add_child(_head("대원 (✦ = 신 해금 캐릭터)"))
+	mchar_list = ItemList.new()
+	mchar_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	mchar_list.item_selected.connect(func(i):
+		mchar = str(mchar_list.get_item_metadata(i))
+		mir_sel = ""
+		_rebuild())
+	lc.add_child(mchar_list)
+	lc.add_child(_small("대원을 골라 오른쪽에서 '정체가 신' 을 켜면 신 해금 캐릭터. 해금되면 게임 스킬 창의 신앙 탭이 '기적' 으로 바뀌고, 신앙도가 신성도가 됨."))
+	var mc := VBoxContainer.new()
+	mc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(mc)
+	mir_head = _head("")
+	mc.add_child(mir_head)
+	mir_list = ItemList.new()
+	mir_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	mir_list.item_selected.connect(func(i):
+		mir_sel = str(mir_list.get_item_metadata(i))
+		_rebuild())
+	mc.add_child(mir_list)
+	var bb := HBoxContainer.new()
+	mc.add_child(bb)
+	bb.add_child(_btn("기적 추가", _add_miracle))
+	bb.add_child(_btn("기적 삭제", func():
+		var m := _miracle(mir_sel)
+		if not m.is_empty():
+			faith.miracles.erase(m)
+			mir_sel = ""
+			_mark()
+			_rebuild()))
+	mc.add_child(_small("게임: 정체가 드러난 뒤에만 · 신성도(= 신앙도 값, 출전마다 +)가 필요 신성도 이상이면 포인트 없이 배움 (모자라면 회색 + '신성도 부족'). 전에 배운 신앙 스킬 효과는 그대로."))
+	return box
+
+
+func _divine(cid: String) -> Dictionary:
+	return faith.divine.get(cid, {})
+
+
+func _miracle(id: String) -> Dictionary:
+	for m in faith.miracles:
+		if m.id == id:
+			return m
+	return {}
+
+
+func _char_miracles() -> Array:
+	var out := (faith.miracles as Array).filter(func(m): return m.char == mchar)
+	out.sort_custom(func(a, b): return int(a.need) < int(b.need))
+	return out
+
+
+## 새 게임을 시작하면 잠김인지 해금인지 (편집 중 확인용)
+func _divine_start_text(cid: String, dv: Dictionary) -> String:
+	var c: Dictionary = dv.condition
+	if bool(dv.unlocked) or c.type == "always":
+		return "새 게임: 처음부터 해금 (신앙 탭 = 기적)"
+	var u := _unit(cid)
+	var v := int(c.value)
+	match str(c.type):
+		"level":
+			var lv := u.level if u != null else 1
+			return "새 게임: 잠김 → 레벨 %d 이 되면 해금 (시작 Lv%d)%s" % [v, lv, " — 이미 충족, 첫날 해금" if lv >= v else ""]
+		"faith":
+			var f0 := int(char_faith.get(cid, {}).get("faith", 0))
+			return "새 게임: 잠김 → 신앙도 %d 이 되면 해금 (시작 %d, 출전마다 +)%s" % [v, f0, " — 이미 충족, 첫날 해금" if f0 >= v else ""]
+		"affinity":
+			return "새 게임: 잠김 → 친밀도 %d 이 되면 해금 (대화·요청·선물로 오름)" % v
+		"day":
+			return "새 게임: 잠김 → %d일차가 되면 해금%s" % [v, " — 첫날 해금" if v <= 1 else ""]
+	return "새 게임: 잠김 → 이벤트·대사에서 직접 해금 (BaseSim.unlock_divine)"
+
+
+func _fill_miracle_lists() -> void:
+	if _unit(mchar) == null and not allies.is_empty():
+		mchar = allies[0].id
+	mchar_list.clear()
+	for u in allies:
+		var dv := _divine(u.id)
+		var t: String = u.display_name
+		if not dv.is_empty():
+			var gname: String = _god(str(dv.god)).get("name", str(dv.god))
+			t = "✦ %s — %s · %s" % [u.display_name, gname, "처음부터 해금" if bool(dv.unlocked) or dv.condition.type == "always" else "잠김: " + UnlockCond.describe(dv.condition)]
+		mchar_list.add_item(t)
+		mchar_list.set_item_metadata(mchar_list.item_count - 1, u.id)
+		if not dv.is_empty():
+			mchar_list.set_item_custom_fg_color(mchar_list.item_count - 1, FaithData.color_of(_god(str(dv.god))).lightened(0.2))
+		if u.id == mchar:
+			mchar_list.select(mchar_list.item_count - 1)
+	mir_list.clear()
+	var u0 := _unit(mchar)
+	mir_head.text = "%s 의 기적 (필요 신성도 순)" % (u0.display_name if u0 != null else "-")
+	for m in _char_miracles():
+		mir_list.add_item("신성 %3d  ·  %s  —  %s" % [int(m.need), m.name, m.desc])
+		mir_list.set_item_metadata(mir_list.item_count - 1, m.id)
+		if m.id == mir_sel:
+			mir_list.select(mir_list.item_count - 1)
+
+
+func _add_miracle() -> void:
+	if _divine(mchar).is_empty():
+		status.text = "먼저 오른쪽에서 '정체가 신' 을 켜세요"
+		return
+	var list := _char_miracles()
+	var dv := _divine(mchar)
+	var start := int(dv.condition.value) if dv.condition.type == "faith" else 20
+	var need := mini(FaithData.FAITH_MAX, int(list.back().need) + 15) if not list.is_empty() else start
+	var base := "%s_m%d" % [mchar.trim_prefix("a_"), list.size() + 1]
+	var id := base
+	var i := 2
+	while not _miracle(id).is_empty() or not _fskill(id).is_empty():
+		id = "%s_%d" % [base, i]
+		i += 1
+	var m := FaithData.new_miracle(id, mchar, need)
+	m.desc = SkillTreeData.auto_desc(m.effect, int(m.value), actions)
+	faith.miracles.append(m)
+	mir_sel = id
+	_mark()
+	_rebuild()
+
+
+func _build_miracle_form() -> void:
+	var u := _unit(mchar)
+	if u == null:
+		form.add_child(_head("대원을 고르세요"))
+		return
+	form.add_child(_head("%s — 신 해금" % u.display_name))
+	var dv := _divine(mchar)
+	var on := CheckBox.new()
+	on.text = "이 캐릭터는 정체가 신 (해금되면 신앙 탭 → 기적)"
+	on.button_pressed = not dv.is_empty()
+	on.toggled.connect(func(v):
+		if _rebuilding:
+			return
+		if v:
+			var g0: String = str(char_faith.get(mchar, {}).get("god", ""))
+			faith.divine[mchar] = FaithData.new_divine(g0 if g0 != "" else (faith.gods[0].id if not faith.gods.is_empty() else ""))
+		else:
+			faith.divine.erase(mchar)
+			var mine := _char_miracles()
+			for m in mine:
+				faith.miracles.erase(m)
+			if not mine.is_empty():
+				status.text = "신 해금을 끄면서 기적 %d개도 지웠습니다 (저장 안 함)" % mine.size()
+		_mark()
+		_rebuild())
+	form.add_child(on)
+	if dv.is_empty():
+		form.add_child(_small("켜면: 정체인 신 · 처음부터 해금인지 · 해금 조건 · 그 캐릭터만의 기적을 정합니다."))
+		return
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 6)
+	form.add_child(grid)
+	var gods := []
+	for g in faith.gods:
+		gods.append([g.id, "%s (%s)" % [g.name, g.id]])
+	_row(grid, "정체인 신", _option(gods, dv.god, func(v):
+		dv.god = str(v)
+		_mark()
+		_rebuild()))
+	var unl := CheckBox.new()
+	unl.text = "이미 해금됨 (처음부터 신)"
+	unl.button_pressed = bool(dv.unlocked)
+	unl.toggled.connect(func(v):
+		if not _rebuilding:
+			dv.unlocked = v
+			_mark()
+			_rebuild())
+	_row(grid, "해금 상태", unl)
+	if not bool(dv.unlocked):
+		var ct := []
+		for t in UnlockCond.ORDER:
+			if t != "always":
+				ct.append([t, UnlockCond.TYPES[t]])
+		_row(grid, "해금 조건", _option(ct, dv.condition.type, func(v):
+			dv.condition = UnlockCond.norm({"type": str(v), "value": dv.condition.value})
+			_mark()
+			_rebuild()))
+		if UnlockCond.uses_value(dv.condition.type):
+			var r: Array = UnlockCond.RANGE[dv.condition.type]
+			var sp := _spin(r[0], r[1], 1, int(dv.condition.value), "")
+			sp.value_changed.connect(func(v):
+				if not _rebuilding:
+					dv.condition.value = int(v)
+					_mark()
+					_fill_miracle_lists())
+			_row(grid, "값 (%s)" % UnlockCond.describe(dv.condition), sp)
+	var stl := _small(_divine_start_text(mchar, dv))
+	stl.add_theme_color_override("font_color", Color(1, 0.9, 0.5) if bool(dv.unlocked) or dv.condition.type == "always" else Color(0.7, 0.85, 1.0))
+	form.add_child(stl)
+	form.add_child(_small("게임에서 확인: BaseSim.divine_state(캐릭터) = 잠김 / 해금 · 조건은 레벨·신앙도·친밀도가 바뀔 때와 날이 바뀔 때 검사. 지금 믿는 신(신앙 스킬 화면): %s" % _god(str(char_faith.get(mchar, {}).get("god", ""))).get("name", "무신앙")))
+	var m := _miracle(mir_sel)
+	form.add_child(HSeparator.new())
+	if m.is_empty() or m.char != mchar:
+		form.add_child(_head("기적을 고르거나 '기적 추가'"))
+		return
+	form.add_child(_head("기적"))
+	var g2 := GridContainer.new()
+	g2.columns = 2
+	g2.add_theme_constant_override("h_separation", 8)
+	g2.add_theme_constant_override("v_separation", 6)
+	form.add_child(g2)
+	var mid := LineEdit.new()
+	mid.text = str(m.id)
+	mid.placeholder_text = "고유 id (영문) — Enter 로 적용"
+	mid.text_submitted.connect(func(v):
+		v = v.strip_edges()
+		if v == "" or v == m.id:
+			return
+		if not _miracle(v).is_empty() or not _fskill(v).is_empty():
+			status.text = "id '%s' 는 이미 있습니다" % v
+			return
+		m.id = v
+		mir_sel = v
+		_mark()
+		_rebuild())
+	_row(g2, "id", mid)
+	_row(g2, "이름", _line(str(m.name), func(v):
+		m.name = v
+		_fill_miracle_lists()))
+	var need := _spin(0, FaithData.FAITH_MAX, 1, int(m.need), "")
+	need.value_changed.connect(func(v):
+		if not _rebuilding:
+			m.need = int(v)
+			_mark())
+	need.get_line_edit().focus_exited.connect(func(): _fill_miracle_lists())
+	_row(g2, "필요 신성도", need)
+	_effect_rows(g2, m)
 
 
 # ================================================================ 상태 정의 (이름 · 글자 · 색 → 효과)

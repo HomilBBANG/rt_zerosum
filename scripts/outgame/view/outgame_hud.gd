@@ -71,6 +71,8 @@ func setup(p_hub: Node, p_sim: BaseSim) -> void:
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner.visible = false
 	add_child(banner)
+	sim.divine_revealed.connect(func(cid):
+		show_toast("✦ %s 의 정체 — %s! 스킬 창 신앙 탭이 '기적' 으로" % [_char_name(cid), sim.divine_god(cid).get("name", "신")], Color(1, 0.9, 0.5)))
 
 
 # ================================================================ 공통 위젯
@@ -720,7 +722,7 @@ func open_facility(fid: String) -> void:
 # ---------------------------------------------------------------- 스킬 창 (캐릭터마다 액티브 · 패시브 · 신앙)
 const SKILL_MODES := [["active", "액티브 스킬"], ["passive", "패시브 스킬"], ["faith", "신앙 스킬"]]
 const SKILL_MODE_HINT := {"active": "전투에서 쓰는 스킬을 강화 · 갈래 끝에서 새 스킬", "passive": "늘 적용되는 능력치 (체력·속도·AP·방어·위력)",
-	"faith": "믿는 신에 따라 배울 수 있는 스킬이 다름"}
+	"faith": "믿는 신에 따라 배울 수 있는 스킬이 다름", "miracle": "정체가 신 — 신성도로 기적을 일으킴 (그 캐릭터만의 기적)"}
 
 
 ## cid = "" 이면 첫 대원. 왼쪽: 대원 목록 (위아래 스크롤) / 위: 액티브 · 패시브 · 신앙 탭
@@ -751,7 +753,7 @@ func open_skills(cid: String = "", pick: String = "", mode: String = "active") -
 	var cur_btn: Button = null
 	for u in allies:
 		var pts := sim.skill_points(u.id)
-		var b := _button("%s\nLv%d%s" % [u.display_name, sim.char_level(u.id), "  ●%d" % pts if pts > 0 else ""],
+		var b := _button("%s%s\nLv%d%s" % [u.display_name, " ✦" if sim.is_divine(u.id) else "", sim.char_level(u.id), "  ●%d" % pts if pts > 0 else ""],
 			Color(0.85, 0.6, 1.0) if u.id == cid else Color(0.45, 0.55, 0.7), 14)
 		b.icon = UnitArt.portrait(u.sprite_id, manifest)
 		b.expand_icon = true
@@ -775,8 +777,9 @@ func open_skills(cid: String = "", pick: String = "", mode: String = "active") -
 	main.add_child(right)
 	var tabs := _hbox(6)
 	right.add_child(tabs)
+	var divine := sim.is_divine(cid)   # 정체가 신 → 신앙 탭 = 기적
 	for m in SKILL_MODES:
-		var mb := _button(m[1], Color(1.0, 0.85, 0.35) if m[0] == mode else Color(0.45, 0.55, 0.7), 15, 120)
+		var mb := _button("✦ 기적" if m[0] == "faith" and divine else m[1], Color(1.0, 0.85, 0.35) if m[0] == mode else Color(0.45, 0.55, 0.7), 15, 120)
 		mb.custom_minimum_size.y = 40
 		var mm: String = m[0]
 		mb.pressed.connect(func():
@@ -784,13 +787,16 @@ func open_skills(cid: String = "", pick: String = "", mode: String = "active") -
 				close_top()
 				open_skills(cid, "", mm))
 		tabs.add_child(mb)
-	var hint := _label(SKILL_MODE_HINT.get(mode, ""), 13, Color(0.75, 0.8, 0.9))
+	var hint := _label(SKILL_MODE_HINT.get("miracle" if mode == "faith" and divine else mode, ""), 13, Color(0.75, 0.8, 0.9))
 	hint.size_flags_vertical = SIZE_SHRINK_CENTER
 	tabs.add_child(hint)
 	var row := _hbox(12)
 	right.add_child(row)
 	if mode == "faith":
-		_faith_page(row, cid)
+		if divine:
+			_miracle_page(row, cid)
+		else:
+			_faith_page(row, cid)
 		return
 	var kname: String = BaseSim.TREE_KIND_NAME.get(mode, "")
 	# 왼쪽: 정보
@@ -940,8 +946,10 @@ func _faith_page(row: HBoxContainer, cid: String) -> void:
 		orow.add_child(ol)
 
 
-func _faith_card(cid: String, fs: Dictionary, gcol: Color) -> Control:
-	var st := sim.faith_state(cid, fs.id)
+## 신앙 스킬 카드 (miracle = true 면 기적 카드: 신성도 · '신성도 부족')
+func _faith_card(cid: String, fs: Dictionary, gcol: Color, miracle: bool = false) -> Control:
+	var st := sim.miracle_state(cid, fs.id) if miracle else sim.faith_state(cid, fs.id)
+	var word := "신성" if miracle else "신앙"
 	var c := Control.new()
 	c.custom_minimum_size = Vector2(176, 200)
 	c.draw.connect(func():
@@ -964,13 +972,13 @@ func _faith_card(cid: String, fs: Dictionary, gcol: Color) -> Control:
 		var r := Rect2(Vector2.ZERO, c.size)
 		c.draw_style_box(sb, r)
 		c.draw_string(bold, Vector2(0, 30), str(fs.name), HORIZONTAL_ALIGNMENT_CENTER, c.size.x, 18, ncol)
-		c.draw_string(font, Vector2(0, 54), "신앙 %d" % int(fs.need), HORIZONTAL_ALIGNMENT_CENTER, c.size.x, 13, gcol if st != "no_faith" else ncol)
+		c.draw_string(font, Vector2(0, 54), "%s %d" % [word, int(fs.need)], HORIZONTAL_ALIGNMENT_CENTER, c.size.x, 13, gcol if st != "no_faith" else ncol)
 		c.draw_multiline_string(font, Vector2(10, 136), str(fs.desc), HORIZONTAL_ALIGNMENT_CENTER, c.size.x - 20, 14, -1, ncol.darkened(0.05))
 		var sub: String = {"learned": "습득", "ready": "배우기 가능", "no_faith": ""}.get(st, "")
 		c.draw_string(font, Vector2(0, c.size.y - 14), sub, HORIZONTAL_ALIGNMENT_CENTER, c.size.x, 13, gcol.lightened(0.4))
 		if st == "no_faith":
 			c.draw_rect(r.grow(-2), Color(0.1, 0.1, 0.1, 0.35))
-			var t := "신앙 부족"
+			var t := "%s 부족" % word
 			var ts := bold.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 20)
 			var p := r.get_center() + Vector2(-ts.x * 0.5, ts.y * 0.35)
 			c.draw_string_outline(bold, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 4, Color(0, 0, 0, 0.8))
@@ -980,11 +988,65 @@ func _faith_card(cid: String, fs: Dictionary, gcol: Color) -> Control:
 		c.tooltip_text = "클릭: 배우기"
 		c.gui_input.connect(func(ev):
 			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
-				var res := sim.learn_faith_skill(cid, fs.id)
+				var res := sim.learn_miracle(cid, fs.id) if miracle else sim.learn_faith_skill(cid, fs.id)
 				show_toast(res.msg, GOOD if res.ok else BAD)
 				close_top()
 				open_skills(cid, "", "faith"))
 	return c
+
+
+## 기적 탭 (정체가 신인 캐릭터): 정체인 신 · 신성도(= 신앙도 값) · 그 캐릭터만의 기적. 전에 배운 신앙 스킬 효과는 그대로
+func _miracle_page(row: HBoxContainer, cid: String) -> void:
+	var unit: UnitData = GameData._find(sim.battle.allies, cid)
+	var gi := sim.divine_god(cid)
+	var gcol: Color = gi.get("color", Color(1, 0.9, 0.5))
+	var info := _vbox(6)
+	info.custom_minimum_size = Vector2(280, 560)
+	row.add_child(info)
+	var head := _hbox(10)
+	info.add_child(head)
+	head.add_child(_portrait_rect(unit.sprite_id, 76))
+	var hc := _vbox(2)
+	head.add_child(hc)
+	hc.add_child(_label(unit.display_name + " ✦", 22, GOLD))
+	hc.add_child(_label("%s · Lv%d" % [unit.role, sim.char_level(cid)], 15, Color(0.85, 0.9, 1)))
+	hc.add_child(_label("신성도 %d" % sim.faith(cid), 17, gcol))
+	info.add_child(_gauge("신성도", float(sim.faith(cid)), float(sim.faith_max()), gcol, "%d / %d" % [sim.faith(cid), sim.faith_max()]))
+	info.add_child(_label("출전할 때마다 신성도 +%d" % sim.data.inum("faith_battle", 5), 12, Color(0.7, 0.75, 0.85)))
+	info.add_child(_label("기적은 포인트 없이 배움 (임시 데이터)", 12, Color(0.7, 0.75, 0.85)))
+	info.add_child(_label("배운 기적", 15, Color(1, 0.95, 0.75)))
+	var learned := sim.miracle_list(cid).filter(func(m): return sim.miracle_state(cid, m.id) == "learned")
+	if learned.is_empty():
+		info.add_child(_label("(없음)", 12, Color(0.6, 0.64, 0.7)))
+	for m in learned:
+		info.add_child(_label("· %s — %s" % [m.name, m.desc], 12, gcol.lightened(0.3)))
+	var old_fs := sim.faith_skill_list(cid).filter(func(fs): return sim.has_faith_skill(cid, fs.id))
+	if not old_fs.is_empty():
+		info.add_child(_label("전에 배운 신앙 스킬 (효과 유지)", 13, Color(0.75, 0.78, 0.85)))
+		for fs in old_fs:
+			info.add_child(_label("· %s — %s" % [fs.name, fs.desc], 12, Color(0.7, 0.74, 0.82)))
+	var right := _vbox(10)
+	right.custom_minimum_size = Vector2(740, 560)
+	row.add_child(right)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _panel_style(Color(gcol.darkened(0.8), 0.95), gcol, 10))
+	right.add_child(card)
+	var gh := _hbox(12)
+	card.add_child(gh)
+	var gid := str(sim.divine_info(cid).get("god", ""))
+	var icon := GodIcon.make(gi if not gi.is_empty() else {"name": "?"}, 64, "%s — 눌러서 세계관 도감" % gi.get("name", "?"))
+	icon.pressed.connect(func(): open_codex("gods", gid))
+	gh.add_child(icon)
+	var gt := _vbox(2)
+	gh.add_child(gt)
+	gt.add_child(_label("정체 — %s" % gi.get("name", "?"), 24, gcol.lightened(0.2)))
+	gt.add_child(_label(str(gi.get("desc", "")), 14, Color(0.88, 0.9, 0.95)))
+	gt.add_child(_label("이 캐릭터는 신 — 신앙 대신 기적을 일으킵니다", 12, Color(0.65, 0.7, 0.8)))
+	var grid := HBoxContainer.new()
+	grid.add_theme_constant_override("separation", 12)
+	right.add_child(grid)
+	for m in sim.miracle_list(cid):
+		grid.add_child(_faith_card(cid, m, gcol, true))
 
 
 # ---------------------------------------------------------------- 연구실 (로한): 연구 → 무기고 제작 해금
@@ -1501,6 +1563,20 @@ func _codex_detail(det: VBoxContainer, tab: String, e: Dictionary) -> void:
 				det.add_child(_label("기록", 17, Color(1, 0.95, 0.75)))
 				det.add_child(_label("%s · Lv%d · 키 %dcm · HP %d · 속도 %d · AP %d · 방어 %d · %s" % [u.role, sim.char_level(u.id), roundi(u.height_cm), sim.char_max_hp(u.id), u.speed, u.max_ap, u.defense,
 					"원거리" if u.range_type == "ranged" else "근접"], 15, Color(0.85, 0.9, 1)))
+				if sim.is_divine(u.id):   # 정체가 드러난 신 (잠겨 있으면 안 보임)
+					var dg := sim.divine_god(u.id)
+					var dr := _hbox(10)
+					det.add_child(dr)
+					dr.add_child(_label("정체", 15, Color(1, 0.9, 0.5)))
+					var dic := GodIcon.make(dg, 36, "%s — 종교(신) 탭" % dg.get("name", ""))
+					var dgid := str(sim.divine_info(u.id).god)
+					dic.pressed.connect(func():
+						close_top()
+						open_codex("gods", dgid))
+					dr.add_child(dic)
+					var dl := _label("%s (신) · 신성도 %d" % [dg.get("name", "?"), sim.faith(u.id)], 15, Color(dg.get("color", GOLD)).lightened(0.2))
+					dl.size_flags_vertical = SIZE_SHRINK_CENTER
+					dr.add_child(dl)
 				var gi := sim.god_info(u.id)
 				var gr := _hbox(10)
 				det.add_child(gr)

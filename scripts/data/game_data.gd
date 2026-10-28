@@ -24,6 +24,9 @@ var skill_tree: Dictionary = {}
 var gods: Dictionary = {}
 var god_order: Array[String] = []
 var faith_skills: Dictionary = {}
+## 신 해금 캐릭터: 캐릭터 id → {god, unlocked(처음부터), condition} / 캐릭터 id → [기적] (faith.json divine · miracles)
+var divine: Dictionary = {}
+var miracles: Dictionary = {}
 var char_faith: Dictionary = {}
 var warnings: PackedStringArray = []
 var _stage_copies: Array = []       # [{copy: UnitData, base: id, stage: id}] 스테이지 배율 적용본
@@ -128,6 +131,8 @@ func _parse(sheets: Dictionary) -> void:
 		gods[g.id] = {"id": g.id, "name": g.name, "color": FaithData.color_of(g), "symbol": FaithData.symbol_of(g), "desc": g.desc}
 		god_order.append(g.id)
 	faith_skills = FaithData.by_god(fd)
+	divine = fd.divine
+	miracles = FaithData.miracles_by_char(fd)
 	for d in _table(sheets.get("몬스터", [])):
 		var m := _unit(d, "enemy")
 		if md.kits.has(m.id):   # 몬스터가 쓰는 스킬 = monster_skills.json kits (없으면 몬스터 시트 '스킬' 열)
@@ -275,6 +280,8 @@ func apply_from(newer: GameData) -> void:
 	gods = newer.gods
 	god_order = newer.god_order
 	faith_skills = newer.faith_skills
+	divine = newer.divine
+	miracles = newer.miracles
 	char_faith = newer.char_faith
 	stages = newer.stages
 	stage_order = newer.stage_order

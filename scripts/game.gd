@@ -93,6 +93,8 @@ func _ready() -> void:
 					if req.get("skills") is Dictionary:   # 스킬 트리 탭: 기지에서 그 대원 스킬 창 (레벨 올린 상태)
 						var sk: Dictionary = req.skills
 						cli["base_ui"] = "skills:%s:L%d:::%s" % [sk.get("char", ""), int(sk.get("level", 1)), sk.get("kind", "active")]
+						if bool(sk.get("divine", false)):   # 기적 탭 테스트: 정체 해금 + 신성도 올려 둠
+							cli["base_ui"] = "divine:%s;faith:%s:%d" % [sk.get("char", ""), sk.get("char", ""), int(sk.get("faith", 0))]
 				if str(req.get("try_skill", "")) != "":   # 스킬 트리 탭 '상태 이상': 그 스킬을 아군 모두의 첫 스킬 칸에
 					cli["try_skill"] = str(req.try_skill)
 				if req.get("sortie", false):   # 출정 대사 탭: 새 기지에서 출정 대기 화면 (대원 상태 섞기)
