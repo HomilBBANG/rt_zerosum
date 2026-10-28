@@ -63,6 +63,20 @@
 			"turns": 1,
 			"value": 0,
 			"chance": 70
+		},
+		{
+			"skill": "painkiller_shot",
+			"status": "painkiller",
+			"turns": 3,
+			"value": 8,
+			"chance": 100
+		},
+		{
+			"skill": "self_heal",
+			"status": "self_heal",
+			"turns": 3,
+			"value": 6,
+			"chance": 100
 		}
 	]
 }

@@ -161,9 +161,9 @@ func reload_data(keep_edit: bool = true) -> void:
 			names[u.id] = u.display_name
 	status_ids.clear()
 	status_names.clear()
-	for sid in StatusCatalog.DEFS:
+	for sid in StatusCatalog.all_ids():
 		status_ids.append(sid)
-		status_names[sid] = str(StatusCatalog.DEFS[sid].name)
+		status_names[sid] = str(StatusCatalog.get_def(sid).name)
 	if test.char == "" and not char_ids.is_empty():
 		test.char = char_ids[0]
 	_rebuild_filter()

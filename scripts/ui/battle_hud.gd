@@ -517,11 +517,12 @@ func _on_action_resolved(event: Dictionary) -> void:
 	_refresh_panel()
 
 
-## 차례 시작 상태 이상 (출혈·화상 피해, 동상 폭발, 기절)
+## 차례 시작 상태 이상 (출혈·화상 피해, 재생 회복, 동상 폭발, 기절)
 func _on_status_ticked(event: Dictionary) -> void:
 	var u: UnitRuntime = event.unit
-	if event.results.is_empty() and u.statuses.has("stun"):
-		_spawn_popup(u, "기절 — 행동 불가", StatusCatalog.color_of("stun"))
+	if event.results.is_empty() and u.has_effect("stun"):
+		var stun_id: String = u.statuses_with("stun")[0]
+		_spawn_popup(u, "%s — 행동 불가" % StatusCatalog.get_def(stun_id).name, StatusCatalog.color_of(stun_id))
 	_status_popups(event.results, [])
 	_refresh_floating()
 	_refresh_panel()
@@ -538,13 +539,17 @@ func _status_popups(results: Array, applied: Array) -> void:
 		var text := "-%d" % r.amount
 		if r.get("status", "") != "":
 			color = StatusCatalog.color_of(r.status)
-			text = "%s -%d" % [StatusCatalog.get_def(r.status).name, r.amount]
+			text = "%s %s%d" % [StatusCatalog.get_def(r.status).name, "+" if r.kind == "heal" else "-", r.amount]
 		elif r.kind == "heal":
 			color = Color(0.4, 1, 0.5)
 			text = "+%d" % r.amount
 		elif r.kind == "ap":
 			color = Color(0.5, 0.9, 1)
 			text = "AP +%d" % r.amount
+		if int(r.get("absorbed", 0)) > 0:   # 보호막이 막은 만큼
+			text = ("%s  (막음 %d)" % [text, r.absorbed]) if int(r.amount) > 0 else "막음 %d" % r.absorbed
+			if int(r.amount) == 0:
+				color = StatusCatalog.EFFECTS.shield.color
 		if r.get("killed", false):
 			text += "  전투 불능"
 		_spawn_popup(r.target, text, color, k)
@@ -769,7 +774,11 @@ func _refresh_statuses(u: UnitRuntime) -> void:
 		row.mouse_filter = Control.MOUSE_FILTER_STOP
 		var title: String = d.get("name", sid)
 		if d.get("battle", false):
-			title += "  %d턴" % int(info.get("turns", 0)) if sid != "frost" else "  %d턴 뒤" % int(info.get("turns", 0))
+			var eff := StatusCatalog.effect_of(sid)
+			if eff == "shield":
+				title += "  %d · %d턴" % [int(info.get("value", 0)), int(info.get("turns", 0))]   # 남은 보호막
+			else:
+				title += "  %d턴" % int(info.get("turns", 0)) if eff != "frost" else "  %d턴 뒤" % int(info.get("turns", 0))
 		row.add_child(_label(title, 13, Color(1, 1, 1)))
 		var tip := "%s  ·  %s\n%s" % [d.get("name", sid), "긍정" if good else "부정", StatusCatalog.describe(sid, info)]
 		row.mouse_entered.connect(func():

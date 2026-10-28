@@ -4,6 +4,7 @@ extends Control
 ## 위: 캐릭터 · 액티브/패시브/신앙 고르기 · 다른 캐릭터 트리 가져오기 · 필요 레벨 자동.
 ## 신앙: 왼쪽 신 목록(추가·삭제) · 가운데 그 신의 신앙 스킬(필요 신앙도 순) · 오른쪽 신·스킬 고치기. 누가 어느 신을 믿는지는 엑셀 캐릭터 시트.
 ## 상태 이상: 왼쪽 스킬 목록(누가 쓰는지·달린 상태 이상) · 오른쪽 그 스킬에 상태 이상 달기(여러 개, 턴·수치·확률) → data/skill_status.json.
+## 상태 정의: 상태 이상 이름·머리 위 글자·색 + 쓰는 효과(규칙) → data/statuses.json. 같은 효과를 이름만 다르게 여러 개 (예: 진통제·자가 치유 = 재생).
 ## 가운데: 게임과 같은 십자형 그림 — 노드 클릭 = 고르기, "+" 칸 = 그 갈래 끝에 단계 추가(최대 SkillTreeData.MAX_TIER).
 ## 오른쪽: 고른 노드의 id · 이름 · 필요 레벨 · 효과 · 값 · 설명, 단계 옮기기 · 삭제, 아래 검사.
 ## 게임 규칙(BaseSim): 중앙은 처음부터 습득, 갈래 안은 앞 단계부터, 갈래 끝(마지막 단계)은 트리마다 하나만, 스킬 포인트는 두 트리 공용.
@@ -35,6 +36,12 @@ var skill_sel := ""
 var skill_filter := "all"
 var status_box: Control
 var skill_list: ItemList
+## 상태 정의 (kind == "statusdef")
+var sdefs: Array = []                # data/statuses.json [{id, name, effect, short, color, desc}]
+var sdef_sel := ""
+var sdef_box: Control
+var sdef_list: ItemList
+var sdef_new_eff: OptionButton
 ## 몬스터 스킬 (kind == "monster")
 var mdata: Dictionary = {"skills": [], "kits": {}}
 var sheet_skill_ids: Array = []      # 엑셀 스킬 시트 스킬 (공용, 여기서는 읽기만)
@@ -106,9 +113,9 @@ func _ready() -> void:
 		_rebuild())
 	bar.add_child(char_opt)
 	tree_only.append(char_opt)
-	for k in SkillTreeData.KINDS + ["faith", "status", "monster"]:
+	for k in SkillTreeData.KINDS + ["faith", "status", "statusdef", "monster"]:
 		var b := Button.new()
-		b.text = "%s 트리" % SkillTreeData.KIND_NAME[k] if k in SkillTreeData.KINDS else {"faith": "신앙 스킬", "status": "상태 이상", "monster": "몬스터 스킬"}[k]
+		b.text = "%s 트리" % SkillTreeData.KIND_NAME[k] if k in SkillTreeData.KINDS else {"faith": "신앙 스킬", "status": "상태 이상", "statusdef": "상태 정의", "monster": "몬스터 스킬"}[k]
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
 		var kk: String = k
@@ -157,6 +164,10 @@ func _ready() -> void:
 	status_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	status_box.custom_minimum_size = Vector2(560, 420)
 	holder.add_child(status_box)
+	sdef_box = _build_sdef_box()
+	sdef_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sdef_box.custom_minimum_size = Vector2(560, 420)
+	holder.add_child(sdef_box)
 	monster_box = _build_monster_box()
 	monster_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	monster_box.custom_minimum_size = Vector2(560, 420)
@@ -206,6 +217,7 @@ func reload_data(keep_edit: bool = true) -> void:
 	if cid == "" or _unit(cid) == null:
 		cid = allies[0].id if not allies.is_empty() else ""
 	if keep_edit and dirty:
+		StatusCatalog.refresh(sdefs)   # GameData 가 파일로 다시 읽었으므로 저장 안 한 상태 정의를 다시 씌움
 		_rebuild()
 	else:
 		_load()
@@ -215,6 +227,10 @@ func _load() -> void:
 	nodes = SkillTreeData.read()
 	faith = FaithData.read()
 	sstat = SkillStatusData.read()
+	sdefs = StatusCatalog.read()
+	StatusCatalog.refresh(sdefs)
+	if _sdef(sdef_sel).is_empty():
+		sdef_sel = sdefs[0].id if not sdefs.is_empty() else ""
 	mdata = MonsterSkillData.read()
 	if not monsters.has(mon_sel) and not monsters.is_empty():
 		mon_sel = str(monsters.keys()[0])
@@ -233,13 +249,15 @@ func _save() -> void:
 	var err2 := FaithData.write(faith)
 	var err3 := SkillStatusData.write(sstat)
 	err3 = maxi(err3, MonsterSkillData.write(mdata))
+	err3 = maxi(err3, StatusCatalog.write(sdefs))
 	if err == OK and err2 == OK and err3 == OK:
 		dirty = false
 		var errs: int = SkillTreeData.check(nodes, allies, actions).errors.size() + FaithData.check(faith, char_faith, actions).errors.size() \
-			+ SkillStatusData.check(sstat, actions).errors.size() + MonsterSkillData.check(mdata, sheet_skill_ids, monsters).errors.size()
-		status.text = "저장됨: data/skill_tree.json · faith.json · skill_status.json · monster_skills.json" + ("" if errs == 0 else "  (검사 오류 %d개 — 아래 확인)" % errs)
+			+ SkillStatusData.check(sstat, actions).errors.size() + MonsterSkillData.check(mdata, sheet_skill_ids, monsters).errors.size() \
+			+ StatusCatalog.check(sdefs).errors.size()
+		status.text = "저장됨: data/skill_tree.json · faith.json · skill_status.json · statuses.json · monster_skills.json" + ("" if errs == 0 else "  (검사 오류 %d개 — 아래 확인)" % errs)
 		if Engine.is_editor_hint():
-			for path in [SkillTreeData.PATH, FaithData.PATH, SkillStatusData.PATH, MonsterSkillData.PATH]:
+			for path in [SkillTreeData.PATH, FaithData.PATH, SkillStatusData.PATH, MonsterSkillData.PATH, StatusCatalog.PATH]:
 				EditorInterface.get_resource_filesystem().update_file(path)
 	else:
 		status.text = "저장 실패 (%d / %d / %d)" % [err, err2, err3]
@@ -262,8 +280,12 @@ func _play() -> void:
 		if Engine.is_editor_hint():
 			EditorInterface.play_custom_scene("res://scenes/battle_2d.tscn")
 		return
-	if kind == "status":
-		f.store_string(JSON.stringify({"try_skill": skill_sel}))
+	if kind in ["status", "statusdef"]:
+		var try_id := skill_sel
+		if kind == "statusdef":   # 그 상태가 달린 첫 스킬
+			var users := sstat.filter(func(e): return e.status == sdef_sel)
+			try_id = str(users[0].skill) if not users.is_empty() else skill_sel
+		f.store_string(JSON.stringify({"try_skill": try_id}))
 		f.close()
 		if Engine.is_editor_hint():
 			EditorInterface.play_custom_scene("res://scenes/battle_2d.tscn")
@@ -420,16 +442,18 @@ func _rebuild() -> void:
 	var is_f := kind == "faith"
 	var is_s := kind == "status"
 	var is_m := kind == "monster"
-	var tree_mode := not is_f and not is_s and not is_m
+	var is_d := kind == "statusdef"
+	var tree_mode := not is_f and not is_s and not is_m and not is_d
 	canvas.visible = tree_mode
 	faith_box.visible = is_f
 	status_box.visible = is_s
+	sdef_box.visible = is_d
 	monster_box.visible = is_m
 	for c in tree_only:
 		c.visible = tree_mode
-	play_level.visible = not is_s and not is_m
+	play_level.visible = not is_s and not is_m and not is_d
 	level_lab.visible = play_level.visible
-	play_btn.text = "전투 테스트 플레이 (이 스킬 쥐여 주기)" if is_s else ("전투 테스트 플레이 (첫 스테이지)" if is_m else "기지 스킬 창 테스트 플레이")
+	play_btn.text = "전투 테스트 플레이 (이 스킬 쥐여 주기)" if is_s else ("전투 테스트 플레이 (첫 스테이지)" if is_m else ("전투 테스트 플레이 (이 상태가 달린 스킬)" if is_d else "기지 스킬 창 테스트 플레이"))
 	for c in form.get_children():
 		form.remove_child(c)
 		c.queue_free()
@@ -438,10 +462,14 @@ func _rebuild() -> void:
 		_build_faith_form()
 	elif is_s:
 		_fill_skill_list()
+		_fill_status_ref()
 		_build_status_form()
 	elif is_m:
 		_fill_monster_lists()
 		_build_monster_form()
+	elif is_d:
+		_fill_sdef_list()
+		_build_sdef_form()
 	else:
 		_build_form()
 	_rebuilding = false
@@ -459,6 +487,13 @@ func _refresh_view() -> void:
 	if kind == "status":
 		info_label.text = "상태 이상 %d개 · 달린 스킬 %d개" % [sstat.size(), SkillStatusData.by_skill(sstat).size()]
 		_show_check(SkillStatusData.check(sstat, actions))
+		return
+	if kind == "statusdef":
+		var effs := {}
+		for d in sdefs:
+			effs[d.effect] = true
+		info_label.text = "상태 %d개 · 쓰는 효과 %d / %d가지" % [sdefs.size(), effs.size(), StatusCatalog.EFFECTS.size()]
+		_show_check(StatusCatalog.check(sdefs, _sdef_use_counts()))
 		return
 	canvas.show_tree(_tree(), sel)
 	var u := _unit(cid)
@@ -518,7 +553,7 @@ func _build_status_box() -> Control:
 	var rc := VBoxContainer.new()
 	rc.custom_minimum_size.x = 300
 	box.add_child(rc)
-	rc.add_child(_head("상태 이상 종류"))
+	rc.add_child(_head("상태 이상 (이름 → 효과)"))
 	var sc := ScrollContainer.new()
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -526,16 +561,26 @@ func _build_status_box() -> Control:
 	var ref := VBoxContainer.new()
 	ref.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(ref)
-	for sid in StatusCatalog.BATTLE:
+	status_ref = ref
+	return box
+
+
+## 오른쪽 참고 목록: 상태마다 '이름 (효과) — 설명' (상태 정의를 고치면 다시)
+var status_ref: VBoxContainer
+func _fill_status_ref() -> void:
+	for c in status_ref.get_children():
+		c.queue_free()
+	for sid in StatusCatalog.battle_ids():
+		var d := StatusCatalog.get_def(sid)
 		var l := Label.new()
-		l.text = "%s — %s" % [StatusCatalog.get_def(sid).name, str(StatusCatalog.get_def(sid).desc).replace("{t}", "n").replace("{v}", "v")]
+		var en: String = StatusCatalog.EFFECTS.get(d.effect, {}).get("name", d.effect)
+		l.text = "%s%s — %s" % [d.name, "" if en == d.name else " (%s)" % en, str(d.desc).replace("{t}", "n").replace("{v}", "v")]
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.custom_minimum_size.x = 280
 		l.add_theme_font_size_override("font_size", 12)
 		l.add_theme_color_override("font_color", StatusCatalog.color_of(sid).lightened(0.2))
-		ref.add_child(l)
-	ref.add_child(_small("\n적용: 처음 걸릴 때 한 번 + 그 캐릭터 차례마다 행동보다 먼저. n턴 = 그 캐릭터 차례 n번 (차례가 끝날 때 1 감소, 동상은 차례 시작에 감소 → 0 이면 터짐). 다시 걸리면 남은 턴·수치 중 큰 쪽."))
-	return box
+		status_ref.add_child(l)
+	status_ref.add_child(_small("\n적용: 처음 걸릴 때 한 번 + 그 캐릭터 차례마다 행동보다 먼저. n턴 = 그 캐릭터 차례 n번 (차례가 끝날 때 1 감소, 동상은 차례 시작에 감소 → 0 이면 터짐). 다시 걸리면 남은 턴·수치 중 큰 쪽. 넉백·끌어당김은 맞는 순간 한 번(턴 없음).\n이름·글자·색·새 상태는 '상태 정의'."))
 
 
 ## 이 스킬을 쓰는 쪽: 아군(기본 스킬 · 스킬 트리 새 스킬 · 신앙 새 스킬) / 괴물
@@ -609,8 +654,10 @@ func _status_cards(skill_id: String, effect: String) -> void:
 	if mine.is_empty():
 		form.add_child(_small("없음 — 아래 '상태 이상 추가'"))
 	var items := []
-	for sid in StatusCatalog.BATTLE:
-		items.append([sid, StatusCatalog.get_def(sid).name])
+	for sid in StatusCatalog.battle_ids():
+		var d := StatusCatalog.get_def(sid)
+		var en: String = StatusCatalog.EFFECTS.get(d.effect, {}).get("name", d.effect)
+		items.append([sid, d.name if en == d.name else "%s (%s)" % [d.name, en]])
 	for e in mine:
 		var card := PanelContainer.new()
 		var sb := StyleBoxFlat.new()
@@ -628,11 +675,12 @@ func _status_cards(skill_id: String, effect: String) -> void:
 		grid.add_theme_constant_override("h_separation", 8)
 		cv.add_child(grid)
 		_row(grid, "상태 이상", _option(items, e.status, func(v):
+			var same := StatusCatalog.effect_of(str(v)) == StatusCatalog.effect_of(e.status)
 			e.status = str(v)
-			if SkillStatusData.VALUE_HINT.get(e.status, "") == "":
+			if StatusCatalog.hint(e.status) == "":
 				e.value = 0
-			elif int(e.value) <= 0:
-				e.value = 10
+			elif not same or int(e.value) <= 0:
+				e.value = StatusCatalog.default_value(e.status)   # 효과가 바뀌면 그 효과의 기본 수치
 			_mark()
 			_rebuild()))
 		var tu := _spin(1, 20, 1, int(e.turns), "")
@@ -641,8 +689,11 @@ func _status_cards(skill_id: String, effect: String) -> void:
 				e.turns = int(v)
 				_mark()
 				_fill_skill_list())
-		_row(grid, "턴 (차례 수)" if e.status != "frost" else "턴 (터지기까지)", tu)
-		var hint: String = SkillStatusData.VALUE_HINT.get(e.status, "")
+		if not StatusCatalog.is_instant(e.status):   # 넉백·끌어당김은 맞는 순간 한 번 (턴 없음)
+			_row(grid, "턴 (차례 수)" if StatusCatalog.effect_of(e.status) != "frost" else "턴 (터지기까지)", tu)
+		else:
+			tu.queue_free()
+		var hint := StatusCatalog.hint(e.status)
 		if hint != "":
 			var va := _spin(0, 999, 1, int(e.value), "")
 			va.value_changed.connect(func(v):
@@ -669,7 +720,7 @@ func _status_cards(skill_id: String, effect: String) -> void:
 	var add := _btn("+ 상태 이상 추가", func():
 		var used := mine.map(func(x): return x.status)
 		var pick := "bleed"
-		for sid in StatusCatalog.BATTLE:
+		for sid in StatusCatalog.battle_ids():
 			if not used.has(sid):
 				pick = sid
 				break
@@ -679,6 +730,196 @@ func _status_cards(skill_id: String, effect: String) -> void:
 	form.add_child(add)
 	if effect in ["heal", "ap_grant"]:
 		form.add_child(_small("아군 대상 스킬이라 상태 이상도 아군에게 걸립니다 (가속 같은 긍정 상태에 쓰세요)."))
+
+
+# ================================================================ 상태 정의 (이름 · 글자 · 색 → 효과)
+func _build_sdef_box() -> Control:
+	var box := HBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 10)
+	var lc := VBoxContainer.new()
+	lc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(lc)
+	lc.add_child(_head("상태 (이름 → 효과)"))
+	sdef_list = ItemList.new()
+	sdef_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sdef_list.item_selected.connect(func(i):
+		sdef_sel = str(sdef_list.get_item_metadata(i))
+		_rebuild())
+	lc.add_child(sdef_list)
+	var add := HBoxContainer.new()
+	lc.add_child(add)
+	add.add_child(_lab("새 상태 — 효과"))
+	sdef_new_eff = OptionButton.new()
+	for eff in StatusCatalog.EFFECT_ORDER:
+		sdef_new_eff.add_item(StatusCatalog.EFFECTS[eff].name)
+		sdef_new_eff.set_item_metadata(sdef_new_eff.item_count - 1, eff)
+	add.add_child(sdef_new_eff)
+	add.add_child(_btn("+ 추가", _add_sdef))
+	add.add_child(_btn("삭제", _delete_sdef))
+	lc.add_child(_small("같은 효과를 이름만 다르게 여러 개 만들 수 있습니다 (예: 진통제 · 자가 치유 = 재생). 스킬에는 상태를 답니다 ('상태 이상' 화면)."))
+	# 효과 설명 (참고)
+	var rc := VBoxContainer.new()
+	rc.custom_minimum_size.x = 300
+	box.add_child(rc)
+	rc.add_child(_head("효과 (규칙)"))
+	var sc := ScrollContainer.new()
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rc.add_child(sc)
+	var ref := VBoxContainer.new()
+	ref.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(ref)
+	for eff in StatusCatalog.EFFECT_ORDER:
+		var e: Dictionary = StatusCatalog.EFFECTS[eff]
+		var l := Label.new()
+		l.text = "%s (%s)%s — %s" % [e.name, eff, "" if str(e.hint) == "" else " · 수치 = " + str(e.hint), str(e.desc).replace("{t}", "n").replace("{v}", "v")]
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size.x = 280
+		l.add_theme_font_size_override("font_size", 12)
+		l.add_theme_color_override("font_color", (e.color as Color).lightened(0.2))
+		ref.add_child(l)
+	return box
+
+
+func _sdef(id: String) -> Dictionary:
+	for d in sdefs:
+		if d.id == id:
+			return d
+	return {}
+
+
+## 상태 id → 그 상태가 달린 스킬 수
+func _sdef_use_counts() -> Dictionary:
+	var out := {}
+	for d in sdefs:
+		out[d.id] = 0
+	for e in sstat:
+		out[e.status] = int(out.get(e.status, 0)) + 1
+	return out
+
+
+func _fill_sdef_list() -> void:
+	sdef_list.clear()
+	var uses := _sdef_use_counts()
+	for d in sdefs:
+		var en: String = StatusCatalog.EFFECTS.get(d.effect, {}).get("name", d.effect)
+		sdef_list.add_item("[%s] %s (%s)  → %s   · 스킬 %d" % [d.short, d.name, d.id, en, int(uses.get(d.id, 0))])
+		sdef_list.set_item_metadata(sdef_list.item_count - 1, d.id)
+		sdef_list.set_item_custom_fg_color(sdef_list.item_count - 1, StatusCatalog.color_of(d.id).lightened(0.25))
+		if d.id == sdef_sel:
+			sdef_list.select(sdef_list.item_count - 1)
+
+
+## 편집 중인 정의를 바로 게임 쪽 조회(StatusCatalog)에도 (저장 전 미리보기)
+func _sdef_changed() -> void:
+	StatusCatalog.refresh(sdefs)
+	_mark()
+	_fill_sdef_list()
+
+
+func _add_sdef() -> void:
+	var eff := str(sdef_new_eff.get_item_metadata(sdef_new_eff.selected))
+	var n := 1
+	var id := eff
+	while not _sdef(id).is_empty():
+		n += 1
+		id = "%s_%d" % [eff, n]
+	var d := StatusCatalog.new_status(id, eff)
+	if n > 1:
+		d.name = "%s %d" % [d.name, n]
+	sdefs.append(d)
+	sdef_sel = id
+	StatusCatalog.refresh(sdefs)
+	_mark()
+	_rebuild()
+
+
+func _delete_sdef() -> void:
+	var d := _sdef(sdef_sel)
+	if d.is_empty():
+		return
+	var used := sstat.filter(func(e): return e.status == d.id)
+	for e in used:
+		sstat.erase(e)
+	sdefs.erase(d)
+	sdef_sel = sdefs[0].id if not sdefs.is_empty() else ""
+	StatusCatalog.refresh(sdefs)
+	_mark()
+	status.text = "상태 '%s' 삭제%s (저장 안 함)" % [d.name, "" if used.is_empty() else " — 달려 있던 스킬 %d개에서도 뺌" % used.size()]
+	_rebuild()
+
+
+func _build_sdef_form() -> void:
+	var d := _sdef(sdef_sel)
+	if d.is_empty():
+		form.add_child(_head("상태를 고르세요"))
+		return
+	form.add_child(_head("%s (%s)" % [d.name, d.id]))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	form.add_child(grid)
+	var on_id := func(v):
+		var nv := str(v).strip_edges()
+		if nv == "" or not _sdef(nv).is_empty():
+			return
+		for e in sstat:   # 이 상태가 달린 스킬도 새 id 로
+			if e.status == d.id:
+				e.status = nv
+		d.id = nv
+		sdef_sel = nv
+		_sdef_changed()
+	_row(grid, "id", _line(d.id, on_id, "영문 소문자·숫자·_"))
+	_row(grid, "이름", _line(d.name, func(v):
+		d.name = str(v)
+		_sdef_changed()))
+	var effs := []
+	for eff in StatusCatalog.EFFECT_ORDER:
+		effs.append([eff, "%s (%s)" % [StatusCatalog.EFFECTS[eff].name, eff]])
+	_row(grid, "효과", _option(effs, d.effect, func(v):
+		d.effect = str(v)
+		for e in sstat:   # 효과가 바뀌면 달린 스킬의 수치도 그 효과 기본값으로
+			if e.status == d.id:
+				e.value = StatusCatalog.default_value(d.id) if StatusCatalog.hint(d.id) != "" else 0
+		_sdef_changed()
+		_rebuild()))
+	var on_short := func(v):
+		d.short = str(v)
+		_sdef_changed()
+	_row(grid, "머리 위 글자", _line(d.short, on_short, "한 글자"))
+	var cp := ColorPickerButton.new()
+	cp.color = Color.html(d.color) if str(d.color).begins_with("#") else StatusCatalog.color_of(d.id)
+	cp.custom_minimum_size = Vector2(80, 26)
+	cp.color_changed.connect(func(c):
+		d.color = "#" + c.to_html(false)
+		_sdef_changed())
+	_row(grid, "색", cp)
+	var on_desc := func(v):
+		d.desc = str(v)
+		_sdef_changed()
+	_row(grid, "설명", _line(d.get("desc", ""), on_desc, "비우면 효과 설명 ({t} = 턴, {v} = 수치)"))
+	var e0: Dictionary = StatusCatalog.EFFECTS.get(d.effect, {})
+	form.add_child(_small("효과 '%s': %s%s" % [e0.get("name", d.effect), str(e0.get("desc", "")).replace("{t}", "n").replace("{v}", "v"),
+		"" if str(e0.get("hint", "")) == "" else "\n스킬에 달 때 수치 = " + str(e0.hint)]))
+	form.add_child(HSeparator.new())
+	var users := sstat.filter(func(e): return e.status == d.id)
+	form.add_child(_head("이 상태가 달린 스킬 (%d)" % users.size()))
+	if users.is_empty():
+		form.add_child(_small("없음 — '상태 이상' 화면에서 스킬에 답니다."))
+	for e in users:
+		var a: ActionData = actions.get(e.skill)
+		var row := HBoxContainer.new()
+		form.add_child(row)
+		var l := _small("%s (%s) — %s" % [a.display_name if a != null else e.skill, e.skill, SkillStatusData.summary({"id": d.id, "turns": e.turns, "value": e.value, "chance": e.chance})])
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		l.custom_minimum_size.x = 260
+		row.add_child(l)
+		var sk: String = e.skill
+		row.add_child(_btn("열기", func():
+			skill_sel = sk
+			kind = "status"
+			_rebuild()))
 
 
 # ================================================================ 몬스터 스킬

@@ -19,7 +19,7 @@ signal unit_moved(unit: UnitRuntime, from_key: String, to_key: String)
 signal units_swapped(a: UnitRuntime, b: UnitRuntime)
 signal weapon_changed(unit: UnitRuntime)
 signal unit_died(unit: UnitRuntime)
-## 차례 시작 상태 이상 적용 (출혈·화상 피해, 동상 폭발, 기절): {unit, results, text}
+## 차례 시작 상태 이상 적용 (출혈·화상 피해, 재생 회복, 동상 폭발, 기절): {unit, results, text}
 signal status_ticked(event: Dictionary)
 signal battle_ended(winner: String)
 signal log_message(text: String)
@@ -266,7 +266,7 @@ func _execute(actor: UnitRuntime, action: ActionData, target: UnitRuntime) -> bo
 	var event := ActionResolver.resolve(action, actor, target, rng)
 	_log(event.text)
 	ap_changed.emit(actor)
-	if (event.applied as Array).any(func(x): return x.status in ["slow", "haste"]):
+	if (event.applied as Array).any(func(x): return StatusCatalog.effect_of(x.status) in ["slow", "haste"]):
 		_resort_rest()
 	action_resolved.emit(event)
 	for r in event.results:
@@ -274,7 +274,26 @@ func _execute(actor: UnitRuntime, action: ActionData, target: UnitRuntime) -> bo
 			ap_changed.emit(r.target)
 		if r.get("killed", false):
 			unit_died.emit(r.target)
+	# 넉백·끌어당김: 맞은 뒤 자리 옮김 (같은 편과 자리 바꿈 포함)
+	for a in event.applied:
+		if StatusCatalog.is_instant(a.status):
+			_displace(a.target, a.status, int(a.get("value", 1)))
 	return true
+
+
+func _displace(u: UnitRuntime, sid: String, value: int) -> void:
+	var res := StatusRules.displace(u, sid, value, slots)
+	var nm: String = StatusCatalog.get_def(sid).name
+	if not res.ok:
+		if str(res.get("reason", "")) != "":
+			_log(res.reason)
+		return
+	if res.kind == "move":
+		_log("%s: %s — %s → %s" % [u.display_name(), nm, res.from, res.to])
+		unit_moved.emit(u, res.from, res.to)
+	else:
+		_log("%s: %s — %s 와 자리 바뀜" % [u.display_name(), nm, res.other.display_name()])
+		units_swapped.emit(u, res.other)
 
 
 ## 감속·가속이 걸리면 이번 라운드에 아직 차례가 안 온 유닛들 순서를 지금 속도로 다시 정렬
@@ -322,7 +341,7 @@ func get_command_options() -> Array[Dictionary]:
 	var mv: ActionData = actions.get("move", null)
 	if mv != null:
 		var can := APComponent.can_pay(current, mv.ap_cost) and current.can_be_moved()
-		var why := "" if can else ("AP 부족" if current.can_be_moved() else ("구속 — 자리 이동 불가" if current.statuses.has("root") else "자리 이동 불가 (부상·큰 몸집)"))
+		var why := "" if can else ("AP 부족" if current.can_be_moved() else ("구속 — 자리 이동 불가" if current.has_effect("root") else "자리 이동 불가 (부상·큰 몸집)"))
 		out.append({"id": "move", "name": mv.display_name, "cost": mv.ap_cost, "enabled": can, "reason": why, "kind": "move", "desc": mv.description})
 	var wp: ActionData = actions.get("weapon", null)
 	if wp != null:

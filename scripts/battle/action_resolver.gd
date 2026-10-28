@@ -9,6 +9,9 @@ static func compute_damage(action: ActionData, actor: UnitRuntime, target: UnitR
 		+ actor.data.power_bonus + int(actor.data.skill_power.get(action.id, 0))
 	if not is_equal_approx(actor.data.damage_mult, 1.0):
 		base = int(roundf(base * actor.data.damage_mult))
+	var mark := target.effect_value("mark")   # 표식: 이 대상을 노리는 공격 위력 +value%
+	if mark != 0:
+		base = int(roundf(base * (100 + mark) / 100.0))
 	var variance := rng.randi_range(-1, 1) if rng != null else 0
 	return maxi(1, base - target.data.defense + variance)
 
@@ -19,16 +22,12 @@ static func resolve(action: ActionData, actor: UnitRuntime, target: UnitRuntime,
 	}
 	match action.effect:
 		"damage":
-			var dmg := compute_damage(action, actor, target, rng)
-			target.hp = maxi(0, target.hp - dmg)
-			var killed := target.hp == 0
-			if killed:
-				target.alive = false
+			var dr := StatusRules.deal(target, compute_damage(action, actor, target, rng))   # 취약·보호막 반영
 			event.targets = [target]
-			event.results = [{"target": target, "kind": "damage", "amount": dmg, "killed": killed}]
-			event.text = "%s → %s: %s %d 피해%s" % [
-				actor.display_name(), target.display_name(), action.display_name, dmg,
-				" (전투 불능)" if killed else ""]
+			event.results = [{"target": target, "kind": "damage", "amount": dr.amount, "absorbed": dr.absorbed, "killed": dr.killed}]
+			event.text = "%s → %s: %s %d 피해%s%s" % [
+				actor.display_name(), target.display_name(), action.display_name, dr.amount,
+				" (보호막 %d 막음)" % dr.absorbed if dr.absorbed > 0 else "", " (전투 불능)" if dr.killed else ""]
 		"heal":
 			var amount: int = action.power + int(actor.data.level / 2) + actor.data.heal_bonus + int(actor.data.skill_power.get(action.id, 0))
 			var before := target.hp
@@ -52,7 +51,8 @@ static func resolve(action: ActionData, actor: UnitRuntime, target: UnitRuntime,
 	return event
 
 
-## 스킬의 상태 이상: 맞은 대상이 살아 있으면 하나씩 확률로 걸고 바로 한 번 적용 (event.applied, 틱 피해는 event.results 에 덧붙임)
+## 스킬의 상태 이상: 맞은 대상이 살아 있으면 하나씩 확률로 걸고 바로 한 번 적용 (event.applied, 틱 피해·회복은 event.results 에 덧붙임).
+## 넉백·끌어당김은 event.applied 만 — 자리는 컨트롤러가 옮김
 static func _apply_status(action: ActionData, target: UnitRuntime, rng: RandomNumberGenerator, event: Dictionary) -> void:
 	event["applied"] = []
 	if action.statuses.is_empty() or target == null or action.effect in ["move", "weapon_swap"]:
@@ -67,8 +67,11 @@ static func _apply_status(action: ActionData, target: UnitRuntime, rng: RandomNu
 			event.text += " (%s 실패)" % nm
 			continue
 		var ticks := StatusRules.apply(target, sid, int(st.get("turns", 1)), int(st.get("value", 0)))
-		event.applied.append({"target": target, "status": sid})
-		event.text += " → %s %d턴" % [nm, int(st.get("turns", 1))]
+		event.applied.append({"target": target, "status": sid, "value": int(st.get("value", 0))})
+		event.text += (" → %s" % nm) if StatusCatalog.is_instant(sid) else (" → %s %d턴" % [nm, int(st.get("turns", 1))])
 		for r in ticks:
 			event.results.append(r)
-			event.text += " (%s %d 피해%s)" % [nm, r.amount, ", 전투 불능" if r.killed else ""]
+			if r.kind == "heal":
+				event.text += " (%s HP %d 회복)" % [nm, r.amount]
+			else:
+				event.text += " (%s %d 피해%s)" % [nm, r.amount, ", 전투 불능" if r.killed else ""]

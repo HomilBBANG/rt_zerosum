@@ -15,9 +15,9 @@ var alive: bool = true
 var actions_this_turn: int = 0
 ## 부상·상태이상 등으로 자리를 옮길 수 없음 (자리 이동·교환 대상에서 빠짐). 상태이상 시스템이 생기면 여기서 판단
 var move_locked: bool = false
-## 상태 이상 id 목록 (정의는 StatusCatalog)
+## 상태 이상 id 목록 (정의는 StatusCatalog — 규칙은 상태가 쓰는 효과로: has_effect · effect_value)
 var statuses: Array[String] = []
-## 전투 상태 이상의 남은 턴·수치: id → {turns, value} (StatusRules)
+## 전투 상태 이상의 남은 턴·수치: 상태 id → {turns, value} (StatusRules)
 var status_info: Dictionary = {}
 
 
@@ -91,13 +91,35 @@ func status_turns(id: String) -> int:
 	return int(status_info.get(id, {}).get("turns", 0))
 
 
+## 그 효과를 쓰는 상태가 걸려 있나 (예: "stun" — '기절'이든 이름을 바꾼 상태든)
+func has_effect(effect: String) -> bool:
+	for sid in statuses:
+		if StatusCatalog.effect_of(sid) == effect:
+			return true
+	return false
+
+
+## 그 효과를 쓰는 상태들의 수치 합 (예: 가속 두 개 = 둘을 더함)
+func effect_value(effect: String) -> int:
+	var v := 0
+	for sid in statuses:
+		if StatusCatalog.effect_of(sid) == effect:
+			v += int(status_info.get(sid, {}).get("value", 0))
+	return v
+
+
+## 그 효과를 쓰는 상태 id 들 (걸린 순서)
+func statuses_with(effect: String) -> Array[String]:
+	var out: Array[String] = []
+	for sid in statuses:
+		if StatusCatalog.effect_of(sid) == effect:
+			out.append(sid)
+	return out
+
+
 ## 지금 속도 (감속·가속 반영, 최소 1) — 행동 순서에 씀
 func speed_now() -> int:
-	var pct := 0
-	if statuses.has("haste"):
-		pct += int(status_info.get("haste", {}).get("value", 0))
-	if statuses.has("slow"):
-		pct -= int(status_info.get("slow", {}).get("value", 0))
+	var pct := effect_value("haste") - effect_value("slow")
 	if pct == 0:
 		return data.speed
 	return maxi(1, roundi(data.speed * (100 + pct) / 100.0))

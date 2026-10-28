@@ -55,6 +55,7 @@ func _init() -> void:
 	_test_equip_and_move_lock()
 	_test_rally_status()
 	_test_battle_statuses()
+	_test_status_effects()
 	_test_balance_data_and_ai_graph()
 	_test_sfx()
 	load("res://tests/outgame_tests.gd").new().run(_check)
@@ -599,4 +600,114 @@ func _test_sfx() -> void:
 		c._process(0.1)
 	_check(c._step_i == before, "idle 에서는 발자국 없음")
 	c.free()
+
+
+## 상태 = 이름 + 효과 (data/statuses.json) / 새 효과: 넉백 · 끌어당김 · 표식 · 도발 · 취약 · 재생 · 보호막
+func _test_status_effects() -> void:
+	print("[13c] 상태 id → 효과, 넉백·끌어당김·표식·도발·취약·재생·보호막")
+	# 같은 효과, 다른 이름
+	_check(StatusCatalog.effect_of("painkiller") == "regen" and StatusCatalog.effect_of("self_heal") == "regen", "진통제·자가 치유 = 효과 재생")
+	_check(StatusCatalog.get_def("painkiller").name == "진통제" and StatusCatalog.get_def("self_heal").name == "자가 치유" and StatusCatalog.get_def("painkiller").positive, "이름은 따로, 규칙(긍정·전투 전용)은 효과에서")
+	_check(StatusCatalog.effect_of("bleed") == "bleed" and StatusCatalog.find("진통제") == "painkiller", "효과 이름 그대로인 상태 · 한글 이름으로 찾기")
+	_check(StatusCatalog.check(StatusCatalog.read()).errors.is_empty(), "data/statuses.json 검사 통과")
+	var bad := [StatusCatalog.new_status("x", "regen"), StatusCatalog.new_status("x", "nope"), StatusCatalog.new_status("rallied", "regen")]
+	var bres := StatusCatalog.check(bad)
+	_check(bres.errors.size() == 3, "검사: id 중복 · 모르는 효과 · 게임 상태 id [%s]" % " / ".join(bres.errors))
+	var gd := GameData.load_from()
+	_check(gd.actions.painkiller_shot.status_ids() == ["painkiller"] and gd.actions.self_heal.status_ids() == ["self_heal"], "진통제 투여 → 진통제, 자가 치유 → 자가 치유")
+	var bc := _make("ally")
+	bc.start_battle()
+	var enemies := bc.slots.living_units("enemy")
+	var allies := bc.slots.living_units("ally")
+	var atk: ActionData = bc.actions["basic_attack"]
+	# 재생: 걸릴 때 + 자기 차례마다 최대 HP v% 회복, 이름이 다른 같은 효과는 따로 걸림
+	var p := allies[0]
+	p.data.max_hp = 100
+	p.hp = 50
+	var r1 := StatusRules.apply(p, "painkiller", 3, 8)
+	_check(p.hp == 58 and r1.size() == 1 and r1[0].kind == "heal" and r1[0].status == "painkiller", "진통제: 걸릴 때 +8 (50 → %d)" % p.hp)
+	StatusRules.apply(p, "self_heal", 2, 6)
+	var ts := StatusRules.turn_start(p)
+	_check(p.hp == 64 + 8 + 6 and ts.results.size() == 2 and p.has_effect("regen") and p.statuses_with("regen").size() == 2, "자가 치유 걸 때 +6, 차례 시작에 진통제 +8 · 자가 치유 +6 따로 (→ %d)" % p.hp)
+	p.hp = 99
+	StatusRules.turn_start(p)
+	_check(p.hp == 100, "재생은 최대 HP 까지")
+	# 보호막: 피해를 먼저 막고 다 막으면 사라짐
+	var sh := allies[1]
+	sh.data.max_hp = 100
+	sh.hp = 100
+	StatusRules.apply(sh, "shield", 2, 10)
+	var d1 := StatusRules.deal(sh, 6)
+	_check(d1.absorbed == 6 and d1.amount == 0 and sh.hp == 100 and int(sh.status_info.shield.value) == 4, "보호막 10: 6 막음 (남은 4)")
+	var d2 := StatusRules.deal(sh, 7)
+	_check(d2.absorbed == 4 and d2.amount == 3 and sh.hp == 97 and not sh.has_effect("shield"), "남은 4 막고 3 피해, 보호막 사라짐")
+	StatusRules.apply(sh, "shield", 2, 5)
+	StatusRules.apply(sh, "bleed", 2, 10)
+	_check(sh.hp == 92 and not sh.has_effect("shield"), "보호막은 상태 이상 피해(출혈 10)도 막음 (5 막고 5 → %d)" % sh.hp)
+	sh.remove_status("bleed")
+	# 취약: 받는 피해 +v%
+	sh.hp = 100
+	sh.add_status("vulnerable", 2, 50)
+	_check(StatusRules.deal(sh, 10).amount == 15 and sh.hp == 85, "취약 50%: 10 → 15 피해")
+	sh.remove_status("vulnerable")
+	# 표식: 이 대상을 노리는 공격 위력 +v% (방어 전)
+	var e0 := enemies[0]
+	var plain := ActionResolver.compute_damage(atk, allies[0], e0, null)
+	e0.add_status("mark", 2, 100)
+	var marked := ActionResolver.compute_damage(atk, allies[0], e0, null)
+	_check(marked > plain, "표식 100%%: 위력 두 배 (%d → %d)" % [plain, marked])
+	# 표식: 적 AI 는 표식 대상 먼저
+	var foe := enemies[0]
+	var front := bc.slots.units_in_row("ally", 0)
+	if front.size() >= 2:
+		var low: UnitRuntime = front[0] if front[0].hp <= front[1].hp else front[1]
+		var high: UnitRuntime = front[1] if low == front[0] else front[0]
+		high.hp = high.data.max_hp
+		low.hp = 1
+		var g0 := AIGraph._try_skill("basic_attack", "hp_low", foe, bc.actions, bc.slots, null) if foe.data.skill_ids.has("basic_attack") else {}
+		high.add_status("mark", 2, 25)
+		var g1 := AIGraph._try_skill("basic_attack", "hp_low", foe, bc.actions, bc.slots, null) if foe.data.skill_ids.has("basic_attack") else {}
+		_check(not g0.is_empty() and g0.target == low and g1.target == high, "AI: 평소엔 HP 낮은 쪽, 표식이 있으면 표식 대상")
+		high.remove_status("mark")
+	e0.remove_status("mark")
+	# 도발: 상대 편은 도발한 캐릭터만 (닿을 때)
+	var any_atk := atk.duplicate() as ActionData
+	any_atk.target_rule = "enemy_any"
+	var tank := enemies[enemies.size() - 1]
+	tank.add_status("taunt", 2, 0)
+	var vt := TargetValidator.valid_targets(any_atk, allies[0], bc.slots)
+	_check(vt.size() == 1 and vt[0] == tank, "도발: 원거리 공격 대상 = 도발한 %s 만" % tank.display_name())
+	_check(TargetValidator.block_reason(any_atk, allies[0], enemies[0], bc.slots).begins_with("도발"), "다른 적을 고르면 막힘")
+	var melee := atk.duplicate() as ActionData
+	melee.target_rule = "enemy_melee"
+	if tank.row > TargetValidator.melee_reachable_row(allies[0], bc.slots):
+		_check(not TargetValidator.valid_targets(melee, allies[0], bc.slots).has(tank) and not TargetValidator.valid_targets(melee, allies[0], bc.slots).is_empty(), "근접이 못 닿는 열의 도발은 무시")
+	tank.remove_status("taunt")
+	# 넉백 · 끌어당김: 맞으면 자리 옮김 (같은 편과 자리 바꿈)
+	var push := any_atk.duplicate() as ActionData
+	push.ap_cost = 0
+	push.statuses = [{"id": "knockback", "turns": 1, "value": 1, "chance": 100}]
+	bc.actions["t_push"] = push
+	var tgt: UnitRuntime = bc.slots.units_in_row("enemy", 0)[0]
+	var idx := tgt.index
+	var behind := bc.slots.unit_at(SlotManager.make_key("enemy", 1, idx))
+	var hp_before := tgt.hp
+	bc.player_execute("t_push", tgt)
+	_check(tgt.row == 1 and tgt.index == idx and (behind == null or behind.row == 0) and not tgt.statuses.has("knockback"), "넉백: 전방 → 중앙, 뒤 칸 %s 은 앞으로 (상태로 안 남음)" % (behind.display_name() if behind != null else "없음"))
+	_check(tgt.hp < hp_before or not tgt.alive, "넉백 스킬도 피해는 그대로")
+	var pull := push.duplicate() as ActionData
+	pull.statuses = [{"id": "pull", "turns": 1, "value": 1, "chance": 100}]
+	bc.actions["t_pull"] = pull
+	var back: UnitRuntime = bc.slots.units_in_row("enemy", 2)[0]
+	back.hp = back.data.max_hp
+	bc.player_execute("t_pull", back)
+	_check(back.row == 1, "끌어당김: 후방 → 중앙")
+	back.add_status("root", 2, 0)
+	bc.player_execute("t_pull", back)
+	_check(back.row == 1 and bc.log_lines[bc.log_lines.size() - 1].contains("안 됨"), "구속이면 안 끌려옴")
+	back.remove_status("root")
+	var dm := StatusRules.displace(bc.slots.units_in_row("enemy", 2)[0] if not bc.slots.units_in_row("enemy", 2).is_empty() else back, "knockback", 1, bc.slots)
+	_check(not dm.ok, "맨 뒤 열은 더 안 밀림")
+	_check(SkillStatusData.summary({"id": "knockback", "turns": 1, "value": 1, "chance": 100}) == "넉백 (칸 수 1)", "넉백 요약은 턴 없이")
+	bc.queue_free()
 

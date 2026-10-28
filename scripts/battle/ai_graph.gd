@@ -212,6 +212,15 @@ static func _try_skill(skill: String, rule: String, actor: UnitRuntime, actions:
 	var targets := _usable_targets(skill, actor, actions, slots)
 	if targets.is_empty():
 		return {}
+	# 표식: 공격 스킬이면 표식이 걸린 대상 먼저 (그중에서 규칙대로)
+	var sa: ActionData = actions[skill]
+	if sa.effect == "damage" and rule != "kill":
+		var marked: Array[UnitRuntime] = []
+		for t in targets:
+			if t.has_effect("mark"):
+				marked.append(t)
+		if not marked.is_empty():
+			targets = marked
 	var a: ActionData = actions[skill]
 	var best: UnitRuntime = null
 	match rule:

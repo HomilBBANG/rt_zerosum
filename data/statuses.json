@@ -1,0 +1,141 @@
+{
+	"version": 1,
+	"statuses": [
+		{
+			"id": "bleed",
+			"name": "출혈",
+			"effect": "bleed",
+			"short": "혈",
+			"color": "#f23340",
+			"desc": ""
+		},
+		{
+			"id": "burn",
+			"name": "화상",
+			"effect": "burn",
+			"short": "화",
+			"color": "#ff8c26",
+			"desc": ""
+		},
+		{
+			"id": "frost",
+			"name": "동상",
+			"effect": "frost",
+			"short": "동",
+			"color": "#8cd9ff",
+			"desc": ""
+		},
+		{
+			"id": "slow",
+			"name": "감속",
+			"effect": "slow",
+			"short": "감",
+			"color": "#9999f2",
+			"desc": ""
+		},
+		{
+			"id": "haste",
+			"name": "가속",
+			"effect": "haste",
+			"short": "가",
+			"color": "#66ff99",
+			"desc": ""
+		},
+		{
+			"id": "stun",
+			"name": "기절",
+			"effect": "stun",
+			"short": "기",
+			"color": "#ffe64d",
+			"desc": ""
+		},
+		{
+			"id": "root",
+			"name": "구속",
+			"effect": "root",
+			"short": "구",
+			"color": "#bf8c59",
+			"desc": ""
+		},
+		{
+			"id": "blind",
+			"name": "실명",
+			"effect": "blind",
+			"short": "실",
+			"color": "#b3b3bf",
+			"desc": ""
+		},
+		{
+			"id": "knockback",
+			"name": "넉백",
+			"effect": "knockback",
+			"short": "넉",
+			"color": "#f2bf73",
+			"desc": ""
+		},
+		{
+			"id": "pull",
+			"name": "끌어당김",
+			"effect": "pull",
+			"short": "끌",
+			"color": "#d980f2",
+			"desc": ""
+		},
+		{
+			"id": "mark",
+			"name": "표식",
+			"effect": "mark",
+			"short": "표",
+			"color": "#ff5999",
+			"desc": ""
+		},
+		{
+			"id": "taunt",
+			"name": "도발",
+			"effect": "taunt",
+			"short": "도",
+			"color": "#ff9940",
+			"desc": ""
+		},
+		{
+			"id": "vulnerable",
+			"name": "취약",
+			"effect": "vulnerable",
+			"short": "취",
+			"color": "#e67359",
+			"desc": ""
+		},
+		{
+			"id": "regen",
+			"name": "재생",
+			"effect": "regen",
+			"short": "재",
+			"color": "#73f28c",
+			"desc": ""
+		},
+		{
+			"id": "shield",
+			"name": "보호막",
+			"effect": "shield",
+			"short": "막",
+			"color": "#8cccff",
+			"desc": ""
+		},
+		{
+			"id": "painkiller",
+			"name": "진통제",
+			"effect": "regen",
+			"short": "진",
+			"color": "#7fe0b0",
+			"desc": ""
+		},
+		{
+			"id": "self_heal",
+			"name": "자가 치유",
+			"effect": "regen",
+			"short": "치",
+			"color": "#a6f07a",
+			"desc": ""
+		}
+	]
+}

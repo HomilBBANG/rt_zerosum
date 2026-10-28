@@ -59,6 +59,8 @@ SKILLS = [
     ["inspire", "고무", "support", 1, "ally_other", "ap_grant", 1, "스킬 트리(액티브): 다른 아군 1명 AP +1"],
     ["incendiary", "소이탄", "heavy", 2, "weapon", "damage", 6, "스킬 트리(액티브): 맞으면 화상 (화염 속성 고정 피해)"],
     ["suppress", "제압 사격", "attack", 2, "enemy_any", "damage", 5, "스킬 트리(액티브): 열 무관, 맞으면 감속"],
+    ["painkiller_shot", "진통제 투여", "support", 2, "ally_any", "status", 0, "[임시] 아군 1명에게 진통제 — 차례마다 최대 HP 회복 (상태 '진통제' = 효과 재생)"],
+    ["self_heal", "자가 치유", "support", 1, "self", "status", 0, "[임시] 자신 — 차례마다 최대 HP 회복 (상태 '자가 치유' = 효과 재생)"],
 ]
 STAGE_COLS = ["id", "이름", "조명", "선공", "적HP배율", "적공격배율", "시드", "설명"]
 STAGES = [

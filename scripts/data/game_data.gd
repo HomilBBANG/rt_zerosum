@@ -104,7 +104,8 @@ func _parse(sheets: Dictionary) -> void:
 	for ms in md.skills:
 		if not actions.has(ms.id) and str(ms.id) != "":
 			actions[ms.id] = MonsterSkillData.to_action(ms)
-	# 스킬에 다는 상태 이상 (data/skill_status.json — 에디터 '스킬 트리' 탭 → 상태 이상)
+	# 스킬에 다는 상태 이상 (data/skill_status.json — 에디터 '스킬 트리' 탭 → 상태 이상). 상태 정의(이름·효과)는 data/statuses.json
+	StatusCatalog.refresh()
 	var sts := SkillStatusData.read()
 	for e in SkillStatusData.check(sts, actions).errors:
 		warnings.append("상태 이상: " + e)
@@ -112,7 +113,7 @@ func _parse(sheets: Dictionary) -> void:
 	for sid in per:
 		if actions.has(sid):
 			for st in per[sid]:
-				if st.id in StatusCatalog.BATTLE:
+				if st.id in StatusCatalog.battle_ids():
 					(actions[sid] as ActionData).statuses.append(st)
 	for d in _table(sheets.get("캐릭터", [])):
 		allies.append(_unit(d, "ally"))

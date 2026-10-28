@@ -2,6 +2,7 @@ class_name TargetValidator
 extends RefCounted
 ## 대상 유효성 (GDD 3절 위치 제한 첫 버전).
 ## 근접: 상대 전방 우선, 전방이 비면 다음 열. 원거리: 어느 열이나. 지원: 아군 전 열.
+## 도발: 공격 대상 중 도발 효과가 걸린 캐릭터가 있으면 그들만 고를 수 있음.
 ## 두 칸(전방+중앙) 큰 몸집은 두 열 모두에 있는 것으로 본다 → 살아 있는 동안 전방을 막는다.
 
 
@@ -42,6 +43,13 @@ static func valid_targets(action: ActionData, actor: UnitRuntime, slots: SlotMan
 					out.append(u)
 		"self":
 			out = [actor]
+	if rule in ["enemy_melee", "enemy_any"]:   # 도발: 닿는 대상 중 도발한 캐릭터가 있으면 그들만
+		var tz: Array[UnitRuntime] = []
+		for u in out:
+			if u.has_effect("taunt"):
+				tz.append(u)
+		if not tz.is_empty():
+			out = tz
 	return out
 
 
@@ -63,6 +71,11 @@ static func block_reason(action: ActionData, actor: UnitRuntime, target: UnitRun
 		"enemy_any":
 			if target.team != enemy:
 				return "적만 공격할 수 있습니다."
+	if rule in ["enemy_melee", "enemy_any"] and not target.has_effect("taunt"):
+		var tz := valid_targets(action, actor, slots).filter(func(u): return u.has_effect("taunt"))
+		if not tz.is_empty():
+			return "도발 — %s 만 공격할 수 있습니다." % ", ".join(tz.map(func(u): return u.display_name()))
+	match rule:
 		"ally_any":
 			if target.team != actor.team:
 				return "아군만 대상으로 할 수 있습니다."

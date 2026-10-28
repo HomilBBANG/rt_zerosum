@@ -27,7 +27,7 @@ var data: GameData = null
 var stage_id: String = ""
 signal data_reloaded(warnings: PackedStringArray)
 var _balance_mtime: int = 0
-var _tree_mtime: int = 0     # data/skill_tree.json + faith.json + skill_status.json (에디터 '스킬 트리' 탭에서 저장하면 같이 다시 읽음)
+var _tree_mtime: int = 0     # data/skill_tree.json + faith.json + skill_status.json + statuses.json + monster_skills.json (에디터 '스킬 트리' 탭에서 저장하면 같이 다시 읽음)
 var _poll_t: float = 0.0
 ## 아웃게임 (data/outgame.xlsx + 대원 일정). base = 진행 중인 기지 (없으면 null)
 const SAVE_PATH := "user://outgame_save.json"
@@ -73,7 +73,7 @@ func _ready() -> void:
 	data = GameData.load_from()
 	if data != null:
 		_balance_mtime = FileAccess.get_modified_time(GameData.BALANCE_PATH)
-		_tree_mtime = FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH)
+		_tree_mtime = FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
 		allies = data.allies
 		actions = data.actions
 		for w in data.warnings:
@@ -267,7 +267,7 @@ func _process(delta: float) -> void:
 	if data == null:
 		return
 	var t := FileAccess.get_modified_time(GameData.BALANCE_PATH)
-	var tt := FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH)
+	var tt := FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
 	if t == 0 or (t == _balance_mtime and tt == _tree_mtime):
 		return
 	var newer := GameData.load_from()
@@ -280,7 +280,7 @@ func _process(delta: float) -> void:
 		push_warning("balance.xlsx: " + w)
 	for e in _ally_copies:
 		_derive_ally(e.copy, e.base)
-	print("[balance] data/balance.xlsx · skill_tree.json · faith.json · skill_status.json · monster_skills.json 다시 읽음")
+	print("[balance] data/balance.xlsx · skill_tree.json · faith.json · skill_status.json · statuses.json · monster_skills.json 다시 읽음")
 	data_reloaded.emit(data.warnings)
 
 
