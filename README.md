@@ -108,7 +108,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![무기고](docs/screenshots/outgame/armory.png)
 
 ## 밸런스 데이터 (엑셀) · AI 에디터 · 스테이지 에디터
-에디터는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`, `addons/rtz_sortie_editor`, `addons/rtz_skill_editor`, `addons/rtz_quest_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` · `출정 대사` · `스킬 트리` · `퀘스트` 가 있습니다.
+에디터는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`, `addons/rtz_sortie_editor`, `addons/rtz_skill_editor`, `addons/rtz_quest_editor`, `addons/rtz_cutscene_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` · `출정 대사` · `스킬 트리` · `퀘스트` · `컷씬` 이 있습니다.
 **밸런스 수치는 `data/balance.xlsx`** 한 파일에 시트별로 있습니다: `캐릭터` · `몬스터` · `아이템` · `스킬` · `스테이지` (+ 열 설명 `읽어보기`).
 - 엑셀(또는 Numbers·LibreOffice)로 열어 고치고 **저장하면 1초 안에 게임이 다시 읽어 바로 적용** — 진행 중인 전투의 HP·AP·위력·이름까지.
   캐릭터 추가·편성·적 배치처럼 전투 구성이 바뀌는 것은 다음 전투(R 재시작)부터.
@@ -218,7 +218,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ## 퀘스트 (에디터)
 - 게임: 기지 상단 **`퀘스트`** 버튼 → 퀘스트 창 (진행 중 → 완료, 시작 안 한 퀘스트는 안 보임). 카드마다 의뢰인 얼굴 · 설명 · 단계(✓ 끝냄 / ▶ 지금 + 진행 횟수 / 뒤 단계는 `???`) · 보상. 시작·다음 단계·완료 때 알림, 기지 기록에 `◆`.
 - 규칙(`BaseSim`): **시작 조건**을 채우면 자동 시작 (처음부터 / 직접 시작 = 이벤트·대사에서 `BaseSim.start_quest(id)` / 미션 완료 후(의뢰·전투·연구·다른 퀘스트) / 의뢰인 레벨·신앙도·친밀도 / n일차) → **단계를 앞에서부터 하나씩** → 마지막 단계를 끝내면 완료 + **보상**(현금은 주간 결산 때, 친밀도는 의뢰인).
-  단계 종류: 의뢰 완료 · 전투 승리(스테이지 또는 아무 전투) · 대원과 대화 · 연구 완료 · 대원 친밀도 · 대원 레벨 · 일차 도달 · 다른 퀘스트 완료. **횟수 단계(의뢰·전투·대화)는 그 단계가 시작된 뒤부터 셈** — 전에 한 것은 안 셈.
+  단계 종류: 의뢰 완료 · 전투 승리(스테이지 또는 아무 전투) · 대원과 대화 · 연구 완료 · 대원 친밀도 · 대원 레벨 · 일차 도달 · 다른 퀘스트 완료 · 컷씬 보기. **횟수 단계(의뢰·전투·대화)는 그 단계가 시작된 뒤부터 셈** — 전에 한 것은 안 셈.
   완료한 퀘스트는 **신 해금 조건 `미션 완료 → 퀘스트`** 로 씀 (`quest:퀘스트 id`). 저장 파일에 진행 단계·대화 횟수 저장.
 - **에디터 = Godot 에디터 상단 `퀘스트` 탭** (`addons/rtz_quest_editor` → `data/quests.json`):
   왼쪽 퀘스트 목록(추가 · 복제 · 삭제 · ↑↓ 순서, ✦ = 신 해금에 쓰임) · 가운데 id(바꾸면 다른 퀘스트·신 해금 조건도 따라감) · 이름 · 의뢰인 · 설명 · 시작 조건 · **단계 카드**(종류 · 대상 · 횟수/값 · 표시 글 — 비우면 자동 설명, ↑↓ · 삭제) · 보상(현금 · 의뢰인 친밀도).
@@ -229,6 +229,24 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![퀘스트 창 (기지 상단 '퀘스트')](docs/screenshots/quest_log.png)
 ![퀘스트 에디터 (Godot 에디터 상단 '퀘스트' 탭)](docs/screenshots/quest_editor.png)
+
+## 컷씬 (에디터)
+- 게임: 대화 장면 · 이미지 CG 를 보는 재생 화면 (기지 위에 덮어서, 그동안 시간 멈춤). **대사** = 말하는 대원이 왼쪽/오른쪽에 서고(말하는 쪽 밝게) 아래 상자에 이름·글이 한 글자씩 · **나레이션** · **CG**(화면 전체 그림 — 'CG 끄기'·배경 컷까지 대사가 그 위에) · **배경**(없으면 기지 화면이 어둡게 비침) · **선택지** · **행동**(퀘스트 시작 · 신 정체 해금 · 친밀도 · 현금).
+  클릭 · Space · Enter = 다음 (글이 나오는 중이면 다 보이기) · Esc / `건너뛰기` = 끝까지 (행동은 그대로 적용).
+- **이어지기**: 컷씬이 끝나면 `다음 컷씬` 으로, 선택지는 고른 것의 컷씬으로 (끝 = 그 컷씬 다음 컷). 대화 → 이벤트 → 퀘스트 → 오프닝 어느 컷씬끼리도 이어 붙일 수 있음.
+- **계기(언제 나오나)**: 새 게임 시작(오프닝) · 퀘스트 시작 / n단계 시작 / 완료 · 지휘관이 대원에게 말 걸기(평소 대사 대신) · 대원끼리 대화 엿듣기(엿듣기 창 대신) · n일차 아침 · 신의 정체가 드러날 때 · 전투 승리 · 없음(이어지기·직접 재생만, 스크립트 `BaseSim.queue_cutscene(id)`). `한 번만` 체크. 같은 때 여러 개면 목록 순서대로 하나씩, 창이 열려 있으면 닫힌 뒤.
+  본 컷씬은 저장되고, 퀘스트 단계 `컷씬 보기` · 미션 `cutscene:id`(퀘스트 시작 조건 · 신 해금 조건)로 쓸 수 있음.
+- **에디터 = Godot 에디터 상단 `컷씬` 탭** (`addons/rtz_cutscene_editor` → `data/cutscenes.json`, 그림은 `assets/cg/`):
+  왼쪽 목록(분류 오프닝·대화·이벤트·퀘스트·기타로 거르기 · 추가 · 복제 · 삭제 · 순서, ▶ = 계기 있음 · ↪ = 이어짐) · 가운데 id(바꾸면 이어지는 곳도 따라감) · 이름 · 분류 · 계기 · 한 번만 · 다음 컷씬(**`새 컷씬 만들어 잇기`**) · **컷 카드**(종류별 칸 — 대사: 대원·표시 이름(예: ???, 테라)·서는 곳 / CG·배경: 그림 고르기 + 썸네일 / 선택지: 선택지마다 이어질 컷씬 + `새 컷씬` / 행동, ↑↓ · 복제 · 삭제, 아래 버튼 = 고른 컷 다음에 추가).
+  오른쪽 **게임과 같은 재생 화면 미리보기**(카드 클릭 = 그 컷, **`▶ 이 컷부터 미리보기 재생`** 뒤 미리보기 클릭 = 다음, 선택지·이어지기도 그대로) · 흐름(계기 · 어디서 이어져 오는지 · 어디로 가는지 · 쓰는 퀘스트, 눌러서 이동) · 검사(없는 컷씬·대원·그림·퀘스트, 선택지 없음 등).
+  **`기지 테스트 플레이 (이 컷부터)`** = 저장 → 새 기지에서 그 컷부터 재생. 새 CG 는 `assets/cg/` 에 PNG 를 넣고 탭을 다시 열면 목록에 나옴(임포트 안 기다려도 보임).
+- **[임시] 컷씬 9개**: 오프닝(무너진 도시 CG → 기지 복도, 단·키라·앨마 → 이어서 혼자 있는 하나 → 선택지 '말을 건다' → 하나 컷씬) · 하나의 비밀 완료 → 대지모의 현신(CG) · 로한의 첫 연구 시작 → 연구실 · 3일차 → 옥상의 밤(키라·니키타, 친밀도 +3) · 단에게 처음 말 걸기 → 단의 조언(선택지 2갈래). 그림 4장은 자리표시.
+- 확인: `godot --path . ++ --scene=base --base_ui=cutscene:cs_opening` (셋째 칸 = 시작 컷 번호, 0부터). 테스트 플레이·스크린샷(`--base_ui`·`--shot`)에서는 오프닝 등 대기 컷씬이 안 나옴.
+
+![컷씬 — CG 위 대사 (하나의 비밀 → 대지모의 현신)](docs/screenshots/cutscene_cg.png)
+![컷씬 — 대원끼리 대화 (옥상의 밤)](docs/screenshots/cutscene_talk.png)
+![컷씬 — 선택지 (기지 화면 위)](docs/screenshots/cutscene_choice.png)
+![컷씬 에디터 (Godot 에디터 상단 '컷씬' 탭)](docs/screenshots/cutscene_editor.png)
 
 ## 세계관 도감
 기지 상단 **`도감`** 버튼 (또는 신 아이콘 클릭). 탭 = **등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경**. 왼쪽 목록(위아래 스크롤) → 오른쪽 그림·이름·부제·설명 + 게임 기록.
@@ -469,11 +487,12 @@ scripts/ui/        battle_hud, title, main_menu, formation, result
 scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정·단면 좌표), world_clock, room_route_service, npc_schedule_resolver,
                    npc_agent, economy_ledger, base_sim(해금·이동·대화·위생·의뢰·결산·점검·제작·저장) / base_hub(씬)
 scripts/outgame/view/  base_view_3d(3D 단면 건물·조명·카메라), base_overlay(이름표·자물쇠·오염·말풍선 — 화면 좌표), npc_view(대원 스프라이트), outgame_hud(HUD·창)
-addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor, rtz_sortie_editor, rtz_skill_editor, rtz_quest_editor (Godot 에디터 상단 탭)
-data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), faith.json(신·신앙 스킬·믿는 신·신 해금 캐릭터·기적), codex.json(세계관 도감), quests.json(퀘스트), statuses.json(상태 정의: 이름 → 효과), skill_status.json(스킬 상태 이상), monster_skills.json(몬스터 스킬), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
+addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor, rtz_sortie_editor, rtz_skill_editor, rtz_quest_editor, rtz_cutscene_editor (Godot 에디터 상단 탭)
+data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), faith.json(신·신앙 스킬·믿는 신·신 해금 캐릭터·기적), codex.json(세계관 도감), quests.json(퀘스트), cutscenes.json(컷씬), statuses.json(상태 정의: 이름 → 효과), skill_status.json(스킬 상태 이상), monster_skills.json(몬스터 스킬), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/characters/ 캐릭터별 base·프레임 애니메이션·마스크·character.json (전투·기지 공통)
+assets/cg/         컷씬 CG·배경 그림 (1280x720 PNG, 지금은 [임시] — tools/gen_cg_placeholders.py)
 assets/sprites/    무기 스프라이트 + 구역 마스크 (_mask_r/_mask_l) + 옛 테스트 캐릭터 + manifest.json
 assets/textures/   배경 플레이트 + 마스크, 3D 얼굴 데칼
 setup/             install_windows.ps1, install.sh (기기 설치), play.bat / play.sh / play.command (루트, 실행)

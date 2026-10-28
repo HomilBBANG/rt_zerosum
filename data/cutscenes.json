@@ -1,0 +1,374 @@
+{
+	"version": 1,
+	"cutscenes": [
+		{
+			"id": "cs_opening",
+			"name": "[임시] 오프닝 — 무너진 도시",
+			"kind": "opening",
+			"trigger": {
+				"type": "new_game",
+				"target": "",
+				"value": 1
+			},
+			"once": true,
+			"next": "cs_opening_hana",
+			"steps": [
+				{
+					"type": "cg",
+					"image": "res://assets/cg/cg_opening.png",
+					"text": "2048년. 도시는 하룻밤 사이에 무너졌다."
+				},
+				{
+					"type": "narration",
+					"text": "살아남은 이들은 지하 기지로 모였다. 그리고 오늘부터, 당신이 이곳의 지휘관이다."
+				},
+				{
+					"type": "bg",
+					"image": "res://assets/cg/bg_base_corridor.png"
+				},
+				{
+					"type": "say",
+					"speaker": "npc_dan",
+					"name": "",
+					"side": "left",
+					"text": "지휘관님, 오셨군요. 대원들은 전부 모였습니다."
+				},
+				{
+					"type": "say",
+					"speaker": "npc_kira",
+					"name": "",
+					"side": "right",
+					"text": "드디어! 이제 좀 제대로 굴러가겠네요."
+				},
+				{
+					"type": "say",
+					"speaker": "npc_alma",
+					"name": "",
+					"side": "right",
+					"text": "다친 사람이 생기면 바로 의무실로 보내 주세요. 무리는 금지예요."
+				}
+			]
+		},
+		{
+			"id": "cs_opening_hana",
+			"name": "[임시] 오프닝 — 혼자 있는 하나",
+			"kind": "opening",
+			"trigger": {
+				"type": "none",
+				"target": "",
+				"value": 1
+			},
+			"once": true,
+			"next": "",
+			"steps": [
+				{
+					"type": "say",
+					"speaker": "npc_hana",
+					"name": "",
+					"side": "left",
+					"text": "……."
+				},
+				{
+					"type": "narration",
+					"text": "하나는 무리에서 조금 떨어져, 무언가를 생각하는 듯하다."
+				},
+				{
+					"type": "choice",
+					"text": "하나에게 말을 걸까?",
+					"options": [
+						{
+							"text": "말을 건다",
+							"next": "cs_hana_first"
+						},
+						{
+							"text": "지금은 둔다",
+							"next": ""
+						}
+					]
+				},
+				{
+					"type": "narration",
+					"text": "기지의 하루가 시작된다."
+				}
+			]
+		},
+		{
+			"id": "cs_hana_first",
+			"name": "[임시] 하나 — 언젠가 말할게요",
+			"kind": "quest",
+			"trigger": {
+				"type": "none",
+				"target": "",
+				"value": 1
+			},
+			"once": true,
+			"next": "",
+			"steps": [
+				{
+					"type": "say",
+					"speaker": "npc_hana",
+					"name": "",
+					"side": "right",
+					"text": "…지휘관님? 아니에요, 아무것도."
+				},
+				{
+					"type": "say",
+					"speaker": "npc_hana",
+					"name": "",
+					"side": "right",
+					"text": "언젠가… 말씀드릴게요. 제가 부탁하는 일을 끝까지 도와주신다면."
+				},
+				{
+					"type": "action",
+					"do": "affinity",
+					"target": "npc_hana",
+					"value": 2
+				},
+				{
+					"type": "narration",
+					"text": "(퀘스트 '하나의 비밀' — 상단 '퀘스트' 창에서 확인)"
+				}
+			]
+		},
+		{
+			"id": "cs_hana_reveal",
+			"name": "[임시] 하나의 비밀 — 대지모의 현신",
+			"kind": "quest",
+			"trigger": {
+				"type": "quest_done",
+				"target": "q_hana_secret",
+				"value": 1
+			},
+			"once": true,
+			"next": "",
+			"steps": [
+				{
+					"type": "say",
+					"speaker": "npc_hana",
+					"name": "",
+					"side": "left",
+					"text": "약속, 지켜 주셨네요. 이제 말씀드릴게요."
+				},
+				{
+					"type": "cg",
+					"image": "res://assets/cg/cg_hana_terra.png",
+					"text": "땅이 울리고, 하나의 주위로 푸른 빛이 피어올랐다."
+				},
+				{
+					"type": "say",
+					"speaker": "npc_hana",
+					"name": "테라",
+					"side": "left",
+					"text": "나는 대지모 테라. 이 아이의 몸을 빌려 너희 곁에 있었다."
+				},
+				{
+					"type": "say",
+					"speaker": "npc_hana",
+					"name": "테라",
+					"side": "left",
+					"text": "두려워할 것 없다. 이 기지는 이제 나의 땅이기도 하니."
+				},
+				{
+					"type": "cg",
+					"image": "",
+					"text": ""
+				},
+				{
+					"type": "bg",
+					"image": "res://assets/cg/bg_base_corridor.png"
+				},
+				{
+					"type": "say",
+					"speaker": "npc_hana",
+					"name": "",
+					"side": "left",
+					"text": "…놀라셨죠? 그래도 저는 여전히 하나예요."
+				},
+				{
+					"type": "narration",
+					"text": "(하나의 스킬 창 신앙 탭이 '기적' 으로 바뀌었다)"
+				}
+			]
+		},
+		{
+			"id": "cs_rohan_lab",
+			"name": "[임시] 로한의 연구실",
+			"kind": "quest",
+			"trigger": {
+				"type": "quest_start",
+				"target": "q_rohan_lab",
+				"value": 1
+			},
+			"once": true,
+			"next": "",
+			"steps": [
+				{
+					"type": "bg",
+					"image": "res://assets/cg/bg_base_corridor.png"
+				},
+				{
+					"type": "say",
+					"speaker": "npc_rohan",
+					"name": "",
+					"side": "left",
+					"text": "지휘관님! 연구실 장비가 드디어 돌아갑니다."
+				},
+				{
+					"type": "say",
+					"speaker": "npc_rohan",
+					"name": "",
+					"side": "left",
+					"text": "산탄총 설계부터 해 보죠. 연구실에서 연구를 시작해 주시면 됩니다."
+				}
+			]
+		},
+		{
+			"id": "cs_rooftop",
+			"name": "[임시] 옥상의 밤 — 키라와 니키타",
+			"kind": "event",
+			"trigger": {
+				"type": "day",
+				"target": "",
+				"value": 3
+			},
+			"once": true,
+			"next": "",
+			"steps": [
+				{
+					"type": "bg",
+					"image": "res://assets/cg/bg_rooftop_night.png"
+				},
+				{
+					"type": "say",
+					"speaker": "npc_kira",
+					"name": "",
+					"side": "left",
+					"text": "니키타, 또 여기 있었어?"
+				},
+				{
+					"type": "say",
+					"speaker": "npc_nikita",
+					"name": "",
+					"side": "right",
+					"text": "여기가 제일 조용하거든. 별도 잘 보이고."
+				},
+				{
+					"type": "say",
+					"speaker": "npc_kira",
+					"name": "",
+					"side": "left",
+					"text": "…저번 작전, 고마웠어. 네가 아니었으면 난 끝이었을 거야."
+				},
+				{
+					"type": "say",
+					"speaker": "npc_nikita",
+					"name": "",
+					"side": "right",
+					"text": "인사는 됐어. 다음엔 네가 날 지켜 주면 되잖아."
+				},
+				{
+					"type": "action",
+					"do": "affinity",
+					"target": "npc_kira",
+					"value": 3
+				},
+				{
+					"type": "action",
+					"do": "affinity",
+					"target": "npc_nikita",
+					"value": 3
+				}
+			]
+		},
+		{
+			"id": "cs_talk_dan",
+			"name": "[임시] 단의 조언",
+			"kind": "talk",
+			"trigger": {
+				"type": "talk",
+				"target": "npc_dan",
+				"value": 1
+			},
+			"once": true,
+			"next": "",
+			"steps": [
+				{
+					"type": "say",
+					"speaker": "npc_dan",
+					"name": "",
+					"side": "left",
+					"text": "지휘관님, 잠깐 시간 괜찮으십니까?"
+				},
+				{
+					"type": "say",
+					"speaker": "npc_dan",
+					"name": "",
+					"side": "left",
+					"text": "대원들이 지쳐 보입니다. 가끔은 쉬게 해 주는 것도 지휘입니다."
+				},
+				{
+					"type": "choice",
+					"text": "단에게 뭐라고 할까?",
+					"options": [
+						{
+							"text": "알겠다, 신경 쓰지",
+							"next": "cs_talk_dan_yes"
+						},
+						{
+							"text": "지금은 여유가 없다",
+							"next": "cs_talk_dan_no"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "cs_talk_dan_yes",
+			"name": "[임시] 단의 조언 — 알겠다",
+			"kind": "talk",
+			"trigger": {
+				"type": "none",
+				"target": "",
+				"value": 1
+			},
+			"once": true,
+			"next": "",
+			"steps": [
+				{
+					"type": "say",
+					"speaker": "npc_dan",
+					"name": "",
+					"side": "left",
+					"text": "감사합니다. 대원들도 든든해할 겁니다."
+				},
+				{
+					"type": "action",
+					"do": "affinity",
+					"target": "npc_dan",
+					"value": 5
+				}
+			]
+		},
+		{
+			"id": "cs_talk_dan_no",
+			"name": "[임시] 단의 조언 — 여유가 없다",
+			"kind": "talk",
+			"trigger": {
+				"type": "none",
+				"target": "",
+				"value": 1
+			},
+			"once": true,
+			"next": "",
+			"steps": [
+				{
+					"type": "say",
+					"speaker": "npc_dan",
+					"name": "",
+					"side": "left",
+					"text": "…알겠습니다. 그래도 기억은 해 주십시오."
+				}
+			]
+		}
+	]
+}

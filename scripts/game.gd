@@ -73,7 +73,7 @@ func _ready() -> void:
 	data = GameData.load_from()
 	if data != null:
 		_balance_mtime = FileAccess.get_modified_time(GameData.BALANCE_PATH)
-		_tree_mtime = FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(QuestData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
+		_tree_mtime = FileAccess.get_modified_time(SkillTreeData.PATH) + FileAccess.get_modified_time(FaithData.PATH) + FileAccess.get_modified_time(QuestData.PATH) + FileAccess.get_modified_time(CutsceneData.PATH) + FileAccess.get_modified_time(CutsceneData.PATH) + FileAccess.get_modified_time(SkillStatusData.PATH) + FileAccess.get_modified_time(MonsterSkillData.PATH) + FileAccess.get_modified_time(StatusCatalog.PATH)
 		allies = data.allies
 		actions = data.actions
 		for w in data.warnings:
@@ -95,6 +95,9 @@ func _ready() -> void:
 						cli["base_ui"] = "skills:%s:L%d:::%s" % [sk.get("char", ""), int(sk.get("level", 1)), sk.get("kind", "active")]
 						if bool(sk.get("divine", false)):   # 기적 탭 테스트: 정체 해금 + 의지 올려 둠
 							cli["base_ui"] = "divine:%s:%d;faith:%s" % [sk.get("char", ""), int(sk.get("will", 0)), sk.get("char", "")]
+				if req.get("cutscene") is String:   # 컷씬 탭: 새 기지에서 그 컷씬을 그 컷부터 재생
+					cli["editor_base"] = true
+					cli["base_ui"] = "cutscene:%s:%d" % [req.cutscene, int(req.get("step", 0))]
 				if req.get("quest") is String:   # 퀘스트 탭: 새 기지에서 그 퀘스트를 시작(필요하면 단계 건너뛰기)하고 퀘스트 창
 					cli["editor_base"] = true
 					cli["base_ui"] = "quest:%s:%d" % [req.quest, int(req.get("step", 0))]
@@ -285,7 +288,7 @@ func _process(delta: float) -> void:
 		push_warning("balance.xlsx: " + w)
 	for e in _ally_copies:
 		_derive_ally(e.copy, e.base)
-	print("[balance] data/balance.xlsx · skill_tree.json · faith.json · quests.json · skill_status.json · statuses.json · monster_skills.json 다시 읽음")
+	print("[balance] data/balance.xlsx · skill_tree.json · faith.json · quests.json · cutscenes.json · skill_status.json · statuses.json · monster_skills.json 다시 읽음")
 	data_reloaded.emit(data.warnings)
 
 

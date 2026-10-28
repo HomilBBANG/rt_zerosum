@@ -29,6 +29,8 @@ var divine: Dictionary = {}
 var miracles: Dictionary = {}
 ## 퀘스트 [임시 데이터]: [{id, name, giver, desc, start, steps, rewards}] (data/quests.json — 에디터 '퀘스트' 탭, 진행은 BaseSim)
 var quests: Array = []
+## 컷씬 [임시 데이터]: [{id, name, kind, trigger, once, next, steps}] (data/cutscenes.json — 에디터 '컷씬' 탭, 재생은 CutscenePlayer)
+var cutscenes: Array = []
 var char_faith: Dictionary = {}
 var warnings: PackedStringArray = []
 var _stage_copies: Array = []       # [{copy: UnitData, base: id, stage: id}] 스테이지 배율 적용본
@@ -136,6 +138,7 @@ func _parse(sheets: Dictionary) -> void:
 	divine = fd.divine
 	miracles = FaithData.miracles_by_char(fd)
 	quests = QuestData.read()
+	cutscenes = CutsceneData.read()
 	for d in _table(sheets.get("몬스터", [])):
 		var m := _unit(d, "enemy")
 		if md.kits.has(m.id):   # 몬스터가 쓰는 스킬 = monster_skills.json kits (없으면 몬스터 시트 '스킬' 열)
@@ -286,6 +289,7 @@ func apply_from(newer: GameData) -> void:
 	divine = newer.divine
 	miracles = newer.miracles
 	quests = newer.quests
+	cutscenes = newer.cutscenes
 	char_faith = newer.char_faith
 	stages = newer.stages
 	stage_order = newer.stage_order

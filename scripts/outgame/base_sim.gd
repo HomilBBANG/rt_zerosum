@@ -22,6 +22,7 @@ signal divine_revealed(character_id: String)
 signal quest_started(quest_id: String)
 signal quest_step(quest_id: String, step: int)
 signal quest_completed(quest_id: String)
+signal cutscene_queued(cutscene_id: String)
 signal battle_triggered(pending: Dictionary)
 signal research_completed(research_id: String)
 signal leveled_up(character_id: String, level: int)
@@ -51,6 +52,8 @@ var divine_unlocked: Dictionary = {}  # 정체(신)가 드러난 캐릭터 id �
 var quests: Dictionary = {}          # 퀘스트 id → {state: active|done, step(지금 단계 번호), base(그 단계 시작 때 횟수), started, finished(일차)}
 var talk_counts: Dictionary = {}     # 대원 id → 지휘관과 대화한 횟수 (퀘스트 '대원과 대화' 단계)
 var _questing := false
+var cutscene_queue: Array = []       # 재생 기다리는 컷씬 id (기지 화면이 창 없을 때 차례로 재생)
+var cutscenes_seen: Dictionary = {}  # 본 컷씬 id → 처음 본 일차 (이어진 컷씬 포함)
 var inventory: Array = []            # [{uid, item, plus, owner(캐릭터 id 또는 ""), slot}]
 var workshop: Dictionary = {}        # {kind: craft|enhance, recipe?, uid?, remaining, total}
 var researched: Dictionary = {}      # 연구 id → true (완료)
@@ -98,6 +101,8 @@ func _new_game() -> void:
 	_log("기지 운영 시작")
 	for id in data.npc_order:
 		_npc_minute(npcs[id], _minute)
+	trigger_cutscenes("new_game")
+	trigger_cutscenes("day", "", _day + 1)
 	check_divine()   # 처음부터 시작하는 퀘스트 · 이미 조건을 채운 신
 
 
@@ -221,6 +226,7 @@ func _on_minute(m: int) -> void:
 
 
 func _new_day(d: int) -> void:
+	trigger_cutscenes("day", "", d + 1)
 	check_divine()
 	day_changed.emit(d)
 	if d % week_days() == 0:
@@ -483,7 +489,8 @@ func begin_dialogue(npc_id: String) -> Dictionary:
 		if fresh:
 			_log("%s 친밀도 %d 대화를 봤습니다" % [n.name, need])
 			npc_state_changed.emit(n.id)
-	return {"lines": data.dialogues.get(dlg, []), "request": {}, "affinity_need": need, "new_talk": fresh}
+	var cut := _take_cutscene("talk", npc_id)   # 그 대원에게 말 걸기 컷씬이 있으면 평소 대사 대신
+	return {"lines": data.dialogues.get(dlg, []), "request": {}, "affinity_need": need, "new_talk": fresh, "cutscene": cut}
 
 
 ## 친밀도로 해금된 대화 (낮은 단계부터)
@@ -646,7 +653,7 @@ func overhear(key: String) -> Dictionary:
 		story_seen[c.story] = clock.label(_minute)
 		_log("엿듣기로 스토리 대화 발견 (%s)" % c.story)
 	return {"lines": data.dialogues.get(c.dialogue, []), "story": str(c.story), "conv": c.id,
-		"title": "%s · %s 의 대화" % [data.npc_name(ch.a), data.npc_name(ch.b)]}
+		"title": "%s · %s 의 대화" % [data.npc_name(ch.a), data.npc_name(ch.b)], "cutscene": _take_cutscene("overhear", c.id)}
 
 
 # ================================================================ 위생 · 청소
@@ -1268,6 +1275,8 @@ func quest_done(target: String) -> bool:
 			return researched.has(id)
 		"quest":
 			return quest_status(id) == "done"
+		"cutscene":
+			return cutscenes_seen.has(id)
 	return false
 
 
@@ -1284,6 +1293,7 @@ func unlock_divine(cid: String, why: String = "") -> Dictionary:
 	var g: Dictionary = battle.gods.get(str(divine_info(cid).god), {})
 	_log("✦ %s 의 정체 — %s! 신앙 탭이 '기적' 으로 바뀝니다%s" % [_char_label(cid), g.get("name", "신"), " (%s)" % why if why != "" else ""])
 	divine_revealed.emit(cid)
+	trigger_cutscenes("divine", cid)
 	return {"ok": true, "msg": "%s — 정체는 %s" % [_char_label(cid), g.get("name", "신")]}
 
 
@@ -1331,6 +1341,7 @@ func start_quest(qid: String) -> Dictionary:
 	_begin_step(q)
 	_log("◆ 퀘스트 시작: %s" % q.name)
 	quest_started.emit(qid)
+	_quest_cutscenes("quest_start", qid, 0)
 	update_quests()
 	return {"ok": true, "msg": "퀘스트 시작 — %s" % q.name}
 
@@ -1386,6 +1397,8 @@ func quest_progress(qid: String) -> Dictionary:
 			need = n
 		"quest":
 			have = 1 if quest_status(t) == "done" else 0
+		"cutscene":
+			have = 1 if cutscenes_seen.has(t) else 0
 	return {"step": i, "total": steps.size(), "have": mini(have, need), "need": need, "done": have >= need}
 
 
@@ -1405,6 +1418,7 @@ func update_quests() -> void:
 				_begin_step(q)
 				_log("◆ 퀘스트 시작: %s" % q.name)
 				quest_started.emit(qid)
+				_quest_cutscenes("quest_start", qid, 0)
 				changed = true
 			elif stt == "active" and quest_progress(qid).get("done", false):
 				var qs: Dictionary = quests[qid]
@@ -1415,6 +1429,7 @@ func update_quests() -> void:
 				else:
 					_begin_step(q)
 					quest_step.emit(qid, int(qs.step))
+					trigger_cutscenes("quest_step", qid, int(qs.step) + 1)
 	_questing = false
 
 
@@ -1433,6 +1448,104 @@ func _complete_quest(q: Dictionary) -> void:
 		got.append("%s 친밀도 %+d" % [giver.name, int(rw.affinity)])
 	_log("◆ 퀘스트 완료: %s%s" % [q.name, " — 보상 " + ", ".join(got) if not got.is_empty() else ""])
 	quest_completed.emit(q.id)
+	trigger_cutscenes("quest_done", q.id)
+
+
+# ---------------------------------------------------------------- 컷씬 (data/cutscenes.json — 에디터 '컷씬' 탭) [임시 데이터]
+## 계기(새 게임 · 퀘스트 시작/단계/완료 · 말 걸기 · 엿듣기 · n일차 · 신 정체 · 전투 승리)가 오면 대기열에 넣고, 기지 HUD 가 창이 없을 때 차례로 재생.
+## 말 걸기·엿듣기 컷씬은 대기열이 아니라 그 대화 대신 바로 (begin_dialogue · overhear 결과의 "cutscene").
+func cutscene_defs() -> Array:
+	return battle.cutscenes if battle != null else []
+
+
+func cutscene_def(id: String) -> Dictionary:
+	for c in cutscene_defs():
+		if c.id == id:
+			return c
+	return {}
+
+
+func _cutscene_matches(c: Dictionary, type: String, target: String, value: int) -> bool:
+	var t: Dictionary = c.trigger
+	if str(t.type) != type:
+		return false
+	if type in ["quest_start", "quest_done", "quest_step", "talk", "overhear", "divine"] and str(t.target) != target:
+		return false
+	if type == "battle_win" and str(t.target) != "" and str(t.target) != target:
+		return false
+	if type in ["quest_step", "day"] and int(t.value) != value:
+		return false
+	return not (bool(c.once) and cutscenes_seen.has(c.id))
+
+
+## 계기가 맞는 컷씬을 대기열에 (한 번만 컷씬은 이미 봤거나 대기 중이면 빼고)
+func trigger_cutscenes(type: String, target: String = "", value: int = 0) -> void:
+	for c in cutscene_defs():
+		if _cutscene_matches(c, type, target, value) and not cutscene_queue.has(c.id):
+			cutscene_queue.append(c.id)
+			cutscene_queued.emit(c.id)
+
+
+func _quest_cutscenes(type: String, qid: String, _step: int) -> void:
+	trigger_cutscenes(type, qid)
+	trigger_cutscenes("quest_step", qid, 1)   # 1단계 시작 = 퀘스트 시작
+
+
+## 말 걸기·엿듣기: 맞는 컷씬 하나 (없으면 "")
+func _take_cutscene(type: String, target: String) -> String:
+	for c in cutscene_defs():
+		if _cutscene_matches(c, type, target, 0):
+			return str(c.id)
+	return ""
+
+
+## 이벤트·스크립트에서 직접 재생 예약
+func queue_cutscene(id: String) -> bool:
+	if cutscene_def(id).is_empty() or cutscene_queue.has(id):
+		return false
+	cutscene_queue.append(id)
+	cutscene_queued.emit(id)
+	return true
+
+
+## 다음에 재생할 컷씬 id ("" = 없음) — 꺼내면 대기열에서 빠짐
+func next_cutscene() -> String:
+	while not cutscene_queue.is_empty():
+		var id := str(cutscene_queue.pop_front())
+		if not cutscene_def(id).is_empty():
+			return id
+	return ""
+
+
+## 컷씬을 보기 시작함 (재생 화면이 이어진 컷씬마다 부름)
+func mark_cutscene_seen(id: String) -> void:
+	if not cutscenes_seen.has(id):
+		cutscenes_seen[id] = _day + 1
+		_log("▶ 컷씬: %s" % cutscene_def(id).get("name", id))
+	cutscene_queue.erase(id)
+	check_divine()   # 퀘스트 단계 '컷씬 보기' · 미션 'cutscene:id'
+
+
+## 행동 컷. 반환 {ok, msg}
+func apply_cutscene_action(st: Dictionary) -> Dictionary:
+	var t := str(st.get("target", ""))
+	var v := int(st.get("value", 0))
+	match str(st.get("do", "")):
+		"start_quest":
+			return start_quest(t)
+		"unlock_divine":
+			return unlock_divine(t, "컷씬")
+		"affinity":
+			var n: NpcAgent = npcs.get(t)
+			if n == null:
+				return _fail("없는 대원")
+			_add_affinity(n, float(v))
+			return {"ok": true, "msg": "%s 친밀도 %+d" % [n.name, v]}
+		"cash":
+			var key := "cutscene:%s:%d" % [t, _minute]
+			ledger.add_pending(key, "event", v, t, "이벤트 (%s)" % (t if t != "" else "컷씬"), week_now())
+			return {"ok": true, "msg": "$%d — 주간 결산 때" % v}
+	return _fail("모르는 행동")
 
 
 func miracle_list(cid: String) -> Array:
@@ -2132,6 +2245,8 @@ func apply_battle_result(result: Dictionary) -> void:
 		"rule": str(pending_battle.get("rule", "")), "winner": w})
 	pending_battle = {}
 	_log("전투 결과: %s — %s" % ["승리" if w == "ally" else "패배", ", ".join(lines)])
+	if w == "ally":
+		trigger_cutscenes("battle_win", str(battle_history.back().stage))
 	check_divine()   # 미션(전투 승리) 완료 조건
 
 
@@ -2220,7 +2335,8 @@ func to_dict() -> Dictionary:
 		"story_seen": story_seen, "inspections": inspections, "progression": progression, "inventory": inventory,
 		"workshop": workshop, "researched": researched.keys(), "research": research, "counters": counters, "log": log_lines.slice(maxi(0, log_lines.size() - 100)), "cleaning_log": cleaning_log,
 		"chars": chars, "food": food, "gifts": gifts, "pending_battle": pending_battle, "battle_history": battle_history, "divine_unlocked": divine_unlocked.keys(),
-		"quests": quests, "talk_counts": talk_counts}
+		"quests": quests, "talk_counts": talk_counts,
+		"cutscene_queue": cutscene_queue, "cutscenes_seen": cutscenes_seen}
 
 
 static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) -> BaseSim:
@@ -2263,6 +2379,10 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 		var e: Dictionary = qd[k]
 		s.quests[str(k)] = {"state": str(e.get("state", "active")), "step": int(e.get("step", 0)), "base": int(e.get("base", 0)),
 			"started": int(e.get("started", 1)), "finished": int(e.get("finished", -1))}
+	s.cutscene_queue = (d.get("cutscene_queue", []) as Array).map(func(x): return str(x))
+	var cs0: Dictionary = d.get("cutscenes_seen", {})
+	for k in cs0:
+		s.cutscenes_seen[str(k)] = int(cs0[k])
 	var tc: Dictionary = d.get("talk_counts", {})
 	for k in tc:
 		s.talk_counts[str(k)] = int(tc[k])

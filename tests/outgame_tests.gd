@@ -40,6 +40,7 @@ func run(p_check: Callable) -> void:
 	_test_faith()
 	_test_divine()
 	_test_quests()
+	_test_cutscenes()
 	_test_skill_tree_editor()
 
 
@@ -913,7 +914,7 @@ func _test_divine() -> void:
 	_c(not s.cond_met({"type": "manual", "value": 0}, "a_dan") and s.cond_met({"type": "always", "value": 0}, "a_dan"), "조건: 직접(자동 해금 안 됨) · 처음부터")
 	var names := UnlockCond.mission_names(data, battle)
 	_c(UnlockCond.describe(cond, names) == "미션 완료: 퀘스트 하나의 비밀" and UnlockCond.norm({"type": "zzz"}).type == "manual", "조건 설명 '%s' · 모르는 조건 = 직접 해금" % UnlockCond.describe(cond, names))
-	_c(UnlockCond.missions(data, battle).size() == data.job_order.size() + battle.stage_order.size() + data.research_order.size() + battle.quests.size(), "미션 목록 = 의뢰 + 전투 스테이지 + 연구 + 퀘스트")
+	_c(UnlockCond.missions(data, battle).size() == data.job_order.size() + battle.stage_order.size() + data.research_order.size() + battle.quests.size() + battle.cutscenes.size(), "미션 목록 = 의뢰 + 전투 스테이지 + 연구 + 퀘스트 + 컷씬")
 	# 처음부터 해금 (데이터는 그대로 두고 복사본으로)
 	var b2 := GameData.load_from()
 	b2.divine["a_kira"] = {"god": "veyra", "unlocked": true, "condition": {"type": "manual", "value": 0}}
@@ -983,6 +984,95 @@ func _test_quests() -> void:
 	sv.battle_history.append({"stage": "x", "winner": "ally"})
 	sv.check_divine()
 	_c(sv.quest_status("q_t") == "done", "승리 2번 → 완료")
+
+
+## 컷씬 (data/cutscenes.json — 에디터 '컷씬' 탭 · 임시 데이터) · 계기 · 이어지기 · 재생 화면
+func _test_cutscenes() -> void:
+	print("[34d] 컷씬 — 계기 · 대기열 · 이어지기 · 선택지 · 행동 · 저장")
+	var cuts := CutsceneData.read()
+	_c(cuts.size() >= 5 and battle.cutscenes.size() == cuts.size(), "cutscenes.json 컷씬 %d개 → GameData.cutscenes" % cuts.size())
+	var convs := data.conversations.map(func(c): return c.id)
+	var res := CutsceneData.check(cuts, data.npcs, battle.quests, convs, battle.divine.keys())
+	_c(res.errors.is_empty(), "기본 데이터 검사 오류 없음 %s" % [res.errors])
+	var tmp := "user://cutscenes_test.json"
+	_c(CutsceneData.write(cuts, tmp) == OK and JSON.stringify(CutsceneData.read(tmp)) == JSON.stringify(cuts), "저장 → 다시 읽기 그대로")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+	var bad := CutsceneData.read()
+	bad[0].next = "없음"
+	bad[0].steps.append({"type": "say", "speaker": "npc_없음", "name": "", "side": "left", "text": "x"})
+	bad[0].steps.append({"type": "cg", "image": "res://assets/cg/없음.png", "text": ""})
+	_c(CutsceneData.check(bad, data.npcs, battle.quests, convs, battle.divine.keys()).errors.size() >= 3, "검사: 없는 다음 컷씬 · 대원 · 그림")
+	_c(CutsceneData.images().size() >= 4 and CutsceneData.texture("res://assets/cg/cg_opening.png") != null, "assets/cg 그림 %d개, 원본 PNG 바로 읽기" % CutsceneData.images().size())
+	_c(CutsceneData.incoming(cuts, "cs_hana_first").size() == 1 and CutsceneData.incoming(cuts, "cs_opening_hana")[0][0] == "cs_opening", "이어지기: 선택지 → 하나 / 오프닝 → 혼자 있는 하나")
+	# 계기
+	var s := _sim()
+	_c(s.cutscene_queue == ["cs_opening"], "새 게임 → 오프닝 대기 %s" % [s.cutscene_queue])
+	_c(s.next_cutscene() == "cs_opening" and s.cutscene_queue.is_empty(), "꺼내면 대기열에서 빠짐")
+	s.mark_cutscene_seen("cs_opening")
+	_c(s.cutscenes_seen.has("cs_opening") and s.quest_done("cutscene:cs_opening"), "본 컷씬 기록 · 미션 'cutscene:id'")
+	s.trigger_cutscenes("new_game")
+	_c(s.cutscene_queue.is_empty(), "한 번만 컷씬은 다시 안 나옴")
+	var d := s.begin_dialogue("npc_dan")
+	_c(str(d.get("cutscene", "")) == "cs_talk_dan", "단에게 말 걸기 → 컷씬 '단의 조언' (평소 대사 대신)")
+	s.end_dialogue("npc_dan")
+	s.mark_cutscene_seen("cs_talk_dan")
+	d = s.begin_dialogue("npc_dan")
+	_c(str(d.get("cutscene", "")) == "" and not (d.lines as Array).is_empty(), "본 뒤로는 평소 대사")
+	s.end_dialogue("npc_dan")
+	s.skip_to_next_day()
+	_c(s.cutscene_queue.has("cs_rohan_lab") and not s.cutscene_queue.has("cs_rooftop"), "2일차: 퀘스트 '로한의 첫 연구' 시작 → 컷씬, 옥상(3일차)은 아직")
+	s.skip_to_next_day()
+	_c(s.cutscene_queue.has("cs_rooftop"), "3일차 아침 → 옥상의 밤")
+	# 하나의 비밀 완료 → 대지모의 현신
+	s.jobs.append({"uid": "t9", "contract": "c_ext_escort", "npc": "npc_kira", "state": "assigned", "minute": 0})
+	s._complete_job("t9", s.npcs.npc_kira)
+	s.apply_battle_result({"winner": "ally", "allies": [{"id": "a_dan", "hp": 30, "alive": true, "statuses": []}]})
+	s.begin_dialogue("npc_hana")
+	s.end_dialogue("npc_hana")
+	_c(s.quest_status("q_hana_secret") == "done" and s.cutscene_queue.has("cs_hana_reveal"), "퀘스트 완료 → 컷씬 '대지모의 현신' 대기")
+	# 행동
+	var a0 := float(s.cstate(s.npcs.npc_nikita).affinity)
+	_c(s.apply_cutscene_action({"do": "affinity", "target": "npc_nikita", "value": 4}).ok and float(s.cstate(s.npcs.npc_nikita).affinity) == minf(100.0, a0 + 4), "행동: 친밀도 +4")
+	var pend := s.ledger.pending_total()
+	_c(s.apply_cutscene_action({"do": "cash", "target": "보급", "value": 30}).ok and s.ledger.pending_total() == pend + 30, "행동: 현금 $30 (결산 대기)")
+	_c(not s.apply_cutscene_action({"do": "start_quest", "target": "q_rohan_lab", "value": 0}).ok, "행동: 이미 시작한 퀘스트는 실패")
+	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
+	_c(sv.cutscene_queue == s.cutscene_queue and sv.cutscenes_seen.has("cs_talk_dan"), "저장/불러오기 후 대기열·본 컷씬 유지")
+	# 재생 화면: 오프닝 → (이어짐) 혼자 있는 하나 → 선택지
+	var p := CutscenePlayer.new()
+	p._ready()
+	p.defs = CutsceneData.by_id(cuts)
+	p.npcs = data.npcs
+	var started := []
+	var acts := []
+	var ended := []
+	p.cutscene_started.connect(func(id): started.append(id))
+	p.action_requested.connect(func(st): acts.append(st))
+	p.finished.connect(func(id): ended.append(id))
+	p.play("cs_opening")
+	_c(p.cg_rect.visible and p.box.visible, "첫 컷 = CG + 글 상자")
+	var guard := 0
+	while not p._waiting_choice and p.playing and guard < 50:
+		p.advance()
+		guard += 1
+	_c(started == ["cs_opening", "cs_opening_hana"] and p._waiting_choice and p.choice_box.get_child_count() == 2, "오프닝 끝 → 이어서 '혼자 있는 하나' → 선택지 2개")
+	_c(p.stand.left.texture != null and not p.cg_rect.visible, "배경 컷 뒤엔 CG 꺼지고 대원이 서 있음")
+	p._choose("cs_hana_first")
+	p.skip_all()
+	_c(started.back() == "cs_hana_first" and acts.size() == 1 and acts[0].do == "affinity" and ended == ["cs_hana_first"], "선택지 '말을 건다' → 하나 컷씬, 건너뛰기 = 남은 행동 적용 후 끝")
+	started.clear()
+	ended.clear()
+	p.play("cs_opening_hana")
+	while not p._waiting_choice and guard < 100:
+		p.advance()
+		guard += 1
+	p._choose("")
+	p.advance()
+	p.advance()
+	_c(ended == ["cs_opening_hana"], "선택지 '지금은 둔다'(끝) → 그 컷씬 다음 컷 → 끝")
+	p.show_at("cs_hana_reveal", 2)
+	_c(p.cg_rect.visible and p.name_lab.text == "테라" and not p.stand.left.visible, "미리보기: 3번 컷 = CG 위에 '테라' 대사, 서 있는 대원 숨김")
+	p.free()
 
 
 func _test_skill_tree_editor() -> void:

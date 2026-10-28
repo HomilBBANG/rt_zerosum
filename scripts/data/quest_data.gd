@@ -10,8 +10,8 @@ extends RefCounted
 
 const PATH := "res://data/quests.json"
 const STEP_KINDS := {"contract": "의뢰 완료", "stage": "전투 승리", "research": "연구 완료", "talk": "대원과 대화",
-	"affinity": "대원 친밀도", "level": "대원 레벨", "day": "일차 도달", "quest": "다른 퀘스트 완료"}
-const STEP_ORDER := ["contract", "stage", "talk", "research", "affinity", "level", "day", "quest"]
+	"affinity": "대원 친밀도", "level": "대원 레벨", "day": "일차 도달", "quest": "다른 퀘스트 완료", "cutscene": "컷씬 보기"}
+const STEP_ORDER := ["contract", "stage", "talk", "research", "affinity", "level", "day", "quest", "cutscene"]
 ## 횟수로 세는 단계 (그 단계 시작 뒤부터) / 값 이상이면 되는 단계
 const COUNTED := ["contract", "stage", "talk"]
 const VALUED := ["affinity", "level", "day"]
@@ -91,6 +91,8 @@ static func step_text(st: Dictionary, names: Dictionary = {}) -> String:
 			return "%d일차가 되기" % n
 		"quest":
 			return "퀘스트 '%s' 완료" % nm
+		"cutscene":
+			return "컷씬 '%s' 보기" % nm
 	return str(st.kind)
 
 
@@ -122,6 +124,9 @@ static func targets(kind: String, od: OutgameData, gd: GameData, quests: Array =
 		"quest":
 			for q in quests:
 				out.append([q.id, str(q.name)])
+		"cutscene":
+			for c in (gd.cutscenes if gd != null else CutsceneData.read()):
+				out.append([c.id, str(c.name)])
 	return out
 
 

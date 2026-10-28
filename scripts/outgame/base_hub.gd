@@ -112,6 +112,10 @@ func _ready() -> void:
 		var nb := sim.next_battle()
 		if not nb.is_empty():
 			sim.skip(maxi(0, int(nb.minute) - sim.clock.minute_int() - 10))
+	if Game.cli.has("editor_base") or Game.cli.has("shot") or Game.cli.has("base_ui"):
+		sim.cutscene_queue.clear()   # 테스트 플레이·스크린샷은 오프닝 등 대기 컷씬 없이
+	else:
+		hud._pump_cutscenes.call_deferred()   # 새 게임 오프닝 · 전투에서 돌아온 뒤 컷씬
 	if Game.cli.has("base_ui"):
 		for spec in str(Game.cli.base_ui).split(";"):   # 여러 개는 ; 로 (순서대로)
 			call_deferred("_cli_ui", spec)
@@ -512,7 +516,7 @@ func debug_delete_save() -> void:
 	hud.show_toast("저장 파일 삭제 (지금 진행은 그대로)")
 
 
-## CLI 스크린샷용: --base_ui=dialogue:npc_alma | overhear | unlock:f1_mess | facility:b1_workshop | context:npc_dan | statement | character:npc_kira | codex:gods:solus | quest:q_hana_secret
+## CLI 스크린샷용: --base_ui=dialogue:npc_alma | overhear | unlock:f1_mess | facility:b1_workshop | context:npc_dan | statement | character:npc_kira | codex:gods:solus | quest:q_hana_secret | cutscene:cs_opening
 func _cli_ui(spec: String) -> void:
 	var p := spec.split(":")
 	match p[0]:
@@ -554,6 +558,8 @@ func _cli_ui(spec: String) -> void:
 			if p.size() > 2:
 				sim.add_will(p[1], int(p[2]))
 			hud.show_toast(r3.msg, OutgameHud.GOOD if r3.ok else OutgameHud.BAD)
+		"cutscene":   # cutscene:컷씬 id[:컷 번호(0부터)] — 그 컷씬 재생 (에디터 테스트 플레이용)
+			hud.play_cutscene(p[1], int(p[2]) if p.size() > 2 else 0)
 		"quest":   # quest[:퀘스트 id[:단계까지 진행]] — 퀘스트 창 (시작 안 했으면 시작, 에디터 테스트 플레이용)
 			if p.size() > 1 and p[1] != "":
 				if sim.quest_status(p[1]) == "":

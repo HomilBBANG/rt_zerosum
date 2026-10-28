@@ -76,6 +76,7 @@ func setup(p_hub: Node, p_sim: BaseSim) -> void:
 		show_toast("✦ %s 의 정체 — %s! 스킬 창 신앙 탭이 '기적' 으로" % [_char_name(cid), sim.divine_god(cid).get("name", "신")], Color(1, 0.9, 0.5)))
 	sim.quest_started.connect(func(qid): show_toast("◆ 퀘스트 시작: %s" % sim.quest_def(qid).get("name", qid), QUEST_COL))
 	sim.quest_step.connect(func(qid, _i): show_toast("◆ %s — 다음: %s" % [sim.quest_def(qid).get("name", qid), _quest_step_line(qid, int(_i))], QUEST_COL))
+	sim.cutscene_queued.connect(func(_id): _pump_cutscenes.call_deferred())
 	sim.quest_completed.connect(func(qid): show_toast("◆ 퀘스트 완료: %s" % sim.quest_def(qid).get("name", qid), GOOD))
 
 
@@ -465,9 +466,15 @@ func close_top() -> void:
 	if m.has_meta("on_close"):
 		(m.get_meta("on_close") as Callable).call()
 	m.queue_free()
+	_after_modal()
+
+
+func _after_modal() -> void:
 	if _modals.is_empty() and not _queue.is_empty():
 		var fn: Callable = _queue.pop_front()
 		fn.call_deferred()
+	elif _modals.is_empty():
+		_pump_cutscenes.call_deferred()
 
 
 func close_all() -> void:
@@ -538,6 +545,9 @@ func _sprite_of(speaker: String) -> String:
 func open_dialogue(npc_id: String) -> void:
 	var d := sim.begin_dialogue(npc_id)
 	if d.is_empty():
+		return
+	if str(d.get("cutscene", "")) != "":   # 말 걸기 컷씬 = 평소 대사 대신
+		play_cutscene(d.cutscene, 0, func(): sim.end_dialogue(npc_id))
 		return
 	var req: Dictionary = d.request
 	var title := "%s와(과) 대화" % sim.data.npc_name(npc_id) if req.is_empty() else "%s의 요청 !" % sim.data.npc_name(npc_id)
@@ -631,6 +641,9 @@ func _gift_row(npc_id: String) -> HBoxContainer:
 func open_overhear(key: String) -> void:
 	var o := sim.overhear(key)
 	if o.is_empty():
+		return
+	if str(o.get("cutscene", "")) != "":   # 엿듣기 컷씬 = 엿듣기 창 대신
+		play_cutscene(o.cutscene)
 		return
 	var win := _window("엿듣기 — " + str(o.title), 680)
 	var body: VBoxContainer = win.body
@@ -1378,6 +1391,49 @@ func open_contracts(npc_id: String) -> void:
 			var n: NpcAgent = sim.npcs.get(jb.npc)
 			body.add_child(_label("%s — %s (%s, 남은 %d분)" % [sim.data.jobs.get(jb.contract, {}).get("name", jb.contract), n.name if n else jb.npc,
 				"이동 중" if jb.state == "assigned" else "작업 중", int(n.busy) if n else 0], 14, Color(0.85, 0.9, 1)))
+
+
+# ---------------------------------------------------------------- 컷씬 (data/cutscenes.json — 에디터 '컷씬' 탭, 재생 화면은 CutscenePlayer)
+## 창이 열려 있으면 닫힌 뒤에. 재생 중엔 모달로 쳐서 시간이 멈춤. on_end = 다 본 뒤 (말 걸기 컷씬이면 대화 끝내기)
+func play_cutscene(id: String, from: int = 0, on_end: Callable = Callable()) -> void:
+	if sim.cutscene_def(id).is_empty():
+		if on_end.is_valid():
+			on_end.call()
+		return
+	if modal_open():
+		enqueue(func(): play_cutscene(id, from, on_end))
+		return
+	var p := CutscenePlayer.new()
+	p.defs = CutsceneData.by_id(sim.cutscene_defs())
+	p.npcs = sim.data.npcs
+	add_child(p)
+	_modals.append(p)
+	p.set_meta("on_close", func(): p.skip_all())   # close_top · close_all 로 닫혀도 남은 행동은 적용
+	p.cutscene_started.connect(func(cid): sim.mark_cutscene_seen(cid))
+	p.action_requested.connect(func(st):
+		var r := sim.apply_cutscene_action(st)
+		if str(st.do) != "affinity":
+			show_toast(str(r.msg), GOOD if r.ok else BAD))
+	p.finished.connect(func(_last):
+		_modals.erase(p)
+		p.queue_free()
+		if on_end.is_valid():
+			on_end.call()
+		_after_modal())
+	p.play(id, from)
+
+
+## 대기열의 컷씬 (창이 없을 때 하나씩)
+func _pump_cutscenes() -> void:
+	if modal_open():
+		return
+	var id := sim.next_cutscene()
+	if id != "":
+		play_cutscene(id)
+
+
+func playing_cutscene() -> bool:
+	return _modals.any(func(m): return m is CutscenePlayer)
 
 
 # ---------------------------------------------------------------- 퀘스트 (data/quests.json — 에디터 '퀘스트' 탭, 진행은 BaseSim)
