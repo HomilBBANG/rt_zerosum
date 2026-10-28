@@ -42,6 +42,7 @@ func run(p_check: Callable) -> void:
 	_test_quests()
 	_test_cutscenes()
 	_test_skill_tree_editor()
+	_test_editor_history()
 
 
 func _sim() -> BaseSim:
@@ -1255,3 +1256,70 @@ func _test_skill_tree_editor() -> void:
 	_c(ult_next == "sk_" + nid, "필살기 다음 칸에 들어감")
 	_c(not MonsterSkillData.check({"skills": [MonsterSkillData.new_skill("heal")], "kits": {}}, battle.actions.keys(), battle.monsters).errors.is_empty(), "검사: 엑셀 스킬과 같은 id 는 오류")
 	panel.free()
+
+
+## 에디터 뒤로 감기 (Ctrl+Z) · 앞으로 감기 (Ctrl+Y) — addons/rtz_common/editor_history.gd
+func _test_editor_history() -> void:
+	print("[36] 에디터 뒤로 감기 · 앞으로 감기")
+	var st := {"v": {"n": 0, "name": ""}}
+	var h := EditorHistory.new(func(): return var_to_str(st.v), func(x): st.v = str_to_var(x))
+	h.reset()
+	st.v.n = 1
+	h.tick(0.2)
+	st.v.name = "가"
+	h.tick(0.2)
+	st.v.name = "가나"
+	h.tick(0.2)
+	h.tick(0.5)
+	_c(h.undo_count() == 1, "잇달아 바꾼 것은 잠깐 멈춘 뒤 한 단계로 묶임")
+	st.v.n = 5
+	_c(h.undo() and st.v.n == 1 and st.v.name == "가나", "아직 기록 안 된 바뀜도 뒤로 감기 전에 기록 → 한 단계 뒤로")
+	_c(h.undo() and st.v.n == 0 and st.v.name == "" and typeof(st.v.n) == TYPE_INT, "한 단계 더 뒤로 (정수는 정수 그대로)")
+	_c(not h.undo(), "처음보다 더 뒤로는 안 감")
+	_c(h.redo() and st.v.n == 1 and h.redo() and st.v.n == 5 and not h.redo(), "앞으로 감기 두 번 → 마지막까지")
+	h.undo()
+	st.v.n = 9
+	h.tick(0.2)
+	h.tick(0.5)
+	_c(h.redo_count() == 0 and not h.redo(), "뒤로 간 뒤 새로 고치면 앞쪽 기록은 사라짐")
+	var ev := InputEventKey.new()
+	ev.pressed = true
+	ev.ctrl_pressed = true
+	ev.keycode = KEY_Z
+	var d1 := EditorHistory.key_dir(ev)
+	ev.shift_pressed = true
+	var d2 := EditorHistory.key_dir(ev)
+	ev.shift_pressed = false
+	ev.keycode = KEY_Y
+	var d3 := EditorHistory.key_dir(ev)
+	ev.ctrl_pressed = false
+	ev.meta_pressed = true
+	var d4 := EditorHistory.key_dir(ev)
+	ev.meta_pressed = false
+	var d5 := EditorHistory.key_dir(ev)
+	_c(d1 == -1 and d2 == 1 and d3 == 1 and d4 == 1 and d5 == 0, "Ctrl+Z 뒤로 · Ctrl+Shift+Z · Ctrl+Y · Cmd+Y 앞으로 · 그냥 Y 는 아님")
+	# 스킬 트리 에디터: 노드 추가 → 뒤로 → 앞으로
+	var panel: Control = load("res://addons/rtz_skill_editor/skill_editor_panel.gd").new()
+	panel._ready()
+	var before: int = panel.nodes.size()
+	panel.kind = "passive"
+	panel.sel = ""
+	panel._add_node(5, 5)
+	panel.history.tick(1.0)
+	panel.history.tick(1.0)
+	_c(panel.nodes.size() == before + 1 and panel.history.undo_count() == 1, "스킬 트리: 노드 추가 = 한 단계")
+	_c(panel.history.undo() and panel.nodes.size() == before, "Ctrl+Z → 추가한 노드가 사라짐")
+	_c(panel.history.redo() and panel.nodes.size() == before + 1 and not panel._cell(5, 5).is_empty(), "Ctrl+Y → 다시 생김")
+	panel.free()
+	# 다른 에디터들도 기록을 가짐
+	for path in ["res://addons/rtz_quest_editor/quest_editor_panel.gd", "res://addons/rtz_battle_editor/battle_editor_panel.gd",
+			"res://addons/rtz_sortie_editor/sortie_editor_panel.gd", "res://addons/rtz_cutscene_editor/cutscene_editor_panel.gd"]:
+		var p2: Control = load(path).new()
+		p2._ready()
+		if p2.has_method("reload_data"):
+			p2.reload_data(false)
+		var snap0: String = p2._hist_snap()
+		p2._hist_apply(snap0)
+		_c(p2.history != null and p2._hist_snap() == snap0, "%s: 뒤로 감기 기록 · 되돌려도 데이터 그대로" % path.get_file())
+		p2.free()
+

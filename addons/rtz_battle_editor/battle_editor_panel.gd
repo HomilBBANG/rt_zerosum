@@ -8,6 +8,7 @@ extends Control
 const RULE_COLORS := [Color(1.0, 0.45, 0.4), Color(1.0, 0.75, 0.3), Color(0.45, 0.8, 1.0), Color(0.6, 0.9, 0.45), Color(0.85, 0.55, 1.0), Color(0.4, 0.95, 0.85)]
 const PREVIEW_DAYS := 7
 
+var history: EditorHistory   # Ctrl+Z 뒤로 감기 · Ctrl+Y 앞으로 감기 (addons/rtz_common/editor_history.gd)
 var rules: Array = []
 var sel := -1
 var dirty := false
@@ -25,6 +26,7 @@ var check_label: RichTextLabel
 
 
 func _ready() -> void:
+	history = EditorHistory.new(_hist_snap, _hist_apply)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -136,6 +138,7 @@ func _load() -> void:
 	sel = clampi(sel, 0, rules.size() - 1) if not rules.is_empty() else -1
 	status.text = "%d개 규칙" % rules.size()
 	_rebuild()
+	history.reset()
 
 
 func _mark() -> void:
@@ -536,3 +539,25 @@ func _head(t: String) -> Label:
 	l.add_theme_font_size_override("font_size", 15)
 	l.add_theme_color_override("font_color", Color(1, 0.95, 0.75))
 	return l
+
+
+# ================================================================ 뒤로 감기 (Ctrl+Z) · 앞으로 감기 (Ctrl+Y)
+func _process(delta: float) -> void:
+	if history != null and is_visible_in_tree():
+		history.tick(delta)
+
+
+func _input(event: InputEvent) -> void:
+	EditorHistory.handle_input(self, event, history, status)
+
+
+## 편집 중인 데이터 전체 (var_to_str — 정수·실수 그대로)
+func _hist_snap() -> String:
+	return var_to_str(rules)
+
+
+func _hist_apply(s: String) -> void:
+	rules = str_to_var(s)
+	dirty = true
+	sel = clampi(sel, 0, rules.size() - 1) if not rules.is_empty() else -1
+	_rebuild()

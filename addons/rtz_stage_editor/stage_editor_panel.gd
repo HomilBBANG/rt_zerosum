@@ -8,6 +8,7 @@ const CELL := Vector2(170, 150)
 const GAP := 10.0
 const ROW_NAMES := ["전방", "중앙", "후방"]
 
+var history: EditorHistory   # Ctrl+Z 뒤로 감기 · Ctrl+Y 앞으로 감기 (addons/rtz_common/editor_history.gd)
 var stage_list: OptionButton
 var info: Label
 var status: Label
@@ -22,6 +23,7 @@ var data: GameData = null     # 밸런스 엑셀 (스테이지·몬스터)
 
 
 func _ready() -> void:
+	history = EditorHistory.new(_hist_snap, _hist_apply)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -160,6 +162,7 @@ func _load(id: String) -> void:
 	_update_info()
 	status.text = ""
 	grid.queue_redraw()
+	history.reset()
 
 
 func _update_info() -> void:
@@ -312,3 +315,26 @@ func _shortcut_input(event: InputEvent) -> void:
 	if is_visible_in_tree() and event is InputEventKey and event.pressed and (event.ctrl_pressed or event.meta_pressed) and event.keycode == KEY_S:
 		_save()
 		get_viewport().set_input_as_handled()
+
+
+# ================================================================ 뒤로 감기 (Ctrl+Z) · 앞으로 감기 (Ctrl+Y)
+func _process(delta: float) -> void:
+	if history != null and is_visible_in_tree():
+		history.tick(delta)
+
+
+func _input(event: InputEvent) -> void:
+	EditorHistory.handle_input(self, event, history, status)
+
+
+## 편집 중인 데이터 전체 (var_to_str — 정수·실수 그대로)
+func _hist_snap() -> String:
+	return var_to_str([stage_id, placement])
+
+
+func _hist_apply(s: String) -> void:
+	var v: Array = str_to_var(s)
+	if str(v[0]) != stage_id:
+		return
+	placement = v[1]
+	grid.queue_redraw()

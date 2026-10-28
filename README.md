@@ -109,6 +109,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ## 밸런스 데이터 (엑셀) · AI 에디터 · 스테이지 에디터
 에디터는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`, `addons/rtz_sortie_editor`, `addons/rtz_skill_editor`, `addons/rtz_quest_editor`, `addons/rtz_cutscene_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` · `출정 대사` · `스킬 트리` · `퀘스트` · `컷씬` 이 있습니다.
+**모든 탭 공통: `Ctrl+Z` = 뒤로 감기 · `Ctrl+Y` (또는 `Ctrl+Shift+Z`) = 앞으로 감기** (Mac 은 Cmd, 탭마다 200단계, 글자를 이어 치면 한 단계로 묶임). 글자 칸에 커서가 있으면 그 칸 글자만 되돌리고, 칸 밖을 한 번 누르면 탭 전체 뒤로 감기. 파일을 다시 읽으면(`되돌리기` · 다른 파일/대원 열기) 기록은 새로 시작. 저장은 따로 (`Ctrl+S`).
 **밸런스 수치는 `data/balance.xlsx`** 한 파일에 시트별로 있습니다: `캐릭터` · `몬스터` · `아이템` · `스킬` · `스테이지` (+ 열 설명 `읽어보기`).
 - 엑셀(또는 Numbers·LibreOffice)로 열어 고치고 **저장하면 1초 안에 게임이 다시 읽어 바로 적용** — 진행 중인 전투의 HP·AP·위력·이름까지.
   캐릭터 추가·편성·적 배치처럼 전투 구성이 바뀌는 것은 다음 전투(R 재시작)부터.

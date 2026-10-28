@@ -12,6 +12,7 @@ extends Control
 
 const CANVAS := preload("res://addons/rtz_skill_editor/skill_tree_canvas.gd")
 
+var history: EditorHistory   # Ctrl+Z 뒤로 감기 · Ctrl+Y 앞으로 감기 (addons/rtz_common/editor_history.gd)
 var nodes: Array = []                # 전체 노드 (모든 캐릭터)
 var dirty := false
 var _rebuilding := false
@@ -78,6 +79,7 @@ var info_label: Label
 
 
 func _ready() -> void:
+	history = EditorHistory.new(_hist_snap, _hist_apply)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -277,6 +279,7 @@ func _load() -> void:
 	dirty = false
 	status.text = "data/skill_tree.json 노드 %d개 · data/faith.json 신 %d · 신앙 스킬 %d" % [nodes.size(), faith.gods.size(), faith.skills.size()]
 	_rebuild()
+	history.reset()
 
 
 ## 스킬 트리 · 신앙 · 상태 이상 모두 저장
@@ -2150,3 +2153,31 @@ func _head(t: String) -> Label:
 	l.add_theme_font_size_override("font_size", 15)
 	l.add_theme_color_override("font_color", Color(1, 0.95, 0.75))
 	return l
+
+
+# ================================================================ 뒤로 감기 (Ctrl+Z) · 앞으로 감기 (Ctrl+Y)
+func _process(delta: float) -> void:
+	if history != null and is_visible_in_tree():
+		history.tick(delta)
+
+
+func _input(event: InputEvent) -> void:
+	EditorHistory.handle_input(self, event, history, status)
+
+
+## 편집 중인 데이터 전체 (var_to_str — 정수·실수 그대로)
+func _hist_snap() -> String:
+	return var_to_str([nodes, faith, sstat, sdefs, mdata])
+
+
+func _hist_apply(s: String) -> void:
+	var v: Array = str_to_var(s)
+	nodes = v[0]
+	faith = v[1]
+	char_faith = faith.believers
+	sstat = v[2]
+	sdefs = v[3]
+	StatusCatalog.refresh(sdefs)
+	mdata = v[4]
+	dirty = true
+	_rebuild()

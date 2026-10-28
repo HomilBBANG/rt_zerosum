@@ -9,6 +9,7 @@ const COL_YES := Color(0.35, 0.9, 0.5)
 const COL_NO := Color(1.0, 0.4, 0.35)
 const COL_FAIL := Color(1.0, 0.7, 0.25)
 
+var history: EditorHistory   # Ctrl+Z 뒤로 감기 · Ctrl+Y 앞으로 감기 (addons/rtz_common/editor_history.gd)
 var graph: GraphEdit
 var ai_list: OptionButton
 var new_id: LineEdit
@@ -20,6 +21,7 @@ var data: GameData = null     # 밸런스 엑셀 (스킬 목록·몬스터 AI �
 
 
 func _ready() -> void:
+	history = EditorHistory.new(_hist_snap, _hist_apply)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -261,14 +263,7 @@ func _clear() -> void:
 
 func _load(id: String) -> void:
 	current_id = id
-	_clear()
-	var g := AIGraph.load_graph(id)
-	for n in g.get("nodes", []):
-		var pos: Array = n.get("pos", [0, 0])
-		_make_node(str(n.id), str(n.type), n.get("params", {}), Vector2(float(pos[0]), float(pos[1])))
-	for c in g.get("connections", []):
-		if graph.has_node(NodePath(str(c.from))) and graph.has_node(NodePath(str(c.to))):
-			graph.connect_node(StringName(str(c.from)), int(c.port), StringName(str(c.to)), 0)
+	_apply_graph(AIGraph.load_graph(id))
 	_refresh_list()
 	_frame_nodes.call_deferred()
 	var users: PackedStringArray = []
@@ -278,6 +273,7 @@ func _load(id: String) -> void:
 				users.append(data.monsters[mid].display_name)
 	users_label.text = "이 AI 를 쓰는 몬스터: %s   (엑셀 몬스터 시트 AI 열에서 지정)" % (", ".join(users) if not users.is_empty() else "없음")
 	status.text = ""
+	history.reset()
 
 
 ## 불러온 노드가 화면 왼쪽 위부터 보이게 스크롤
@@ -292,18 +288,34 @@ func _frame_nodes() -> void:
 		graph.scroll_offset = (mn - Vector2(30, 70)) * graph.zoom
 
 
-func _save() -> void:
-	if current_id == "":
-		return
+## 그래프 → {nodes, connections} (저장 · 뒤로 감기 공용)
+func _graph_dict() -> Dictionary:
 	var nodes := []
 	for c in graph.get_children():
-		if c is GraphNode:
-			nodes.append({"id": str(c.name), "type": c.get_meta("type"), "params": c.get_meta("params"),
+		if c is GraphNode and not c.is_queued_for_deletion():
+			nodes.append({"id": str(c.name), "type": c.get_meta("type"), "params": (c.get_meta("params") as Dictionary).duplicate(),
 				"pos": [roundf(c.position_offset.x), roundf(c.position_offset.y)]})
 	var conns := []
 	for c in graph.get_connection_list():
 		conns.append({"from": str(c.from_node), "port": int(c.from_port), "to": str(c.to_node)})
-	var err := AIGraph.save_graph(current_id, {"nodes": nodes, "connections": conns})
+	return {"nodes": nodes, "connections": conns}
+
+
+## {nodes, connections} → 그래프 (불러오기 · 뒤로 감기 공용)
+func _apply_graph(g: Dictionary) -> void:
+	_clear()
+	for n in g.get("nodes", []):
+		var pos: Array = n.get("pos", [0, 0])
+		_make_node(str(n.id), str(n.type), n.get("params", {}), Vector2(float(pos[0]), float(pos[1])))
+	for c in g.get("connections", []):
+		if graph.has_node(NodePath(str(c.from))) and graph.has_node(NodePath(str(c.to))):
+			graph.connect_node(StringName(str(c.from)), int(c.port), StringName(str(c.to)), 0)
+
+
+func _save() -> void:
+	if current_id == "":
+		return
+	var err := AIGraph.save_graph(current_id, _graph_dict())
 	_scan()
 	status.text = "저장됨: data/ai/%s.json" % current_id if err == OK else "저장 실패 (%d)" % err
 
@@ -336,3 +348,25 @@ func _shortcut_input(event: InputEvent) -> void:
 	if is_visible_in_tree() and event is InputEventKey and event.pressed and (event.ctrl_pressed or event.meta_pressed) and event.keycode == KEY_S:
 		_save()
 		get_viewport().set_input_as_handled()
+
+
+# ================================================================ 뒤로 감기 (Ctrl+Z) · 앞으로 감기 (Ctrl+Y)
+func _process(delta: float) -> void:
+	if history != null and is_visible_in_tree():
+		history.tick(delta)
+
+
+func _input(event: InputEvent) -> void:
+	EditorHistory.handle_input(self, event, history, status)
+
+
+## 편집 중인 데이터 전체 (var_to_str — 정수·실수 그대로)
+func _hist_snap() -> String:
+	return var_to_str([current_id, _graph_dict()])
+
+
+func _hist_apply(s: String) -> void:
+	var v: Array = str_to_var(s)
+	if str(v[0]) != current_id:
+		return
+	_apply_graph(v[1])

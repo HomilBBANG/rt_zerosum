@@ -11,6 +11,7 @@ const START_NAMES := {"always": "처음부터 (새 게임 시작 때)", "manual"
 const COUNT_LABEL := {"contract": "횟수", "stage": "횟수", "talk": "횟수", "affinity": "친밀도 이상", "level": "레벨 이상", "day": "일차"}
 const COUNT_RANGE := {"contract": [1, 99], "stage": [1, 99], "talk": [1, 99], "affinity": [1, 100], "level": [1, 20], "day": [1, 999]}
 
+var history: EditorHistory   # Ctrl+Z 뒤로 감기 · Ctrl+Y 앞으로 감기 (addons/rtz_common/editor_history.gd)
 var quests: Array = []               # data/quests.json 퀘스트 (QuestData)
 var faith: Dictionary = {}           # data/faith.json (신 해금 연결만 고침)
 var faith_dirty := false
@@ -31,6 +32,7 @@ var new_kind: OptionButton
 
 
 func _ready() -> void:
+	history = EditorHistory.new(_hist_snap, _hist_apply)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -139,6 +141,7 @@ func _load() -> void:
 	dirty = false
 	status.text = "data/quests.json 퀘스트 %d개" % quests.size()
 	_rebuild()
+	history.reset()
 
 
 func _save() -> void:
@@ -711,3 +714,29 @@ func _head(t: String) -> Label:
 	l.add_theme_font_size_override("font_size", 15)
 	l.add_theme_color_override("font_color", Color(1, 0.95, 0.75))
 	return l
+
+
+# ================================================================ 뒤로 감기 (Ctrl+Z) · 앞으로 감기 (Ctrl+Y)
+func _process(delta: float) -> void:
+	if history != null and is_visible_in_tree():
+		history.tick(delta)
+
+
+func _input(event: InputEvent) -> void:
+	EditorHistory.handle_input(self, event, history, status)
+
+
+## 편집 중인 데이터 전체 (var_to_str — 정수·실수 그대로)
+func _hist_snap() -> String:
+	return var_to_str([quests, faith])
+
+
+func _hist_apply(s: String) -> void:
+	var v: Array = str_to_var(s)
+	quests = v[0]
+	faith = v[1]
+	faith_dirty = true
+	dirty = true
+	if _quest(sel).is_empty():
+		sel = quests[0].id if not quests.is_empty() else ""
+	_rebuild()

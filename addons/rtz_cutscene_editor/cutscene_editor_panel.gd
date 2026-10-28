@@ -6,6 +6,7 @@ extends Control
 ## 오른쪽: 게임과 같은 재생 화면(CutscenePlayer) 미리보기 — '▶ 이 컷부터 재생' 뒤 미리보기 클릭 = 다음 · 흐름(어디서 오고 어디로 가는지, 눌러서 이동) · 검사.
 ## 이어지기: 다음 컷씬 / 선택지마다 이어질 컷씬 — '새 컷씬 만들어 잇기' 로 바로 만들 수 있음.
 
+var history: EditorHistory   # Ctrl+Z 뒤로 감기 · Ctrl+Y 앞으로 감기 (addons/rtz_common/editor_history.gd)
 var cuts: Array = []                 # data/cutscenes.json 컷씬 (CutsceneData)
 var od: OutgameData
 var gd: GameData
@@ -31,6 +32,7 @@ var new_kind: OptionButton
 
 
 func _ready() -> void:
+	history = EditorHistory.new(_hist_snap, _hist_apply)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -189,6 +191,7 @@ func _load() -> void:
 	dirty = false
 	status.text = "data/cutscenes.json 컷씬 %d개 · assets/cg 그림 %d개" % [cuts.size(), images.size()]
 	_rebuild()
+	history.reset()
 
 
 func _save() -> void:
@@ -891,3 +894,28 @@ func _head(t: String) -> Label:
 	l.add_theme_font_size_override("font_size", 15)
 	l.add_theme_color_override("font_color", Color(1, 0.95, 0.75))
 	return l
+
+
+# ================================================================ 뒤로 감기 (Ctrl+Z) · 앞으로 감기 (Ctrl+Y)
+func _process(delta: float) -> void:
+	if history != null and is_visible_in_tree():
+		history.tick(delta)
+
+
+func _input(event: InputEvent) -> void:
+	EditorHistory.handle_input(self, event, history, status)
+
+
+## 편집 중인 데이터 전체 (var_to_str — 정수·실수 그대로)
+func _hist_snap() -> String:
+	return var_to_str(cuts)
+
+
+func _hist_apply(s: String) -> void:
+	cuts = str_to_var(s)
+	dirty = true
+	_previewing = false
+	if _cut(sel).is_empty():
+		sel = cuts[0].id if not cuts.is_empty() else ""
+	ssel = clampi(ssel, 0, maxi(0, (_cut(sel).get("steps", []) as Array).size() - 1))
+	_rebuild()
