@@ -848,38 +848,60 @@ func _test_faith() -> void:
 	_c(sv.faith("a_dan") == s.faith("a_dan") and sv.has_faith_skill("a_dan", lo.id), "저장/불러오기 후 신앙 유지")
 
 
-## 신 해금 캐릭터 (니키타 = 밤의 여신 녹트, 신앙도 60 이상에서 해금 — 임시 데이터) · 기적
+## 신 해금 캐릭터 (하나 = 대지모 테라, 잠김 — 미션 '민간인 호위' 의뢰를 끝내면 해금 · 임시 데이터) · 기적
 func _test_divine() -> void:
-	print("[34b] 신 해금 캐릭터 · 기적 · 해금 조건")
+	print("[34b] 신 해금 캐릭터 · 기적 · 해금 조건 (미션 완료)")
 	var s := _sim()
-	_c(s.divine_state("a_dan") == "" and s.divine_state("a_nikita") == "locked" and not s.is_divine("a_nikita"), "단 = 신 아님, 니키타 = 신 해금 캐릭터 · 잠김")
-	var mid: String = s.miracle_list("a_nikita")[0].id
-	_c(s.miracle_state("a_nikita", mid) == "locked" and not s.learn_miracle("a_nikita", mid).ok, "잠긴 동안 기적 못 배움")
+	_c(s.divine_state("a_nikita") == "" and s.divine_state("a_dan") == "", "니키타·단 = 신 아님")
+	_c(s.divine_state("a_hana") == "locked" and not s.is_divine("a_hana"), "하나 = 신 해금 캐릭터 · 잠김")
+	var cond: Dictionary = battle.divine.a_hana.condition
+	_c(cond.type == "quest" and cond.target == "contract:c_ext_escort", "해금 조건 = 미션 완료 (의뢰 민간인 호위)")
+	var mid: String = s.miracle_list("a_hana")[0].id
+	_c(s.miracle_state("a_hana", mid) == "locked" and not s.learn_miracle("a_hana", mid).ok, "잠긴 동안 기적 못 배움")
 	var got := []
 	s.divine_revealed.connect(func(c): got.append(c))
-	var need := int(battle.divine.a_nikita.condition.value)
-	s.add_faith("a_nikita", need - 1 - s.faith("a_nikita"))
-	_c(not s.is_divine("a_nikita"), "신앙도 %d — 아직 잠김" % s.faith("a_nikita"))
-	s.add_faith("a_nikita", 1)
-	_c(s.is_divine("a_nikita") and got == ["a_nikita"] and s.divine_god("a_nikita").name == battle.gods.noct.name, "신앙도 %d → 정체 해금 (녹트), 알림 1번" % need)
-	_c(s.miracle_state("a_nikita", mid) == "ready" and s.learn_miracle("a_nikita", mid).ok and s.miracle_state("a_nikita", mid) == "learned", "해금 뒤 신성도 충분 → 기적 배움")
-	var hi: Dictionary = s.miracle_list("a_nikita").back()
-	_c(s.miracle_state("a_nikita", hi.id) == "no_faith", "신성도 모자라면 '신성도 부족'")
-	var base: UnitData = GameData._find(battle.allies, "a_nikita")
+	# 다른 의뢰를 끝내도 그대로, 그 의뢰를 끝내면 해금
+	s.jobs.append({"uid": "t1", "contract": "c_ext_supply", "npc": "npc_dan", "state": "assigned", "minute": 0})
+	s._complete_job("t1", s.npcs.npc_dan)
+	_c(not s.is_divine("a_hana") and not s.quest_done("contract:c_ext_escort") and s.quest_done("contract:c_ext_supply"), "다른 의뢰(보급품 운반) 완료 → 아직 잠김")
+	s.jobs.append({"uid": "t2", "contract": "c_ext_escort", "npc": "npc_kira", "state": "assigned", "minute": 0})
+	_c(not s.quest_done("contract:c_ext_escort"), "맡기기만 하면 미완료")
+	s._complete_job("t2", s.npcs.npc_kira)
+	_c(s.is_divine("a_hana") and got == ["a_hana"] and s.divine_god("a_hana").name == battle.gods.terra.name, "민간인 호위 완료 → 하나 정체 해금 (테라), 알림 1번")
+	var need := int(s.miracle_list("a_hana")[0].need)
+	_c(s.miracle_state("a_hana", mid) == ("ready" if s.faith("a_hana") >= need else "no_faith"), "해금 뒤 기적 = 신성도로 (지금 %d, 필요 %d)" % [s.faith("a_hana"), need])
+	s.add_faith("a_hana", need)
+	_c(s.learn_miracle("a_hana", mid).ok and s.miracle_state("a_hana", mid) == "learned", "신성도 충분 → 기적 배움")
+	var hi: Dictionary = s.miracle_list("a_hana").back()
+	_c(s.miracle_state("a_hana", hi.id) == "no_faith", "신성도 모자라면 '신성도 부족'")
+	var base: UnitData = GameData._find(battle.allies, "a_hana")
 	var copy := UnitData.new()
 	GameData._copy_props(copy, base)
+	var hp0 := s.char_max_hp("a_hana")
 	s.apply_to_ally(copy, base)
-	_c(int(copy.skill_power.get("basic_attack", 0)) >= 4, "기적 효과 → 전투 복제본 (기본 공격 +%d)" % int(copy.skill_power.get("basic_attack", 0)))
+	_c(copy.max_hp >= base.max_hp + 10, "기적 효과 → 전투 복제본 (최대 HP %d → %d)" % [base.max_hp, copy.max_hp])
 	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
-	_c(sv.is_divine("a_nikita") and sv.miracle_state("a_nikita", mid) == "learned", "저장/불러오기 후 정체·기적 유지")
-	_c(not s.unlock_divine("a_nikita").ok and not s.unlock_divine("a_dan").ok, "이미 해금 · 신 아님 = 직접 해금 실패")
-	# 조건 종류
+	_c(sv.is_divine("a_hana") and sv.miracle_state("a_hana", mid) == "learned", "저장/불러오기 후 정체·기적 유지")
+	_c(not s.unlock_divine("a_hana").ok and not s.unlock_divine("a_nikita").ok, "이미 해금 · 신 아님 = 직접 해금 실패")
+	# 미션 종류: 전투 승리 · 연구
+	var st: String = battle.stage_order[0]
+	_c(not s.quest_done("stage:" + st), "전투 미션: 이기기 전 미완료")
+	s.battle_history.append({"stage": st, "winner": "enemy"})
+	_c(not s.quest_done("stage:" + st), "져도 미완료")
+	s.battle_history.append({"stage": st, "winner": "ally"})
+	_c(s.quest_done("stage:" + st), "이기면 완료")
+	var rq: String = data.research_order[0]
+	_c(not s.quest_done("research:" + rq), "연구 미션: 완료 전")
+	s.researched[rq] = true
+	_c(s.quest_done("research:" + rq) and not s.quest_done("nope") and not s.quest_done("contract:없음"), "연구 완료 / 잘못된 미션 = 미완료")
+	# 다른 조건 종류
 	_c(s.cond_met({"type": "level", "value": s.char_level("a_dan")}, "a_dan") and not s.cond_met({"type": "level", "value": s.char_level("a_dan") + 1}, "a_dan"), "조건: 레벨 이상")
 	_c(s.cond_met({"type": "day", "value": 1}, "a_dan") and not s.cond_met({"type": "day", "value": 99}, "a_dan"), "조건: n일차부터")
 	_c(not s.cond_met({"type": "manual", "value": 0}, "a_dan") and s.cond_met({"type": "always", "value": 0}, "a_dan"), "조건: 직접(자동 해금 안 됨) · 처음부터")
-	_c(s.cond_met({"type": "affinity", "value": 0}, "a_dan"), "조건: 친밀도 이상")
-	_c(UnlockCond.describe({"type": "faith", "value": 60}) == "신앙도 60 이상" and UnlockCond.norm({"type": "zzz"}).type == "manual", "조건 설명 · 모르는 조건 = 직접 해금")
-	# 처음부터 해금 (데이터 그대로 두고 복사본으로)
+	var names := UnlockCond.mission_names(data, battle)
+	_c(UnlockCond.describe(cond, names) == "미션 완료: 의뢰 민간인 호위" and UnlockCond.norm({"type": "zzz"}).type == "manual", "조건 설명 '%s' · 모르는 조건 = 직접 해금" % UnlockCond.describe(cond, names))
+	_c(UnlockCond.missions(data, battle).size() == data.job_order.size() + battle.stage_order.size() + data.research_order.size(), "미션 목록 = 의뢰 + 전투 스테이지 + 연구")
+	# 처음부터 해금 (데이터는 그대로 두고 복사본으로)
 	var b2 := GameData.load_from()
 	b2.divine["a_kira"] = {"god": "veyra", "unlocked": true, "condition": {"type": "manual", "value": 0}}
 	var s3 := BaseSim.create(data, b2)

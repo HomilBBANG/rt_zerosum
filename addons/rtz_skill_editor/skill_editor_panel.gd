@@ -44,6 +44,8 @@ var miracle_box: Control
 var mchar_list: ItemList
 var mir_list: ItemList
 var mir_head: Label
+var missions: Array = []             # [[target, 표시]] 의뢰 · 전투 스테이지 · 연구 (조건 '미션 완료')
+var mission_names: Dictionary = {}
 ## 상태 정의 (kind == "statusdef")
 var sdefs: Array = []                # data/statuses.json [{id, name, effect, short, color, desc}]
 var sdef_sel := ""
@@ -219,6 +221,9 @@ func reload_data(keep_edit: bool = true) -> void:
 		first_stage = gd.stage_order[0] if not gd.stage_order.is_empty() else ""
 		var mids: Array = (MonsterSkillData.read().skills as Array).map(func(x): return x.id)
 		sheet_skill_ids = actions.keys().filter(func(k): return not mids.has(k))
+		var od := OutgameData.load_from()
+		missions = UnlockCond.missions(od, gd)
+		mission_names = UnlockCond.mission_names(od, gd)
 	char_opt.clear()
 	copy_opt.clear()
 	for u in allies:
@@ -842,6 +847,8 @@ func _divine_start_text(cid: String, dv: Dictionary) -> String:
 			return "새 게임: 잠김 → 친밀도 %d 이 되면 해금 (대화·요청·선물로 오름)" % v
 		"day":
 			return "새 게임: 잠김 → %d일차가 되면 해금%s" % [v, " — 첫날 해금" if v <= 1 else ""]
+		"quest":
+			return "새 게임: 잠김 → %s 하면 해금" % UnlockCond.describe(c, mission_names).trim_prefix("미션 완료: ") + " (미션 완료)"
 	return "새 게임: 잠김 → 이벤트·대사에서 직접 해금 (BaseSim.unlock_divine)"
 
 
@@ -854,7 +861,7 @@ func _fill_miracle_lists() -> void:
 		var t: String = u.display_name
 		if not dv.is_empty():
 			var gname: String = _god(str(dv.god)).get("name", str(dv.god))
-			t = "✦ %s — %s · %s" % [u.display_name, gname, "처음부터 해금" if bool(dv.unlocked) or dv.condition.type == "always" else "잠김: " + UnlockCond.describe(dv.condition)]
+			t = "✦ %s — %s · %s" % [u.display_name, gname, "처음부터 해금" if bool(dv.unlocked) or dv.condition.type == "always" else "잠김: " + UnlockCond.describe(dv.condition, mission_names)]
 		mchar_list.add_item(t)
 		mchar_list.set_item_metadata(mchar_list.item_count - 1, u.id)
 		if not dv.is_empty():
@@ -949,9 +956,16 @@ func _build_miracle_form() -> void:
 			if t != "always":
 				ct.append([t, UnlockCond.TYPES[t]])
 		_row(grid, "해금 조건", _option(ct, dv.condition.type, func(v):
-			dv.condition = UnlockCond.norm({"type": str(v), "value": dv.condition.value})
+			dv.condition = UnlockCond.norm({"type": str(v), "value": dv.condition.value, "target": dv.condition.get("target", "")})
+			if dv.condition.type == "quest" and dv.condition.target == "" and not missions.is_empty():
+				dv.condition.target = str(missions[0][0])
 			_mark()
 			_rebuild()))
+		if dv.condition.type == "quest":   # 어느 미션을 끝내면 해금
+			_row(grid, "미션", _option(missions, dv.condition.get("target", ""), func(v):
+				dv.condition.target = str(v)
+				_mark()
+				_rebuild()))
 		if UnlockCond.uses_value(dv.condition.type):
 			var r: Array = UnlockCond.RANGE[dv.condition.type]
 			var sp := _spin(r[0], r[1], 1, int(dv.condition.value), "")
@@ -964,7 +978,7 @@ func _build_miracle_form() -> void:
 	var stl := _small(_divine_start_text(mchar, dv))
 	stl.add_theme_color_override("font_color", Color(1, 0.9, 0.5) if bool(dv.unlocked) or dv.condition.type == "always" else Color(0.7, 0.85, 1.0))
 	form.add_child(stl)
-	form.add_child(_small("게임에서 확인: BaseSim.divine_state(캐릭터) = 잠김 / 해금 · 조건은 레벨·신앙도·친밀도가 바뀔 때와 날이 바뀔 때 검사. 지금 믿는 신(신앙 스킬 화면): %s" % _god(str(char_faith.get(mchar, {}).get("god", ""))).get("name", "무신앙")))
+	form.add_child(_small("게임에서 확인: BaseSim.divine_state(캐릭터) = 잠김 / 해금 · 조건은 미션(의뢰·전투·연구)을 끝낼 때, 레벨·신앙도·친밀도가 바뀔 때, 날이 바뀔 때 검사. 지금 믿는 신(신앙 스킬 화면): %s" % _god(str(char_faith.get(mchar, {}).get("god", ""))).get("name", "무신앙")))
 	var m := _miracle(mir_sel)
 	form.add_child(HSeparator.new())
 	if m.is_empty() or m.char != mchar:

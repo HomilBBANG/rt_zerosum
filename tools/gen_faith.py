@@ -20,11 +20,11 @@ GODS = [
 BELIEVERS = {"a_dan": {"god": "veyra", "faith": 30}, "a_kira": {"god": "noct", "faith": 20}, "a_ethan": {"god": "solus", "faith": 40},
              "a_hana": {"god": "terra", "faith": 10}, "a_alma": {"god": "solus", "faith": 50}, "a_nikita": {"god": "noct", "faith": 25}}
 # [임시] 신 해금 캐릭터: 정체가 신 — 조건을 채우면 신앙 탭이 '기적' 으로 / 그 캐릭터만의 기적 (필요 신성도 = 신앙도 값)
-DIVINE = {"a_nikita": {"god": "noct", "unlocked": False, "condition": {"type": "faith", "value": 60}}}
+DIVINE = {"a_hana": {"god": "terra", "unlocked": False, "condition": {"type": "quest", "value": 0, "target": "contract:c_ext_escort"}}}
 MIRACLES = [
-    {"id": "nikita_m1", "char": "a_nikita", "name": "달 없는 눈", "need": 60, "effect": "skill_power:basic_attack", "value": 4, "desc": "기본 공격 위력 +4"},
-    {"id": "nikita_m2", "char": "a_nikita", "name": "밤의 장막", "need": 75, "effect": "ap", "value": 1, "desc": "최대 AP +1"},
-    {"id": "nikita_m3", "char": "a_nikita", "name": "그림자 강림", "need": 90, "effect": "skill_power:ultimate", "value": 8, "desc": "필살기 위력 +8"},
+    {"id": "hana_m1", "char": "a_hana", "name": "대지의 맥박", "need": 20, "effect": "hp", "value": 10, "desc": "최대 HP +10"},
+    {"id": "hana_m2", "char": "a_hana", "name": "흔들리지 않는 자", "need": 40, "effect": "defense", "value": 2, "desc": "받는 피해 -2 (방어 +2)"},
+    {"id": "hana_m3", "char": "a_hana", "name": "대지모의 현신", "need": 70, "effect": "skill_power:ultimate", "value": 8, "desc": "필살기 위력 +8"},
 ]
 FS_COLS = ["신", "id", "이름", "필요신앙", "효과", "값", "설명"]
 FAITH_SKILLS = [

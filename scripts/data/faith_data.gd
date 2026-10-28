@@ -164,6 +164,8 @@ static func check(d: Dictionary, char_faith: Dictionary, actions: Dictionary) ->
 			notes.append("신 해금 %s: 자기 자신(%s)을 믿는 상태입니다 — 해금 뒤에는 신앙 대신 기적" % [cid, dv.god])
 		if not (d.get("miracles", []) as Array).any(func(m): return m.char == cid):
 			notes.append("신 해금 %s: 기적이 없습니다" % cid)
+		if str(dv.condition.type) == "quest" and not UnlockCond.MISSION_KINDS.has(str(dv.condition.get("target", "")).split(":")[0]):
+			errors.append("신 해금 %s: 미션 완료 조건인데 미션이 없습니다" % cid)
 		if str(dv.condition.type) == "manual":
 			notes.append("신 해금 %s: 직접 해금 — 이벤트·대사에서 BaseSim.unlock_divine 을 불러야 해금" % cid)
 	var mids := {}

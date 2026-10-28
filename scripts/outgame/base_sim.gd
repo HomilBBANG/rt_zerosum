@@ -932,6 +932,7 @@ func _complete_job(uid: String, n: NpcAgent) -> void:
 		"%s (%s)" % [j.get("name", job.contract), n.name], week_now())
 	_log("%s 완료 — $%d 은 이번 주 결산 때 지급" % [j.get("name", job.contract), amount])
 	job_completed.emit(job)
+	check_divine()   # 미션(의뢰) 완료 조건
 
 
 func training_facility() -> String:
@@ -1227,7 +1228,7 @@ func divine_god(cid: String) -> Dictionary:
 	return battle.gods.get(str(divine_info(cid).get("god", "")), {}) if is_divine(cid) else {}
 
 
-## 해금 조건을 채웠나 (UnlockCond: always · manual · level · faith · affinity · day)
+## 해금 조건을 채웠나 (UnlockCond: always · manual · quest(미션 완료) · level · faith · affinity · day)
 func cond_met(c: Dictionary, cid: String) -> bool:
 	var v := int(c.get("value", 0))
 	match str(c.get("type", "manual")):
@@ -1241,6 +1242,24 @@ func cond_met(c: Dictionary, cid: String) -> bool:
 			return float(cstate_of(cid).get("affinity", 0.0)) >= v
 		"day":
 			return _day + 1 >= v
+		"quest":
+			return quest_done(str(c.get("target", "")))
+	return false
+
+
+## 미션 완료: "contract:id" = 그 의뢰 업무를 끝냄 / "stage:id" = 그 전투 승리 / "research:id" = 연구 완료
+func quest_done(target: String) -> bool:
+	var p := target.split(":")
+	if p.size() < 2:
+		return false
+	var id := target.substr(p[0].length() + 1)
+	match p[0]:
+		"contract":
+			return jobs.any(func(j): return str(j.get("contract", "")) == id and str(j.get("state", "")) == "done")
+		"stage":
+			return battle_history.any(func(b): return str(b.get("stage", "")) == id and str(b.get("winner", "")) == "ally")
+		"research":
+			return researched.has(id)
 	return false
 
 
@@ -1263,7 +1282,7 @@ func check_divine() -> void:
 		return
 	for cid in battle.divine:
 		if divine_state(cid) == "locked" and cond_met(battle.divine[cid].condition, cid):
-			unlock_divine(cid, UnlockCond.describe(battle.divine[cid].condition))
+			unlock_divine(cid, UnlockCond.describe(battle.divine[cid].condition, UnlockCond.mission_names(data, battle)))
 
 
 func miracle_list(cid: String) -> Array:
@@ -1563,6 +1582,7 @@ func _tick_research() -> void:
 		made.append(item_name(str(data.recipes.get(rid, {}).get("item", rid))))
 	_log("연구 완료: %s → 무기고에서 %s 제작 가능" % [q.get("name", qid), ", ".join(made)])
 	research_completed.emit(qid)
+	check_divine()   # 미션(연구) 완료 조건
 
 
 ## 캐릭터의 장착 무기 (슬롯 순)
@@ -1940,6 +1960,7 @@ func apply_battle_result(result: Dictionary) -> void:
 		"rule": str(pending_battle.get("rule", "")), "winner": w})
 	pending_battle = {}
 	_log("전투 결과: %s — %s" % ["승리" if w == "ally" else "패배", ", ".join(lines)])
+	check_divine()   # 미션(전투 승리) 완료 조건
 
 
 func _char_label(character_id: String) -> String:
