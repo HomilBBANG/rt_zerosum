@@ -66,14 +66,14 @@
 		},
 		{
 			"skill": "painkiller_shot",
-			"status": "painkiller",
+			"status": "regen_2",
 			"turns": 3,
 			"value": 8,
 			"chance": 100
 		},
 		{
 			"skill": "self_heal",
-			"status": "self_heal",
+			"status": "regen_3",
 			"turns": 3,
 			"value": 6,
 			"chance": 100

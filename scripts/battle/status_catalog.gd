@@ -3,6 +3,8 @@ class_name StatusCatalog
 extends RefCounted
 ## 상태 이상 = 이름 붙은 상태(data/statuses.json, 에디터 '스킬 트리' 탭 → 상태 정의) + 그 상태가 쓰는 효과(EFFECTS, 규칙은 StatusRules).
 ## 같은 효과를 이름만 다르게 여러 상태로 쓸 수 있음 — 예: '진통제'·'자가 치유' 둘 다 효과 regen(재생).
+## 상태 id = 효과 id, 같은 효과의 두 번째부터는 _2, _3 … (예: regen = 재생, regen_2 = 진통제, regen_3 = 자가 치유).
+## 같은 id 는 겹치지 않음(다시 걸리면 남은 턴·수치 큰 쪽으로 갱신) → 같은 효과라도 id 가 다르면 따로 걸림.
 ## 상태 = {id, name, effect, short(머리 위 한 글자), color(#rrggbb), desc(비우면 효과 설명)}. 스킬에는 상태 id 를 담 (data/skill_status.json).
 ## positive = 긍정(녹색) / 부정(붉은색). blocks_move: 자리 이동·교체 대상에서 빠짐. instant: 맞는 순간 한 번(넉백·끌어당김), 남지 않음.
 ## battle: 전투 안에서만 (전투가 끝나면 사라지고 기지로 안 넘어감). expires "own_turn_end" = 그 유닛의 다음 턴이 끝나면 사라짐.
@@ -69,6 +71,28 @@ static func new_status(id: String, effect: String) -> Dictionary:
 		"color": "#" + (e.get("color", Color.WHITE) as Color).to_html(false), "desc": ""}
 
 
+## 그 효과로 새로 만들 상태 id: 효과 id → 이미 있으면 효과_2, 효과_3 … (except = 지금 고치는 상태라 빼고 셈)
+static func next_id(effect: String, entries: Array, except: Variant = null) -> String:
+	var used := {}
+	for s in entries:
+		if s != except:
+			used[str(s.id)] = true
+	if not used.has(effect):
+		return effect
+	var n := 2
+	while used.has("%s_%d" % [effect, n]):
+		n += 1
+	return "%s_%d" % [effect, n]
+
+
+## id 가 그 효과의 id 규칙(효과 id 또는 효과 id_숫자)에 맞나
+static func id_matches(id: String, effect: String) -> bool:
+	if id == effect:
+		return true
+	var tail := id.trim_prefix(effect + "_")
+	return id.begins_with(effect + "_") and tail.is_valid_int() and int(tail) >= 2
+
+
 ## 파일 → 상태 목록. 파일이 없으면 효과마다 같은 id 의 기본 상태
 static func read(path: String = PATH) -> Array:
 	var out := []
@@ -120,7 +144,6 @@ static func check(entries: Array, used: Dictionary = {}) -> Dictionary:
 	var notes := PackedStringArray()
 	var ids := {}
 	var names := {}
-	var re := RegEx.create_from_string("^[a-z0-9_]+$")
 	for s in entries:
 		var id := str(s.id)
 		if id == "":
@@ -129,11 +152,11 @@ static func check(entries: Array, used: Dictionary = {}) -> Dictionary:
 			errors.append("상태 id '%s' 가 두 번 있습니다" % id)
 		elif SYSTEM.has(id):
 			errors.append("'%s' 는 게임이 쓰는 상태 id 입니다 (다른 id)" % id)
-		elif re.search(id) == null:
-			errors.append("'%s': id 는 영문 소문자·숫자·_ 만" % id)
 		ids[id] = true
 		if not EFFECTS.has(str(s.effect)):
 			errors.append("%s: 모르는 효과 '%s'" % [id, s.effect])
+		elif id != "" and not SYSTEM.has(id) and not id_matches(id, str(s.effect)):
+			errors.append("%s: id 는 효과 id 또는 효과 id_숫자 (예: %s, %s_2)" % [id, s.effect, s.effect])
 		if str(s.name).strip_edges() == "":
 			errors.append("%s: 이름이 비었습니다" % id)
 		elif names.has(s.name):

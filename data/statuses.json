@@ -122,7 +122,7 @@
 			"desc": ""
 		},
 		{
-			"id": "painkiller",
+			"id": "regen_2",
 			"name": "진통제",
 			"effect": "regen",
 			"short": "진",
@@ -130,7 +130,7 @@
 			"desc": ""
 		},
 		{
-			"id": "self_heal",
+			"id": "regen_3",
 			"name": "자가 치유",
 			"effect": "regen",
 			"short": "치",

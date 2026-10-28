@@ -757,7 +757,7 @@ func _build_sdef_box() -> Control:
 	add.add_child(sdef_new_eff)
 	add.add_child(_btn("+ 추가", _add_sdef))
 	add.add_child(_btn("삭제", _delete_sdef))
-	lc.add_child(_small("같은 효과를 이름만 다르게 여러 개 만들 수 있습니다 (예: 진통제 · 자가 치유 = 재생). 스킬에는 상태를 답니다 ('상태 이상' 화면)."))
+	lc.add_child(_small("같은 효과를 이름만 다르게 여러 개 만들 수 있습니다 — id 는 효과 id, 두 번째부터 _2, _3 (예: regen 재생 · regen_2 진통제 · regen_3 자가 치유). 같은 id 는 겹치지 않고(다시 걸리면 갱신), id 가 다르면 따로 걸립니다. 스킬에는 상태를 답니다 ('상태 이상' 화면)."))
 	# 효과 설명 (참고)
 	var rc := VBoxContainer.new()
 	rc.custom_minimum_size.x = 300
@@ -820,14 +820,10 @@ func _sdef_changed() -> void:
 
 func _add_sdef() -> void:
 	var eff := str(sdef_new_eff.get_item_metadata(sdef_new_eff.selected))
-	var n := 1
-	var id := eff
-	while not _sdef(id).is_empty():
-		n += 1
-		id = "%s_%d" % [eff, n]
+	var id := StatusCatalog.next_id(eff, sdefs)   # 효과 id → regen_2, regen_3 …
 	var d := StatusCatalog.new_status(id, eff)
-	if n > 1:
-		d.name = "%s %d" % [d.name, n]
+	if id != eff:
+		d.name = "%s %s" % [d.name, id.trim_prefix(eff + "_")]
 	sdefs.append(d)
 	sdef_sel = id
 	StatusCatalog.refresh(sdefs)
@@ -860,17 +856,9 @@ func _build_sdef_form() -> void:
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 8)
 	form.add_child(grid)
-	var on_id := func(v):
-		var nv := str(v).strip_edges()
-		if nv == "" or not _sdef(nv).is_empty():
-			return
-		for e in sstat:   # 이 상태가 달린 스킬도 새 id 로
-			if e.status == d.id:
-				e.status = nv
-		d.id = nv
-		sdef_sel = nv
-		_sdef_changed()
-	_row(grid, "id", _line(d.id, on_id, "영문 소문자·숫자·_"))
+	var idl := _lab(d.id)
+	idl.tooltip_text = "id = 효과 id, 같은 효과 두 번째부터 _2, _3 … (자동). 같은 id 는 겹치지 않고, id 가 다르면 같은 효과라도 따로 걸림"
+	_row(grid, "id (자동)", idl)
 	_row(grid, "이름", _line(d.name, func(v):
 		d.name = str(v)
 		_sdef_changed()))
@@ -878,10 +866,16 @@ func _build_sdef_form() -> void:
 	for eff in StatusCatalog.EFFECT_ORDER:
 		effs.append([eff, "%s (%s)" % [StatusCatalog.EFFECTS[eff].name, eff]])
 	_row(grid, "효과", _option(effs, d.effect, func(v):
+		var old_id: String = d.id
 		d.effect = str(v)
-		for e in sstat:   # 효과가 바뀌면 달린 스킬의 수치도 그 효과 기본값으로
-			if e.status == d.id:
+		d.id = StatusCatalog.next_id(d.effect, sdefs, d)   # 효과가 바뀌면 id 도 그 효과 번호로
+		sdef_sel = d.id
+		StatusCatalog.refresh(sdefs)
+		for e in sstat:   # 달린 스킬도 새 id, 수치는 그 효과 기본값으로
+			if e.status == old_id:
+				e.status = d.id
 				e.value = StatusCatalog.default_value(d.id) if StatusCatalog.hint(d.id) != "" else 0
+		status.text = "효과 바꿈: %s → %s (저장 안 함)" % [old_id, d.id]
 		_sdef_changed()
 		_rebuild()))
 	var on_short := func(v):

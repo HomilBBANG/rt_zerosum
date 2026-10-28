@@ -606,15 +606,19 @@ func _test_sfx() -> void:
 func _test_status_effects() -> void:
 	print("[13c] 상태 id → 효과, 넉백·끌어당김·표식·도발·취약·재생·보호막")
 	# 같은 효과, 다른 이름
-	_check(StatusCatalog.effect_of("painkiller") == "regen" and StatusCatalog.effect_of("self_heal") == "regen", "진통제·자가 치유 = 효과 재생")
-	_check(StatusCatalog.get_def("painkiller").name == "진통제" and StatusCatalog.get_def("self_heal").name == "자가 치유" and StatusCatalog.get_def("painkiller").positive, "이름은 따로, 규칙(긍정·전투 전용)은 효과에서")
-	_check(StatusCatalog.effect_of("bleed") == "bleed" and StatusCatalog.find("진통제") == "painkiller", "효과 이름 그대로인 상태 · 한글 이름으로 찾기")
+	_check(StatusCatalog.effect_of("regen_2") == "regen" and StatusCatalog.effect_of("regen_3") == "regen", "regen_2 진통제 · regen_3 자가 치유 = 효과 재생")
+	_check(StatusCatalog.get_def("regen_2").name == "진통제" and StatusCatalog.get_def("regen_3").name == "자가 치유" and StatusCatalog.get_def("regen_2").positive, "이름은 따로, 규칙(긍정·전투 전용)은 효과에서")
+	_check(StatusCatalog.effect_of("bleed") == "bleed" and StatusCatalog.find("진통제") == "regen_2", "효과 이름 그대로인 상태 · 한글 이름으로 찾기")
 	_check(StatusCatalog.check(StatusCatalog.read()).errors.is_empty(), "data/statuses.json 검사 통과")
-	var bad := [StatusCatalog.new_status("x", "regen"), StatusCatalog.new_status("x", "nope"), StatusCatalog.new_status("rallied", "regen")]
+	var bad := [StatusCatalog.new_status("regen_2", "regen"), StatusCatalog.new_status("regen_2", "regen"), StatusCatalog.new_status("x", "nope"),
+		StatusCatalog.new_status("rallied", "regen"), StatusCatalog.new_status("painkiller", "regen"), StatusCatalog.new_status("regen_1", "regen")]
 	var bres := StatusCatalog.check(bad)
-	_check(bres.errors.size() == 3, "검사: id 중복 · 모르는 효과 · 게임 상태 id [%s]" % " / ".join(bres.errors))
+	_check(bres.errors.size() == 5, "검사: id 중복 · 모르는 효과 · 게임 상태 id · 효과 id 규칙 어김 2 [%s]" % " / ".join(bres.errors))
+	var cur_defs := StatusCatalog.read()
+	_check(StatusCatalog.next_id("regen", cur_defs) == "regen_4" and StatusCatalog.next_id("knockback", cur_defs) == "knockback_2" and StatusCatalog.next_id("regen", []) == "regen",
+		"새 상태 id = 효과 id → _2, _3 … (재생 다음 = regen_4)")
 	var gd := GameData.load_from()
-	_check(gd.actions.painkiller_shot.status_ids() == ["painkiller"] and gd.actions.self_heal.status_ids() == ["self_heal"], "진통제 투여 → 진통제, 자가 치유 → 자가 치유")
+	_check(gd.actions.painkiller_shot.status_ids() == ["regen_2"] and gd.actions.self_heal.status_ids() == ["regen_3"], "스킬 진통제 투여 → regen_2, 스킬 자가 치유 → regen_3")
 	var bc := _make("ally")
 	bc.start_battle()
 	var enemies := bc.slots.living_units("enemy")
@@ -624,14 +628,18 @@ func _test_status_effects() -> void:
 	var p := allies[0]
 	p.data.max_hp = 100
 	p.hp = 50
-	var r1 := StatusRules.apply(p, "painkiller", 3, 8)
-	_check(p.hp == 58 and r1.size() == 1 and r1[0].kind == "heal" and r1[0].status == "painkiller", "진통제: 걸릴 때 +8 (50 → %d)" % p.hp)
-	StatusRules.apply(p, "self_heal", 2, 6)
+	var r1 := StatusRules.apply(p, "regen_2", 3, 8)
+	_check(p.hp == 58 and r1.size() == 1 and r1[0].kind == "heal" and r1[0].status == "regen_2", "진통제: 걸릴 때 +8 (50 → %d)" % p.hp)
+	StatusRules.apply(p, "regen_3", 2, 6)
 	var ts := StatusRules.turn_start(p)
 	_check(p.hp == 64 + 8 + 6 and ts.results.size() == 2 and p.has_effect("regen") and p.statuses_with("regen").size() == 2, "자가 치유 걸 때 +6, 차례 시작에 진통제 +8 · 자가 치유 +6 따로 (→ %d)" % p.hp)
 	p.hp = 99
 	StatusRules.turn_start(p)
 	_check(p.hp == 100, "재생은 최대 HP 까지")
+	# 같은 id 는 겹치지 않음: 다시 걸리면 하나로, 남은 턴·수치 큰 쪽
+	var turns_before := p.status_turns("regen_2")
+	StatusRules.apply(p, "regen_2", 5, 4)
+	_check(p.statuses.count("regen_2") == 1 and p.status_turns("regen_2") == maxi(5, turns_before) and int(p.status_info.regen_2.value) == 8, "같은 id(regen_2) 다시 걸림 → 하나로, 턴 5 · 수치 8 유지")
 	# 보호막: 피해를 먼저 막고 다 막으면 사라짐
 	var sh := allies[1]
 	sh.data.max_hp = 100

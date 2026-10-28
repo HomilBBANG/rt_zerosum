@@ -10,7 +10,7 @@ if os.path.exists(OUT) and "--force" not in sys.argv:
 
 # [임시] (스킬 id, 상태, 턴, 수치, 확률)
 STATUSES = [
-    ("painkiller_shot", "painkiller", 3, 8, 100), ("self_heal", "self_heal", 3, 6, 100),   # 상태 정의(data/statuses.json): 진통제·자가 치유 = 효과 재생
+    ("painkiller_shot", "regen_2", 3, 8, 100), ("self_heal", "regen_3", 3, 6, 100),   # 상태 정의(data/statuses.json): regen_2 진통제 · regen_3 자가 치유 = 효과 재생
     ("brutal_strike", "stun", 1, 0, 50),
     ("flank", "bleed", 2, 10, 100),
     ("inspire", "haste", 2, 30, 100),
