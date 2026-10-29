@@ -58,6 +58,7 @@ func _init() -> void:
 	_test_status_effects()
 	_test_hit_evasion()
 	_test_poses()
+	_test_portrait_cache()
 	_test_story_graph()
 	_test_story_edit()
 	_test_codex()
@@ -691,6 +692,21 @@ func _test_poses() -> void:
 	_check(fd.gods.all(func(g): return g.has("icon")), "신 데이터에 아이콘 그림 칸")
 	var bad := FaithData.check({"gods": [{"id": "g1", "name": "시험신", "icon": "res://assets/gods/__nope.png"}], "skills": [], "divine": {}, "miracles": []}, {}, {})
 	_check(Array(bad.errors).any(func(x): return x.contains("아이콘 그림")), "없는 아이콘 그림 = 검사 오류")
+
+
+func _test_portrait_cache() -> void:
+	print("[13j] 초상화 캐시")
+	CharacterSprite2D.clear_cache()
+	var a := CharacterSprite2D.portrait("dan")
+	var b := CharacterSprite2D.portrait("dan")
+	_check(a != null and a == b, "같은 캐릭터 초상화는 한 번만 읽고 같은 텍스처")
+	_check(a.get_width() == 256 and a.get_height() == 256, "단 초상화 256x256 (%dx%d)" % [a.get_width(), a.get_height()])
+	var t0 := Time.get_ticks_usec()
+	for i in 100:
+		CharacterSprite2D.portrait("dan")
+	_check(Time.get_ticks_usec() - t0 < 5000, "캐시된 초상화 100번 < 5ms")
+	CharacterSprite2D.clear_cache()
+	_check(CharacterSprite2D.portrait("dan") != a, "clear_cache 뒤에는 다시 읽음")
 
 
 func _test_story_graph() -> void:

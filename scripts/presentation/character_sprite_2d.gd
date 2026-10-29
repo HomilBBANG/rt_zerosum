@@ -22,6 +22,7 @@ const HOLD := ["death"]                       # 마지막 프레임에서 멈춤
 
 static var _cache: Dictionary = {}   # "<id>/<anim>" → {frames, masks_r, masks_l, fps, loop, ground, figure_px, hip_y, weapon}
 static var _info_cache: Dictionary = {}
+static var _portrait_cache: Dictionary = {}   # 캐릭터 id → 초상화 Texture2D (없으면 null 도 기억)
 ## 칠 방식 강제 (CLI --char_style=neon|classic, --char_gradient=0|1 → Game 이 넣음). 비어 있으면 character.json 그대로
 static var style_override: Dictionary = {}
 
@@ -58,9 +59,12 @@ static func info_of(id: String) -> Dictionary:
 	return _info_cache[id]
 
 
-## 초상화 (HUD)
+## 초상화 (HUD) — 캐릭터마다 한 번만 읽어 둠 (턴 순서는 AP 가 바뀔 때마다 다시 그려서, 매번 PNG 를 읽으면 한 번에 ~20ms 끊김).
+## 그림을 바꾼 뒤 바로 보려면 clear_cache() (에디터 다시 열기 · 게임 다시 실행이면 저절로)
 static func portrait(id: String) -> Texture2D:
-	return _tex(dir_of(id).path_join("portrait.png"))
+	if not _portrait_cache.has(id):
+		_portrait_cache[id] = _tex(dir_of(id).path_join("portrait.png"))
+	return _portrait_cache[id]
 
 
 ## 원본 PNG 가 있으면 직접 읽어 밉맵을 만든다 (임포트 전에 넣은 새 프레임도 바로 보이고, 축소해도 선명). 없으면 임포트된 리소스.
@@ -274,6 +278,7 @@ static func pose_path(id: String, pose: String) -> String:
 static func clear_cache() -> void:
 	_cache.clear()
 	_info_cache.clear()
+	_portrait_cache.clear()
 	Sfx.clear_cache()
 
 

@@ -5,7 +5,7 @@ assets/characters/<id>/
   base.png            기본 한 장 (애니메이션 프레임이 없을 때 쓰는 정지 그림)
   base_mask_l/_r.png  조명 구역 마스크 (셰이더용, 빛이 왼쪽/오른쪽에서 올 때)
   silhouette.png      3D 배경의 그림자용 실루엣
-  portrait.png        초상화 (HUD)
+  portrait.png        초상화 (HUD, 256x256 권장 — new 는 없을 때만 기본 그림 머리에서 잘라 만듦)
   <애니메이션>/0001.png, 0002.png …   ← 사용자가 뽑은 프레임 (idle, walk, sit, sleep, work, attack, hit, heal, death …)
   <애니메이션>/anim.json  (선택) {"fps": 12, "loop": true, "durations": [초, 초, …], "ground": [x, y], "figure_px": 760, "hip_y": 400, "weapon": false}
 
@@ -488,7 +488,9 @@ def cmd_new(cid, src, fig_px=760):
     sil.resize((w // 2, h // 2), Image.LANCZOS).save(os.path.join(cdir, "silhouette.png"))
     side = int(max(head[2], head[3]) * 1.15)
     cx = head[0] + head[2] // 2
-    base.crop((cx - side // 2, max(0, top - 4), cx + side // 2, max(0, top - 4) + side)).save(os.path.join(cdir, "portrait.png"))
+    pp = os.path.join(cdir, "portrait.png")
+    if not os.path.exists(pp):   # 이미 있는 초상화(따로 그린 256x256)는 덮어쓰지 않음 — 다시 자르려면 portrait.png 를 지우고 실행
+        base.crop((cx - side // 2, max(0, top - 4), cx + side // 2, max(0, top - 4) + side)).save(pp)
     old = os.path.join(cdir, "character.json")
     if os.path.exists(old):   # 다시 만들 때 칠 방식 설정은 유지
         prev = json.load(open(old, encoding="utf-8"))
