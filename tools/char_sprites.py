@@ -45,7 +45,7 @@ assets/characters/<id>/
       줄마다 동작 하나(왼쪽부터 프레임 순서), ':l' = 좌우 뒤집어 왼쪽 보기. 칸 = 발이 가운데 오는 공통 크기, 짧은 줄 남는 칸은 투명
       → <out>/<캐릭터>/<name>.png (+ 배율마다 <name>_x0.5.png) + <name>.json (줄마다 동작·방향·장 수·fps·발자국 프레임)
   python3 tools/char_sprites.py poses <캐릭터> <이름>=<그림> … [--ref <이름>] [--band 0.25]   상황별 한 장 그림(포즈) → <이름>/0001.png (+ 조명·선화·눈 마스크, anim.json "pose": true)
-      예: dead=90.webp hit=91.webp miss=92.webp shot=93.webp stun=94.webp. 그림*0.8 = 그 그림만 배율 더 곱하기 (다른 크기로 그려진 그림 — 모자 폭 등으로 맞춤).
+      예: dead=90.webp hit=91.webp miss=92.webp shot=93.webp stun=94.webp. 그림*0.8 = 그 그림만 배율 더 곱하기 (다른 크기로 그려진 그림 — 모자 폭 등으로 맞춤), 그림@fit = 그 그림의 키를 기본 그림 키에 맞춤 (서 있는데 작게 그려진 그림).
       무기별 공격 그림 = shot_<무기 스프라이트>(예: shot_pistol), slash_<무기> — 그 무기를 들었을 때 먼저 씀. 배율 = 기준 그림(--ref, 기본 = 가장 키 큰 선 자세)의 키가 figure_px 가 되게 — 모든 포즈 같은 배율
       발 = 선 자세는 맨 아래 발 가운데(--band 0.25 = 아래 25% 줄 좌우 끝 가운데 — 한 발을 뻗은 자세), 누운 자세(가로가 긴 그림)는 그림 가운데 아래. 전투(피격·회피·공격·기절·쓰러짐)·컷씬 대사에서 씀
   python3 tools/char_sprites.py posecheck <캐릭터> [출력.png]   idle · 걷기 · 모든 포즈를 게임과 같은 배율 · 같은 발 위치로 한 장에 (크기 비교 — 초록 선 = 기본 그림 키)
@@ -1240,7 +1240,10 @@ def cmd_poses(cid, pairs, ref=None, band=None):
     ims = {}
     mult = {}
     for name, path in pairs:
-        if "*" in path:   # 그림*배율 — 다른 크기로 그려진 그림(앉은 자세·다른 캔버스)을 다른 포즈와 맞춤
+        if path.endswith("@fit"):   # 그림@fit — 선 자세인데 작게/크게 그려진 그림: 키를 기본 그림 키(figure_px)에 맞춤
+            path = path[:-4]
+            mult[name] = "fit"
+        elif "*" in path:   # 그림*배율 — 다른 크기로 그려진 그림(앉은 자세·다른 캔버스)을 다른 포즈와 맞춤
             path, m = path.rsplit("*", 1)
             mult[name] = float(m)
         im = Image.open(path).convert("RGBA")
@@ -1253,7 +1256,7 @@ def cmd_poses(cid, pairs, ref=None, band=None):
     k = fig / ims[ref][0].height
     pad = 6
     for name, (im, path) in ims.items():
-        km = k * mult.get(name, 1.0)
+        km = fig / im.height if mult.get(name) == "fit" else k * mult.get(name, 1.0)
         im2 = im.resize((round(im.width * km), round(im.height * km)), Image.LANCZOS)
         can = Image.new("RGBA", (im2.width + pad * 2, im2.height + pad * 2), (0, 0, 0, 0))
         can.alpha_composite(im2, (pad, pad))
