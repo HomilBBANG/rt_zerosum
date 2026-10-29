@@ -2,266 +2,273 @@
 	"version": 1,
 	"gods": [
 		{
-			"color": "#faff66",
-			"desc": "새벽과 여명의 신",
 			"id": "aurora",
 			"name": "아우로라",
-			"symbol": ""
+			"color": "#faff66",
+			"symbol": "",
+			"icon": "",
+			"desc": "새벽과 여명의 신"
 		},
 		{
-			"color": "#ff5a4e",
-			"desc": "분노의 핏빛 달",
 			"id": "rubrath",
 			"name": "루브라스",
-			"symbol": ""
+			"color": "#ff5a4e",
+			"symbol": "",
+			"icon": "",
+			"desc": "분노의 핏빛 달"
 		},
 		{
-			"color": "#8f7bff",
-			"desc": "심연의 눈이자 공허의 신",
 			"id": "tenebriculus",
 			"name": "테네브리쿨루스",
-			"symbol": ""
+			"color": "#8f7bff",
+			"symbol": "",
+			"icon": "",
+			"desc": "심연의 눈이자 공허의 신"
 		},
 		{
-			"color": "#cf5fd3",
-			"desc": "인간을 사랑하는 신",
 			"id": "yoshua",
 			"name": "요슈아",
-			"symbol": ""
+			"color": "#cf5fd3",
+			"symbol": "",
+			"icon": "",
+			"desc": "인간을 사랑하는 신"
 		},
 		{
-			"color": "#2cdcf3",
-			"desc": "종말의 겨울",
 			"id": "alpha",
 			"name": "유성회",
-			"symbol": ""
+			"color": "#2cdcf3",
+			"symbol": "",
+			"icon": "",
+			"desc": "종말의 겨울"
 		},
 		{
-			"color": "#ff7d00",
-			"desc": "무한한 광기와 쾌락",
 			"id": "omrga",
 			"name": "오메가",
-			"symbol": ""
+			"color": "#ff7d00",
+			"symbol": "",
+			"icon": "",
+			"desc": "무한한 광기와 쾌락"
 		},
 		{
-			"color": "#08b071",
-			"desc": "세상의 멸망과 창조 사이의 존재",
 			"id": "nox",
 			"name": "녹스",
-			"symbol": ""
+			"color": "#08b071",
+			"symbol": "",
+			"icon": "",
+			"desc": "세상의 멸망과 창조 사이의 존재"
 		}
 	],
 	"believers": {
 		"a_alma": {
-			"faith": 25,
-			"god": "yoshua"
+			"god": "yoshua",
+			"faith": 25
 		},
 		"a_dan": {
-			"faith": 30,
-			"god": "aurora"
+			"god": "yoshua",
+			"faith": 30
 		},
 		"a_ethan": {
-			"faith": 40,
-			"god": "yoshua"
+			"god": "yoshua",
+			"faith": 40
 		},
 		"a_hana": {
-			"faith": 0,
-			"god": "yoshua"
+			"god": "yoshua",
+			"faith": 0
 		},
 		"a_kira": {
-			"faith": 30,
-			"god": "tenebriculus"
+			"god": "tenebriculus",
+			"faith": 30
 		},
 		"a_nikita": {
-			"faith": 50,
-			"god": "alpha"
+			"god": "alpha",
+			"faith": 50
 		}
 	},
 	"divine": {
 		"a_hana": {
-			"condition": {
-				"target": "quest:q_hana_secret",
-				"type": "quest",
-				"value": 0
-			},
 			"god": "omrga",
 			"unlocked": false,
+			"condition": {
+				"type": "quest",
+				"value": 0,
+				"target": "quest:q_hana_secret"
+			},
 			"will": 10
 		}
 	},
 	"skills": [
 		{
-			"desc": "회복량 +2",
-			"effect": "heal",
-			"god": "aurora",
 			"id": "solus_1",
+			"god": "aurora",
 			"name": "햇살의 손길",
 			"need": 20,
-			"value": 2
+			"effect": "heal",
+			"value": 2,
+			"desc": "회복량 +2"
 		},
 		{
-			"desc": "최대 HP +6",
-			"effect": "hp",
-			"god": "aurora",
 			"id": "solus_2",
+			"god": "aurora",
 			"name": "빛의 가호",
 			"need": 40,
-			"value": 6
+			"effect": "hp",
+			"value": 6,
+			"desc": "최대 HP +6"
 		},
 		{
-			"desc": "응급 처치 회복 +5",
-			"effect": "skill_power:heal",
-			"god": "aurora",
 			"id": "solus_3",
+			"god": "aurora",
 			"name": "성광",
 			"need": 60,
-			"value": 5
+			"effect": "skill_power:heal",
+			"value": 5,
+			"desc": "응급 처치 회복 +5"
 		},
 		{
-			"desc": "최대 HP +12",
-			"effect": "hp",
-			"god": "aurora",
 			"id": "solus_4",
+			"god": "aurora",
 			"name": "태양의 축복",
 			"need": 80,
-			"value": 12
+			"effect": "hp",
+			"value": 12,
+			"desc": "최대 HP +12"
 		},
 		{
-			"desc": "모든 공격 위력 +1",
-			"effect": "power",
-			"god": "rubrath",
 			"id": "veyra_1",
+			"god": "rubrath",
 			"name": "피의 맹세",
 			"need": 20,
-			"value": 1
+			"effect": "power",
+			"value": 1,
+			"desc": "모든 공격 위력 +1"
 		},
 		{
-			"desc": "강공격 위력 +3",
-			"effect": "skill_power:heavy_attack",
-			"god": "rubrath",
 			"id": "veyra_2",
+			"god": "rubrath",
 			"name": "전쟁의 함성",
 			"need": 40,
-			"value": 3
+			"effect": "skill_power:heavy_attack",
+			"value": 3,
+			"desc": "강공격 위력 +3"
 		},
 		{
-			"desc": "모든 공격 위력 +2",
-			"effect": "power",
-			"god": "rubrath",
 			"id": "veyra_3",
+			"god": "rubrath",
 			"name": "광전사",
 			"need": 60,
-			"value": 2
+			"effect": "power",
+			"value": 2,
+			"desc": "모든 공격 위력 +2"
 		},
 		{
-			"desc": "필살기 위력 +6",
-			"effect": "skill_power:ultimate",
-			"god": "rubrath",
 			"id": "veyra_4",
+			"god": "rubrath",
 			"name": "신의 철퇴",
 			"need": 80,
-			"value": 6
+			"effect": "skill_power:ultimate",
+			"value": 6,
+			"desc": "필살기 위력 +6"
 		},
 		{
-			"desc": "속도 +1",
-			"effect": "speed",
-			"god": "tenebriculus",
 			"id": "noct_1",
+			"god": "tenebriculus",
 			"name": "그림자 걸음",
 			"need": 20,
-			"value": 1
+			"effect": "speed",
+			"value": 1,
+			"desc": "속도 +1"
 		},
 		{
-			"desc": "턴마다 AP 회복 +1",
-			"effect": "ap_rec",
-			"god": "tenebriculus",
 			"id": "noct_2",
+			"god": "tenebriculus",
 			"name": "밤의 숨결",
 			"need": 40,
-			"value": 1
+			"effect": "ap_rec",
+			"value": 1,
+			"desc": "턴마다 AP 회복 +1"
 		},
 		{
-			"desc": "기본 공격 위력 +3",
-			"effect": "skill_power:basic_attack",
-			"god": "tenebriculus",
 			"id": "noct_3",
+			"god": "tenebriculus",
 			"name": "암습",
 			"need": 60,
-			"value": 3
+			"effect": "skill_power:basic_attack",
+			"value": 3,
+			"desc": "기본 공격 위력 +3"
 		},
 		{
-			"desc": "최대 AP +1",
-			"effect": "ap",
-			"god": "tenebriculus",
 			"id": "noct_4",
+			"god": "tenebriculus",
 			"name": "달 없는 밤",
 			"need": 80,
-			"value": 1
+			"effect": "ap",
+			"value": 1,
+			"desc": "최대 AP +1"
 		},
 		{
-			"desc": "방어 +1",
-			"effect": "defense",
-			"god": "yoshua",
 			"id": "terra_1",
+			"god": "yoshua",
 			"name": "단단한 뿌리",
 			"need": 20,
-			"value": 1
+			"effect": "defense",
+			"value": 1,
+			"desc": "방어 +1"
 		},
 		{
-			"desc": "최대 HP +8",
-			"effect": "hp",
-			"god": "yoshua",
 			"id": "terra_2",
+			"god": "yoshua",
 			"name": "대지의 피",
 			"need": 40,
-			"value": 8
+			"effect": "hp",
+			"value": 8,
+			"desc": "최대 HP +8"
 		},
 		{
-			"desc": "방어 +1",
-			"effect": "defense",
-			"god": "yoshua",
 			"id": "terra_3",
+			"god": "yoshua",
 			"name": "바위 피부",
 			"need": 60,
-			"value": 1
+			"effect": "defense",
+			"value": 1,
+			"desc": "방어 +1"
 		},
 		{
-			"desc": "최대 HP +14",
-			"effect": "hp",
-			"god": "yoshua",
 			"id": "terra_4",
+			"god": "yoshua",
 			"name": "어머니의 품",
 			"need": 80,
-			"value": 14
+			"effect": "hp",
+			"value": 14,
+			"desc": "최대 HP +14"
 		}
 	],
 	"miracles": [
 		{
-			"char": "a_hana",
-			"desc": "최대 HP +10",
-			"effect": "hp",
 			"id": "hana_m1",
+			"char": "a_hana",
 			"name": "대지의 맥박",
 			"need": 20,
-			"value": 10
+			"effect": "hp",
+			"value": 10,
+			"desc": "최대 HP +10"
 		},
 		{
-			"char": "a_hana",
-			"desc": "받는 피해 -2 (방어 +2)",
-			"effect": "defense",
 			"id": "hana_m2",
+			"char": "a_hana",
 			"name": "흔들리지 않는 자",
 			"need": 40,
-			"value": 2
+			"effect": "defense",
+			"value": 2,
+			"desc": "받는 피해 -2 (방어 +2)"
 		},
 		{
-			"char": "a_hana",
-			"desc": "필살기 위력 +8",
-			"effect": "skill_power:ultimate",
 			"id": "hana_m3",
+			"char": "a_hana",
 			"name": "대지모의 현신",
 			"need": 70,
-			"value": 8
+			"effect": "skill_power:ultimate",
+			"value": 8,
+			"desc": "필살기 위력 +8"
 		}
 	]
 }
