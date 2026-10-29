@@ -40,6 +40,7 @@ var _edge_pts: Array = []         # 그린 선의 점들 (선 클릭 판정)
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_CLICK
+	clip_contents = true   # 그림이 캔버스 밖(툴바 · 오른쪽 칸 · 에디터 메뉴)으로 넘치지 않게
 	font = load("res://assets/fonts/Pretendard-Medium.ttf")
 	bold = load("res://assets/fonts/Pretendard-Bold.ttf") if ResourceLoader.exists("res://assets/fonts/Pretendard-Bold.ttf") else font
 	resized.connect(queue_redraw)
