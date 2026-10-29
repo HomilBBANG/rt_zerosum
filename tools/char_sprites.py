@@ -48,6 +48,7 @@ assets/characters/<id>/
       예: dead=90.webp hit=91.webp miss=92.webp shot=93.webp stun=94.webp. 그림*0.8 = 그 그림만 배율 더 곱하기 (다른 크기로 그려진 그림 — 모자 폭 등으로 맞춤).
       무기별 공격 그림 = shot_<무기 스프라이트>(예: shot_pistol), slash_<무기> — 그 무기를 들었을 때 먼저 씀. 배율 = 기준 그림(--ref, 기본 = 가장 키 큰 선 자세)의 키가 figure_px 가 되게 — 모든 포즈 같은 배율
       발 = 선 자세는 맨 아래 발 가운데(--band 0.25 = 아래 25% 줄 좌우 끝 가운데 — 한 발을 뻗은 자세), 누운 자세(가로가 긴 그림)는 그림 가운데 아래. 전투(피격·회피·공격·기절·쓰러짐)·컷씬 대사에서 씀
+  python3 tools/char_sprites.py posecheck <캐릭터> [출력.png]   idle · 걷기 · 모든 포즈를 게임과 같은 배율 · 같은 발 위치로 한 장에 (크기 비교 — 초록 선 = 기본 그림 키)
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
 import json
@@ -1288,6 +1289,42 @@ def cmd_poses(cid, pairs, ref=None, band=None):
         print(cid, name, "포즈", can.size, "발", meta["ground"], "누움" if lying else "")
 
 
+def cmd_posecheck(cid, out=None):
+    """크기 비교 시트: idle(첫 프레임)·walk·포즈를 각자의 figure_px 로 같은 키 배율, 발을 같은 선에 (게임과 같은 계산)."""
+    from PIL import ImageDraw
+    cdir = os.path.join(CHAR_DIR, cid)
+    info = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    names = [a for a in ("idle", "walk", "run") if os.path.exists(os.path.join(cdir, a, "0001.png"))]
+    for d in sorted(os.listdir(cdir)):
+        aj = os.path.join(cdir, d, "anim.json")
+        if os.path.exists(aj) and json.load(open(aj, encoding="utf-8")).get("pose"):
+            names.append(d)
+    H = 420
+    tiles = []
+    for a in names:
+        meta = json.load(open(os.path.join(cdir, a, "anim.json"), encoding="utf-8")) if os.path.exists(os.path.join(cdir, a, "anim.json")) else {}
+        g = meta.get("ground", info["ground"])
+        s = H * 0.95 / float(meta.get("figure_px", info.get("figure_px", 760)))
+        im = Image.open(os.path.join(cdir, a, "0001.png")).convert("RGBA")
+        im = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
+        tiles.append((a, im, g[0] * s, g[1] * s))
+    top = int(H * 1.1)
+    W = sum(max(t[1].width, 120) + 10 for t in tiles)
+    can = Image.new("RGBA", (W, top + 30), (50, 55, 70, 255))
+    dr = ImageDraw.Draw(can)
+    x = 0
+    for a, im, gx, gy in tiles:
+        w = max(im.width, 120)
+        can.alpha_composite(im, (int(x + w / 2 - gx), int(top - gy)))
+        dr.text((x + 4, top + 6), a, fill=(255, 255, 255, 255))
+        x += w + 10
+    dr.line((0, top, W, top), fill=(255, 80, 80, 255))
+    dr.line((0, top - H * 0.95, W, top - H * 0.95), fill=(80, 255, 80, 255))
+    out = out or os.path.join(ROOT, "exports", "posecheck_%s.jpg" % cid)
+    can.convert("RGB").save(out, quality=88)
+    print(cid, "크기 비교", len(tiles), "장 →", os.path.relpath(out, ROOT))
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
@@ -1324,6 +1361,8 @@ if __name__ == "__main__":
         skip = {args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
         names = tuple(a for a in args[2:] if not a.startswith("--") and a not in skip)
         cmd_export(args[1], names or ("idle", "walk", "run"), int(opt.get("cols", 6)), opt.get("out"))
+    elif args[:1] == ["posecheck"] and len(args) >= 2:
+        cmd_posecheck(args[1], args[2] if len(args) > 2 else None)
     elif args[:1] == ["poses"] and len(args) >= 3:
         opt = {a[2:]: args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
         cmd_poses(args[1], [tuple(a.split("=", 1)) for a in args[2:] if "=" in a and not a.startswith("--")], opt.get("ref"),

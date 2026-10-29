@@ -146,7 +146,11 @@ func _run_cli() -> void:
 						if pz == "dead":
 							sp.play_death()
 						else:
-							sp.play_pose(pz, view.pose_opts())
+							var po: Dictionary = view.pose_opts()
+							if Game.cli.has("pose_zoom"):
+								po.zoom = float(Game.cli.pose_zoom)
+								po.drift = 0.0
+							sp.play_pose(pz, po)
 							if pz in ["shot", "hit"]:
 								view.shake_camera()
 						break

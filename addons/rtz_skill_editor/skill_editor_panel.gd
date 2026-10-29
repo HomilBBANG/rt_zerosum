@@ -2305,7 +2305,7 @@ func _build_pose_box() -> Control:
 	lc.add_child(pose_list)
 	lc.add_child(_small("자동 = 적에게 쓰는 피해·상태 스킬은 shot(공격 — 근접 무기를 들고 있으면 slash, 그림이 없으면 shot), 그 밖의 스킬(회복·AP·버프)은 point_up. 맞는 쪽은 상황으로 자동: 피함 miss · 기절 stun · 디버프·구속 tired · 피해 hit. AP 를 다 쓰면 tired, 쓰러지면 dead, 패배 결과 화면은 annoying. 그림이 없는 캐릭터는 예전 동작."))
 	var rc := VBoxContainer.new()
-	rc.custom_minimum_size.x = 330
+	rc.custom_minimum_size.x = 470
 	box.add_child(rc)
 	var hr := HBoxContainer.new()
 	rc.add_child(hr)
@@ -2320,7 +2320,7 @@ func _build_pose_box() -> Control:
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	rc.add_child(sc)
 	pose_gallery = GridContainer.new()
-	pose_gallery.columns = 3
+	pose_gallery.columns = 4
 	pose_gallery.add_theme_constant_override("h_separation", 6)
 	pose_gallery.add_theme_constant_override("v_separation", 6)
 	sc.add_child(pose_gallery)
@@ -2370,18 +2370,33 @@ func _fill_pose_gallery() -> void:
 		pose_gallery.add_child(_pose_thumb(u.sprite_id, str(p), have.has(p), 96))
 
 
+## 포즈 작은 그림 — 모든 포즈를 같은 배율 · 같은 발 위치로 (기본 그림 키 = 칸 높이의 90%, 크기 비교가 되게)
 func _pose_thumb(spr: String, p: String, has: bool, h: float) -> Control:
 	var v := VBoxContainer.new()
-	v.custom_minimum_size.x = h * 0.95
-	var tr := TextureRect.new()
-	tr.custom_minimum_size = Vector2(h * 0.95, h)
-	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var w := h * 1.2
+	v.custom_minimum_size.x = w
+	var box := Control.new()
+	box.custom_minimum_size = Vector2(w, h)
+	box.clip_contents = true
+	v.add_child(box)
 	var path := CharacterSprite2D.pose_path(spr, p) if has else ""
-	tr.texture = CharacterSprite2D._tex(path) if path != "" else null
-	v.add_child(tr)
+	var tex := CharacterSprite2D._tex(path) if path != "" else null
+	if tex != null:
+		var inf := CharacterSprite2D.info_of(spr)
+		var aj := CharacterSprite2D.dir_of(spr).path_join(p).path_join("anim.json")
+		var o: Variant = JSON.parse_string(FileAccess.get_file_as_string(aj)) if FileAccess.file_exists(aj) else null
+		var g: Array = o.ground if o is Dictionary and o.get("ground") is Array else [tex.get_width() * 0.5, tex.get_height()]
+		var fp := float(o.get("figure_px", inf.get("figure_px", 760))) if o is Dictionary else float(inf.get("figure_px", 760))
+		var k := h * 0.9 / fp
+		var tr := TextureRect.new()
+		tr.texture = tex
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_SCALE
+		tr.size = Vector2(tex.get_width(), tex.get_height()) * k
+		tr.position = Vector2(w * 0.5 - float(g[0]) * k, h - 2.0 - float(g[1]) * k)
+		box.add_child(tr)
 	var l := _small("%s (%s)%s" % [SkillPoseData.pose_name(p), p, "" if has else "\n그림 없음"])
-	l.custom_minimum_size.x = h * 0.95
+	l.custom_minimum_size.x = w
 	l.tooltip_text = str(SkillPoseData.POSES.get(p, {}).get("when", ""))
 	if not has:
 		l.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))

@@ -625,7 +625,7 @@ func _test_poses() -> void:
 	for pz in ["hit", "miss", "shot", "slash", "tired", "dead", "point_up", "stun", "annoying", "awkward", "hit_2", "move"]:
 		_check(hp.has(pz), "하나 포즈 '%s' 있음" % pz)
 	var kp := CharacterSprite2D.poses("kira")
-	for pz in ["stun", "miss", "hit", "slash", "tired", "annoying", "shot", "shot_pistol"]:
+	for pz in ["stun", "miss", "hit", "hit_2", "slash", "tired", "annoying", "shot", "shot_pistol", "point_up"]:
 		_check(kp.has(pz), "키라 포즈 '%s' 있음" % pz)
 	_check(SkillPoseData.pose_name("shot_pistol") == "공격 (pistol)", "무기별 포즈 이름")
 	_check(SkillPoseData.pose_name("hit_2") == "피격 2" and SkillPoseData.pose_name("move") == "자리 이동", "포즈 이름 (같은 포즈 다른 그림 = 피격 2)")
