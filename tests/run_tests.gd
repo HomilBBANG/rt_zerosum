@@ -625,8 +625,9 @@ func _test_poses() -> void:
 	for pz in ["hit", "miss", "shot", "slash", "tired", "dead", "point_up", "stun", "annoying", "awkward", "hit_2", "move"]:
 		_check(hp.has(pz), "하나 포즈 '%s' 있음" % pz)
 	var kp := CharacterSprite2D.poses("kira")
-	for pz in ["stun", "miss", "hit"]:
+	for pz in ["stun", "miss", "hit", "slash", "tired", "annoying", "shot", "shot_pistol"]:
 		_check(kp.has(pz), "키라 포즈 '%s' 있음" % pz)
+	_check(SkillPoseData.pose_name("shot_pistol") == "공격 (pistol)", "무기별 포즈 이름")
 	_check(SkillPoseData.pose_name("hit_2") == "피격 2" and SkillPoseData.pose_name("move") == "자리 이동", "포즈 이름 (같은 포즈 다른 그림 = 피격 2)")
 	# 스킬 포즈 규칙 (SkillPoseData)
 	var bc := _make("ally")
@@ -640,16 +641,30 @@ func _test_poses() -> void:
 	var heal := ActionData.new()
 	heal.id = "t_pose_heal"
 	heal.effect = "heal"
-	_check(SkillPoseData.caster_poses(atk, a0, e, {}) == (["shot"] if a0.is_ranged_now() else ["slash", "shot"]), "자동: 적에게 공격 = shot (근접 무기면 slash → shot)")
+	_check(SkillPoseData.auto_caster(atk, a0, e) == (["shot"] if a0.is_ranged_now() else ["slash", "shot"]), "자동: 적에게 공격 = shot (근접 무기면 slash → shot)")
+	var kira: UnitRuntime = null
+	for u in bc.slots.living_units("ally"):
+		if u.data.sprite_id == "kira":
+			kira = u
+	if kira != null:
+		var wi := -1
+		for i in kira.data.weapons.size():
+			if str(kira.data.weapons[i].get("sprite", "")) == "pistol":
+				wi = i
+		if wi >= 0:
+			var keep := kira.weapon_index
+			kira.weapon_index = wi
+			_check(SkillPoseData.caster_poses(atk, kira, e, {}) == ["shot_pistol", "shot"], "권총을 들면 shot_pistol 먼저")
+			kira.weapon_index = keep
 	var melee := bc.slots.living_units("ally").filter(func(u): return not u.is_ranged_now())
 	var ranged := bc.slots.living_units("ally").filter(func(u): return u.is_ranged_now())
 	if not melee.is_empty():
-		_check(SkillPoseData.caster_pose(atk, melee[0], e, {}) == "slash", "근접 무기 공격 = slash 먼저")
+		_check(SkillPoseData.auto_caster(atk, melee[0], e)[0] == "slash", "근접 무기 공격 = slash 먼저")
 	if not ranged.is_empty():
-		_check(SkillPoseData.caster_pose(atk, ranged[0], e, {}) == "shot", "원거리 무기 공격 = shot")
-	_check(SkillPoseData.caster_pose(heal, a0, a1, {}) == "point_up", "자동: 회복·버프 = point_up")
-	_check(SkillPoseData.caster_pose(atk, a0, e, {"t_pose_atk": "point_up"}) == "point_up", "스킬 포즈를 정하면 그 포즈")
-	_check(SkillPoseData.caster_pose(atk, a0, e, {"t_pose_atk": "none"}) == "", "포즈 없음 = 예전 동작")
+		_check(SkillPoseData.auto_caster(atk, ranged[0], e)[0] == "shot", "원거리 무기 공격 = shot")
+	_check(SkillPoseData.auto_caster(heal, a0, a1) == ["point_up"] and SkillPoseData.caster_poses(heal, a0, a1, {}).back() == "point_up", "자동: 회복·버프 = point_up")
+	_check(SkillPoseData.caster_poses(atk, a0, e, {"t_pose_atk": "point_up"}).back() == "point_up" and not SkillPoseData.caster_poses(atk, a0, e, {"t_pose_atk": "point_up"}).has("shot"), "스킬 포즈를 정하면 그 포즈")
+	_check(SkillPoseData.caster_poses(atk, a0, e, {"t_pose_atk": "none"}).is_empty(), "포즈 없음 = 예전 동작")
 	_check(SkillPoseData.target_poses("miss", []) == ["miss"], "피함 = miss")
 	_check(SkillPoseData.target_poses("damage", ["stun"])[0] == "stun", "기절 = stun 먼저")
 	_check(SkillPoseData.target_poses("damage", ["root"]) == ["tired", "hit"], "구속(디버프) = tired, 없으면 hit")

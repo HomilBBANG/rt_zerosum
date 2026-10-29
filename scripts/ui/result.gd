@@ -55,34 +55,42 @@ func _ready() -> void:
 	Game.maybe_cli_capture()
 
 
-## 패배: 출전 대원 중 그 포즈 그림(annoying = 언짢음)이 있는 대원을 오른쪽에 (SkillPoseData)
+## 패배: 출전 대원 중 그 포즈 그림(annoying = 언짢음)이 있는 대원을 오른쪽에 (SkillPoseData) — 기본 그림과 같은 배율이라 앉은 그림은 작게
 func _show_pose_art(r: Dictionary, pose: String) -> void:
-	var paths: Array[String] = []
+	var arts := []   # [텍스처, 캐릭터 그림 높이(image_size)]
 	for a in r.get("allies", []):
 		var u := Game.find_ally(str(a.get("id", "")))
 		var p := CharacterSprite2D.pose_path(u.sprite_id, pose) if u != null else ""
-		if p != "":
-			paths.append(p)
-	var h := 600.0
-	var x := 1250.0
-	for i in mini(paths.size(), 3):
-		var tex := CharacterSprite2D._tex(paths[i])
-		if tex == null:
-			continue
-		var k := h / float(tex.get_height()) * (1.0 if i == 0 else 0.86)
+		var tex := CharacterSprite2D._tex(p) if p != "" else null
+		if tex != null:
+			arts.append([tex, float((CharacterSprite2D.info_of(u.sprite_id).get("image_size", [512, 768]) as Array)[1])])
+		if arts.size() >= 3:
+			break
+	if arts.is_empty():
+		return
+	var left := 660.0    # 이 오른쪽 안에만 (왼쪽 글·버튼을 가리지 않게)
+	var right := 1270.0
+	var k := 600.0 / float(arts[0][1])
+	var total := 0.0
+	for i in arts.size():
+		var t: Texture2D = arts[i][0]
+		total += t.get_width() * (600.0 / float(arts[i][1])) * (1.0 if i == 0 else 0.86) * (1.0 if i == 0 else 0.75)
+	var fit := minf(1.0, (right - left) / maxf(1.0, total))
+	var x := right
+	for i in arts.size():
+		var tex: Texture2D = arts[i][0]
+		k = 600.0 / float(arts[i][1]) * fit * (1.0 if i == 0 else 0.86)
 		var tr := TextureRect.new()
 		tr.texture = tex
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.stretch_mode = TextureRect.STRETCH_SCALE
 		tr.size = Vector2(tex.get_width(), tex.get_height()) * k
-		x -= tr.size.x * (1.0 if i == 0 else 0.7)
+		x -= tr.size.x * (1.0 if i == 0 else 0.75)
 		tr.position = Vector2(x, 720.0 - tr.size.y - 10.0)
 		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		if i > 0:
-			tr.modulate = Color(0.75, 0.75, 0.8)
-			tr.show_behind_parent = false
 		add_child(tr)
 		if i > 0:
+			tr.modulate = Color(0.75, 0.75, 0.8)
 			move_child(tr, 2)   # 뒤 대원은 앞 대원 뒤로 (배경·쐐기 다음)
 
 

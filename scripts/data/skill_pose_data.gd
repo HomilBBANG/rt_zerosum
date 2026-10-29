@@ -9,6 +9,7 @@ extends RefCounted
 ## 그 밖: AP 를 다 씀(탈진) = tired · 쓰러짐 = dead · 패배 = annoying (결과 화면).
 ## 그 캐릭터에게 그 포즈 그림이 없으면 다음 후보(맞는 쪽은 hit), 그것도 없으면 예전 동작. 자리 이동 = move.
 ## 같은 포즈의 다른 그림 <포즈>_2, _3 … 이 있으면 그때마다 무작위 (UnitSprite2D.pose_variant).
+## 무기별 그림 <포즈>_<무기 스프라이트> (예: shot_pistol · slash_knife) 이 있으면 그 무기를 들었을 때 먼저.
 
 const PATH := "res://data/skill_poses.json"
 const NONE := "none"
@@ -34,8 +35,9 @@ static func pose_name(p: String) -> String:
 	if POSES.has(p):
 		return str(POSES[p].name)
 	var i := p.rfind("_")
-	if i > 0 and p.substr(i + 1).is_valid_int() and POSES.has(p.substr(0, i)):
-		return "%s %s" % [POSES[p.substr(0, i)].name, p.substr(i + 1)]
+	if i > 0 and POSES.has(p.substr(0, i)):
+		var tail := p.substr(i + 1)
+		return "%s %s" % [POSES[p.substr(0, i)].name, tail] if tail.is_valid_int() else "%s (%s)" % [POSES[p.substr(0, i)].name, tail]
 	return p
 
 
@@ -82,14 +84,29 @@ static func auto_for(action: ActionData) -> String:
 	return "shot" if action.target_rule in ["weapon", "enemy_melee", "enemy_any"] and action.effect in ["damage", "status"] else "point_up"
 
 
-## 스킬을 쓸 때 쓰는 쪽 포즈 후보 ([] = 포즈 없음 → 예전 공격 동작). 에디터에서 정한 포즈면 그것 하나
+## 스킬을 쓸 때 쓰는 쪽 포즈 후보 ([] = 포즈 없음 → 예전 공격 동작). 에디터에서 정한 포즈면 그것 하나.
+## 후보마다 지금 든 무기 그림(<포즈>_<무기 스프라이트>, 예: shot_pistol)이 먼저
 static func caster_poses(action: ActionData, actor: UnitRuntime, target: UnitRuntime, table: Dictionary) -> Array:
 	if action == null:
 		return []
 	var p := str(table.get(action.id, ""))
 	if p == NONE:
 		return []
-	return [p] if p != "" else auto_caster(action, actor, target)
+	return with_weapon([p] if p != "" else auto_caster(action, actor, target), actor)
+
+
+static func with_weapon(cands: Array, actor: UnitRuntime) -> Array:
+	if actor == null:
+		return cands
+	var w := actor.current_weapon()
+	var ws := str(w.get("sprite", w.get("id", "")))
+	if ws == "" or ws == "none":
+		return cands
+	var out := []
+	for c in cands:
+		out.append("%s_%s" % [c, ws])
+		out.append(c)
+	return out
 
 
 ## 첫 후보 (테스트·표시용)
