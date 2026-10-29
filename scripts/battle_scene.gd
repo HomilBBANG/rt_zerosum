@@ -147,10 +147,11 @@ func _run_cli() -> void:
 							sp.play_death()
 						else:
 							var po: Dictionary = view.pose_opts()
-							if Game.cli.has("pose_zoom"):
+							if Game.cli.has("pose_zoom"):   # --pose_zoom=1 = 줌 없이 (크기 확인)
 								po.zoom = float(Game.cli.pose_zoom)
 								po.drift = 0.0
 							sp.play_pose(pz, po)
+							view.focus_camera(sp, po)
 							if pz in ["shot", "hit"]:
 								view.shake_camera()
 						break

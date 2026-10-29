@@ -4,8 +4,8 @@ extends Node2D
 ## + 구역 마스크 셰이더 + 무기 레이어 + 클릭 영역 + 하이라이트.
 ## 공격·피격·회복·쓰러짐 애니메이션 프레임이 없으면 간단한 이동·흔들림 트윈으로 대신한다.
 ## 상황별 포즈(한 장 그림, anim.json "pose": true — tools/char_sprites.py poses): shot 공격 · hit 피격 · miss 회피 · stun 기절 · dead 쓰러짐 …
-##   같은 포즈의 다른 그림 <포즈>_2, _3 … 이 있으면 그때마다 무작위로 하나 (pose_variant).
-##   dead 를 뺀 포즈는 잠깐 바꿔 보여 줌 (play_pose: 캐릭터 가운데 기준 확대 + 살짝 옆에서 가운데로 흐름 → 원래 크기 · idle).
+##   같은 포즈의 다른 그림 <포즈>_2, _3 … 이 있으면 그때마다 무작위로 하나 (pose_variant). 확대 연출은 카메라 (BattleView2D.focus_camera).
+##   dead 를 뺀 포즈는 잠깐 바꿔 보여 줌 (play_pose → 끝나면 idle). 캐릭터 크기는 그대로.
 
 signal clicked(unit: UnitRuntime)
 
@@ -31,7 +31,6 @@ var _dead_alpha: float = 1.0
 var ui_accent: Color = Color(1, 0.9, 0.4)
 var chr: CharacterSprite2D = null
 var chr_height: float = 232.0
-var _flip_scale := Vector2.ONE      # 확대 연출 전 flip 배율 (좌우 반전 포함)
 var _pose_tw: Tween
 var _pose_name := ""
 
@@ -64,7 +63,6 @@ func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
 	if is_mirrored():
 		flip.scale.x = -1.0
 	flip.scale *= BASE_SCALE
-	_flip_scale = flip.scale
 	if CharacterSprite2D.exists(unit.data.sprite_id):
 		_build_character()
 		return
@@ -348,8 +346,6 @@ func has_pose(pose: String) -> bool:
 	return chr != null and chr.has_anim(pose) and bool(CharacterSprite2D.anim_data(chr.cid, pose).get("pose", false))
 
 
-## 포즈 잠깐 바꾸기 → 끝날 때까지 걸리는 초. o = 연출 값 (BattleView2D 인스펙터 '포즈 연출'):
-##   zoom 배율(1.2) · zoom_in 확대에 걸리는 초 · time 포즈 유지 초(1.5) · drift 처음 가로 어긋남(px, - = 뒤쪽) · back 원래로 돌아오는 초
 ## 같은 포즈의 다른 그림(<포즈>_2, _3 … 폴더)이 있으면 그중 무작위 하나
 func pose_variant(pose: String) -> String:
 	var vs: Array[String] = [pose]
@@ -360,45 +356,29 @@ func pose_variant(pose: String) -> String:
 	return vs[randi() % vs.size()]
 
 
+## 포즈 잠깐 바꾸기 (캐릭터 크기는 그대로 — 확대는 BattleView2D 카메라가) → 포즈를 보여 주는 초.
+## o = 연출 값 (BattleView2D 인스펙터 '포즈 연출'): time 포즈 유지 초(1.5). 끝나면 idle
 func play_pose(pose: String, o: Dictionary = {}) -> float:
 	if not has_pose(pose) or not unit.alive:
 		return 0.0
 	pose = pose_variant(pose)
-	var k := float(o.get("zoom", 1.2))
-	var t_in := float(o.get("zoom_in", 0.15))
 	var t_hold := float(o.get("time", 1.5))
-	var t_back := float(o.get("back", 0.2))
-	var drift := float(o.get("drift", -5.0)) * (1.0 if unit.team == "ally" else -1.0)   # 뒤쪽(적에게서 먼 쪽)에서 가운데로
 	_stop_pose()
 	_pose_name = pose
 	chr.play(pose)
-	_pose_set(1.0, drift)
-	var hold := func(t: float) -> void:   # 확대는 빠르게(zoom_in 초), 가로 어긋남은 time 초 동안 천천히 가운데로
-		var zi := 1.0 - pow(1.0 - clampf(t / maxf(0.01, t_in), 0.0, 1.0), 3.0)
-		var dr := sin(clampf(t / maxf(0.01, t_hold), 0.0, 1.0) * PI * 0.5)
-		_pose_set(lerpf(1.0, k, zi), drift * (1.0 - dr))
-	var back := func(v: float) -> void:
-		_pose_set(v, 0.0)
 	var to_idle := func() -> void:
 		if unit.alive and chr.current == pose:
 			chr.play("idle")
+		_pose_name = ""
 	_pose_tw = create_tween()
-	_pose_tw.tween_method(hold, 0.0, t_hold, t_hold)
+	_pose_tw.tween_interval(t_hold)
 	_pose_tw.tween_callback(to_idle)
-	_pose_tw.tween_method(back, k, 1.0, t_back).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	_pose_tw.tween_callback(_clear_pose_name)
-	return t_hold + t_back
+	return t_hold
 
 
-func _clear_pose_name() -> void:
-	_pose_name = ""
-
-
-## 확대 배율 v · 가로 어긋남 dx (캐릭터 가운데 = 발 위 키의 절반 기준으로 확대)
-func _pose_set(v: float, dx: float) -> void:
-	flip.scale = _flip_scale * v
-	var c := Vector2(0.0, -chr_height * 0.5)
-	flip.position = c * (1.0 - v) + Vector2(dx, 0.0)
+## 카메라 확대 중심 = 캐릭터 가운데 (발 위 키의 절반, 월드 좌표)
+func center_world() -> Vector2:
+	return position + Vector2(0.0, -chr_height * 0.5 * scale.y)
 
 
 func _stop_pose() -> void:
@@ -406,7 +386,6 @@ func _stop_pose() -> void:
 		_pose_tw.kill()
 	_pose_tw = null
 	_pose_name = ""
-	_pose_set(1.0, 0.0)
 
 
 func play_hit() -> void:

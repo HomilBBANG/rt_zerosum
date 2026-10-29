@@ -296,18 +296,20 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   **무기별 그림** = `<포즈>_<무기 스프라이트>` (예: 키라 `shot_pistol`) — 그 무기를 들고 쓸 때 먼저, 없으면 `<포즈>`. 무기 스프라이트 = 엑셀 아이템 시트 `스프라이트` 열 (pistol · rifle · sniper · knife · bayonet …).
   **같은 포즈의 다른 그림** = `<포즈>_2`, `_3` … (예: 하나 `hit_2`) — 그 상황마다 무작위로 하나. 컷씬에서는 따로 고를 수 있음.
   하나: `python3 tools/char_sprites.py poses hero2 hit=… miss=… shot=…@fit slash=… tired=… dead=… point_up=… stun=… annoying=… awkward=… hit_2=… move=… --ref hit --band 0.25` · 키라: `… poses kira stun=… miss=… hit=… slash=… tired=… "annoying=앉은.webp*0.785" shot=소총.webp@fit shot_pistol=… --ref miss --band 0.25` (`그림*배율` = 다른 크기로 그려진 그림을 모자 폭으로 맞춤 · `그림@fit` = 서 있는데 작게 그려진 그림의 키를 기본 그림 키에) (`--band` = 아래 25% 줄의 좌우 끝 가운데를 발로 — 한 발을 앞으로 뻗은 자세도 몸 가운데에).
-  **크기 확인**: `python3 tools/char_sprites.py posecheck <캐릭터> [출력.jpg]` — idle · 걷기 · 뛰기 · 모든 포즈를 게임과 같은 배율 · 같은 발 위치로 한 장에 (초록 선 = 기본 그림 키). 지금 세 캐릭터 모두 기본 그림과 키 ±2% · 눈 사이 폭 ±4% 안 ([니키타](docs/screenshots/posecheck_nikita_army.jpg) · [하나](docs/screenshots/posecheck_hero2.jpg) · [키라](docs/screenshots/posecheck_kira.jpg)). 전투에서 포즈가 보일 때 커 보이는 것은 연출(20% 확대, View 인스펙터 `포즈 연출` → 확대 배율) — 확대 없이 보기 `--pose_zoom=1`.
+  **크기 확인**: `python3 tools/char_sprites.py posecheck <캐릭터> [출력.jpg]` — idle · 걷기 · 뛰기 · 모든 포즈를 게임과 같은 배율 · 같은 발 위치로 한 장에 (초록 선 = 기본 그림 키). 지금 세 캐릭터 모두 기본 그림과 키 ±2% · 눈 사이 폭 ±4% 안 ([니키타](docs/screenshots/posecheck_nikita_army.jpg) · [하나](docs/screenshots/posecheck_hero2.jpg) · [키라](docs/screenshots/posecheck_kira.jpg)). 전투에서 포즈가 보일 때 크게 보이는 것은 카메라 줌(1.2배, View 인스펙터 `포즈 연출`) — 줌 없이 보기 `--pose_zoom=1`.
   모든 포즈 같은 배율(`--ref` 그림의 키 = 기본 그림 키), 발 = 선 자세는 발 가운데 · 누운 그림(가로가 긴 그림)은 가운데 아래. 새 이름의 포즈도 그대로 넣으면 에디터 목록에 나옴. 그림이 없는 캐릭터는 예전 연출 그대로.
 - **스킬마다 쓰는 쪽 포즈 = Godot 에디터 `스킬 트리` 탭 → `스킬 포즈`** (`data/skill_poses.json`): 스킬 목록(→ 지금 포즈) · `이 스킬을 쓸 때 포즈`(**자동** · **포즈 없음**(예전 공격 동작) · 포즈 이름) · 캐릭터별 미리보기 · 오른쪽 캐릭터별 포즈 그림 모음. 맞는 쪽 포즈는 상황으로 자동 (위 표).
   맞는 쪽 우선순위: 피함 miss → 기절 stun → 디버프 tired → 피해 hit (그 캐릭터에게 그림이 없으면 다음 후보). 넉백·끌어당김(즉시 효과)은 디버프로 안 침.
-- **전투 연출**: 잠깐 바꾸는 포즈는 캐릭터 가운데 기준 **20% 빠르게 확대**(0.15초) · 처음엔 가운데보다 **x −5px**(뒤쪽 — 적에게서 먼 쪽)에서 **1.5초 동안 천천히 가운데로** → 원래 크기로 돌아오며 **idle**. 카메라는 그대로.
-  `shot` · `hit` 때 처음 **0.2초 카메라 흔들림** (한 행동에 한 번). 쓰러지는 공격을 맞으면 hit 없이 바로 dead. AP 를 다 쓴 행동은 그 포즈 뒤에 tired. 차례 시작 상태 이상 피해(출혈 등)는 포즈 없이 예전처럼 흔들림만.
-  수치 조절 = `battle_2d.tscn` → View 노드 인스펙터 **`포즈 연출`**: 확대 배율 · 확대 시간 · 보여 주는 시간 · 처음 가로 어긋남 · 돌아오는 시간 · 흔들림 시간 · 세기.
+- **전투 연출 (카메라)**: 잠깐 바꾸는 포즈는 **카메라가 그 캐릭터 가운데로 빠르게(0.15초) 1.2배 줌** — 캐릭터 크기는 그대로. 처음엔 캐릭터가 화면 가운데보다 **x −5px**(뒤쪽 — 적에게서 먼 쪽)에 있다가 **1.5초 동안 천천히 가운데로** → 끝나면 카메라가 움직이지 않고 **바로 원래 화면**, 캐릭터는 **idle**.
+  줌해도 원래 화면 밖(방 바깥 빈 곳)은 안 보이게 — 화면 가장자리 캐릭터는 가운데까지 오지 않음 (`pose_keep_in_view`). 한 행동에 카메라는 한 캐릭터: 쓰는 쪽 포즈가 먼저, 없으면 맞는 쪽.
+  `shot` · `slash` · `hit` 때 처음 **0.2초 카메라 흔들림** (한 행동에 한 번, 줌과 함께). 쓰러지는 공격을 맞으면 hit 없이 바로 dead. AP 를 다 쓴 행동은 그 포즈 뒤에 tired. 차례 시작 상태 이상 피해(출혈 등)는 포즈 없이 예전처럼 흔들림만.
+  수치 조절 = `battle_2d.tscn` → View 노드 인스펙터 **`포즈 연출`**: 카메라 줌 배율 · 줌 시간 · 보여 주는 시간 · 처음 가로 어긋남 · 돌아오는 시간(0 = 바로) · 화면 밖 안 보이기 · 흔들림 시간 · 세기.
   확인: `godot --path . ++ --scene=battle --ambush=ally --autoplay=pose:shot` (`slash` · `point_up` · `hit` · `miss` · `stun` · `tired` · `dead`, 캐릭터 고르기 `--pose_char=hero2`) · 패배 화면 `--scene=result --winner=enemy`.
 - **컷씬**: 대사 컷의 `포즈` — 8장 모두 고를 수 있음 (컷씬 항목).
 
 ![전투 포즈 — shot · hit / miss · stun / dead](docs/screenshots/battle_poses.jpg)
 ![패배 결과 화면 annoying · 전투 point_up / tired](docs/screenshots/battle_poses2.jpg)
+![포즈 카메라 줌 — 니키타 point_up (가장자리라 화면 안에서 멈춤) · 하나 hit](docs/screenshots/battle_pose_camera.jpg)
 ![하나 포즈 — hit · miss / shot · slash / tired](docs/screenshots/battle_poses_hana.jpg)
 ![하나 포즈 — point_up · stun / dead · 패배 화면 annoying](docs/screenshots/battle_poses_hana2.jpg)
 ![키라 idle · stun / miss · hit — 하나 hit_2 · move](docs/screenshots/battle_poses_kira.jpg)
