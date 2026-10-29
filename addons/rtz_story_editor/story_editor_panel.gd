@@ -441,7 +441,8 @@ func _fill_detail() -> void:
 	canvas.queue_redraw()
 	for c in form.get_children():
 		form.remove_child(c)
-		c.queue_free()
+		if c != detail:   # detail 은 계속 씀 (지우면 다음에 freed 오류)
+			c.queue_free()
 	open_btn.disabled = not (sel.begins_with("q:") or sel.begins_with("c:") or sel.begins_with("d:"))
 	if sel_edge >= 0 and graph != null and sel_edge < graph.edges.size():
 		var e: Dictionary = graph.edges[sel_edge]
