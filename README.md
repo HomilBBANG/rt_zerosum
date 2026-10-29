@@ -295,7 +295,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![도감 — 도시 배경](docs/screenshots/outgame/codex_cities.png)
 
 ## 상황별 포즈 그림 (전투 · 컷씬)
-캐릭터마다 상황별 한 장 그림을 넣으면 전투와 컷씬 대사에서 씁니다. 지금은 **니키타**(`nikita_army`) 9장 (… · shot_pistol(자동권총 — 권총을 들 때)) · **앨마**(`alma`) 9장 (shot(권총) · shot_2(리볼버 — 사격 때 무작위) · slash(나이프) · point_up(무릎 꿇고 붕대 — 회복·버프) · miss(몸 틀어 피함) · stun(이마 짚음) · hit(팔 감싸며 움찔) · annoying(팔짱) · dead) · **하나**(`hero2`) 12장 (hit · hit_2 · miss · shot(저격총) · slash(대검) · tired · dead · point_up(주먹 자세) · stun(이마 짚음) · annoying(얼굴 가림) · move(총 들고 이동) · awkward(목 뒤 — 대화용) · shot_pistol(권총 — 권총을 들 때)) · **키라**(`kira`) 10장 (hit · hit_2 · miss · stun · slash(단검) · tired · annoying(앉아서 외면) · shot(소총) · shot_pistol(권총) · point_up(관자놀이 — 생각)) · **이선**(`ethan`) 9장 (dead · hit · tired · slash(대검) · shot(소총) · shot_pistol(권총) · miss(움찔 피함) · stun(머리 짚음) · annoying(주먹 쥐고 분함)) (원본 = `art_src/<캐릭터>/`):
+캐릭터마다 상황별 한 장 그림을 넣으면 전투와 컷씬 대사에서 씁니다. 지금은 **니키타**(`nikita_army`) 9장 (… · shot_pistol(자동권총 — 권총을 들 때)) · **앨마**(`alma`) 12장 (shot(권총) · shot_2(리볼버 — 사격 때 무작위) · slash(나이프) · point_up(무릎 꿇고 붕대 — 회복·버프) · miss(몸 틀어 피함) · stun(이마 짚음) · hit(팔 감싸며 움찔) · annoying(팔짱 · 찡그림) · dead · smile(뒷짐 미소 — 대화용) · smile_2(팔짱 미소 — 대화용) · smirk(팔짱 · 음흉한 웃음 — 대화용)) · **단**(`dan`) 2장 (hit(뒤로 휘청) · dead) · **하나**(`hero2`) 12장 (hit · hit_2 · miss · shot(저격총) · slash(대검) · tired · dead · point_up(주먹 자세) · stun(이마 짚음) · annoying(얼굴 가림) · move(총 들고 이동) · awkward(목 뒤 — 대화용) · shot_pistol(권총 — 권총을 들 때)) · **키라**(`kira`) 10장 (hit · hit_2 · miss · stun · slash(단검) · tired · annoying(앉아서 외면) · shot(소총) · shot_pistol(권총) · point_up(관자놀이 — 생각)) · **이선**(`ethan`) 9장 (dead · hit · tired · slash(대검) · shot(소총) · shot_pistol(권총) · miss(움찔 피함) · stun(머리 짚음) · annoying(주먹 쥐고 분함)) (원본 = `art_src/<캐릭터>/`):
 
 | 포즈 | 이름 | 전투에서 쓰는 때 |
 |---|---|---|
@@ -310,12 +310,14 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 | `annoying` | 언짢음 | **패배** — 결과 화면 오른쪽에 출전 대원 그림 |
 | `move` | 자리 이동 | 자리 이동 · 자리 교체할 때 (이동을 기다리지 않음) |
 | `awkward` | 머쓱함 | 대화용 (전투에서 자동으로 안 씀 — 스킬 포즈로 고를 수는 있음) |
+| `smile` | 미소 | 대화용 (전투에서 자동으로 안 씀 — 스킬 포즈로 고를 수는 있음) |
+| `smirk` | 음흉한 웃음 | 대화용 (전투에서 자동으로 안 씀 — 스킬 포즈로 고를 수는 있음) |
 
 - 넣기: `python3 tools/char_sprites.py poses nikita_army dead=… hit=… miss=… shot=… stun=… point_up=… tired=… annoying=… --ref miss` → `<포즈>/0001.png` + 조명·선화·눈 마스크 + `anim.json {"pose": true}`.
   **무기별 그림** = `<포즈>_<무기 스프라이트>` (예: 키라 `shot_pistol`) — 그 무기를 들고 쓸 때 먼저, 없으면 `<포즈>`. 무기 스프라이트 = 엑셀 아이템 시트 `스프라이트` 열 (pistol · rifle · sniper · knife · bayonet …).
   **같은 포즈의 다른 그림** = `<포즈>_2`, `_3` … (예: 하나 `hit_2`) — 그 상황마다 무작위로 하나. 컷씬에서는 따로 고를 수 있음.
   하나: `python3 tools/char_sprites.py poses hero2 hit=… miss=… shot=…@fit slash=… tired=… dead=… point_up=… stun=… annoying=… awkward=… hit_2=… move=… --ref hit --band 0.25` · 키라: `… poses kira stun=… miss=… hit=… slash=… tired=… "annoying=앉은.webp*0.785" shot=소총.webp@fit shot_pistol=… --ref miss --band 0.25` · 이선: `… poses ethan dead=… hit=… tired=… slash=… shot=…@fit shot_pistol=…@fit miss=… stun=… annoying=… --ref slash --band 0.25` (`그림*배율` = 다른 크기로 그려진 그림을 모자 폭으로 맞춤 · `그림@fit` = 서 있는데 작게 그려진 그림의 키를 기본 그림 키에) (`--band` = 아래 25% 줄의 좌우 끝 가운데를 발로 — 한 발을 앞으로 뻗은 자세도 몸 가운데에).
-  **크기 확인**: `python3 tools/char_sprites.py posecheck <캐릭터> [출력.jpg]` — idle · 걷기 · 뛰기 · 모든 포즈를 게임과 같은 배율 · 같은 발 위치로 한 장에 (초록 선 = 기본 그림 키). 지금 모든 캐릭터가 기본 그림과 키 ±2% · 눈 사이 폭 ±4% 안 ([니키타](docs/screenshots/posecheck_nikita_army.jpg) · [앨마](docs/screenshots/posecheck_alma.jpg) · [하나](docs/screenshots/posecheck_hero2.jpg) · [키라](docs/screenshots/posecheck_kira.jpg) · [이선](docs/screenshots/posecheck_ethan.jpg)). 전투에서 포즈가 보일 때 크게 보이는 것은 카메라 줌(1.5배, View 인스펙터 `포즈 연출`) — 줌 없이 보기 `--pose_zoom=1`.
+  **크기 확인**: `python3 tools/char_sprites.py posecheck <캐릭터> [출력.jpg]` — idle · 걷기 · 뛰기 · 모든 포즈를 게임과 같은 배율 · 같은 발 위치로 한 장에 (초록 선 = 기본 그림 키). 지금 모든 캐릭터가 기본 그림과 키 ±2% · 눈 사이 폭 ±4% 안 ([니키타](docs/screenshots/posecheck_nikita_army.jpg) · [앨마](docs/screenshots/posecheck_alma.jpg) · [단](docs/screenshots/posecheck_dan.jpg) · [하나](docs/screenshots/posecheck_hero2.jpg) · [키라](docs/screenshots/posecheck_kira.jpg) · [이선](docs/screenshots/posecheck_ethan.jpg)). 전투에서 포즈가 보일 때 크게 보이는 것은 카메라 줌(1.5배, View 인스펙터 `포즈 연출`) — 줌 없이 보기 `--pose_zoom=1`.
   모든 포즈 같은 배율(`--ref` 그림의 키 = 기본 그림 키), 발 = 선 자세는 발 가운데 · 누운 그림(가로가 긴 그림)은 가운데 아래. 새 이름의 포즈도 그대로 넣으면 에디터 목록에 나옴. 그림이 없는 캐릭터는 예전 연출 그대로.
 - **스킬마다 쓰는 쪽 포즈 = Godot 에디터 `스킬 트리` 탭 → `스킬 포즈`** (`data/skill_poses.json`): 스킬 목록(→ 지금 포즈) · `이 스킬을 쓸 때 포즈`(**자동** · **포즈 없음**(예전 공격 동작) · 포즈 이름) · 캐릭터별 미리보기 · 오른쪽 캐릭터별 포즈 그림 모음. 맞는 쪽 포즈는 상황으로 자동 (위 표).
 - **캐릭터 · 무기별 공격 그림 = 같은 화면 오른쪽 `<캐릭터> 의 무기별 공격 포즈`** (`skill_poses.json` → `weapons`): 캐릭터를 고르면 그 캐릭터의 무기(엑셀 `무기` 열)마다 공격할 때 쓸 그림을 고름 — **자동**(그 무기 이름 그림 `shot_pistol` 같은 것이 있으면 그것, 없으면 원거리 shot / 근접 slash — 실제로 쓰일 그림을 함께 표시) 또는 그 캐릭터에게 있는 아무 포즈. 그 무기를 들고 적에게 공격·상태 스킬을 쓸 때 적용. 우선순위: 스킬에 정한 포즈 → 무기별 포즈 → 자동. 그림이 없는 포즈를 고르면 검사 오류.

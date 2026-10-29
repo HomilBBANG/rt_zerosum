@@ -28,8 +28,10 @@ const POSES := {
 	"annoying": {"name": "언짢음", "when": "패배 (결과 화면)"},
 	"move": {"name": "자리 이동", "when": "자리 이동 · 자리 교체할 때 (자동)"},
 	"awkward": {"name": "머쓱함", "when": "대화용 (전투에서 자동으로 안 씀 — 스킬 포즈로 고를 수는 있음)"},
+	"smile": {"name": "미소", "when": "대화용 (전투에서 자동으로 안 씀 — 스킬 포즈로 고를 수는 있음)"},
+	"smirk": {"name": "음흉한 웃음", "when": "대화용 (전투에서 자동으로 안 씀 — 스킬 포즈로 고를 수는 있음)"},
 }
-const POSE_ORDER := ["shot", "slash", "point_up", "hit", "miss", "stun", "tired", "dead", "annoying", "move", "awkward"]
+const POSE_ORDER := ["shot", "slash", "point_up", "hit", "miss", "stun", "tired", "dead", "annoying", "move", "awkward", "smile", "smirk"]
 
 
 ## 표시 이름 — 같은 포즈의 다른 그림(hit_2)은 "피격 2"
