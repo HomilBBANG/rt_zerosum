@@ -295,7 +295,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![도감 — 도시 배경](docs/screenshots/outgame/codex_cities.png)
 
 ## 상황별 포즈 그림 (전투 · 컷씬)
-캐릭터마다 상황별 한 장 그림을 넣으면 전투와 컷씬 대사에서 씁니다. 지금은 **니키타**(`nikita_army`) 9장 (… · shot_pistol(자동권총 — 권총을 들 때)) · **앨마**(`alma`) 4장 (shot(권총) · stun(이마 짚음) · hit(팔 감싸며 움찔) · dead) · **하나**(`hero2`) 12장 (hit · hit_2 · miss · shot(저격총) · slash(대검) · tired · dead · point_up(주먹 자세) · stun(이마 짚음) · annoying(얼굴 가림) · move(총 들고 이동) · awkward(목 뒤 — 대화용) · shot_pistol(권총 — 권총을 들 때)) · **키라**(`kira`) 10장 (hit · hit_2 · miss · stun · slash(단검) · tired · annoying(앉아서 외면) · shot(소총) · shot_pistol(권총) · point_up(관자놀이 — 생각)) · **이선**(`ethan`) 9장 (dead · hit · tired · slash(대검) · shot(소총) · shot_pistol(권총) · miss(움찔 피함) · stun(머리 짚음) · annoying(주먹 쥐고 분함)) (원본 = `art_src/<캐릭터>/`):
+캐릭터마다 상황별 한 장 그림을 넣으면 전투와 컷씬 대사에서 씁니다. 지금은 **니키타**(`nikita_army`) 9장 (… · shot_pistol(자동권총 — 권총을 들 때)) · **앨마**(`alma`) 9장 (shot(권총) · shot_2(리볼버 — 사격 때 무작위) · slash(나이프) · point_up(무릎 꿇고 붕대 — 회복·버프) · miss(몸 틀어 피함) · stun(이마 짚음) · hit(팔 감싸며 움찔) · annoying(팔짱) · dead) · **하나**(`hero2`) 12장 (hit · hit_2 · miss · shot(저격총) · slash(대검) · tired · dead · point_up(주먹 자세) · stun(이마 짚음) · annoying(얼굴 가림) · move(총 들고 이동) · awkward(목 뒤 — 대화용) · shot_pistol(권총 — 권총을 들 때)) · **키라**(`kira`) 10장 (hit · hit_2 · miss · stun · slash(단검) · tired · annoying(앉아서 외면) · shot(소총) · shot_pistol(권총) · point_up(관자놀이 — 생각)) · **이선**(`ethan`) 9장 (dead · hit · tired · slash(대검) · shot(소총) · shot_pistol(권총) · miss(움찔 피함) · stun(머리 짚음) · annoying(주먹 쥐고 분함)) (원본 = `art_src/<캐릭터>/`):
 
 | 포즈 | 이름 | 전투에서 쓰는 때 |
 |---|---|---|
