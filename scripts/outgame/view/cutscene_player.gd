@@ -25,6 +25,7 @@ var cur: Dictionary = {}
 var idx := -1
 var playing := false
 var slots := {"left": "", "right": ""}     # 서 있는 대원 id
+var poses := {"left": "", "right": ""}     # 서 있는 대원 포즈 ("" = 기본 그림)
 var _shown := 0.0
 var _typing := false
 var _waiting_choice := false
@@ -67,7 +68,7 @@ func _ready() -> void:
 	for side in ["left", "right"]:
 		var tr := TextureRect.new()
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.stretch_mode = TextureRect.STRETCH_SCALE   # 크기·자리는 _place_stand (그림마다 같은 배율)
 		tr.size = Vector2(430, 645)
 		tr.position = Vector2(40 if side == "left" else STAGE.x - 470, STAGE.y - 645 + 40)
 		tr.flip_h = side == "right"
@@ -183,6 +184,7 @@ func _fit() -> void:
 
 func _clear_stage() -> void:
 	slots = {"left": "", "right": ""}
+	poses = {"left": "", "right": ""}
 	bg_rect.visible = false
 	cg_rect.visible = false
 	back.color.a = dim_alpha
@@ -312,6 +314,7 @@ func _apply_visual(st: Dictionary) -> void:
 					if slots[s] == sp and s != side:
 						slots[s] = ""
 				slots[side] = sp
+				poses[side] = str(st.get("pose", ""))
 			_update_stands(side)
 		"narration":
 			_update_stands("")
@@ -321,9 +324,44 @@ func _apply_visual(st: Dictionary) -> void:
 func _update_stands(active: String) -> void:
 	for s in slots:
 		var spr := str(npcs.get(slots[s], {}).get("sprite", ""))
-		stand[s].texture = CharacterSprite2D._tex("res://assets/characters/%s/base.png" % spr) if spr != "" and slots[s] != "" else null
+		var pose := str(poses.get(s, ""))
+		var path := CharacterSprite2D.pose_path(spr, pose) if spr != "" else ""
+		if path == "":
+			path = "res://assets/characters/%s/base.png" % spr
+			pose = ""
+		stand[s].texture = CharacterSprite2D._tex(path) if spr != "" and slots[s] != "" else null
+		_place_stand(s, spr, pose)
 		stand[s].modulate = Color.WHITE if s == active else DIM
 		stand[s].visible = not cg_rect.visible
+
+
+## 서 있는 그림 자리: 기본 그림을 칸(430×645)에 맞춘 배율 그대로, 포즈 그림도 같은 배율 · 같은 발 위치 (누운 그림은 바닥에)
+func _place_stand(side: String, spr: String, pose: String) -> void:
+	var tr: TextureRect = stand[side]
+	var box := Rect2(Vector2(40 if side == "left" else STAGE.x - 470, STAGE.y - 645 + 40), Vector2(430, 645))
+	var tex := tr.texture
+	if tex == null:
+		tr.position = box.position
+		tr.size = box.size
+		return
+	var inf := CharacterSprite2D.info_of(spr)
+	var isz: Array = inf.get("image_size", [tex.get_width(), tex.get_height()])
+	var k := minf(box.size.x / float(isz[0]), box.size.y / float(isz[1]))
+	var g0: Array = inf.get("ground", [float(isz[0]) * 0.5, float(isz[1])])
+	var g: Array = g0
+	if pose != "":
+		var aj := CharacterSprite2D.dir_of(spr).path_join(pose).path_join("anim.json")
+		var o: Variant = JSON.parse_string(FileAccess.get_file_as_string(aj)) if FileAccess.file_exists(aj) else null
+		if o is Dictionary and o.get("ground") is Array:
+			g = o.ground
+	var flip := tr.flip_h
+	var base_off := Vector2((box.size.x - float(isz[0]) * k) * 0.5, (box.size.y - float(isz[1]) * k) * 0.5)
+	var foot := box.position + base_off + Vector2((float(isz[0]) - float(g0[0])) if flip else float(g0[0]), float(g0[1])) * k
+	var sz := Vector2(tex.get_width(), tex.get_height()) * k
+	var gx := (float(tex.get_width()) - float(g[0])) if flip else float(g[0])
+	tr.size = sz
+	tr.position = foot - Vector2(gx, float(g[1])) * k
+	tr.position.x = clampf(tr.position.x, 0.0, maxf(0.0, STAGE.x - sz.x))   # 누운 그림처럼 넓으면 화면 안으로
 
 
 func _show_text(st: Dictionary) -> void:

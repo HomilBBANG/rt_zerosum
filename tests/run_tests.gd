@@ -57,6 +57,7 @@ func _init() -> void:
 	_test_battle_statuses()
 	_test_status_effects()
 	_test_hit_evasion()
+	_test_poses()
 	_test_codex()
 	_test_balance_data_and_ai_graph()
 	_test_sfx()
@@ -605,6 +606,21 @@ func _test_sfx() -> void:
 
 
 ## 상태 = 이름 + 효과 (data/statuses.json) / 새 효과: 넉백 · 끌어당김 · 표식 · 도발 · 취약 · 재생 · 보호막
+func _test_poses() -> void:
+	print("[13f] 상황별 포즈 그림")
+	var ps := CharacterSprite2D.poses("nikita_army")
+	for pz in ["dead", "hit", "miss", "shot", "stun"]:
+		_check(ps.has(pz), "니키타 포즈 '%s' 있음" % pz)
+		_check(CharacterSprite2D.pose_path("nikita_army", pz) != "", "니키타 포즈 '%s' 그림 경로" % pz)
+	_check(not ps.has("idle") and not ps.has("walk"), "동작 폴더(idle·walk)는 포즈가 아님")
+	_check(CharacterSprite2D.pose_path("nikita_army", "") == "" and CharacterSprite2D.pose_path("nikita_army", "nope") == "", "없는 포즈 = 기본 그림")
+	var d := CharacterSprite2D.anim_data("nikita_army", "dead")
+	_check((d.frames as Array).size() == 1 and bool(d.loop), "dead = 한 장, 멈춘 그림 (반복)")
+	var st := CutsceneData.norm_step({"type": "say", "speaker": "npc_nikita", "side": "left", "pose": "hit", "text": "윽"})
+	_check(st.pose == "hit", "컷씬 대사 포즈 저장")
+	_check(CutsceneData.norm_step({"type": "say", "text": "a"}).pose == "", "포즈 비우면 기본 그림")
+
+
 func _test_hit_evasion() -> void:
 	print("[13e] 명중 · 회피")
 	var bc := _make("ally")

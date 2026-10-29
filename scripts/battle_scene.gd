@@ -116,7 +116,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ESCAPE: Game.go_menu()
 
 
-## CLI 자동 진행 (스크린샷/검증용): --autoplay=aim|move|fight:N|slot:i:press|hover
+## CLI 자동 진행 (스크린샷/검증용): --autoplay=aim|move|fight:N|slot:i:press|hover|pose:<포즈>[:초]
 func _run_cli() -> void:
 	var auto: String = Game.cli.get("autoplay", "")
 	if auto != "":
@@ -136,6 +136,21 @@ func _run_cli() -> void:
 				break
 			if auto == "move":
 				hud.begin_move()
+				break
+			if auto.begins_with("pose"):
+				# --autoplay=pose:<shot|hit|miss|stun|dead>[:초] — 포즈 그림이 있는 첫 아군에게 그 연출, 초 뒤에 찍음 (기본 0.6)
+				var pz := auto.get_slice(":", 1)
+				for id in view.sprites:
+					var sp: UnitSprite2D = view.sprites[id]
+					if sp.has_pose(pz):
+						if pz == "dead":
+							sp.play_death()
+						else:
+							sp.play_pose(pz, view.pose_opts())
+							if pz in ["shot", "hit"]:
+								view.shake_camera()
+						break
+				await get_tree().create_timer(float(auto.get_slice(":", 2)) if auto.get_slice_count(":") > 2 else 0.6).timeout
 				break
 			if auto.begins_with("slot"):
 				# --autoplay=slot:<번호>:press|hover — 하단 슬롯 클릭/호버 (0~2 무기, 3 이동, 4~6 스킬, 7 필살기)

@@ -249,6 +249,28 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 	d.fps = float(d.fps)
 
 
+## 상황별 포즈 이름 목록 (anim.json "pose": true 인 동작 폴더 — 예: shot · hit · miss · stun · dead)
+const POSE_NAMES := {"shot": "공격", "hit": "피격", "miss": "회피", "stun": "기절", "dead": "쓰러짐"}
+static func poses(id: String) -> Array[String]:
+	var out: Array[String] = []
+	if not exists(id):
+		return out
+	for d in DirAccess.get_directories_at(dir_of(id)):
+		var aj := dir_of(id).path_join(d).path_join("anim.json")
+		if FileAccess.file_exists(aj):
+			var o: Variant = JSON.parse_string(FileAccess.get_file_as_string(aj))
+			if o is Dictionary and bool(o.get("pose", false)):
+				out.append(d)
+	out.sort()
+	return out
+
+
+## 포즈 그림 경로 (없으면 "")
+static func pose_path(id: String, pose: String) -> String:
+	var p := dir_of(id).path_join(pose).path_join("0001.png")
+	return p if pose != "" and (FileAccess.file_exists(p) or ResourceLoader.exists(p)) else ""
+
+
 ## 에디터·게임에서 프레임을 새로 넣었을 때 다시 읽기
 static func clear_cache() -> void:
 	_cache.clear()

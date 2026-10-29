@@ -701,6 +701,17 @@ func _step_card(c: Dictionary, i: int) -> Control:
 			_row(g, "말하는 대원", _option(who, st.speaker, func(nv):
 				st.speaker = str(nv)
 				touch.call()
+				_mark()
+				_rebuild.call_deferred()))   # 포즈 목록을 그 대원 것으로
+			var spr := str(od.npcs.get(st.speaker, {}).get("sprite", "")) if od != null else ""
+			var pose_opts := [["", "기본 그림"]]
+			for pz in CharacterSprite2D.poses(spr):
+				pose_opts.append([pz, "%s (%s)" % [CharacterSprite2D.POSE_NAMES.get(pz, pz), pz]])
+			if str(st.get("pose", "")) != "" and not CharacterSprite2D.poses(spr).has(str(st.pose)):
+				pose_opts.append([str(st.pose), "%s (그림 없음)" % st.pose])
+			_row(g, "포즈", _option(pose_opts, str(st.get("pose", "")), func(nv):
+				st.pose = str(nv)
+				touch.call()
 				_mark()))
 			var set_name := func(nv):
 				st.name = nv

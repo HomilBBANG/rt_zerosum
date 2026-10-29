@@ -3,6 +3,8 @@ extends Node2D
 ## 2D 유닛: 캐릭터 프레임 애니메이션(CharacterSprite2D, assets/characters/<id>) 또는 옛 평면 스프라이트
 ## + 구역 마스크 셰이더 + 무기 레이어 + 클릭 영역 + 하이라이트.
 ## 공격·피격·회복·쓰러짐 애니메이션 프레임이 없으면 간단한 이동·흔들림 트윈으로 대신한다.
+## 상황별 포즈(한 장 그림, anim.json "pose": true — tools/char_sprites.py poses): shot 공격 · hit 피격 · miss 회피 · stun 기절 · dead 쓰러짐.
+##   dead 를 뺀 포즈는 잠깐 바꿔 보여 줌 (play_pose: 캐릭터 가운데 기준 확대 + 살짝 옆에서 가운데로 흐름 → 원래 크기 · idle).
 
 signal clicked(unit: UnitRuntime)
 
@@ -28,6 +30,9 @@ var _dead_alpha: float = 1.0
 var ui_accent: Color = Color(1, 0.9, 0.4)
 var chr: CharacterSprite2D = null
 var chr_height: float = 232.0
+var _flip_scale := Vector2.ONE      # 확대 연출 전 flip 배율 (좌우 반전 포함)
+var _pose_tw: Tween
+var _pose_name := ""
 
 
 ## 좌우 반전 여부: 적은 왼쪽(아군)을 보게 뒤집는다. 원화가 이미 왼쪽을 보면(art_faces_left, 예: 구울) 반대로.
@@ -58,6 +63,7 @@ func build(p_unit: UnitRuntime, p_manifest: Dictionary) -> void:
 	if is_mirrored():
 		flip.scale.x = -1.0
 	flip.scale *= BASE_SCALE
+	_flip_scale = flip.scale
 	if CharacterSprite2D.exists(unit.data.sprite_id):
 		_build_character()
 		return
@@ -336,9 +342,64 @@ func play_attack(toward_right: bool, ranged: bool) -> Tween:
 	return tw
 
 
+## 그 상황별 포즈 그림이 있는가 (shot · hit · miss · stun · dead)
+func has_pose(pose: String) -> bool:
+	return chr != null and chr.has_anim(pose) and bool(CharacterSprite2D.anim_data(chr.cid, pose).get("pose", false))
+
+
+## 포즈 잠깐 바꾸기 → 끝날 때까지 걸리는 초. o = 연출 값 (BattleView2D 인스펙터 '포즈 연출'):
+##   zoom 배율(1.2) · zoom_in 확대에 걸리는 초 · time 포즈 유지 초(1.5) · drift 처음 가로 어긋남(px, - = 뒤쪽) · back 원래로 돌아오는 초
+func play_pose(pose: String, o: Dictionary = {}) -> float:
+	if not has_pose(pose) or not unit.alive:
+		return 0.0
+	var k := float(o.get("zoom", 1.2))
+	var t_in := float(o.get("zoom_in", 0.15))
+	var t_hold := float(o.get("time", 1.5))
+	var t_back := float(o.get("back", 0.2))
+	var drift := float(o.get("drift", -5.0)) * (1.0 if unit.team == "ally" else -1.0)   # 뒤쪽(적에게서 먼 쪽)에서 가운데로
+	_stop_pose()
+	_pose_name = pose
+	chr.play(pose)
+	_pose_set(1.0, drift)
+	var hold := func(t: float) -> void:   # 확대는 빠르게(zoom_in 초), 가로 어긋남은 time 초 동안 천천히 가운데로
+		var zi := 1.0 - pow(1.0 - clampf(t / maxf(0.01, t_in), 0.0, 1.0), 3.0)
+		var dr := sin(clampf(t / maxf(0.01, t_hold), 0.0, 1.0) * PI * 0.5)
+		_pose_set(lerpf(1.0, k, zi), drift * (1.0 - dr))
+	var back := func(v: float) -> void:
+		_pose_set(v, 0.0)
+	var to_idle := func() -> void:
+		if unit.alive and chr.current == pose:
+			chr.play("idle")
+	_pose_tw = create_tween()
+	_pose_tw.tween_method(hold, 0.0, t_hold, t_hold)
+	_pose_tw.tween_callback(to_idle)
+	_pose_tw.tween_method(back, k, 1.0, t_back).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	_pose_tw.tween_callback(_clear_pose_name)
+	return t_hold + t_back
+
+
+func _clear_pose_name() -> void:
+	_pose_name = ""
+
+
+## 확대 배율 v · 가로 어긋남 dx (캐릭터 가운데 = 발 위 키의 절반 기준으로 확대)
+func _pose_set(v: float, dx: float) -> void:
+	flip.scale = _flip_scale * v
+	var c := Vector2(0.0, -chr_height * 0.5)
+	flip.position = c * (1.0 - v) + Vector2(dx, 0.0)
+
+
+func _stop_pose() -> void:
+	if _pose_tw != null and _pose_tw.is_valid():
+		_pose_tw.kill()
+	_pose_tw = null
+	_pose_name = ""
+	_pose_set(1.0, 0.0)
+
+
 func play_hit() -> void:
 	_flash = 1.0
-	if chr != null and chr.has_anim("hit"):
+	if chr != null and chr.has_anim("hit") and not has_pose("hit"):   # hit 포즈 그림은 play_pose 로만 (쓰러진 그림을 덮지 않게)
 		chr.play("hit")
 		if (CharacterSprite2D.anim_data(chr.cid, "hit").frames as Array).size() >= 3:
 			return   # 프레임이 충분하면 그림만, 1~2장이면 흔들림도 함께
@@ -374,6 +435,12 @@ func play_move_steps(delay: float = 0.0) -> void:
 
 func play_death() -> void:
 	Sfx.play_at(self, Sfx.common("dead"), Sfx.DEAD_DB)   # 쓰러지는 소리 (공용)
+	if has_pose("dead"):   # 쓰러진 그림으로 바꿈 (회색 처리 · 쓰러지는 회전 없음)
+		_stop_pose()
+		chr.play("dead")
+		z_index = 5
+		set_highlight("none")
+		return
 	if chr != null and chr.has_anim("death"):
 		chr.play("death")
 		var tw2 := create_tween()

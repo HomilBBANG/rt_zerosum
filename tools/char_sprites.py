@@ -44,6 +44,9 @@ assets/characters/<id>/
   python3 tools/char_sprites.py rows <캐릭터> [idle walk walk:l run run:l] [--name rows] [--scale 1,0.5]   동작마다 한 줄로 긴 시트 한 장
       줄마다 동작 하나(왼쪽부터 프레임 순서), ':l' = 좌우 뒤집어 왼쪽 보기. 칸 = 발이 가운데 오는 공통 크기, 짧은 줄 남는 칸은 투명
       → <out>/<캐릭터>/<name>.png (+ 배율마다 <name>_x0.5.png) + <name>.json (줄마다 동작·방향·장 수·fps·발자국 프레임)
+  python3 tools/char_sprites.py poses <캐릭터> <이름>=<그림> … [--ref <이름>]   상황별 한 장 그림(포즈) → <이름>/0001.png (+ 조명·선화·눈 마스크, anim.json "pose": true)
+      예: dead=90.webp hit=91.webp miss=92.webp shot=93.webp stun=94.webp. 배율 = 기준 그림(--ref, 기본 = 가장 키 큰 선 자세)의 키가 figure_px 가 되게 — 모든 포즈 같은 배율
+      발 = 선 자세는 맨 아래 발 가운데, 누운 자세(가로가 긴 그림)는 그림 가운데 아래. 전투(피격·회피·공격·기절·쓰러짐)·컷씬 대사에서 씀
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
 import json
@@ -1227,6 +1230,54 @@ def cmd_rows(cid, rows=("idle", "walk", "walk:l", "run", "run:l"), name="rows", 
     bg.convert("RGB").save(os.path.join(out, "%s_preview.jpg" % name), quality=85)
 
 
+def cmd_poses(cid, pairs, ref=None):
+    """상황별 한 장 그림 → 한 장짜리 동작 폴더 (<이름>/0001.png + 마스크 + anim.json {"pose": true, "loop": true, ground, figure_px})."""
+    cdir = os.path.join(CHAR_DIR, cid)
+    info = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    fig = float(info.get("figure_px", 760))
+    ims = {}
+    for name, path in pairs:
+        im = Image.open(path).convert("RGBA")
+        if __import__("numpy").array(im)[..., 3].min() > 250:
+            im = remove_white_bg(im)
+        bb = im.split()[3].point(lambda v: 255 if v > 40 else 0).getbbox()
+        ims[name] = (im.crop(bb), path)
+    standing = [n for n, (im, _) in ims.items() if im.height > im.width]
+    ref = ref or (max(standing, key=lambda n: ims[n][0].height) if standing else next(iter(ims)))
+    k = fig / ims[ref][0].height
+    pad = 6
+    for name, (im, path) in ims.items():
+        im2 = im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS)
+        can = Image.new("RGBA", (im2.width + pad * 2, im2.height + pad * 2), (0, 0, 0, 0))
+        can.alpha_composite(im2, (pad, pad))
+        lying = im2.width > im2.height
+        if lying:
+            gx = can.width / 2
+        else:
+            _bb, gx = _feet(can)
+        gy = pad + im2.height
+        adir = os.path.join(cdir, name)
+        os.makedirs(adir, exist_ok=True)
+        for f in os.listdir(adir):
+            if f.endswith(".png") or f == "anim.json":
+                os.remove(os.path.join(adir, f))
+        stem = os.path.join(adir, "0001")
+        can.save(stem + ".png")
+        mr, ml = make_masks(can)
+        mr.save(stem + "_mask_r.png")
+        ml.save(stem + "_mask_l.png")
+        line_mask(can).save(stem + "_line.png")
+        if not lying:   # 누운 자세는 눈 감음 → 눈 마스크 없음
+            # 머리 가로 범위 = 맨 위 10% 줄(모자·정수리) — 앞으로 뻗은 총·팔은 눈 찾기에서 뺌
+            top = can.crop((0, 0, can.width, round(pad + fig * 0.10))).split()[3].point(lambda v: 255 if v > 40 else 0).getbbox()
+            head = (top[0], pad, top[2] - top[0], fig * 0.2) if top else None
+            eye_mask(can, head=head).save(stem + "_eye.png")
+        meta = {"pose": True, "loop": True, "fps": 1.0, "ground": [round(gx), gy], "figure_px": fig,
+                "hip_y": round(gy - fig * 0.52) if not lying else gy - 40, "source": "%s (배율 %.3f, 기준 %s)" % (os.path.basename(path), k, ref)}
+        json.dump(meta, open(os.path.join(adir, "anim.json"), "w", encoding="utf-8"), ensure_ascii=False)
+        print(cid, name, "포즈", can.size, "발", meta["ground"], "누움" if lying else "")
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
@@ -1263,6 +1314,9 @@ if __name__ == "__main__":
         skip = {args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
         names = tuple(a for a in args[2:] if not a.startswith("--") and a not in skip)
         cmd_export(args[1], names or ("idle", "walk", "run"), int(opt.get("cols", 6)), opt.get("out"))
+    elif args[:1] == ["poses"] and len(args) >= 3:
+        opt = {a[2:]: args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
+        cmd_poses(args[1], [tuple(a.split("=", 1)) for a in args[2:] if "=" in a and not a.startswith("--")], opt.get("ref"))
     elif args[:1] == ["rows"] and len(args) >= 2:
         opt = {a[2:]: args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
         skip = {args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}

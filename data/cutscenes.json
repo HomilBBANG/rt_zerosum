@@ -264,7 +264,8 @@
 					"speaker": "npc_nikita",
 					"name": "",
 					"side": "right",
-					"text": "인사는 됐어. 다음엔 네가 날 지켜 주면 되잖아."
+					"text": "인사는 됐어. 다음엔 네가 날 지켜 주면 되잖아.",
+					"pose": "miss"
 				},
 				{
 					"type": "action",

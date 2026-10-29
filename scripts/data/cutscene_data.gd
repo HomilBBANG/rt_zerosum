@@ -3,7 +3,7 @@ class_name CutsceneData
 extends RefCounted
 ## 컷씬 (data/cutscenes.json, Godot 에디터 상단 '컷씬' 탭에서 편집). 재생은 CutscenePlayer, 언제 나오는지는 BaseSim (계기 trigger → 대기열).
 ## 컷씬 = {id, name, kind(분류), trigger{type, target, value}, once(한 번만), next(끝나면 이어질 컷씬 id), steps[컷]}
-## 컷 종류: say 대사(말하는 대원 · 표시 이름 · 왼쪽/오른쪽 서기) / narration 나레이션 / cg 이미지 CG(image "" = 끄기, 글은 아래 상자) /
+## 컷 종류: say 대사(말하는 대원 · 표시 이름 · 왼쪽/오른쪽 서기 · pose 포즈 그림 — "" = 기본, 그 캐릭터의 상황별 포즈 hit·miss·shot·stun·dead …) / narration 나레이션 / cg 이미지 CG(image "" = 끄기, 글은 아래 상자) /
 ##   bg 배경(image "" = 기지 화면 어둡게) / choice 선택지(고른 것의 next 컷씬으로 이어짐, "" = 끝) / action 행동(퀘스트 시작 · 신 정체 해금 · 친밀도 · 신앙도 · 현금)
 ## 이어지기: 컷씬 끝 → next, 선택지 → 그 선택지의 next. 이어진 컷씬도 '본 컷씬' 으로 기록 (퀘스트 단계 '컷씬 보기', 미션 'cutscene:id').
 ## 이미지는 assets/cg/ 의 PNG (1280x720 권장, 원본 PNG 를 바로 읽어서 임포트 전에 넣어도 보임).
@@ -29,7 +29,7 @@ static func new_cutscene(id: String, kind: String = "event") -> Dictionary:
 static func new_step(t: String) -> Dictionary:
 	match t:
 		"say":
-			return {"type": "say", "speaker": "", "name": "", "side": "left", "text": "…"}
+			return {"type": "say", "speaker": "", "name": "", "side": "left", "pose": "", "text": "…"}
 		"cg":
 			return {"type": "cg", "image": "", "text": ""}
 		"bg":
@@ -51,6 +51,7 @@ static func norm_step(st: Dictionary) -> Dictionary:
 			o.speaker = str(st.get("speaker", ""))
 			o.name = str(st.get("name", ""))
 			o.side = "right" if str(st.get("side", "left")) == "right" else "left"
+			o.pose = str(st.get("pose", ""))
 			o.text = str(st.get("text", ""))
 		"narration":
 			o.text = str(st.get("text", ""))

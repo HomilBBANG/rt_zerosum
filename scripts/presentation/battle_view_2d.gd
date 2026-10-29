@@ -30,9 +30,41 @@ const UNIT_SCRIPT := preload("res://scripts/presentation/unit_sprite_2d.gd")
 	set(v):
 		cam_screen_center = v
 		_camera_changed()
+@export_group("포즈 연출")
+## 상황별 포즈 그림(shot 공격 · hit 피격 · miss 회피 · stun 기절)으로 잠깐 바꿀 때. 그림이 있는 캐릭터만 (tools/char_sprites.py poses)
+@export_range(1.0, 2.0, 0.01) var pose_zoom := 1.2           ## 캐릭터 가운데 기준 확대 배율
+@export_range(0.02, 1.0, 0.01, "suffix:초") var pose_zoom_in := 0.15   ## 확대에 걸리는 시간 (빠르게)
+@export_range(0.2, 5.0, 0.05, "suffix:초") var pose_time := 1.5        ## 포즈를 보여 주는 시간 (그동안 가로로 천천히 가운데로)
+@export_range(-60.0, 60.0, 0.5, "suffix:px") var pose_drift := -5.0  ## 처음 가로 어긋남 (- = 뒤쪽, 적에게서 먼 쪽)
+@export_range(0.02, 1.0, 0.01, "suffix:초") var pose_back := 0.2       ## 원래 크기 · idle 로 돌아오는 시간
+@export_range(0.0, 1.0, 0.01, "suffix:초") var shake_time := 0.2       ## 공격(shot) · 피격(hit) 때 카메라 흔들림 시간
+@export_range(0.0, 40.0, 0.5, "suffix:px") var shake_px := 7.0       ## 카메라 흔들림 세기
 @export_group("")
 
 var _cam_live := false
+
+
+func pose_opts() -> Dictionary:
+	return {"zoom": pose_zoom, "zoom_in": pose_zoom_in, "time": pose_time, "drift": pose_drift, "back": pose_back}
+
+
+## 카메라 흔들림 (처음 shake_time 초) — 끝나면 원래 자리 그대로 (구도 고정)
+var _shake_tw: Tween
+func shake_camera() -> void:
+	if bcam == null or shake_time <= 0.0 or shake_px <= 0.0:
+		return
+	if _shake_tw != null and _shake_tw.is_valid():
+		_shake_tw.kill()
+	var home := CAM_SCREEN * 0.5
+	var px := shake_px
+	var shake := func(t: float) -> void:
+		var a := px * (1.0 - t)
+		bcam.position = home + Vector2(randf_range(-a, a), randf_range(-a, a))
+	var done := func() -> void:
+		bcam.position = home
+	_shake_tw = create_tween()
+	_shake_tw.tween_method(shake, 0.0, 1.0, shake_time)
+	_shake_tw.tween_callback(done)
 
 
 ## 매니페스트 카메라(슬롯 배치·스프라이트 기준 키) + 인스펙터 값
@@ -463,20 +495,58 @@ func _on_action_resolved(event: Dictionary) -> void:
 		return
 	_begin_busy()
 	var ranged: bool = actor.is_ranged_now() or event.action.kind == "ultimate"
-	var tw := s.play_attack(actor.team == "ally", ranged)
+	var opts := pose_opts()
+	var start := Time.get_ticks_msec()
+	var until := 0.0   # 시작부터 포즈가 끝나는 초
+	var shook := false
+	var tw: Tween = null
+	# 공격 = 다른 편에게 쓰는 피해 · 상태 스킬 → shot 포즈 (없으면 공격 애니메이션)
+	var tgt: Variant = (event.targets as Array)[0] if not (event.targets as Array).is_empty() else null
+	var attack: bool = tgt != null and ActionResolver.rolls_hit(event.action, actor, tgt)
+	if attack and s.has_pose("shot"):
+		until = s.play_pose("shot", opts)
+		shake_camera()
+		shook = true
+	else:
+		tw = s.play_attack(actor.team == "ally", ranged)
 	await get_tree().create_timer(0.12).timeout
+	var stunned := {}
+	for ap in event.get("applied", []):
+		if StatusCatalog.effect_of(str(ap.status)) == "stun":
+			stunned[ap.target.instance_id] = true
+	var posed := {}
 	for r in event.results:
 		var ts := sprite_of(r.target)
 		if ts == null:
 			continue
-		if r.kind == "damage":
+		var id: int = r.target.instance_id
+		var pose := ""
+		if r.kind == "damage" and not posed.has(id):
+			pose = "stun" if stunned.has(id) and ts.has_pose("stun") else "hit"
+		elif r.kind == "miss":
+			pose = "miss"
+		if pose != "" and r.target.alive and ts.has_pose(pose):
+			posed[id] = true
+			until = maxf(until, 0.12 + ts.play_pose(pose, opts))
+			if pose == "hit" and not shook:
+				shake_camera()
+				shook = true
+		elif r.kind == "damage":
 			ts.play_hit()
 		elif r.kind == "miss":
 			ts.play_dodge()
-		else:
+		elif r.kind != "damage":
 			ts.play_heal()
-	if tw.is_valid():
+	# 피해 없이 기절만 걸린 대상 (상태 스킬)
+	for id in stunned:
+		var ts2: UnitSprite2D = sprites.get(id, null)
+		if ts2 != null and not posed.has(id) and ts2.unit.alive and ts2.has_pose("stun"):
+			until = maxf(until, 0.12 + ts2.play_pose("stun", opts))
+	if tw != null and tw.is_valid():
 		await tw.finished
+	var left := until - (Time.get_ticks_msec() - start) / 1000.0
+	if left > 0.0:
+		await get_tree().create_timer(left).timeout
 	_end_busy()
 
 
