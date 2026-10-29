@@ -769,6 +769,24 @@ func _test_story_edit() -> void:
 	g3.build(d.quests, d.cutscenes, d.divine, {}, {}, {})
 	_check(g3.nodes.has("s:day:3") and g3.nodes["c:cs_new_1"].pos == Vector2(999, 77), "아직 안 이은 계기 노드 · 끌어 놓은 자리 반영")
 	_check(StoryEdit.apply_link("c_day", "s:day:3", "c:cs_new_1", d) == "" and str(c1.trigger.type) == "day" and int(c1.trigger.value) == 3, "n일차 계기 → 컷씬 = 계기 day 3")
+	# 그래프에서 빼기(detach + hidden): 선만 끊고 데이터는 남음, 다른 노드와 이어 주면 다시 보임
+	var d2 := {"quests": [], "cutscenes": [], "divine": {}}
+	var h1 := StoryEdit.add_quest(d2)
+	var h2 := StoryEdit.add_quest(d2)
+	var hc := StoryEdit.add_cutscene(d2)
+	StoryEdit.apply_link("qq_start", "q:q_new_1", "q:q_new_2", d2)
+	StoryEdit.apply_link("qc_done", "q:q_new_1", "c:cs_new_1", d2)
+	StoryEdit.apply_link("mq_step", "m:contract:c_ext_escort", "q:q_new_1", d2)
+	_check(StoryEdit.detach(d2, "q:q_new_1") == "" and d2.quests.size() == 2 and str(h2.start.type) == "manual" and str(hc.trigger.type) == "none" and h1.steps.size() == 1, "떼어 내기: 퀘스트는 남고 다른 노드와의 선만 끊김 (미션 단계는 그대로)")
+	var gh := StoryGraph.new()
+	gh.hidden = ["q:q_new_1"]
+	gh.build(d2.quests, d2.cutscenes, d2.divine, {}, {}, {})
+	_check(not gh.nodes.has("q:q_new_1") and not gh.nodes.has("m:contract:c_ext_escort") and gh.hidden_now.size() == 1 and str(gh.hidden_now[0][0]) == "q:q_new_1", "숨긴 노드와 그것만 잇던 미션 노드는 그래프에서 빠짐 · hidden_now 목록")
+	_check(not Array(gh.notes).any(func(x): return x.contains("q_new_1")), "숨긴 노드는 검사에서도 뺌")
+	StoryEdit.apply_link("qq_start", "q:q_new_1", "q:q_new_2", d2)
+	gh.build(d2.quests, d2.cutscenes, d2.divine, {}, {}, {})
+	_check(gh.nodes.has("q:q_new_1") and gh.hidden_now.is_empty(), "숨긴 노드라도 다른 퀘스트와 이어 주면 다시 보임")
+	_check(StoryEdit.detach(d2, "m:contract:c_ext_escort") != "", "미션은 뗄 수 없음")
 	# 저장 · 다시 읽기 왕복
 	var tmp := "user://_story_edit_test.json"
 	_check(QuestData.write(d.quests, tmp) == OK and QuestData.read(tmp).size() == 1 and str(QuestData.read(tmp)[0].id) == "q_new_2", "퀘스트 저장 → 다시 읽기")

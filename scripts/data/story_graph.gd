@@ -7,6 +7,7 @@ extends RefCounted
 ## 선 = {from, to, label, src}  (from 이 먼저 일어나고 → to, src = 이 선이 적힌 데이터 자리 — StoryEdit.unlink 가 씀)
 ## 편집(선 긋기 · 지우기 · 노드 추가 · 이름 고치기)은 StoryEdit — 이 탭에서 저장하면 quests.json · cutscenes.json · faith.json(divine) 에 씀.
 ## 자리: 자동 배치(열 · 행) 위에 사용자가 끌어 놓은 자리(manual_pos, data/story_layout.json)가 있으면 그것.
+## hidden = 그래프에서 뺀 노드(탭에서 Delete) — 선만 끊고 데이터는 그대로, 다른 노드와 이어 주면 다시 나옴.
 ## 선 규칙:
 ##   퀘스트 시작 조건: 처음부터/직접/n일차/의뢰인 조건 → 계기 노드, 미션 완료 → 그 미션(퀘스트·컷씬·의뢰·전투·연구) 노드에서
 ##   퀘스트 단계(퀘스트·컷씬·의뢰·전투·연구) → 그 노드에서 "n단계" / 퀘스트 → 컷씬 (계기 퀘스트 시작·단계·완료)
@@ -31,6 +32,8 @@ var notes := PackedStringArray()
 ## names = QuestData.target_names (kind:id → 이름), npc_names = npc id → 이름, char_names = 전투 캐릭터 id → 이름
 var manual_pos: Dictionary = {}     # 노드 id → Vector2 (사용자가 끌어 놓은 자리)
 var extra_starts: Array = []        # [[key, title]] 아직 아무것도 안 잇는 계기 노드 (탭에서 '+ 계기' 로 만든 것)
+var hidden: Array = []              # 그래프에서 뺀 노드 id (q:·c:·d: — 데이터에는 남음, 다른 퀘스트·컷씬·해금과 이어지면 다시 보임)
+var hidden_now: Array = []          # build 뒤: 실제로 빠진 노드 [[id, kind, title]] ('꺼내기' 목록)
 
 
 func build(quests: Array, cutscenes: Array, divine: Dictionary, names: Dictionary = {}, npc_names: Dictionary = {}, char_names: Dictionary = {}) -> void:
@@ -190,14 +193,51 @@ func build(quests: Array, cutscenes: Array, divine: Dictionary, names: Dictionar
 					_edge(_mission_node(t, qids, cids, names), dn, "완료 후 해금", dsrc)
 			_:
 				_edge(_start("stat:d:" + str(cid), UnlockCond.describe(cond, names)), dn, "해금", dsrc)
+	# ---- 숨긴 노드: 그래프에서만 빼고(선도 같이) 데이터엔 둠. 다른 퀘스트·컷씬·해금과 이어져 있으면 숨기지 않음
+	var hide := {}
+	for h in hidden:
+		if nodes.has(str(h)):
+			hide[str(h)] = true
+	var changed := true
+	while changed and not hide.is_empty():
+		changed = false
+		for e in edges:
+			for pair in [[e.from, e.to], [e.to, e.from]]:
+				if hide.has(pair[0]) and not hide.has(pair[1]) and str(nodes[pair[1]].kind) in ["quest", "cutscene", "divine"]:
+					hide.erase(pair[0])
+					changed = true
+	hidden_now = []
+	if not hide.is_empty():
+		edges = edges.filter(func(e): return not (hide.has(e.from) or hide.has(e.to)))
+		var keep_start := {}
+		for es in extra_starts:
+			keep_start["s:" + str(es[0])] = true
+		var order2: Array[String] = []
+		for id in order:
+			var n: Dictionary = nodes[id]
+			if hide.has(id):
+				hidden_now.append([id, str(n.kind), str(n.title)])
+				nodes.erase(id)
+				continue
+			if str(n.kind) in ["start", "mission"] and not keep_start.has(id) and _in_edges(id).is_empty() and out_edges(id).is_empty():
+				nodes.erase(id)   # 숨긴 노드만 잇던 계기·미션
+				continue
+			order2.append(id)
+		order = order2
 	# ---- 검사
 	for q in quests:
+		if hide.has("q:" + str(q.id)):
+			continue
 		if str(q.start.type) == "manual" and not _has_in("q:" + str(q.id), "퀘스트 시작"):
 			notes.append("퀘스트 '%s': 직접 시작인데 어느 컷씬도 시작하지 않음 (스크립트에서 BaseSim.start_quest 를 불러야 함)" % q.name)
 	for c in cutscenes:
+		if hide.has("c:" + str(c.id)):
+			continue
 		if str(c.trigger.type) == "none" and _in_edges("c:" + str(c.id)).is_empty():
 			notes.append("컷씬 '%s': 계기 없음인데 어느 컷씬에서도 이어지지 않음 → 재생될 일이 없음" % c.name)
 	for cid in divine:
+		if hide.has("d:" + str(cid)):
+			continue
 		var dv: Dictionary = divine[cid]
 		if not bool(dv.get("unlocked", false)) and str(dv.get("condition", {}).get("type", "")) == "manual" and _in_edges("d:" + str(cid)).is_empty():
 			notes.append("신 정체 해금 '%s': 직접 해금인데 어느 컷씬도 해금하지 않음" % char_names.get(cid, cid))

@@ -2,8 +2,9 @@
 extends Control
 ## 스토리 흐름 탭 (Godot 에디터 상단 "스토리"): 퀘스트 · 컷씬 · 신 정체 해금 · 미션 · 계기가 어떻게 이어지는지 한 그림으로 (StoryGraph) + 여기서 바로 편집 (StoryEdit).
 ## 왼쪽 = 흐름 그림 (왼쪽이 먼저, 오른쪽이 나중 · 노드 클릭 = 자세히 · 노드 끌기 = 자리 옮기기 · 빈 곳 끌기 = 화면 옮기기 · 휠 = 확대 · 더블클릭 = 그 탭 열기)
-##   **Shift+노드에서 끌어 다른 노드에 놓기 = 선 긋기** (무슨 뜻으로 이을지 고르는 창) · 선 클릭 → Delete = 선 지우기 (데이터에서 그 연결을 뺌) · 노드 고르고 Delete = 퀘스트·컷씬 삭제
-## 위: + 퀘스트 · + 컷씬 · + 계기(새 게임 · n일차 · 말 걸기 · 엿듣기 · 전투 승리 · 처음부터 · 직접) · 저장(Ctrl+S) · 되돌리기 · 자동 배치 · 전체 보기 · 보기 필터
+##   **Shift+노드에서 끌어 다른 노드에 놓기 = 선 긋기** (무슨 뜻으로 이을지 고르는 창) · 선 클릭 → Delete = 선 지우기 (데이터에서 그 연결을 뺌)
+## 위: + 퀘스트 · + 컷씬 · + 계기(새 게임 · n일차 · 말 걸기 · 엿듣기 · 전투 승리 · 처음부터 · 직접) · 꺼내기(그래프에서 뺀 것 다시) · 저장(Ctrl+S) · 되돌리기 · 자동 배치 · 전체 보기 · 보기 필터
+## 노드 Delete = 그래프에서 빼기만 (선은 끊고 퀘스트 · 컷씬 · 해금 데이터는 그대로 — 그 탭에는 남음). 탭을 오갔다 와도 편집 · 되돌리기 기록 유지 (파일이 그대로면 다시 읽지 않음).
 ## 오른쪽 = 고른 노드: 이름 · (퀘스트) 의뢰인 · 설명 / (컷씬) 분류 · 한 번만 · 설명 바로 고치기, 어디서 와서 어디로 가는지(눌러서 따라가기), '그 탭에서 열기'(단계·대사 같은 세부). 아래 검사.
 ## 저장 = data/quests.json · cutscenes.json · faith.json(divine) · story_layout.json(끌어 놓은 자리). Ctrl+Z / Ctrl+Y 뒤로·앞으로 감기.
 
@@ -16,6 +17,8 @@ var d: Dictionary = {"quests": [], "cutscenes": [], "divine": {}}   # 편집 중
 var faith: Dictionary = {}          # faith.json 전체 (divine 만 여기서 고침)
 var layout: Dictionary = {}         # 노드 id → [x, y]
 var extra_starts: Array = []        # [[key, title]] 아직 안 이은 계기 노드
+var hidden_ids: Array = []              # 그래프에서 뺀 노드 id (데이터엔 남음 — '꺼내기' 로 다시)
+var _disk_snap := ""                # 마지막으로 읽거나 저장한 파일 내용 (탭을 다시 열 때 바뀌었는지 보려고)
 var dirty := false
 var _rebuilding := false
 var sel := ""
@@ -36,10 +39,14 @@ var _fit_pending := true
 var _popup: PopupMenu
 var _popup_link: Array = []         # [from, to, options]
 var _start_popup: PopupMenu
+var _hidden_popup: PopupMenu
+var hidden_btn: Button
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL   # 에디터 메인 화면(VBox)에서 전체 높이를 쓰게
 	var root := VBoxContainer.new()
 	root.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	root.add_theme_constant_override("separation", 6)
@@ -58,6 +65,9 @@ func _ready() -> void:
 	bar.add_child(_btn("+ 컷씬", _add_cutscene))
 	var sbtn := _btn("+ 계기 ▾", func(): _start_popup.position = Vector2i(get_global_mouse_position()); _start_popup.popup())
 	bar.add_child(sbtn)
+	hidden_btn = _btn("꺼내기 ▾", _show_hidden_menu)
+	hidden_btn.tooltip_text = "그래프에서 뺀(Delete) 퀘스트 · 컷씬 · 해금을 다시 그래프에"
+	bar.add_child(hidden_btn)
 	bar.add_child(VSeparator.new())
 	bar.add_child(_btn("자동 배치", func():
 		layout.clear()
@@ -157,7 +167,7 @@ func _ready() -> void:
 	check_label.custom_minimum_size.y = 150
 	check_label.scroll_active = true
 	right.add_child(check_label)
-	right.add_child(_small("Shift+노드 끌어서 다른 노드에 놓기 = 선 긋기 · 선 클릭 → Delete = 선 지우기 · 노드 끌기 = 자리 옮기기 · 휠 = 확대 · 더블클릭 = 그 탭 열기. 단계·대사 같은 세부는 퀘스트 · 컷씬 탭에서 (이 탭에서 저장한 뒤 그 탭을 열면 반영)."))
+	right.add_child(_small("Shift+노드 끌어서 다른 노드에 놓기 = 선 긋기 · 선 클릭 → Delete = 선 지우기 · 노드 고르고 Delete = 그래프에서 빼기(데이터는 남음, '꺼내기' 로 다시) · 노드 끌기 = 자리 옮기기 · 휠 = 확대 · 더블클릭 = 그 탭 열기. 단계·대사 같은 세부는 퀘스트 · 컷씬 탭에서."))
 	_popup = PopupMenu.new()
 	_popup.id_pressed.connect(_on_link_chosen)
 	add_child(_popup)
@@ -167,6 +177,9 @@ func _ready() -> void:
 		_start_popup.set_item_metadata(_start_popup.item_count - 1, it[0])
 	_start_popup.id_pressed.connect(func(i): _add_start(str(_start_popup.get_item_metadata(i))))
 	add_child(_start_popup)
+	_hidden_popup = PopupMenu.new()
+	_hidden_popup.id_pressed.connect(func(i): _unhide(str(_hidden_popup.get_item_metadata(i))))
+	add_child(_hidden_popup)
 	history = EditorHistory.new(_hist_snap, _hist_apply)
 	reload_data(false)
 
@@ -187,7 +200,9 @@ func _shortcut_input(event: InputEvent) -> void:
 
 
 # ================================================================ 읽기 · 저장
-## keep_edit = 편집 중이면 데이터는 두고 이름표만 다시 읽음 (탭을 다시 열 때)
+## keep_edit = 탭을 다시 열 때: 파일이 그대로면 아무것도 안 바꿈(편집 · 되돌리기 기록 · 고른 것 유지),
+## 다른 탭에서 저장해 파일이 바뀌었으면 — 여기 편집이 없을 때만 새로 읽되 되돌리기 기록은 이어 감(Ctrl+Z 로 읽기 전으로), 편집 중이면 둠.
+## keep_edit = false ('되돌리기'): 파일대로 새로 읽고 기록 초기화.
 func reload_data(keep_edit: bool = true) -> void:
 	var od := OutgameData.load_from()
 	var gd := GameData.load_from()
@@ -201,22 +216,50 @@ func reload_data(keep_edit: bool = true) -> void:
 	if gd != null:
 		for u in gd.allies:
 			char_names[u.id] = u.display_name
-	if not (keep_edit and dirty):
-		faith = FaithData.read()
-		d = {"quests": QuestData.read(), "cutscenes": CutsceneData.read(), "divine": faith.get("divine", {})}
-		layout = {}
-		if FileAccess.file_exists(LAYOUT_PATH):
-			var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(LAYOUT_PATH))
-			if j is Dictionary and j.get("pos") is Dictionary:
-				layout = j.pos
-		extra_starts = []
+	var disk := _read_disk()
+	var ds: String = disk.snap
+	if not keep_edit:
+		_take_disk(disk)
 		dirty = false
 		status.text = "data/quests.json · cutscenes.json · faith.json 읽음"
 		history.reset()
+	elif ds == _disk_snap:
+		pass   # 파일 그대로 — 편집 · 기록 · 고른 것 유지
+	elif dirty:
+		_disk_snap = ds
+		status.text = "다른 탭에서 저장된 것이 있습니다 — 여기 편집은 그대로 둠 ('되돌리기' = 파일대로 읽기)"
+	else:
+		_take_disk(disk)
+		dirty = false
+		history.flush()   # 새로 읽은 상태를 한 단계로 — Ctrl+Z 로 읽기 전으로
+		status.text = "다른 탭에서 저장한 것을 읽음 (Ctrl+Z = 읽기 전으로)"
 	names = QuestData.target_names(od, gd, d.quests)
 	_rebuild()
 	if _fit_pending or canvas.size.x < 10.0:
 		call_deferred("_fit_later")
+
+
+func _read_disk() -> Dictionary:
+	var f := FaithData.read()
+	var out := {"faith": f, "quests": QuestData.read(), "cutscenes": CutsceneData.read(), "divine": f.get("divine", {}), "layout": {}, "hidden": []}
+	if FileAccess.file_exists(LAYOUT_PATH):
+		var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(LAYOUT_PATH))
+		if j is Dictionary:
+			if j.get("pos") is Dictionary:
+				out.layout = j.pos
+			if j.get("hidden") is Array:
+				out.hidden = j.hidden
+	out.snap = var_to_str([out.quests, out.cutscenes, out.divine, out.layout, out.hidden])
+	return out
+
+
+func _take_disk(disk: Dictionary) -> void:
+	faith = disk.faith
+	d = {"quests": disk.quests, "cutscenes": disk.cutscenes, "divine": disk.divine}
+	layout = disk.layout
+	hidden_ids = disk.hidden
+	extra_starts = []
+	_disk_snap = disk.snap
 
 
 func _save() -> void:
@@ -227,11 +270,12 @@ func _save() -> void:
 	var f := FileAccess.open(LAYOUT_PATH, FileAccess.WRITE)
 	var e4 := OK
 	if f != null:
-		f.store_string(JSON.stringify({"version": 1, "pos": layout}, "\t", false))
+		f.store_string(JSON.stringify({"version": 1, "pos": layout, "hidden": hidden_ids}, "\t", false))
 	else:
 		e4 = FileAccess.get_open_error()
 	if e1 == OK and e2 == OK and e3 == OK and e4 == OK:
 		dirty = false
+		_disk_snap = _read_disk().snap
 		status.text = "저장됨: quests.json · cutscenes.json · faith.json · story_layout.json" + ("" if graph.errors.is_empty() else "  (검사 오류 %d개)" % graph.errors.size())
 		if Engine.is_editor_hint():
 			for path in [QuestData.PATH, CutsceneData.PATH, FaithData.PATH, LAYOUT_PATH]:
@@ -246,7 +290,7 @@ func _mark() -> void:
 
 
 func _hist_snap() -> String:
-	return var_to_str([d, layout, extra_starts])
+	return var_to_str([d, layout, extra_starts, hidden_ids])
 
 
 func _hist_apply(s: String) -> void:
@@ -254,6 +298,7 @@ func _hist_apply(s: String) -> void:
 	d = v[0]
 	layout = v[1]
 	extra_starts = v[2]
+	hidden_ids = v[3] if v.size() > 3 else []
 	dirty = true
 	_rebuild()
 
@@ -261,23 +306,32 @@ func _hist_apply(s: String) -> void:
 # ================================================================ 그래프
 func _rebuild() -> void:
 	_rebuilding = true
-	graph = StoryGraph.new()
-	graph.extra_starts = extra_starts
-	for id in layout:
-		var p: Array = layout[id]
-		graph.manual_pos[id] = Vector2(float(p[0]), float(p[1]))
-	graph.build(d.quests, d.cutscenes, d.divine, names, npc_names, char_names)
+	graph = _new_graph()
 	if sel != "" and not graph.nodes.has(sel):
 		sel = ""
 	if sel_edge >= graph.edges.size():
 		sel_edge = -1
 	canvas.selected_edge = sel_edge
 	canvas.show_graph(graph, sel)
-	info_label.text = "퀘스트 %d · 컷씬 %d · 신 정체 해금 %d · 미션 %d · 계기 %d · 선 %d" % [
-		_count("quest"), _count("cutscene"), _count("divine"), _count("mission"), _count("start"), graph.edges.size()]
+	info_label.text = "퀘스트 %d · 컷씬 %d · 신 정체 해금 %d · 미션 %d · 계기 %d · 선 %d%s" % [
+		_count("quest"), _count("cutscene"), _count("divine"), _count("mission"), _count("start"), graph.edges.size(),
+		"" if graph.hidden_now.is_empty() else " · 그래프에서 뺀 것 %d ('꺼내기')" % graph.hidden_now.size()]
+	hidden_btn.disabled = graph.hidden_now.is_empty()
+	hidden_ids = graph.hidden_now.map(func(h): return h[0])   # 이어져서 다시 나온 것은 목록에서 뺌
 	_fill_detail()
 	_fill_check()
 	_rebuilding = false
+
+
+func _new_graph() -> StoryGraph:
+	var g := StoryGraph.new()
+	g.extra_starts = extra_starts
+	g.hidden = hidden_ids
+	for id in layout:
+		var p: Array = layout[id]
+		g.manual_pos[id] = Vector2(float(p[0]), float(p[1]))
+	g.build(d.quests, d.cutscenes, d.divine, names, npc_names, char_names)
+	return g
 
 
 func _fit_later() -> void:
@@ -411,14 +465,15 @@ func _delete_selected() -> void:
 	if sel == "":
 		return
 	var kind := sel.substr(0, 1)
-	var ref := sel.substr(2)
 	match kind:
-		"q":
-			StoryEdit.remove_quest(d, ref)
-			status.text = "퀘스트 삭제: %s (가리키던 곳도 정리)" % ref
-		"c":
-			StoryEdit.remove_cutscene(d, ref)
-			status.text = "컷씬 삭제: %s (가리키던 곳도 정리)" % ref
+		"q", "c", "d":
+			var err := StoryEdit.detach(d, sel)
+			if err != "":
+				status.text = err
+				return
+			if not hidden_ids.has(sel):
+				hidden_ids.append(sel)
+			status.text = "그래프에서 뺌: %s — 선은 끊고 데이터는 그대로 (%s 탭에 남음 · '꺼내기' 로 다시)" % [graph.nodes[sel].title, {"q": "퀘스트", "c": "컷씬", "d": "스킬 트리"}[kind]]
 		"s":
 			var n0 := extra_starts.size()
 			extra_starts = extra_starts.filter(func(e): return "s:" + str(e[0]) != sel)
@@ -426,12 +481,34 @@ func _delete_selected() -> void:
 				status.text = "이 계기는 퀘스트·컷씬이 쓰고 있어 선을 지워야 사라집니다"
 				return
 		_:
-			status.text = "신 해금 · 미션은 여기서 지우지 않습니다 (스킬 트리 · 엑셀)"
+			status.text = "미션은 그래프에서 뺄 수 없습니다 (퀘스트 단계가 쓰는 동안 보임)"
 			return
-	layout.erase(sel)
 	sel = ""
 	_mark()
 	_rebuild()
+
+
+func _show_hidden_menu() -> void:
+	_hidden_popup.clear()
+	for h in graph.hidden_now:
+		_hidden_popup.add_item("%s · %s" % [StoryGraph.KIND_NAME.get(h[1], ""), h[2]])
+		_hidden_popup.set_item_metadata(_hidden_popup.item_count - 1, h[0])
+	if _hidden_popup.item_count == 0:
+		status.text = "그래프에서 뺀 것이 없습니다"
+		return
+	_hidden_popup.position = Vector2i(get_global_mouse_position())
+	_hidden_popup.popup()
+
+
+## 그래프에서 뺐던 노드를 다시 그래프에 (선은 Shift 끌기로 다시 이음)
+func _unhide(id: String) -> void:
+	hidden_ids.erase(id)
+	sel = id
+	sel_edge = -1
+	_mark()
+	_rebuild()
+	canvas.focus_node(id)
+	status.text = "다시 꺼냄: %s — Shift 끌기로 이어 주세요" % graph.nodes[id].title if graph.nodes.has(id) else "꺼냄"
 
 
 # ================================================================ 오른쪽
@@ -504,8 +581,8 @@ func _fill_detail() -> void:
 		t += "  → [url=%s]%s[/url]  [url=edge:%d][color=#9aa0ad]%s[/color][/url]\n" % [e.to, graph.nodes[e.to].title, graph.edges.find(e), e.label if str(e.label) != "" else "(선)"]
 	if not open_btn.disabled:
 		t += "\n[url=open:%s]▶ %s 탭에서 열기[/url] (단계 · 대사 · 보상 같은 세부)" % [sel, {"q": "퀘스트", "c": "컷씬", "d": "스킬 트리 (기적)"}[sel.substr(0, 1)]]
-	if n.kind in ["quest", "cutscene"]:
-		t += "\n[color=#6b7085]Delete = 이 %s 삭제 (가리키던 곳도 정리)[/color]" % StoryGraph.KIND_NAME[n.kind]
+	if n.kind in ["quest", "cutscene", "divine"]:
+		t += "\n[color=#6b7085]Delete = 그래프에서 빼기 (선만 끊음 · %s 데이터는 남음 · '꺼내기' 로 다시)[/color]" % StoryGraph.KIND_NAME[n.kind]
 	detail.text = t
 
 
@@ -572,12 +649,7 @@ func _cutscene_form(c: Dictionary) -> void:
 func _rebuild_keep() -> void:
 	var keep_sel := sel
 	var keep_edge := sel_edge
-	graph = StoryGraph.new()
-	graph.extra_starts = extra_starts
-	for id in layout:
-		var p: Array = layout[id]
-		graph.manual_pos[id] = Vector2(float(p[0]), float(p[1]))
-	graph.build(d.quests, d.cutscenes, d.divine, names, npc_names, char_names)
+	graph = _new_graph()
 	sel = keep_sel
 	sel_edge = keep_edge
 	canvas.show_graph(graph, sel)

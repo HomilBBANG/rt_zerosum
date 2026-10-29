@@ -247,9 +247,57 @@ static func add_cutscene(d: Dictionary) -> Dictionary:
 	return c
 
 
+## 노드를 그래프에서 떼어 냄: 다른 퀘스트·컷씬·해금과의 선만 모두 지우고 데이터는 남김 (스토리 탭 Delete — 퀘스트·컷씬 탭에는 그대로, '꺼내기' 로 다시 이음)
+## 미션(의뢰·전투·연구) 단계 같은 그 자신의 내용은 두고, 다른 스토리 노드를 가리키는 것(시작 조건 · 퀘스트/컷씬 단계 · 계기 · 다음 · 선택지 · 행동 · 해금 조건)만 끊음
+static func detach(d: Dictionary, node: String) -> String:
+	var a := split(node)
+	match a[0]:
+		"q":
+			var q := quest(d, a[1])
+			if q.is_empty():
+				return "없는 퀘스트"
+			var t := str(q.start.get("target", ""))
+			if t.begins_with("quest:") or t.begins_with("cutscene:"):
+				q.start = {"type": "manual", "value": 0, "target": ""}
+			q.steps = (q.steps as Array).filter(func(st): return not str(st.kind) in ["quest", "cutscene"])
+			_clear_quest_refs(d, a[1])
+		"c":
+			var c := cutscene(d, a[1])
+			if c.is_empty():
+				return "없는 컷씬"
+			if str(c.trigger.type).begins_with("quest") or str(c.trigger.type) == "divine":
+				c.trigger = {"type": "none", "target": "", "value": 1}
+			c.next = ""
+			c.steps = (c.steps as Array).filter(func(st): return not (str(st.type) == "action" and str(st.do) in ["start_quest", "unlock_divine"]))
+			for st in c.steps:
+				if str(st.type) == "choice":
+					for op in st.options:
+						op.next = ""
+			_clear_cutscene_refs(d, a[1])
+		"d":
+			if not d.divine.has(a[1]):
+				return "없는 해금"
+			var dv: Dictionary = d.divine[a[1]]
+			var t := str(dv.get("condition", {}).get("target", ""))
+			if t.begins_with("quest:") or t.begins_with("cutscene:"):
+				dv.unlocked = false
+				dv.condition = {"type": "manual", "value": 0, "target": ""}
+			for c in d.cutscenes:
+				if str(c.trigger.type) == "divine" and str(c.trigger.target) == a[1]:
+					c.trigger = {"type": "none", "target": "", "value": 1}
+				c.steps = (c.steps as Array).filter(func(st): return not (str(st.type) == "action" and str(st.do) == "unlock_divine" and str(st.target) == a[1]))
+		_:
+			return "계기 · 미션은 뗄 것이 없습니다"
+	return ""
+
+
 ## 퀘스트 삭제 + 가리키던 곳 정리 (시작 조건 → 직접, 단계 삭제, 컷씬 계기 → 없음, 행동 삭제, 해금 조건 → 직접)
 static func remove_quest(d: Dictionary, id: String) -> void:
 	d.quests = d.quests.filter(func(q): return str(q.id) != id)
+	_clear_quest_refs(d, id)
+
+
+static func _clear_quest_refs(d: Dictionary, id: String) -> void:
 	for q in d.quests:
 		if str(q.start.get("target", "")) == "quest:" + id:
 			q.start = {"type": "manual", "value": 0, "target": ""}
@@ -266,6 +314,10 @@ static func remove_quest(d: Dictionary, id: String) -> void:
 ## 컷씬 삭제 + 가리키던 곳 정리 (다음 → 비움, 선택지 next → 비움, 시작 조건 · 단계 · 해금 조건)
 static func remove_cutscene(d: Dictionary, id: String) -> void:
 	d.cutscenes = d.cutscenes.filter(func(c): return str(c.id) != id)
+	_clear_cutscene_refs(d, id)
+
+
+static func _clear_cutscene_refs(d: Dictionary, id: String) -> void:
 	for c in d.cutscenes:
 		if str(c.next) == id:
 			c.next = ""
