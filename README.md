@@ -433,6 +433,13 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![해상도: AI 시트 그대로 키움 vs 4배 AI 확대](docs/screenshots/sr_compare.png)
 ![키라 애니메이션 (idle · walk · run)](docs/screenshots/kira_anims.png)
 
+### 스프라이트 시트로 내보내기
+`python3 tools/char_sprites.py export <캐릭터> [idle walk run] [--cols 6]` → `exports/sheets/<캐릭터>/<동작>_sheet.png` + `<동작>_sheet.json`.
+- 프레임(`<동작>/0001.png …`, 원화 색 그대로 · 투명 배경 · 원본 해상도)을 왼쪽 위부터 가로로 6칸씩. 마스크·선화는 안 넣음.
+- **모든 동작이 같은 칸 크기 · 같은 발 위치** → 동작을 바꿔도 캐릭터가 안 튐. json = 칸 크기 · 열 · 행 · 장 수 · fps · 발 위치(ground) · 발자국 프레임(steps).
+- 미리보기 = `preview.jpg` (1/4 크기). `exports/` 는 Godot 가 읽지 않음(`.gdignore`).
+- 지금 있는 것: **니키타**(`nikita_army`) idle 32장 12fps · walk 18장 16fps · run 23장 22fps, 칸 562×804, 발 (308, 797).
+
 ### 효과음 (발자국 · 쓰러짐)
 - **발자국**: 캐릭터마다 걷기·뛰기 소리 (아군 6명 모두: **키라 · 니키타 · 이선 · 하나 · 앨마 · 단**). 걷기·뛰기 애니메이션에서 **발이 땅에 닿는 프레임**마다 한 걸음씩 재생 → 애니메이션 속도가 달라도 발과 소리가 맞음.
   - 기지: 대원이 걷거나 뛸 때. 전투: 자리 이동·자리 바꾸기 때 두 걸음 (전투는 멈춘 그림으로 미끄러지므로).
@@ -524,6 +531,7 @@ setup/             install_windows.ps1, install.sh (기기 설치), play.bat / p
 tools/             gen_sprites.py (원화·마스크 생성기), char_sprites.py (애니메이션 프레임 조명 마스크), render_shots.sh,
                    gen_balance_xlsx.py / gen_outgame_xlsx.py (엑셀·일정 초기 생성 — 이미 있으면 덮어쓰지 않음)
 tests/             run_tests.gd, outgame_tests.gd
+exports/sheets/    캐릭터 동작 스프라이트 시트 내보내기 (tools/char_sprites.py export, Godot 는 안 읽음)
 docs/              design/ (기획서 사본, outgame/ = 아웃게임 기획 01~04 + 구현 현황 05), screenshots/, 2D_vs_3D_comparison.md
 ```
 

@@ -38,6 +38,9 @@ assets/characters/<id>/
       크기: 기준 프레임(--ref, 똑바로 선 칸)의 키 = figure_px. ground = 프레임마다 발을 접지선에(카메라 흔들림 제거), cell = 칸 높이 그대로(뛰기처럼 뜨는 동작)
       누운 자세처럼 캔버스를 넘으면 그 동작만 캔버스를 넓힘 (anim.json 의 ground). 조명·선화·눈 마스크도 프레임마다
   python3 tools/char_sprites.py steps <캐릭터> [walk run]   걷기·뛰기에서 발이 땅에 닿는 프레임 2개 → anim.json "steps" (발자국 소리 맞추기)
+  python3 tools/char_sprites.py export <캐릭터> [idle walk run] [--cols 6] [--out exports/sheets]   프레임 → 스프라이트 시트 한 장씩 (밖으로 내보내기용)
+      <out>/<캐릭터>/<동작>_sheet.png (왼쪽 위부터 가로로, 투명 배경) + <동작>_sheet.json (칸 크기·열·행·장 수·fps·발 위치·발자국 프레임)
+      모든 동작이 같은 칸 크기 · 같은 발 위치 (동작을 바꿔도 캐릭터가 안 튐), 원본 해상도 그대로. 미리보기 = preview.jpg
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
 import json
@@ -1101,6 +1104,65 @@ def cmd_steps(cid, anims=("walk", "run")):
         print(cid, anim, "발 닿는 프레임", meta["steps"], "(%d장 중)" % n)
 
 
+def cmd_export(cid, anims=("idle", "walk", "run"), cols=6, out=None):
+    """동작 프레임(<동작>/0001.png …, 원화 색 — 마스크·선화 제외) → 스프라이트 시트 한 장씩.
+    칸 = 모든 동작의 발 위치(anim.json ground, 없으면 character.json)를 맞춘 공통 크기."""
+    cdir = os.path.join(CHAR_DIR, cid)
+    cj = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    out = os.path.join(out or os.path.join(ROOT, "exports", "sheets"), cid)
+    os.makedirs(out, exist_ok=True)
+    items = []
+    for anim in anims:
+        adir = os.path.join(cdir, anim)
+        names = sorted(f for f in os.listdir(adir) if re.match(r"^\d+\.png$", f)) if os.path.isdir(adir) else []
+        if not names:
+            print(cid, anim, "프레임 없음 — 건너뜀")
+            continue
+        aj = os.path.join(adir, "anim.json")
+        meta = json.load(open(aj, encoding="utf-8")) if os.path.exists(aj) else {}
+        frames = [Image.open(os.path.join(adir, f)).convert("RGBA") for f in names]
+        gx, gy = meta.get("ground", cj["ground"])
+        items.append((anim, frames, int(gx), int(gy), meta))
+    if not items:
+        return
+    left = max(gx for _, _, gx, _, _ in items)
+    top = max(gy for _, _, _, gy, _ in items)
+    right = max(max(f.width for f in fr) - gx for _, fr, gx, _, _ in items)
+    bottom = max(max(f.height for f in fr) - gy for _, fr, _, gy, _ in items)
+    cw, ch = left + right, top + bottom
+    previews = []
+    for anim, frames, gx, gy, meta in items:
+        n = len(frames)
+        c = min(cols, n)
+        r = (n + c - 1) // c
+        sheet = Image.new("RGBA", (cw * c, ch * r), (0, 0, 0, 0))
+        for i, f in enumerate(frames):
+            sheet.paste(f, ((i % c) * cw + left - gx, (i // c) * ch + top - gy))
+        path = os.path.join(out, "%s_sheet.png" % anim)
+        sheet.save(path, optimize=True)
+        info = {"character": cid, "anim": anim, "frame_size": [cw, ch], "cols": c, "rows": r, "frames": n,
+                "fps": float(meta.get("fps", cj.get("fps", 12))), "loop": bool(meta.get("loop", True)),
+                "ground": [left, top], "figure_px": float(meta.get("figure_px", cj.get("figure_px", 0))),
+                "order": "왼쪽 위부터 가로로", "source": meta.get("source", "")}
+        if "durations" in meta:
+            info["durations"] = meta["durations"]
+        if "steps" in meta:
+            info["steps"] = meta["steps"]
+        json.dump(info, open(os.path.join(out, "%s_sheet.json" % anim), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        print(cid, anim, "→", os.path.relpath(path, ROOT), "%d장 · %d×%d 칸 · %d열×%d행 · %.0ffps" % (n, cw, ch, c, r, info["fps"]))
+        previews.append((anim, sheet))
+    # 미리보기: 시트들을 1/4 로 줄여 세로로 이어 붙임
+    k = 4
+    small = [(a, s.resize((s.width // k, s.height // k), Image.LANCZOS)) for a, s in previews]
+    pw = max(s.width for _, s in small)
+    pv = Image.new("RGBA", (pw, sum(s.height + 8 for _, s in small)), (40, 44, 52, 255))
+    y = 0
+    for _, s in small:
+        pv.alpha_composite(s, (0, y))
+        y += s.height + 8
+    pv.convert("RGB").save(os.path.join(out, "preview.jpg"), quality=85)
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
@@ -1132,6 +1194,11 @@ if __name__ == "__main__":
         cmd_head(args[1], args[2], opt.get("cut"), None, int(opt.get("deg", 14)),
                  tuple(float(v) for v in opt.get("scale", "0.85-1.15").split("-")),
                  "--no-smooth" not in args, float(opt.get("keep-deg", 3.0)))
+    elif args[:1] == ["export"] and len(args) >= 2:
+        opt = {a[2:]: args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
+        skip = {args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
+        names = tuple(a for a in args[2:] if not a.startswith("--") and a not in skip)
+        cmd_export(args[1], names or ("idle", "walk", "run"), int(opt.get("cols", 6)), opt.get("out"))
     elif args[:1] == ["steps"] and len(args) >= 2:
         cmd_steps(args[1], tuple(args[2:]) or ("walk", "run"))
     elif args[:1] == ["rig"] and len(args) >= 2:

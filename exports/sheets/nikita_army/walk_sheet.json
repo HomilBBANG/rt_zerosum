@@ -1,0 +1,24 @@
+{
+ "character": "nikita_army",
+ "anim": "walk",
+ "frame_size": [
+  562,
+  804
+ ],
+ "cols": 6,
+ "rows": 3,
+ "frames": 18,
+ "fps": 16.0,
+ "loop": true,
+ "ground": [
+  308,
+  797
+ ],
+ "figure_px": 759.0,
+ "order": "왼쪽 위부터 가로로",
+ "source": "84.webp (sr_upscale 4배) 6x6 프레임 10-27 + 머리 = 원화 (윗몸에 붙임 · 크기·기울기 고정)",
+ "steps": [
+  6,
+  16
+ ]
+}
