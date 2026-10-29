@@ -2,44 +2,48 @@
 	"version": 1,
 	"skills": [
 		{
-			"ap": 2,
-			"desc": "맞으면 출혈",
-			"effect": "damage",
 			"id": "rend",
-			"kind": "heavy",
 			"name": "할퀴기",
+			"kind": "heavy",
+			"ap": 2,
+			"target": "weapon",
+			"effect": "damage",
 			"power": 9,
-			"target": "weapon"
+			"accuracy": 90,
+			"desc": "맞으면 출혈"
 		},
 		{
-			"ap": 2,
-			"desc": "열 무관, 맞으면 동상",
-			"effect": "damage",
 			"id": "grave_chill",
-			"kind": "attack",
 			"name": "무덤의 냉기",
-			"power": 4,
-			"target": "enemy_any"
-		},
-		{
+			"kind": "attack",
 			"ap": 2,
-			"desc": "맞으면 구속 (자리 이동 불가)",
+			"target": "enemy_any",
 			"effect": "damage",
-			"id": "hamstring",
-			"kind": "attack",
-			"name": "발목 물기",
-			"power": 7,
-			"target": "weapon"
+			"power": 4,
+			"accuracy": 90,
+			"desc": "열 무관, 맞으면 동상"
 		},
 		{
-			"ap": 1,
-			"desc": "맞으면 실명 (대상 무작위)",
-			"effect": "damage",
-			"id": "sand_kick",
+			"id": "hamstring",
+			"name": "발목 물기",
 			"kind": "attack",
+			"ap": 2,
+			"target": "weapon",
+			"effect": "damage",
+			"power": 7,
+			"accuracy": 90,
+			"desc": "맞으면 구속 (자리 이동 불가)"
+		},
+		{
+			"id": "sand_kick",
 			"name": "모래 차기",
+			"kind": "attack",
+			"ap": 1,
+			"target": "weapon",
+			"effect": "damage",
 			"power": 2,
-			"target": "weapon"
+			"accuracy": 90,
+			"desc": "맞으면 실명 (대상 무작위)"
 		}
 	],
 	"kits": {

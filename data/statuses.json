@@ -2,140 +2,140 @@
 	"version": 1,
 	"statuses": [
 		{
-			"color": "#f23340",
-			"desc": "",
-			"effect": "bleed",
 			"id": "bleed",
 			"name": "출혈",
-			"short": "혈"
+			"effect": "bleed",
+			"short": "혈",
+			"color": "#f23340",
+			"desc": ""
 		},
 		{
-			"color": "#ff8c26",
-			"desc": "",
-			"effect": "burn",
 			"id": "burn",
 			"name": "화상",
-			"short": "화"
+			"effect": "burn",
+			"short": "화",
+			"color": "#ff8c26",
+			"desc": ""
 		},
 		{
-			"color": "#8cd9ff",
-			"desc": "",
-			"effect": "frost",
 			"id": "frost",
 			"name": "동상",
-			"short": "동"
+			"effect": "frost",
+			"short": "동",
+			"color": "#8cd9ff",
+			"desc": ""
 		},
 		{
-			"color": "#9999f2",
-			"desc": "",
-			"effect": "slow",
 			"id": "slow",
 			"name": "감속",
-			"short": "감"
+			"effect": "slow",
+			"short": "감",
+			"color": "#9999f2",
+			"desc": ""
 		},
 		{
-			"color": "#66ff99",
-			"desc": "",
-			"effect": "haste",
 			"id": "haste",
 			"name": "가속",
-			"short": "가"
+			"effect": "haste",
+			"short": "가",
+			"color": "#66ff99",
+			"desc": ""
 		},
 		{
-			"color": "#ffe64d",
-			"desc": "",
-			"effect": "stun",
 			"id": "stun",
 			"name": "기절",
-			"short": "기"
+			"effect": "stun",
+			"short": "기",
+			"color": "#ffe64d",
+			"desc": ""
 		},
 		{
-			"color": "#bf8c59",
-			"desc": "",
-			"effect": "root",
 			"id": "root",
 			"name": "구속",
-			"short": "구"
+			"effect": "root",
+			"short": "구",
+			"color": "#bf8c59",
+			"desc": ""
 		},
 		{
-			"color": "#b3b3bf",
-			"desc": "",
-			"effect": "blind",
 			"id": "blind",
 			"name": "실명",
-			"short": "실"
+			"effect": "blind",
+			"short": "실",
+			"color": "#b3b3bf",
+			"desc": ""
 		},
 		{
-			"color": "#f2bf73",
-			"desc": "",
-			"effect": "knockback",
 			"id": "knockback",
 			"name": "넉백",
-			"short": "넉"
+			"effect": "knockback",
+			"short": "넉",
+			"color": "#f2bf73",
+			"desc": ""
 		},
 		{
-			"color": "#d980f2",
-			"desc": "",
-			"effect": "pull",
 			"id": "pull",
 			"name": "끌어당김",
-			"short": "끌"
+			"effect": "pull",
+			"short": "끌",
+			"color": "#d980f2",
+			"desc": ""
 		},
 		{
-			"color": "#ff5999",
-			"desc": "",
-			"effect": "mark",
 			"id": "mark",
 			"name": "표식",
-			"short": "표"
+			"effect": "mark",
+			"short": "표",
+			"color": "#ff5999",
+			"desc": ""
 		},
 		{
-			"color": "#ff9940",
-			"desc": "",
-			"effect": "taunt",
 			"id": "taunt",
 			"name": "도발",
-			"short": "도"
+			"effect": "taunt",
+			"short": "도",
+			"color": "#ff9940",
+			"desc": ""
 		},
 		{
-			"color": "#e67359",
-			"desc": "",
-			"effect": "vulnerable",
 			"id": "vulnerable",
 			"name": "취약",
-			"short": "취"
+			"effect": "vulnerable",
+			"short": "취",
+			"color": "#e67359",
+			"desc": ""
 		},
 		{
-			"color": "#73f28c",
-			"desc": "",
-			"effect": "regen",
 			"id": "regen",
 			"name": "재생",
-			"short": "재"
+			"effect": "regen",
+			"short": "재",
+			"color": "#73f28c",
+			"desc": ""
 		},
 		{
-			"color": "#8cccff",
-			"desc": "",
-			"effect": "shield",
 			"id": "shield",
 			"name": "보호막",
-			"short": "막"
+			"effect": "shield",
+			"short": "막",
+			"color": "#8cccff",
+			"desc": ""
 		},
 		{
-			"color": "#7fe0b0",
-			"desc": "",
-			"effect": "regen",
 			"id": "regen_2",
 			"name": "진통제",
-			"short": "진"
+			"effect": "regen",
+			"short": "진",
+			"color": "#7fe0b0",
+			"desc": ""
 		},
 		{
-			"color": "#a6f07a",
-			"desc": "",
-			"effect": "regen",
 			"id": "regen_3",
 			"name": "자가 치유",
-			"short": "치"
+			"effect": "regen",
+			"short": "치",
+			"color": "#a6f07a",
+			"desc": ""
 		}
 	]
 }
