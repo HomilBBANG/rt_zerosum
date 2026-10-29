@@ -342,9 +342,12 @@ func _blocked_by_door_leaf(a: Vector3, b: Vector3) -> bool:
 ## 캐릭터 그림자 대리 물체: 보이지 않고 그림자만 드리움
 ## 2D 캐릭터의 그림자를 3D 바닥에 드리우는 대리 물체 (화면에는 안 보이고 그림자만 그림).
 ## 리그의 원화 실루엣을 카메라를 향한 판(알파 시저)으로 세워 캐릭터 모양 그림자를 만든다. 실루엣이 없으면 캡슐.
-func set_shadow_proxy(id: int, pos: Vector3, height: float, alive: bool, sprite_id: String = "", mirror: bool = false) -> void:
+## pose = 지금 보이는 포즈 그림 ("" = 기본 실루엣) — 그림자가 그 그림 모양 (쓰러짐 dead 도 그 그림으로 남음)
+func set_shadow_proxy(id: int, pos: Vector3, height: float, alive: bool, sprite_id: String = "", mirror: bool = false, pose: String = "") -> void:
 	var mi: MeshInstance3D = _proxies.get(id, null)
-	var sil := _silhouette(sprite_id)
+	var sil := _silhouette(sprite_id, pose)
+	if sil.is_empty() and pose != "":
+		sil = _silhouette(sprite_id)
 	if mi == null:
 		mi = MeshInstance3D.new()
 		if sil.is_empty():
@@ -364,6 +367,10 @@ func set_shadow_proxy(id: int, pos: Vector3, height: float, alive: bool, sprite_
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 		add_child(mi)
 		_proxies[id] = mi
+	if mi.mesh is QuadMesh and not sil.is_empty():
+		var mat := (mi.mesh as QuadMesh).material as StandardMaterial3D
+		if mat != null and mat.albedo_texture != sil.tex:
+			mat.albedo_texture = sil.tex
 	if mi.mesh is QuadMesh:
 		# 리그 픽셀 → 미터: 정수리~발바닥(figure_px)이 캐릭터 키가 되도록. 발 기준점(ground)이 슬롯 위치에 오게 판을 옮긴다.
 		var mpp: float = height / float(sil.figure_px)
@@ -371,8 +378,13 @@ func set_shadow_proxy(id: int, pos: Vector3, height: float, alive: bool, sprite_
 		(mi.mesh as QuadMesh).size = size
 		var off := Vector2(size.x * 0.5 - sil.ground.x * mpp, sil.image_size.y * mpp - sil.ground.y * mpp - size.y * 0.5)
 		var sx := -1.0 if mirror else 1.0
-		mi.position = pos + Vector3(off.x * sx, -off.y, 0.0)
 		mi.scale = Vector3(sx, 1.0, 1.0)
+		if sil.image_size.x > sil.image_size.y * 1.6:   # 누운 그림(쓰러짐): 판을 바닥에 눕혀 몸 아래 그림자로 (세운 판은 길게 늘어진 그림자가 됨)
+			mi.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+			mi.position = pos + Vector3(off.x * sx, 0.12, 0.0)
+		else:
+			mi.rotation_degrees = Vector3.ZERO
+			mi.position = pos + Vector3(off.x * sx, -off.y, 0.0)
 	else:
 		(mi.mesh as CapsuleMesh).height = height
 		mi.position = pos + Vector3(0, height * 0.5, 0)
@@ -382,13 +394,25 @@ func set_shadow_proxy(id: int, pos: Vector3, height: float, alive: bool, sprite_
 var _sil_cache: Dictionary = {}
 
 
-func _silhouette(sprite_id: String) -> Dictionary:
+func _silhouette(sprite_id: String, pose: String = "") -> Dictionary:
 	if sprite_id == "":
 		return {}
-	if _sil_cache.has(sprite_id):
-		return _sil_cache[sprite_id]
+	var key := sprite_id + "/" + pose
+	if _sil_cache.has(key):
+		return _sil_cache[key]
 	var info := {}
 	var ch := CharacterSprite2D.info_of(sprite_id)
+	if pose != "":   # 포즈 그림 자체(알파)를 그림자 판으로
+		var path := CharacterSprite2D.pose_path(sprite_id, pose)
+		var tex := CharacterSprite2D._tex(path) if path != "" else null
+		if tex != null:
+			var aj := CharacterSprite2D.dir_of(sprite_id).path_join(pose).path_join("anim.json")
+			var o: Variant = JSON.parse_string(FileAccess.get_file_as_string(aj)) if FileAccess.file_exists(aj) else null
+			var g: Array = o.ground if o is Dictionary and o.get("ground") is Array else [tex.get_width() * 0.5, tex.get_height()]
+			info = {"tex": tex, "image_size": Vector2(tex.get_width(), tex.get_height()), "ground": Vector2(float(g[0]), float(g[1])),
+				"figure_px": float(o.get("figure_px", ch.get("figure_px", 760))) if o is Dictionary else float(ch.get("figure_px", 760))}
+		_sil_cache[key] = info
+		return info
 	if ch.has("silhouette") and ch.has("figure_px"):
 		info = {
 			"tex": CharacterSprite2D._tex(CharacterSprite2D.dir_of(sprite_id).path_join(str(ch.silhouette))),
@@ -396,5 +420,5 @@ func _silhouette(sprite_id: String) -> Dictionary:
 			"ground": Vector2(float(ch.ground[0]), float(ch.ground[1])),
 			"figure_px": float(ch.figure_px),
 		}
-	_sil_cache[sprite_id] = info
+	_sil_cache[key] = info
 	return info

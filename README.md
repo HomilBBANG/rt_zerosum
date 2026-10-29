@@ -302,6 +302,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   맞는 쪽 우선순위: 피함 miss → 기절 stun → 디버프 tired → 피해 hit (그 캐릭터에게 그림이 없으면 다음 후보). 넉백·끌어당김(즉시 효과)은 디버프로 안 침.
 - **전투 연출 (카메라)**: 잠깐 바꾸는 포즈는 **카메라가 그 캐릭터 가운데로 빠르게(0.15초) 1.5배 줌** (캐릭터 가운데가 아래 HUD 위 화면 가운데쯤 `pose_screen_y` 290px 에 오게) — 캐릭터 크기는 그대로. 처음엔 캐릭터가 화면 가운데보다 **x −5px**(뒤쪽 — 적에게서 먼 쪽)에 있다가 **1.5초 동안 천천히 가운데로** → 끝나면 카메라가 움직이지 않고 **바로 원래 화면**, 캐릭터는 **idle**.
   줌해도 원래 화면 밖(방 바깥 빈 곳)은 안 보이게 — 화면 가장자리 캐릭터는 가운데까지 오지 않음 (`pose_keep_in_view`). 한 행동에 카메라는 한 캐릭터: 쓰는 쪽 포즈가 먼저, 없으면 맞는 쪽.
+  **그림자도 그림 모양**: 포즈 그림이 보이는 동안 3D 배경의 그림자 판을 그 그림(알파)으로 바꿈 → 총·칼·뻗은 팔까지 그림자에. 쓰러진 그림(dead)은 판을 바닥에 눕혀 몸 아래 그림자로 남김 (그림이 없는 캐릭터는 예전처럼 쓰러지면 그림자 없음).
   `shot` · `slash` · `hit` 때 처음 **0.2초 카메라 흔들림** (한 행동에 한 번, 줌과 함께). 쓰러지는 공격을 맞으면 hit 없이 바로 dead. AP 를 다 쓴 행동은 그 포즈 뒤에 tired. 차례 시작 상태 이상 피해(출혈 등)는 포즈 없이 예전처럼 흔들림만.
   수치 조절 = `battle_2d.tscn` → View 노드 인스펙터 **`포즈 연출`**: 카메라 줌 배율(1.5) · 캐릭터가 올 화면 높이 · 줌 시간 · 보여 주는 시간 · 처음 가로 어긋남 · 돌아오는 시간(0 = 바로) · 화면 밖 안 보이기 · 흔들림 시간 · 세기.
   확인: `godot --path . ++ --scene=battle --ambush=ally --autoplay=pose:shot` (`slash` · `point_up` · `hit` · `miss` · `stun` · `tired` · `dead`, 캐릭터 고르기 `--pose_char=hero2`) · 패배 화면 `--scene=result --winner=enemy`.
@@ -309,6 +310,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![전투 포즈 — shot · hit / miss · stun / dead](docs/screenshots/battle_poses.jpg)
 ![패배 결과 화면 annoying · 전투 point_up / tired](docs/screenshots/battle_poses2.jpg)
+![그림자도 포즈 모양 — idle · 이선 shot / 하나 slash · 이선 dead (줌 없이)](docs/screenshots/battle_pose_shadow.jpg)
 ![포즈 카메라 줌 1.5배 — 이선 shot · 니키타 point_up (가장자리라 화면 안에서 멈춤) / 키라 stun · 하나 slash](docs/screenshots/battle_pose_camera.jpg)
 ![하나 포즈 — hit · miss / shot · slash / tired](docs/screenshots/battle_poses_hana.jpg)
 ![하나 포즈 — point_up · stun / dead · 패배 화면 annoying](docs/screenshots/battle_poses_hana2.jpg)

@@ -376,6 +376,13 @@ func play_pose(pose: String, o: Dictionary = {}) -> float:
 	return t_hold
 
 
+## 지금 보이는 포즈 그림 이름 ("" = 동작 · 기본 그림) — 3D 배경 그림자를 그 그림 모양으로
+func shadow_pose() -> String:
+	if chr == null:
+		return ""
+	return chr.current if has_pose(chr.current) else ""
+
+
 ## 카메라 확대 중심 = 캐릭터 가운데 (발 위 키의 절반, 월드 좌표)
 func center_world() -> Vector2:
 	return position + Vector2(0.0, -chr_height * 0.5 * scale.y)

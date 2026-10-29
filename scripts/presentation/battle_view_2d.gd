@@ -387,10 +387,32 @@ func _rerender_bg() -> void:
 var _last_view := Vector3(-1, -1, -1)
 
 
+var _shadow_poses: Dictionary = {}   # 유닛 id → 그림자에 쓴 포즈
+
+
+## 포즈 그림이 바뀐 유닛만 그림자 판을 바꾸고 배경을 다시 그림
+func _sync_shadow_poses() -> void:
+	if bg3d == null:
+		return
+	var changed := false
+	for id in sprites:
+		var s: UnitSprite2D = sprites[id]
+		var sp := s.shadow_pose()
+		if str(_shadow_poses.get(id, "")) == sp:
+			continue
+		_shadow_poses[id] = sp
+		var u: UnitRuntime = s.unit
+		bg3d.set_shadow_proxy(id, unit_world(u), 1.75 * (u.data.height_cm / 175.0), u.alive or sp != "", u.data.sprite_id, s.is_mirrored(), sp)
+		changed = true
+	if changed:
+		_rerender_bg()
+
+
 func _process(delta: float) -> void:
 	if back_bars != null:
 		back_bars.queue_redraw()   # 이동 트윈·피해 반영
 	_apply_camera(delta)
+	_sync_shadow_poses()
 	# 2D 카메라가 움직이거나 줌이 바뀌면 3D 배경 카메라를 맞추고 다시 렌더
 	if bg3d == null or bcam == null:
 		return
@@ -411,7 +433,9 @@ func relight() -> void:
 		var u: UnitRuntime = s.unit
 		var w := unit_world(u)
 		var h := 1.75 * (u.data.height_cm / 175.0)
-		bg3d.set_shadow_proxy(id, w, h, u.alive, u.data.sprite_id, s.is_mirrored())
+		var sp := s.shadow_pose()
+		_shadow_poses[id] = sp
+		bg3d.set_shadow_proxy(id, w, h, u.alive or sp != "", u.data.sprite_id, s.is_mirrored(), sp)   # 쓰러진 그림(dead)이 있으면 그림자도 남음
 		var probes: Array = bg3d.light_probe(w, h)
 		var key: Dictionary = probes[0] if not probes.is_empty() and probes[0].intensity > 0.3 else {}
 		var rim: Dictionary = {}
