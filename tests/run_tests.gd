@@ -642,20 +642,14 @@ func _test_poses() -> void:
 	heal.id = "t_pose_heal"
 	heal.effect = "heal"
 	_check(SkillPoseData.auto_caster(atk, a0, e) == (["shot"] if a0.is_ranged_now() else ["slash", "shot"]), "자동: 적에게 공격 = shot (근접 무기면 slash → shot)")
-	var kira: UnitRuntime = null
-	for u in bc.slots.living_units("ally"):
-		if u.data.sprite_id == "kira":
-			kira = u
-	if kira != null:
-		var wi := -1
-		for i in kira.data.weapons.size():
-			if str(kira.data.weapons[i].get("sprite", "")) == "pistol":
-				wi = i
-		if wi >= 0:
-			var keep := kira.weapon_index
-			kira.weapon_index = wi
-			_check(SkillPoseData.caster_poses(atk, kira, e, {}) == ["shot_pistol", "shot"], "권총을 들면 shot_pistol 먼저")
-			kira.weapon_index = keep
+	var keep_w = a0.data.weapons
+	var keep_i := a0.weapon_index
+	var pw: Array[Dictionary] = [{"id": "t_pistol", "name": "시험 권총", "sprite": "pistol", "range_type": "ranged", "power_bonus": 0}]
+	a0.data.weapons = pw
+	a0.weapon_index = 0
+	_check(SkillPoseData.caster_poses(atk, a0, e, {}) == ["shot_pistol", "shot"], "권총을 들면 shot_pistol 먼저 (무기별 그림)")
+	a0.data.weapons = keep_w
+	a0.weapon_index = keep_i
 	var melee := bc.slots.living_units("ally").filter(func(u): return not u.is_ranged_now())
 	var ranged := bc.slots.living_units("ally").filter(func(u): return u.is_ranged_now())
 	if not melee.is_empty():
