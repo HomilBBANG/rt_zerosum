@@ -206,7 +206,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   **믿는 신이 없는 대원(무신앙)도 가능**: 신앙 탭에 **"믿음이 없습니다."** · 신앙 스킬은 비어 있고 · 신앙도가 쌓이지 않음 (보상을 받아도 '믿음이 없어 안 쌓임'). 에디터 `대원 신앙` 에서 `무신앙` 을 고르면 됨.
   **신·신앙 스킬 = Godot 에디터 `스킬 트리` 탭 → `신앙 스킬`** (`data/faith.json`): 왼쪽 신 목록(추가·삭제, id·이름·상징색·설명, 믿는 대원 표시) · 가운데 그 신의 신앙 스킬(필요 신앙도 순, 추가·삭제) · 오른쪽 id·이름·필요 신앙도·효과·값·설명(자동 채우기) · 아래 검사.
   **누가 어느 신을 믿는지(무신앙 포함)·시작 신앙도도 같은 화면 아래 `대원 신앙`** (대원마다 믿는 신 고르기 — 무신앙 포함 · 시작 신앙도, `data/faith.json` 의 `believers`). 엑셀 캐릭터 시트의 `신`·`신앙` 열은 없앰.
-  신마다 **아이콘 글자**(비우면 이름 끝 단어 첫 글자: 솔·베·녹·테) — 게임에서 상징색 원 아이콘. 신 id 를 바꾸거나 지우면 믿는 대원도 따라감(지우면 무신앙). **지금 값은 임시** (태양신 솔루스·전쟁신 베이라·밤의 여신 녹트·대지모 테라, 각 4개).
+  신마다 **아이콘 글자**(비우면 이름 끝 단어 첫 글자: 솔·베·녹·테) — 게임에서 상징색 원 아이콘. **`아이콘 그림`** 을 고르면 글자 대신 그 그림(상징색 테두리 고리 안에): `assets/gods/` 의 PNG 목록에서 고르거나 **`그림 가져오기…`**(PC 의 그림을 `assets/gods/<신 id>.png` 로 복사). 정사각형 · 투명 배경 PNG 권장. 신 목록·스킬 창 신앙 탭·도감·대원 정보 등 신 아이콘이 나오는 곳 모두. 신 id 를 바꾸거나 지우면 믿는 대원도 따라감(지우면 무신앙). **지금 값은 임시** (태양신 솔루스·전쟁신 베이라·밤의 여신 녹트·대지모 테라, 각 4개).
   게임 스킬 창 신앙 탭·대원 정보 카드의 **신 아이콘을 누르면 세계관 도감 `종교(신)` 탭**의 그 신.
 - **신 해금 캐릭터 → 기적**: 정체가 신인 캐릭터가 있음. **해금되면 그 캐릭터의 스킬 창 신앙 탭이 `✦ 기적`** 으로 바뀜 — 정체인 신(아이콘 → 도감), 신앙도 대신 **의지**(해금될 때 `시작 의지`, 출전마다 + 기지 설정 `will_battle`(기본 5) — 신앙도를 올려도 기적에는 안 씀), 그 캐릭터만의 **기적**(필요 의지 이상이면 포인트 없이 배움, 모자라면 회색 + '의지 부족'). 전에 배운 신앙 스킬 효과는 그대로. 대원 목록·도감에 ✦, 도감 등장인물에 '정체' 표시(잠긴 동안은 안 보임).
   **에디터 `스킬 트리` 탭 → `기적 (신 해금)`** (`data/faith.json` 의 `divine` · `miracles`): 왼쪽 대원 목록에서 고르고 **`이 캐릭터는 정체가 신`** 을 켜면 신 해금 캐릭터 → 정체인 신 · **`이미 해금됨 (처음부터 신)`** 체크 · 체크 안 하면 **해금 조건**(직접 해금 = 이벤트·대사 / **미션 완료** = 고른 의뢰 업무를 끝냄·고른 전투 승리·고른 연구 완료·고른 **퀘스트** 완료 / 레벨 / 신앙도 / 친밀도 / n일차 + 값) · "새 게임: 잠김 → …" 확인 줄. 가운데 그 캐릭터의 기적(추가·삭제), + **시작 의지**. 오른쪽 기적 id·이름·필요 의지·효과·값·설명. 테스트 플레이 = 정체 해금 + 의지 100 으로 기적 탭.
@@ -222,6 +222,8 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![신앙 스킬 — 전쟁신 베이라 (신앙 부족 = 회색 + 붉은 글씨)](docs/screenshots/skill_faith.png)
 ![신앙 스킬 에디터 (스킬 트리 탭 → 신앙 스킬)](docs/screenshots/faith_editor.png)
 ![무신앙 — 믿음이 없습니다 (신앙 스킬 비어 있음, 신앙도 안 쌓임)](docs/screenshots/faith_none.png)
+![신 아이콘 그림 (예시 그림 — 아우로라)](docs/screenshots/god_icon_image.jpg)
+![신앙 스킬 에디터 — 아이콘 그림 고르기](docs/screenshots/faith_editor_icon.jpg)
 ![기적 탭 (정체가 신으로 드러난 하나)](docs/screenshots/skill_miracle.png)
 ![기적 · 신 해금 에디터 (스킬 트리 탭 → 기적)](docs/screenshots/miracle_editor.png)
 
@@ -251,7 +253,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   오른쪽 **게임과 같은 재생 화면 미리보기**(카드 클릭 = 그 컷, **`▶ 이 컷부터 미리보기 재생`** 뒤 미리보기 클릭 = 다음, 선택지·이어지기도 그대로) · 흐름(계기 · 어디서 이어져 오는지 · 어디로 가는지 · 쓰는 퀘스트, 눌러서 이동) · 검사(없는 컷씬·대원·그림·퀘스트, 선택지 없음 등).
   **`기지 테스트 플레이 (이 컷부터)`** = 저장 → 새 기지에서 그 컷부터 재생. 새 CG 는 `assets/cg/` 에 PNG 를 넣고 탭을 다시 열면 목록에 나옴(임포트 안 기다려도 보임).
 - **[임시] 컷씬 9개**: 오프닝(무너진 도시 CG → 기지 복도, 단·키라·앨마 → 이어서 혼자 있는 하나 → 선택지 '말을 건다' → 하나 컷씬) · 하나의 비밀 완료 → 대지모의 현신(CG) · 로한의 첫 연구 시작 → 연구실 · 3일차 → 옥상의 밤(키라·니키타, 친밀도 +3) · 단에게 처음 말 걸기 → 단의 조언(선택지 2갈래). 그림 4장은 자리표시.
-- **대사 포즈**: 대사 컷마다 `포즈` — 기본 그림 대신 그 캐릭터의 상황별 그림(니키타: 공격 shot · 피격 hit · 회피 miss · 기절 stun · 쓰러짐 dead). 기본 그림과 같은 배율 · 같은 발 위치에 섬, 그 대원이 다시 말할 때까지 그 포즈 유지. [임시] 옥상의 밤 니키타 마지막 대사 = miss(여유 있는 표정).
+- **대사 포즈**: 대사 컷마다 `포즈` — 기본 그림 대신 그 캐릭터의 상황별 그림(니키타: 공격 shot · 버프·스킬 point_up · 피격 hit · 회피 miss · 기절 stun · 지침 tired · 쓰러짐 dead · 언짢음 annoying). 기본 그림과 같은 배율 · 같은 발 위치에 섬, 그 대원이 다시 말할 때까지 그 포즈 유지. [임시] 옥상의 밤 니키타 마지막 대사 = miss(여유 있는 표정).
 - 확인: `godot --path . ++ --scene=base --base_ui=cutscene:cs_opening` (셋째 칸 = 시작 컷 번호, 0부터). 테스트 플레이·스크린샷(`--base_ui`·`--shot`)에서는 오프닝 등 대기 컷씬이 안 나옴.
 
 ![컷씬 — CG 위 대사 (하나의 비밀 → 대지모의 현신)](docs/screenshots/cutscene_cg.png)
@@ -274,18 +276,32 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![도감 — 도시 배경](docs/screenshots/outgame/codex_cities.png)
 
 ## 상황별 포즈 그림 (전투 · 컷씬)
-캐릭터마다 상황별 한 장 그림을 넣으면 전투와 컷씬 대사에서 씁니다. 지금은 **니키타**(`nikita_army`) 5장: `shot`(공격) · `hit`(피격) · `miss`(회피) · `stun`(기절) · `dead`(쓰러짐).
-- 넣기: `python3 tools/char_sprites.py poses nikita_army dead=누운.png hit=피격.png miss=회피.png shot=공격.png stun=기절.png` → `<포즈>/0001.png` + 조명·선화·눈 마스크 + `anim.json {"pose": true}`.
-  모든 포즈 같은 배율(가장 키 큰 선 자세의 키 = 기본 그림 키), 발 = 선 자세는 발 가운데 · 누운 그림(가로가 긴 그림)은 가운데 아래. 그림이 없는 캐릭터는 예전 연출 그대로.
-- **전투**:
-  - 공격(다른 편에게 쓰는 피해 · 상태 스킬) → `shot` · 맞음 → `hit` · 피함 → `miss` · 기절이 걸림 → `stun` (맞으면서 기절이면 stun) · 쓰러짐 → `dead` (그대로 남음, **회색 처리 · 쓰러지는 회전 없음**).
-  - 잠깐 바꾸는 포즈(shot · hit · miss · stun): 캐릭터 가운데 기준 **20% 빠르게 확대**(0.15초) · 처음엔 가운데보다 **x −5px**(뒤쪽 — 적에게서 먼 쪽)에서 **1.5초 동안 천천히 가운데로** → 원래 크기로 돌아오며 **idle**. 카메라는 그대로.
-  - `shot` · `hit` 때 처음 **0.2초 카메라 흔들림** (한 행동에 한 번). 쓰러지는 공격을 맞으면 hit 없이 바로 dead. 차례 시작 상태 이상 피해(출혈 등)는 포즈 없이 예전처럼 흔들림만.
-  - 수치 조절 = `battle_2d.tscn` → View 노드 인스펙터 **`포즈 연출`**: 확대 배율 · 확대 시간 · 보여 주는 시간 · 처음 가로 어긋남 · 돌아오는 시간 · 흔들림 시간 · 세기.
-  - 확인: `godot --path . ++ --scene=battle --ambush=ally --autoplay=pose:shot` (`hit` · `miss` · `stun` · `dead`).
-- **컷씬**: 대사 컷의 `포즈` (위 컷씬 항목).
+캐릭터마다 상황별 한 장 그림을 넣으면 전투와 컷씬 대사에서 씁니다. 지금은 **니키타**(`nikita_army`) 8장 (원본 = `art_src/nikita_army/`):
+
+| 포즈 | 이름 | 전투에서 쓰는 때 |
+|---|---|---|
+| `shot` | 공격 | 적에게 쓰는 피해·상태 스킬 (자동) |
+| `point_up` | 버프·스킬 | 회복·AP·버프 등 그 밖의 스킬 (자동) |
+| `hit` | 피격 | 공격에 맞음 |
+| `miss` | 회피 | 공격을 피함 |
+| `stun` | 기절 | 기절이 걸림 |
+| `tired` | 지침 | 디버프(부정 상태 이상 — 출혈·감속·구속 등)가 걸림 · **AP 를 다 씀(탈진)** |
+| `dead` | 쓰러짐 | 쓰러짐 (그대로 남음, **회색 처리 · 쓰러지는 회전 없음**) |
+| `annoying` | 언짢음 | **패배** — 결과 화면 오른쪽에 출전 대원 그림 |
+
+- 넣기: `python3 tools/char_sprites.py poses nikita_army dead=… hit=… miss=… shot=… stun=… point_up=… tired=… annoying=… --ref miss` → `<포즈>/0001.png` + 조명·선화·눈 마스크 + `anim.json {"pose": true}`.
+  모든 포즈 같은 배율(`--ref` 그림의 키 = 기본 그림 키), 발 = 선 자세는 발 가운데 · 누운 그림(가로가 긴 그림)은 가운데 아래. 새 이름의 포즈도 그대로 넣으면 에디터 목록에 나옴. 그림이 없는 캐릭터는 예전 연출 그대로.
+- **스킬마다 쓰는 쪽 포즈 = Godot 에디터 `스킬 트리` 탭 → `스킬 포즈`** (`data/skill_poses.json`): 스킬 목록(→ 지금 포즈) · `이 스킬을 쓸 때 포즈`(**자동** · **포즈 없음**(예전 공격 동작) · 포즈 이름) · 캐릭터별 미리보기 · 오른쪽 캐릭터별 포즈 그림 모음. 맞는 쪽 포즈는 상황으로 자동 (위 표).
+  맞는 쪽 우선순위: 피함 miss → 기절 stun → 디버프 tired → 피해 hit (그 캐릭터에게 그림이 없으면 다음 후보). 넉백·끌어당김(즉시 효과)은 디버프로 안 침.
+- **전투 연출**: 잠깐 바꾸는 포즈는 캐릭터 가운데 기준 **20% 빠르게 확대**(0.15초) · 처음엔 가운데보다 **x −5px**(뒤쪽 — 적에게서 먼 쪽)에서 **1.5초 동안 천천히 가운데로** → 원래 크기로 돌아오며 **idle**. 카메라는 그대로.
+  `shot` · `hit` 때 처음 **0.2초 카메라 흔들림** (한 행동에 한 번). 쓰러지는 공격을 맞으면 hit 없이 바로 dead. AP 를 다 쓴 행동은 그 포즈 뒤에 tired. 차례 시작 상태 이상 피해(출혈 등)는 포즈 없이 예전처럼 흔들림만.
+  수치 조절 = `battle_2d.tscn` → View 노드 인스펙터 **`포즈 연출`**: 확대 배율 · 확대 시간 · 보여 주는 시간 · 처음 가로 어긋남 · 돌아오는 시간 · 흔들림 시간 · 세기.
+  확인: `godot --path . ++ --scene=battle --ambush=ally --autoplay=pose:shot` (`point_up` · `hit` · `miss` · `stun` · `tired` · `dead`) · 패배 화면 `--scene=result --winner=enemy`.
+- **컷씬**: 대사 컷의 `포즈` — 8장 모두 고를 수 있음 (컷씬 항목).
 
 ![전투 포즈 — shot · hit / miss · stun / dead](docs/screenshots/battle_poses.jpg)
+![패배 결과 화면 annoying · 전투 point_up / tired](docs/screenshots/battle_poses2.jpg)
+![스킬 포즈 에디터 (스킬 트리 탭 → 스킬 포즈)](docs/screenshots/skill_pose_editor.png)
 
 ## 전투 명중 · 회피
 적에게 쓰는 **피해 · 상태 이상 스킬**은 명중 판정을 합니다 (회복·AP 부여·자기/아군 대상은 항상 맞음).
@@ -539,7 +555,7 @@ scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정
                    npc_agent, economy_ledger, base_sim(해금·이동·대화·위생·의뢰·결산·점검·제작·저장) / base_hub(씬)
 scripts/outgame/view/  base_view_3d(3D 단면 건물·조명·카메라), base_overlay(이름표·자물쇠·오염·말풍선 — 화면 좌표), npc_view(대원 스프라이트), outgame_hud(HUD·창)
 addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor, rtz_sortie_editor, rtz_skill_editor, rtz_quest_editor, rtz_cutscene_editor (Godot 에디터 상단 탭)
-data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), faith.json(신·신앙 스킬·믿는 신·신 해금 캐릭터·기적), codex.json(세계관 도감), quests.json(퀘스트), cutscenes.json(컷씬), statuses.json(상태 정의: 이름 → 효과), skill_status.json(스킬 상태 이상), monster_skills.json(몬스터 스킬), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
+data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), skill_poses.json(스킬마다 쓰는 포즈), faith.json(신·신앙 스킬·믿는 신·신 해금 캐릭터·기적), codex.json(세계관 도감), quests.json(퀘스트), cutscenes.json(컷씬), statuses.json(상태 정의: 이름 → 효과), skill_status.json(스킬 상태 이상), monster_skills.json(몬스터 스킬), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d
 assets/characters/ 캐릭터별 base·프레임 애니메이션·마스크·character.json (전투·기지 공통)
@@ -550,6 +566,8 @@ setup/             install_windows.ps1, install.sh (기기 설치), play.bat / p
 tools/             gen_sprites.py (원화·마스크 생성기), char_sprites.py (애니메이션 프레임 조명 마스크), render_shots.sh,
                    gen_balance_xlsx.py / gen_outgame_xlsx.py (엑셀·일정 초기 생성 — 이미 있으면 덮어쓰지 않음)
 tests/             run_tests.gd, outgame_tests.gd
+art_src/           캐릭터 원본 그림 (포즈 등, tools/char_sprites.py 입력 — Godot 는 안 읽음)
+assets/gods/       신 아이콘 그림 (에디터 '그림 가져오기')
 exports/sheets/    캐릭터 동작 스프라이트 시트 내보내기 (tools/char_sprites.py export, Godot 는 안 읽음)
 docs/              design/ (기획서 사본, outgame/ = 아웃게임 기획 01~04 + 구현 현황 05), screenshots/, 2D_vs_3D_comparison.md
 ```

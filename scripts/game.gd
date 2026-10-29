@@ -216,7 +216,8 @@ func _cli_jump() -> void:
 			go_base()
 		"result":
 			last_result = {"winner": cli.get("winner", "ally"), "rounds": 4, "mode": mode,
-				"log": PackedStringArray(["(CLI 미리보기) 전투 로그 예시", "라운드 4 시작: 라온 → 저격수 → ...", "라온 → 지휘관: 필살기 21 피해 (전투 불능)", "전투 종료: 아군 승리"])}
+				"log": PackedStringArray(["(CLI 미리보기) 전투 로그 예시", "라운드 4 시작: 라온 → 저격수 → ...", "라온 → 지휘관: 필살기 21 피해 (전투 불능)", "전투 종료: 아군 승리"]),
+				"allies": allies.map(func(u): return {"id": u.id, "hp": 0, "alive": false, "statuses": []})}
 			get_tree().change_scene_to_file(SCENE_RESULT)
 		_:
 			pass

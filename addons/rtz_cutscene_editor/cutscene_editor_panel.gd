@@ -706,7 +706,7 @@ func _step_card(c: Dictionary, i: int) -> Control:
 			var spr := str(od.npcs.get(st.speaker, {}).get("sprite", "")) if od != null else ""
 			var pose_opts := [["", "기본 그림"]]
 			for pz in CharacterSprite2D.poses(spr):
-				pose_opts.append([pz, "%s (%s)" % [CharacterSprite2D.POSE_NAMES.get(pz, pz), pz]])
+				pose_opts.append([pz, "%s (%s)" % [SkillPoseData.pose_name(pz), pz]])
 			if str(st.get("pose", "")) != "" and not CharacterSprite2D.poses(spr).has(str(st.pose)):
 				pose_opts.append([str(st.pose), "%s (그림 없음)" % st.pose])
 			_row(g, "포즈", _option(pose_opts, str(st.get("pose", "")), func(nv):

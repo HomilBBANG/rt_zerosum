@@ -5,6 +5,7 @@ extends Control
 ## 신앙: 왼쪽 신 목록(추가·삭제) · 가운데 그 신의 신앙 스킬(필요 신앙도 순) · 오른쪽 신·스킬 고치기 + 대원별 믿는 신·시작 신앙도 (data/faith.json believers).
 ## 상태 이상: 왼쪽 스킬 목록(누가 쓰는지·달린 상태 이상) · 오른쪽 그 스킬에 상태 이상 달기(여러 개, 턴·수치·확률) → data/skill_status.json.
 ## 기적: 신 해금 캐릭터 고르기(정체인 신 · 처음부터 해금 / 해금 조건 · 시작 의지) + 그 캐릭터만의 기적(필요 의지) → data/faith.json divine · miracles.
+## 스킬 포즈: 스킬마다 쓰는 쪽 포즈 그림(자동 · 포즈 없음 · shot · point_up …) + 캐릭터별 포즈 그림 미리보기 → data/skill_poses.json.
 ## 상태 정의: 상태 이상 이름·머리 위 글자·색 + 쓰는 효과(규칙) → data/statuses.json. 같은 효과를 이름만 다르게 여러 개 (예: 진통제·자가 치유 = 재생).
 ## 가운데: 격자 위 자유 모양 (캐릭터마다 다르게) — 빈 칸 클릭 = 새 노드(고른 노드에서 이어짐), 끌기 = 옮기기, Shift+클릭 = 선행 잇기/끊기, Delete = 삭제.
 ## 오른쪽: 고른 노드의 id · 이름 · 갈래 색 · 시작 노드 · 필요 레벨 · 선행(하나라도/모두) · 택일 그룹 · 효과 · 값 · 설명, 옮기기 · 삭제, 아래 검사.
@@ -63,6 +64,15 @@ var monster_box: Control
 var mon_list: ItemList
 var kit_list: ItemList
 var kit_add: OptionButton
+
+## 스킬 포즈 (kind == "pose") — data/skill_poses.json {스킬 id: 포즈}
+var spose: Dictionary = {}
+var pose_skill := ""
+var pose_char := ""
+var pose_box: Control
+var pose_list: ItemList
+var pose_gallery: GridContainer
+var pose_char_opt: OptionButton
 
 var char_opt: OptionButton
 var kind_btns: Dictionary = {}
@@ -126,9 +136,9 @@ func _ready() -> void:
 		_rebuild())
 	bar.add_child(char_opt)
 	tree_only.append(char_opt)
-	for k in SkillTreeData.KINDS + ["faith", "miracle", "status", "statusdef", "monster"]:
+	for k in SkillTreeData.KINDS + ["faith", "miracle", "status", "statusdef", "monster", "pose"]:
 		var b := Button.new()
-		b.text = "%s 트리" % SkillTreeData.KIND_NAME[k] if k in SkillTreeData.KINDS else {"faith": "신앙 스킬", "miracle": "기적 (신 해금)", "status": "상태 이상", "statusdef": "상태 정의", "monster": "몬스터 스킬"}[k]
+		b.text = "%s 트리" % SkillTreeData.KIND_NAME[k] if k in SkillTreeData.KINDS else {"faith": "신앙 스킬", "miracle": "기적 (신 해금)", "status": "상태 이상", "statusdef": "상태 정의", "monster": "몬스터 스킬", "pose": "스킬 포즈"}[k]
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
 		var kk: String = k
@@ -201,6 +211,10 @@ func _ready() -> void:
 	monster_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	monster_box.custom_minimum_size = Vector2(560, 420)
 	holder.add_child(monster_box)
+	pose_box = _build_pose_box()
+	pose_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pose_box.custom_minimum_size = Vector2(560, 420)
+	holder.add_child(pose_box)
 	var right := VBoxContainer.new()
 	right.custom_minimum_size.x = 400
 	right.add_theme_constant_override("separation", 6)
@@ -271,6 +285,7 @@ func _load() -> void:
 	if _sdef(sdef_sel).is_empty():
 		sdef_sel = sdefs[0].id if not sdefs.is_empty() else ""
 	mdata = MonsterSkillData.read()
+	spose = SkillPoseData.read()
 	if not monsters.has(mon_sel) and not monsters.is_empty():
 		mon_sel = str(monsters.keys()[0])
 	if skill_sel == "" and not actions.is_empty():
@@ -290,14 +305,15 @@ func _save() -> void:
 	var err3 := SkillStatusData.write(sstat)
 	err3 = maxi(err3, MonsterSkillData.write(mdata))
 	err3 = maxi(err3, StatusCatalog.write(sdefs))
+	err3 = maxi(err3, SkillPoseData.write(spose))
 	if err == OK and err2 == OK and err3 == OK:
 		dirty = false
 		var errs: int = SkillTreeData.check(nodes, allies, actions).errors.size() + FaithData.check(faith, char_faith, actions).errors.size() \
 			+ SkillStatusData.check(sstat, actions).errors.size() + MonsterSkillData.check(mdata, sheet_skill_ids, monsters).errors.size() \
 			+ StatusCatalog.check(sdefs).errors.size()
-		status.text = "저장됨: data/skill_tree.json · faith.json · skill_status.json · statuses.json · monster_skills.json" + ("" if errs == 0 else "  (검사 오류 %d개 — 아래 확인)" % errs)
+		status.text = "저장됨: data/skill_tree.json · faith.json · skill_status.json · statuses.json · monster_skills.json · skill_poses.json" + ("" if errs == 0 else "  (검사 오류 %d개 — 아래 확인)" % errs)
 		if Engine.is_editor_hint():
-			for path in [SkillTreeData.PATH, FaithData.PATH, SkillStatusData.PATH, MonsterSkillData.PATH, StatusCatalog.PATH]:
+			for path in [SkillTreeData.PATH, FaithData.PATH, SkillStatusData.PATH, MonsterSkillData.PATH, StatusCatalog.PATH, SkillPoseData.PATH]:
 				EditorInterface.get_resource_filesystem().update_file(path)
 	else:
 		status.text = "저장 실패 (%d / %d / %d)" % [err, err2, err3]
@@ -320,8 +336,8 @@ func _play() -> void:
 		if Engine.is_editor_hint():
 			EditorInterface.play_custom_scene("res://scenes/battle_2d.tscn")
 		return
-	if kind in ["status", "statusdef"]:
-		var try_id := skill_sel
+	if kind in ["status", "statusdef", "pose"]:
+		var try_id := skill_sel if kind != "pose" else pose_skill
 		if kind == "statusdef":   # 그 상태가 달린 첫 스킬
 			var users := sstat.filter(func(e): return e.status == sdef_sel)
 			try_id = str(users[0].skill) if not users.is_empty() else skill_sel
@@ -572,18 +588,20 @@ func _rebuild() -> void:
 	var is_m := kind == "monster"
 	var is_d := kind == "statusdef"
 	var is_mi := kind == "miracle"
-	var tree_mode := not is_f and not is_s and not is_m and not is_d and not is_mi
+	var is_p := kind == "pose"
+	var tree_mode := not is_f and not is_s and not is_m and not is_d and not is_mi and not is_p
 	canvas.visible = tree_mode
 	faith_box.visible = is_f
 	status_box.visible = is_s
 	sdef_box.visible = is_d
 	miracle_box.visible = is_mi
 	monster_box.visible = is_m
+	pose_box.visible = is_p
 	for c in tree_only:
 		c.visible = tree_mode
-	play_level.visible = not is_s and not is_m and not is_d
+	play_level.visible = not is_s and not is_m and not is_d and not is_p
 	level_lab.visible = play_level.visible
-	play_btn.text = "전투 테스트 플레이 (이 스킬 쥐여 주기)" if is_s else ("전투 테스트 플레이 (첫 스테이지)" if is_m else ("전투 테스트 플레이 (이 상태가 달린 스킬)" if is_d else ("기지 기적 탭 테스트 플레이 (정체 해금 · 의지 100)" if is_mi else "기지 스킬 창 테스트 플레이")))
+	play_btn.text = "전투 테스트 플레이 (이 스킬 쥐여 주기)" if is_s or is_p else ("전투 테스트 플레이 (첫 스테이지)" if is_m else ("전투 테스트 플레이 (이 상태가 달린 스킬)" if is_d else ("기지 기적 탭 테스트 플레이 (정체 해금 · 의지 100)" if is_mi else "기지 스킬 창 테스트 플레이")))
 	for c in form.get_children():
 		form.remove_child(c)
 		c.queue_free()
@@ -603,6 +621,9 @@ func _rebuild() -> void:
 	elif is_mi:
 		_fill_miracle_lists()
 		_build_miracle_form()
+	elif is_p:
+		_fill_pose_lists()
+		_build_pose_form()
 	else:
 		_build_form()
 	_rebuilding = false
@@ -624,6 +645,10 @@ func _refresh_view() -> void:
 	if kind == "miracle":
 		info_label.text = "신 해금 캐릭터 %d · 기적 %d" % [faith.divine.size(), faith.miracles.size()]
 		_show_check(FaithData.check(faith, char_faith, actions))
+		return
+	if kind == "pose":
+		info_label.text = "포즈를 정한 스킬 %d개 (나머지 = 자동) · 포즈 그림이 있는 캐릭터 %d명" % [spose.size(), _pose_chars().size()]
+		_show_check(SkillPoseData.check(spose, actions, _known_poses()))
 		return
 	if kind == "statusdef":
 		var effs := {}
@@ -1624,6 +1649,7 @@ func _build_faith_box() -> Control:
 	box.add_child(gc)
 	gc.add_child(_head("신 (믿는 신 종류)"))
 	god_list = ItemList.new()
+	god_list.fixed_icon_size = Vector2i(24, 24)   # 아이콘 그림이 있는 신
 	god_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	god_list.item_selected.connect(func(i):
 		god_sel = str(god_list.get_item_metadata(i))
@@ -1692,7 +1718,7 @@ func _believers(gid: String) -> PackedStringArray:
 func _fill_faith_lists() -> void:
 	god_list.clear()
 	for g in faith.gods:
-		god_list.add_item("%s  (%s)" % [g.name, g.id])
+		god_list.add_item("%s  (%s)" % [g.name, g.id], FaithData.icon_texture(g))
 		god_list.set_item_metadata(god_list.item_count - 1, g.id)
 		god_list.set_item_custom_fg_color(god_list.item_count - 1, FaithData.color_of(g))
 		if g.id == god_sel:
@@ -1817,7 +1843,8 @@ func _build_faith_form() -> void:
 	cp.popup_closed.connect(func(): _fill_faith_lists())
 	_row(grid, "상징색", cp)
 	var on_sym := func(v): g.symbol = v
-	_row(grid, "아이콘 글자", _line(str(g.get("symbol", "")), on_sym, "비우면 '%s' (이름 끝 단어 첫 글자)" % FaithData.symbol_of({"name": g.name})))
+	_row(grid, "아이콘 글자", _line(str(g.get("symbol", "")), on_sym, "비우면 '%s' (이름 끝 단어 첫 글자) — 아이콘 그림이 있으면 안 씀" % FaithData.symbol_of({"name": g.name})))
+	_row(grid, "아이콘 그림", _god_icon_row(g))
 	_row(grid, "설명", _line(str(g.desc), func(v): g.desc = v))
 	var bl := _believers(str(g.id))
 	_row(grid, "믿는 대원", _small(", ".join(bl) if not bl.is_empty() else "(없음 — 아래 '대원 신앙')"))
@@ -1861,6 +1888,57 @@ func _build_faith_form() -> void:
 	_row(g2, "필요 신앙도", need)
 	_effect_rows(g2, f)
 	form.add_child(_small("효과는 스킬 트리 노드와 같은 형식 — 전투에 나갈 때 복제본에 더해짐. ※ id 를 바꾸면 이미 배운 저장 파일에서는 배운 것이 풀립니다."))
+
+
+## 신 아이콘 그림 고르기: assets/gods/ 의 그림 목록 · '그림 가져오기…'(PC 의 PNG 를 assets/gods/<신 id>.png 로 복사) · 미리보기
+func _god_icon_row(g: Dictionary) -> Control:
+	var row := HBoxContainer.new()
+	var thumb := TextureRect.new()
+	thumb.custom_minimum_size = Vector2(40, 40)
+	thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	thumb.texture = FaithData.icon_texture(g)
+	row.add_child(thumb)
+	var items := [["", "(없음 — 글자 아이콘)"]]
+	for p in FaithData.icon_files():
+		items.append([p, str(p).get_file()])
+	if str(g.get("icon", "")) != "" and not FaithData.icon_files().has(g.icon):
+		items.append([g.icon, str(g.icon).get_file() + " (없는 파일)"])
+	var o := _option(items, str(g.get("icon", "")), func(v):
+		g.icon = str(v)
+		_mark()
+		_rebuild())
+	o.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(o)
+	row.add_child(_btn("그림 가져오기…", func(): _import_god_icon(g)))
+	return row
+
+
+func _import_god_icon(g: Dictionary) -> void:
+	var fd := FileDialog.new()
+	fd.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	fd.access = FileDialog.ACCESS_FILESYSTEM
+	fd.filters = PackedStringArray(["*.png, *.webp, *.jpg ; 그림"])
+	fd.title = "신 아이콘 그림 (정사각형 권장, 투명 배경 PNG)"
+	add_child(fd)
+	var done := func(path: String) -> void:
+		var ext := path.get_extension().to_lower()
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(FaithData.ICON_DIR))
+		var dst := FaithData.ICON_DIR.path_join("%s.%s" % [str(g.id), ext])
+		var err := DirAccess.copy_absolute(path, ProjectSettings.globalize_path(dst))
+		if err != OK:
+			status.text = "그림 복사 실패 (%d)" % err
+			return
+		g.icon = dst
+		status.text = "아이콘 그림 → %s (저장 안 함)" % dst
+		if Engine.is_editor_hint():
+			EditorInterface.get_resource_filesystem().scan()
+		_mark()
+		_rebuild()
+	fd.file_selected.connect(done)
+	fd.canceled.connect(fd.queue_free)
+	fd.file_selected.connect(func(_p): fd.queue_free())
+	fd.popup_centered_ratio(0.6)
 
 
 ## 대원마다 믿는 신 · 시작 신앙도 (모든 대원, data/faith.json believers)
@@ -2185,9 +2263,181 @@ func _input(event: InputEvent) -> void:
 	EditorHistory.handle_input(self, event, history, status)
 
 
+# ================================================================ 스킬 포즈 (스킬마다 쓰는 쪽 포즈 그림)
+## 포즈 그림이 있는 아군 [UnitData]
+func _pose_chars() -> Array:
+	return allies.filter(func(u): return not CharacterSprite2D.poses(u.sprite_id).is_empty())
+
+
+## 포즈 이름: 알려진 순서 + 캐릭터 폴더에서 찾은 것
+func _known_poses() -> Array:
+	var out: Array = SkillPoseData.POSE_ORDER.duplicate()
+	for u in allies:
+		for p in CharacterSprite2D.poses(u.sprite_id):
+			if not out.has(p):
+				out.append(p)
+	return out
+
+
+func _pose_label(sid: String) -> String:
+	var p := str(spose.get(sid, ""))
+	if p == "":
+		var au: String = SkillPoseData.auto_for(actions.get(sid))
+		return "자동 (%s)" % SkillPoseData.pose_name(au) if au != "" else "자동"
+	if p == SkillPoseData.NONE:
+		return "포즈 없음"
+	return "%s (%s)" % [SkillPoseData.pose_name(p), p]
+
+
+func _build_pose_box() -> Control:
+	var box := HBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 10)
+	var lc := VBoxContainer.new()
+	lc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(lc)
+	lc.add_child(_head("스킬 → 쓰는 쪽 포즈"))
+	pose_list = ItemList.new()
+	pose_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pose_list.item_selected.connect(func(i):
+		pose_skill = str(pose_list.get_item_metadata(i))
+		_rebuild())
+	lc.add_child(pose_list)
+	lc.add_child(_small("자동 = 적에게 쓰는 피해·상태 스킬은 shot(공격), 그 밖의 스킬(회복·AP·버프)은 point_up. 맞는 쪽은 상황으로 자동: 피함 miss · 기절 stun · 디버프·구속 tired · 피해 hit. AP 를 다 쓰면 tired, 쓰러지면 dead, 패배 결과 화면은 annoying. 그림이 없는 캐릭터는 예전 동작."))
+	var rc := VBoxContainer.new()
+	rc.custom_minimum_size.x = 330
+	box.add_child(rc)
+	var hr := HBoxContainer.new()
+	rc.add_child(hr)
+	hr.add_child(_head("포즈 그림"))
+	pose_char_opt = OptionButton.new()
+	pose_char_opt.item_selected.connect(func(i):
+		pose_char = str(pose_char_opt.get_item_metadata(i))
+		_fill_pose_gallery())
+	hr.add_child(pose_char_opt)
+	var sc := ScrollContainer.new()
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rc.add_child(sc)
+	pose_gallery = GridContainer.new()
+	pose_gallery.columns = 3
+	pose_gallery.add_theme_constant_override("h_separation", 6)
+	pose_gallery.add_theme_constant_override("v_separation", 6)
+	sc.add_child(pose_gallery)
+	rc.add_child(_small("새 그림: python3 tools/char_sprites.py poses <캐릭터> <포즈>=<그림> … (README '상황별 포즈 그림'). 컷씬 대사에서도 고를 수 있음."))
+	return box
+
+
+func _fill_pose_lists() -> void:
+	pose_list.clear()
+	if pose_skill == "" or not actions.has(pose_skill):
+		pose_skill = ""
+	for sid in actions:
+		var a: ActionData = actions[sid]
+		if a.effect in ["move", "weapon_swap"]:
+			continue
+		if pose_skill == "":
+			pose_skill = sid
+		var us := _users(sid)
+		pose_list.add_item("%s (%s)   → %s%s" % [a.display_name, sid, _pose_label(sid), "" if not us.ally.is_empty() else "   · 괴물만"])
+		pose_list.set_item_metadata(pose_list.item_count - 1, sid)
+		if spose.has(sid):
+			pose_list.set_item_custom_fg_color(pose_list.item_count - 1, Color(1.0, 0.85, 0.5))
+		if sid == pose_skill:
+			pose_list.select(pose_list.item_count - 1)
+	pose_char_opt.clear()
+	var pcs := _pose_chars()
+	if not pcs.any(func(u): return u.id == pose_char):
+		pose_char = pcs[0].id if not pcs.is_empty() else ""
+	for u in pcs:
+		pose_char_opt.add_item(u.display_name)
+		pose_char_opt.set_item_metadata(pose_char_opt.item_count - 1, u.id)
+		if u.id == pose_char:
+			pose_char_opt.select(pose_char_opt.item_count - 1)
+	_fill_pose_gallery()
+
+
+## 고른 캐릭터의 포즈 그림 (작은 그림 + 이름 + 쓰는 때)
+func _fill_pose_gallery() -> void:
+	for c in pose_gallery.get_children():
+		c.queue_free()
+	var u := _unit(pose_char)
+	if u == null:
+		pose_gallery.add_child(_small("포즈 그림이 있는 캐릭터가 없습니다"))
+		return
+	var have := CharacterSprite2D.poses(u.sprite_id)
+	for p in _known_poses():
+		pose_gallery.add_child(_pose_thumb(u.sprite_id, str(p), have.has(p), 96))
+
+
+func _pose_thumb(spr: String, p: String, has: bool, h: float) -> Control:
+	var v := VBoxContainer.new()
+	v.custom_minimum_size.x = h * 0.95
+	var tr := TextureRect.new()
+	tr.custom_minimum_size = Vector2(h * 0.95, h)
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var path := CharacterSprite2D.pose_path(spr, p) if has else ""
+	tr.texture = CharacterSprite2D._tex(path) if path != "" else null
+	v.add_child(tr)
+	var l := _small("%s (%s)%s" % [SkillPoseData.pose_name(p), p, "" if has else "\n그림 없음"])
+	l.custom_minimum_size.x = h * 0.95
+	l.tooltip_text = str(SkillPoseData.POSES.get(p, {}).get("when", ""))
+	if not has:
+		l.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
+	v.add_child(l)
+	return v
+
+
+func _build_pose_form() -> void:
+	var a: ActionData = actions.get(pose_skill)
+	if a == null:
+		form.add_child(_head("스킬을 고르세요"))
+		return
+	form.add_child(_head("%s (%s)" % [a.display_name, a.id]))
+	var eff := {"damage": "피해 %d" % a.power, "heal": "회복 %d" % a.power, "ap_grant": "AP +%d" % a.power, "status": "상태 이상만"}.get(a.effect, a.effect)
+	form.add_child(_small("AP %d · 대상 %s · %s\n%s" % [a.ap_cost, a.target_rule, eff, a.description]))
+	var us := _users(a.id)
+	form.add_child(_small("쓰는 쪽: 아군 %s / 괴물 %s" % [", ".join(us.ally) if not us.ally.is_empty() else "-", ", ".join(us.monster) if not us.monster.is_empty() else "-"]))
+	form.add_child(HSeparator.new())
+	var au: String = SkillPoseData.auto_for(a)
+	var opts := [["", "자동 — %s (%s)" % [SkillPoseData.pose_name(au), au] if au != "" else "자동"], [SkillPoseData.NONE, "포즈 없음 (예전 공격 동작)"]]
+	for p in _known_poses():
+		opts.append([p, "%s (%s) — %s" % [SkillPoseData.pose_name(p), p, SkillPoseData.POSES.get(p, {}).get("when", "")]])
+	var cur := str(spose.get(a.id, ""))
+	form.add_child(_head("이 스킬을 쓸 때 포즈"))
+	var o := _option(opts, cur, func(v):
+		if str(v) == "":
+			spose.erase(a.id)
+		else:
+			spose[a.id] = str(v)
+		_mark()
+		_rebuild())
+	form.add_child(o)
+	var eff_pose := cur if cur != "" else au
+	form.add_child(_small("확대 연출(20% · 1.5초)과 함께 잠깐 바뀜. shot 이면 카메라 흔들림. 그 캐릭터에게 그림이 없으면 예전 공격 동작."))
+	form.add_child(HSeparator.new())
+	form.add_child(_head("캐릭터별 미리보기"))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	form.add_child(grid)
+	var shown := 0
+	for u in allies:
+		if CharacterSprite2D.poses(u.sprite_id).is_empty():
+			continue
+		var has := eff_pose != SkillPoseData.NONE and CharacterSprite2D.poses(u.sprite_id).has(eff_pose)
+		var th := _pose_thumb(u.sprite_id, eff_pose if eff_pose != SkillPoseData.NONE else "", has, 120)
+		(th.get_child(1) as Label).text = "%s%s" % [u.display_name, "" if has else "\n그림 없음 (예전 동작)"]
+		grid.add_child(th)
+		shown += 1
+	if shown == 0:
+		form.add_child(_small("포즈 그림이 있는 캐릭터가 없습니다."))
+	form.add_child(_small("테스트 플레이 = 이 스킬을 아군 모두의 첫 스킬 칸에 넣고 첫 스테이지 전투."))
+
+
 ## 편집 중인 데이터 전체 (var_to_str — 정수·실수 그대로)
 func _hist_snap() -> String:
-	return var_to_str([nodes, faith, sstat, sdefs, mdata])
+	return var_to_str([nodes, faith, sstat, sdefs, mdata, spose])
 
 
 func _hist_apply(s: String) -> void:
@@ -2199,5 +2449,6 @@ func _hist_apply(s: String) -> void:
 	sdefs = v[3]
 	StatusCatalog.refresh(sdefs)
 	mdata = v[4]
+	spose = v[5] if v.size() > 5 else spose
 	dirty = true
 	_rebuild()

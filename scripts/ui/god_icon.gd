@@ -1,11 +1,12 @@
 class_name GodIcon
 extends Control
-## 신 아이콘: 상징색 원 + 테두리 고리 + 글자(FaithData.symbol_of). 누르면 pressed (도감 열기 등).
+## 신 아이콘: 상징색 원 + 테두리 고리 + 글자(FaithData.symbol_of) — 아이콘 그림(신 icon, assets/gods/)이 있으면 글자 대신 그림. 누르면 pressed (도감 열기 등).
 
 signal pressed
 
 var color := Color(0.85, 0.8, 0.6)
 var symbol := "?"
+var tex: Texture2D = null   # 아이콘 그림 (있으면 글자 대신)
 var _hover := false
 var _font: Font
 
@@ -14,6 +15,7 @@ static func make(god: Dictionary, size: float, tip: String = "") -> GodIcon:
 	var ic := GodIcon.new()
 	ic.color = god.get("color", Color(0.85, 0.8, 0.6)) if god.get("color") is Color else FaithData.color_of(god)
 	ic.symbol = str(god.get("symbol", "")) if str(god.get("symbol", "")) != "" else FaithData.symbol_of(god)
+	ic.tex = FaithData.icon_texture(god)
 	ic.custom_minimum_size = Vector2(size, size)
 	ic.tooltip_text = tip
 	return ic
@@ -43,6 +45,13 @@ func _draw() -> void:
 	var col := color.lightened(0.15) if _hover else color
 	draw_circle(c, r, Color(0.05, 0.06, 0.09, 0.95))
 	draw_circle(c, r * 0.86, col.darkened(0.55))
+	if tex != null:   # 그림: 안쪽 원에 맞춰 (비율 유지) + 테두리 고리
+		var side := r * 1.5
+		var ts := tex.get_size()
+		var k := side / maxf(ts.x, ts.y)
+		draw_texture_rect(tex, Rect2(c - ts * k * 0.5, ts * k), false, Color(1.12, 1.12, 1.12) if _hover else Color.WHITE)
+		draw_arc(c, r * 0.93, 0, TAU, 48, col, maxf(1.5, r * 0.1), true)
+		return
 	draw_arc(c, r * 0.93, 0, TAU, 48, col, maxf(1.5, r * 0.1), true)
 	draw_arc(c, r * 0.72, 0, TAU, 48, Color(col, 0.55), maxf(1.0, r * 0.04), true)
 	for i in 8:   # 둘레 작은 점 (문장 느낌)

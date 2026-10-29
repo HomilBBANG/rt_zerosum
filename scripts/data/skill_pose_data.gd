@@ -1,0 +1,112 @@
+@tool
+class_name SkillPoseData
+extends RefCounted
+## 상황별 포즈 그림(캐릭터마다 assets/characters/<id>/<포즈>/0001.png, anim.json "pose": true — tools/char_sprites.py poses)을
+## 전투 어느 때 쓰는지 + 스킬마다 쓰는 포즈 (data/skill_poses.json, Godot 에디터 '스킬 트리' 탭 → '스킬 포즈').
+## 스킬 포즈 = {"skills": {스킬 id: 포즈}} — 없음/"" = 자동, "none" = 포즈 안 씀(예전 공격 동작).
+## 자동 (쓰는 쪽): 다른 편에게 쓰는 피해·상태 스킬 = shot, 그 밖의 스킬(회복·AP·버프·자기 대상) = point_up.
+## 맞는 쪽: 피함 = miss · 기절 걸림 = stun · 디버프(부정 상태 이상, 구속 포함) 걸림 = tired · 피해 = hit (앞에 것이 먼저).
+## 그 밖: AP 를 다 씀(탈진) = tired · 쓰러짐 = dead · 패배 = annoying (결과 화면).
+## 그 캐릭터에게 그 포즈 그림이 없으면 다음 후보(맞는 쪽은 hit), 그것도 없으면 예전 동작.
+
+const PATH := "res://data/skill_poses.json"
+const NONE := "none"
+## 알려진 포즈 이름 (에디터 표시 순서) → 이름 · 쓰는 때
+const POSES := {
+	"shot": {"name": "공격", "when": "적에게 쓰는 피해·상태 스킬 (자동)"},
+	"point_up": {"name": "버프·스킬", "when": "회복·AP·버프 등 그 밖의 스킬 (자동)"},
+	"hit": {"name": "피격", "when": "공격에 맞음"},
+	"miss": {"name": "회피", "when": "공격을 피함"},
+	"stun": {"name": "기절", "when": "기절이 걸림"},
+	"tired": {"name": "지침", "when": "디버프·구속이 걸림 · AP 를 다 씀(탈진)"},
+	"dead": {"name": "쓰러짐", "when": "쓰러짐 (그대로 남음)"},
+	"annoying": {"name": "언짢음", "when": "패배 (결과 화면)"},
+}
+const POSE_ORDER := ["shot", "point_up", "hit", "miss", "stun", "tired", "dead", "annoying"]
+
+
+static func pose_name(p: String) -> String:
+	return str(POSES.get(p, {}).get("name", p))
+
+
+static func read(path: String = PATH) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var out := {}
+	if j is Dictionary and j.get("skills") is Dictionary:
+		for k in j.skills:
+			var v := str(j.skills[k])
+			if v != "":
+				out[str(k)] = v
+	return out
+
+
+static func write(table: Dictionary, path: String = PATH) -> int:
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return FileAccess.get_open_error()
+	var keys := table.keys()
+	keys.sort()
+	var sk := {}
+	for k in keys:
+		if str(table[k]) != "":
+			sk[k] = str(table[k])
+	f.store_string(JSON.stringify({"version": 1, "skills": sk}, "\t", false))
+	return OK
+
+
+## 자동일 때 쓰는 쪽 포즈
+static func auto_caster(action: ActionData, actor: UnitRuntime, target: UnitRuntime) -> String:
+	if action == null or action.effect in ["move", "weapon_swap"]:
+		return ""
+	if target != null and actor != null and target.team != actor.team and action.effect in ["damage", "status"]:
+		return "shot"
+	return "point_up"
+
+
+## 에디터 표시용 자동 포즈 (대상 규칙으로: 적 대상 피해·상태 = shot, 그 밖 point_up)
+static func auto_for(action: ActionData) -> String:
+	if action == null or action.effect in ["move", "weapon_swap"]:
+		return ""
+	return "shot" if action.target_rule in ["weapon", "enemy_melee", "enemy_any"] and action.effect in ["damage", "status"] else "point_up"
+
+
+## 스킬을 쓸 때 쓰는 쪽 포즈 ("" = 포즈 없음 → 예전 공격 동작)
+static func caster_pose(action: ActionData, actor: UnitRuntime, target: UnitRuntime, table: Dictionary) -> String:
+	if action == null:
+		return ""
+	var p := str(table.get(action.id, ""))
+	if p == NONE:
+		return ""
+	return p if p != "" else auto_caster(action, actor, target)
+
+
+## 맞는 쪽 포즈 후보 (앞에서부터, 그림이 있는 첫 것) — kind = 결과 종류(damage·miss·heal…), effects = 이번에 걸린 상태 효과 id 들
+static func target_poses(kind: String, effects: Array) -> Array:
+	if kind == "miss":
+		return ["miss"]
+	var out := []
+	if effects.has("stun"):
+		out.append("stun")
+	for e in effects:
+		var d: Dictionary = StatusCatalog.EFFECTS.get(str(e), {})
+		if not d.is_empty() and not bool(d.get("positive", false)) and not bool(d.get("instant", false)) and str(e) != "stun":
+			out.append("tired")
+			break
+	if kind == "damage":
+		out.append("hit")
+	return out
+
+
+## 검사: 없는 스킬 · 모르는 포즈 이름(그림이 있는 캐릭터가 없음)
+static func check(table: Dictionary, actions: Dictionary, known_poses: Array) -> Dictionary:
+	var errors := PackedStringArray()
+	var notes := PackedStringArray()
+	for sid in table:
+		var p := str(table[sid])
+		if not actions.has(sid):
+			errors.append("스킬 포즈: 없는 스킬 '%s'" % sid)
+		elif p != NONE and not known_poses.has(p):
+			notes.append("스킬 포즈: %s → '%s' 그림이 있는 캐릭터가 없음 (자동 포즈로)" % [sid, p])
+	return {"errors": errors, "notes": notes}

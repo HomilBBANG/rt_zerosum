@@ -619,6 +619,41 @@ func _test_poses() -> void:
 	var st := CutsceneData.norm_step({"type": "say", "speaker": "npc_nikita", "side": "left", "pose": "hit", "text": "윽"})
 	_check(st.pose == "hit", "컷씬 대사 포즈 저장")
 	_check(CutsceneData.norm_step({"type": "say", "text": "a"}).pose == "", "포즈 비우면 기본 그림")
+	for pz in ["point_up", "tired", "annoying"]:
+		_check(ps.has(pz), "니키타 포즈 '%s' 있음" % pz)
+	# 스킬 포즈 규칙 (SkillPoseData)
+	var bc := _make("ally")
+	bc.start_battle()
+	var e: UnitRuntime = bc.slots.living_units("enemy")[0]
+	var a0: UnitRuntime = bc.slots.living_units("ally")[0]
+	var a1: UnitRuntime = bc.slots.living_units("ally")[1]
+	var atk := ActionData.new()
+	atk.id = "t_pose_atk"
+	atk.effect = "damage"
+	var heal := ActionData.new()
+	heal.id = "t_pose_heal"
+	heal.effect = "heal"
+	_check(SkillPoseData.caster_pose(atk, a0, e, {}) == "shot", "자동: 적에게 공격 = shot")
+	_check(SkillPoseData.caster_pose(heal, a0, a1, {}) == "point_up", "자동: 회복·버프 = point_up")
+	_check(SkillPoseData.caster_pose(atk, a0, e, {"t_pose_atk": "point_up"}) == "point_up", "스킬 포즈를 정하면 그 포즈")
+	_check(SkillPoseData.caster_pose(atk, a0, e, {"t_pose_atk": "none"}) == "", "포즈 없음 = 예전 동작")
+	_check(SkillPoseData.target_poses("miss", []) == ["miss"], "피함 = miss")
+	_check(SkillPoseData.target_poses("damage", ["stun"])[0] == "stun", "기절 = stun 먼저")
+	_check(SkillPoseData.target_poses("damage", ["root"]) == ["tired", "hit"], "구속(디버프) = tired, 없으면 hit")
+	_check(SkillPoseData.target_poses("damage", ["bleed"])[0] == "tired", "디버프(출혈) = tired")
+	_check(SkillPoseData.target_poses("damage", ["knockback"]) == ["hit"], "넉백(즉시)은 디버프로 안 침 = hit")
+	_check(SkillPoseData.target_poses("", ["regen"]).is_empty(), "버프만 걸림 = 포즈 없음")
+	var tmp := "user://t_skill_poses.json"
+	SkillPoseData.write({"basic_attack": "point_up", "x": ""}, tmp)
+	var rd := SkillPoseData.read(tmp)
+	_check(rd.size() == 1 and rd.basic_attack == "point_up", "스킬 포즈 저장 · 읽기 (빈 값은 안 씀)")
+	_check(SkillPoseData.read().is_empty() or SkillPoseData.read() is Dictionary, "data/skill_poses.json 읽힘")
+	# 신 아이콘 그림
+	_check(FaithData.icon_texture({"icon": ""}) == null, "신 아이콘 그림 없음 = 글자 아이콘")
+	var fd := FaithData.read()
+	_check(fd.gods.all(func(g): return g.has("icon")), "신 데이터에 아이콘 그림 칸")
+	var bad := FaithData.check({"gods": [{"id": "g1", "name": "시험신", "icon": "res://assets/gods/__nope.png"}], "skills": [], "divine": {}, "miracles": []}, {}, {})
+	_check(Array(bad.errors).any(func(x): return x.contains("아이콘 그림")), "없는 아이콘 그림 = 검사 오류")
 
 
 func _test_hit_evasion() -> void:

@@ -2,7 +2,7 @@
 class_name FaithData
 extends RefCounted
 ## 신앙 데이터 (data/faith.json, Godot 에디터 '스킬 트리' 탭의 '신앙' 에서 편집).
-## 신 = {id, name, color(#RRGGBB), symbol(아이콘 글자, 비우면 이름 끝 단어 첫 글자), desc} / 신앙 스킬 = {id, god, name, need(필요 신앙도 0~100), effect, value, desc}
+## 신 = {id, name, color(#RRGGBB), symbol(아이콘 글자, 비우면 이름 끝 단어 첫 글자), icon(아이콘 그림 res:// PNG — assets/gods/, 있으면 글자 대신), desc} / 신앙 스킬 = {id, god, name, need(필요 신앙도 0~100), effect, value, desc}
 ## 효과 형식은 스킬 트리 노드와 같음 (SkillTreeData.EFFECTS).
 ## 믿는 신 = believers {캐릭터 id → {god(신 id, "" = 무신앙), faith(시작 신앙도)}} — 같은 에디터 화면에서 고침.
 ## (예전에는 밸런스 엑셀 캐릭터 시트 '신'·'신앙' 열 — believers 가 없는 옛 파일이면 그 열을 씀)
@@ -15,7 +15,36 @@ const FAITH_MAX := 100
 
 
 static func new_god(id: String) -> Dictionary:
-	return {"id": id, "name": "새 신", "color": "#d8c890", "symbol": "", "desc": ""}
+	return {"id": id, "name": "새 신", "color": "#d8c890", "symbol": "", "icon": "", "desc": ""}
+
+
+const ICON_DIR := "res://assets/gods"
+
+
+## 신 아이콘 그림 (없으면 null → 글자 아이콘). 원본 PNG 를 바로 읽음 (임포트 전에 넣어도 보임)
+static func icon_texture(g: Dictionary) -> Texture2D:
+	var p := str(g.get("icon", ""))
+	if p == "":
+		return null
+	if FileAccess.file_exists(p):
+		var img := Image.load_from_file(ProjectSettings.globalize_path(p))
+		if img != null and not img.is_empty():
+			img.generate_mipmaps()
+			return ImageTexture.create_from_image(img)
+	return load(p) if ResourceLoader.exists(p) else null
+
+
+## assets/gods 의 PNG 목록 (res:// 경로)
+static func icon_files() -> Array:
+	var out := []
+	var d := DirAccess.open(ICON_DIR)
+	if d == null:
+		return out
+	for f in d.get_files():
+		if f.get_extension().to_lower() in ["png", "webp", "jpg"]:
+			out.append(ICON_DIR.path_join(f))
+	out.sort()
+	return out
 
 
 ## 신 아이콘 글자: symbol, 없으면 이름 끝 단어 첫 글자 ("태양신 솔루스" → "솔")
@@ -49,7 +78,7 @@ static func read(path: String = PATH) -> Dictionary:
 	for g in j.get("gods", []):
 		if g is Dictionary:
 			out.gods.append({"id": str(g.get("id", "")), "name": str(g.get("name", "")), "color": str(g.get("color", "#d8c890")),
-				"symbol": str(g.get("symbol", "")), "desc": str(g.get("desc", ""))})
+				"symbol": str(g.get("symbol", "")), "icon": str(g.get("icon", "")), "desc": str(g.get("desc", ""))})
 	var b: Variant = j.get("believers", null)
 	if b is Dictionary:
 		out.has_believers = true
@@ -134,6 +163,9 @@ static func check(d: Dictionary, char_faith: Dictionary, actions: Dictionary) ->
 		elif gids.has(g.id):
 			errors.append("신 id '%s' 가 두 번 있습니다" % g.id)
 		gids[g.id] = true
+		var ip := str(g.get("icon", ""))
+		if ip != "" and not FileAccess.file_exists(ip) and not ResourceLoader.exists(ip):
+			errors.append("%s: 아이콘 그림 '%s' 가 없습니다 (글자 아이콘으로 보임)" % [g.name, ip])
 	var sids := {}
 	for s in d.skills:
 		if str(s.id) == "":

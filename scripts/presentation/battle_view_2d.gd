@@ -185,6 +185,7 @@ static func zone_for_slot(team: String, row: int) -> String:
 
 
 func _ready() -> void:
+	skill_poses = SkillPoseData.read()
 	var f := FileAccess.open("res://assets/sprites/manifest.json", FileAccess.READ)
 	manifest = JSON.parse_string(f.get_as_text())
 	set_camera(_camera_dict())
@@ -488,6 +489,18 @@ func clear_slot_markers() -> void:
 
 
 # ---------------------------------------------------------------- 컨트롤러 이벤트 → 연출
+## 스킬마다 쓰는 포즈 (data/skill_poses.json — 에디터 '스킬 트리' 탭 → '스킬 포즈'). 규칙은 SkillPoseData
+var skill_poses: Dictionary = {}
+
+
+## 후보 중 그 캐릭터에게 그림이 있는 첫 포즈 ("" = 없음)
+func _pick_pose(s: UnitSprite2D, cands: Array) -> String:
+	for p in cands:
+		if s.has_pose(str(p)):
+			return str(p)
+	return ""
+
+
 func _on_action_resolved(event: Dictionary) -> void:
 	var actor: UnitRuntime = event.actor
 	var s := sprite_of(actor)
@@ -500,20 +513,21 @@ func _on_action_resolved(event: Dictionary) -> void:
 	var until := 0.0   # 시작부터 포즈가 끝나는 초
 	var shook := false
 	var tw: Tween = null
-	# 공격 = 다른 편에게 쓰는 피해 · 상태 스킬 → shot 포즈 (없으면 공격 애니메이션)
+	# 쓰는 쪽: 스킬 포즈 (자동 = 적에게 쓰는 피해·상태 스킬 shot, 그 밖 point_up) — 그림이 없으면 공격 애니메이션
 	var tgt: Variant = (event.targets as Array)[0] if not (event.targets as Array).is_empty() else null
-	var attack: bool = tgt != null and ActionResolver.rolls_hit(event.action, actor, tgt)
-	if attack and s.has_pose("shot"):
-		until = s.play_pose("shot", opts)
-		shake_camera()
-		shook = true
+	var cp := SkillPoseData.caster_pose(event.action, actor, tgt, skill_poses)
+	if cp != "" and s.has_pose(cp):
+		until = s.play_pose(cp, opts)
+		if cp == "shot":
+			shake_camera()
+			shook = true
 	else:
 		tw = s.play_attack(actor.team == "ally", ranged)
 	await get_tree().create_timer(0.12).timeout
-	var stunned := {}
+	# 맞는 쪽: 이번에 걸린 상태 효과 (대상마다)
+	var effs := {}
 	for ap in event.get("applied", []):
-		if StatusCatalog.effect_of(str(ap.status)) == "stun":
-			stunned[ap.target.instance_id] = true
+		effs.get_or_add(ap.target.instance_id, []).append(StatusCatalog.effect_of(str(ap.status)))
 	var posed := {}
 	for r in event.results:
 		var ts := sprite_of(r.target)
@@ -521,11 +535,9 @@ func _on_action_resolved(event: Dictionary) -> void:
 			continue
 		var id: int = r.target.instance_id
 		var pose := ""
-		if r.kind == "damage" and not posed.has(id):
-			pose = "stun" if stunned.has(id) and ts.has_pose("stun") else "hit"
-		elif r.kind == "miss":
-			pose = "miss"
-		if pose != "" and r.target.alive and ts.has_pose(pose):
+		if not posed.has(id) and r.target.alive and r.kind in ["damage", "miss"]:
+			pose = _pick_pose(ts, SkillPoseData.target_poses(r.kind, effs.get(id, [])))
+		if pose != "":
 			posed[id] = true
 			until = maxf(until, 0.12 + ts.play_pose(pose, opts))
 			if pose == "hit" and not shook:
@@ -535,18 +547,25 @@ func _on_action_resolved(event: Dictionary) -> void:
 			ts.play_hit()
 		elif r.kind == "miss":
 			ts.play_dodge()
-		elif r.kind != "damage":
+		else:
 			ts.play_heal()
-	# 피해 없이 기절만 걸린 대상 (상태 스킬)
-	for id in stunned:
+	# 피해 없이 상태만 걸린 대상 (기절 → stun, 디버프 → tired)
+	for id in effs:
 		var ts2: UnitSprite2D = sprites.get(id, null)
-		if ts2 != null and not posed.has(id) and ts2.unit.alive and ts2.has_pose("stun"):
-			until = maxf(until, 0.12 + ts2.play_pose("stun", opts))
+		if ts2 == null or posed.has(id) or not ts2.unit.alive or (id == actor.instance_id and cp != "" and s.has_pose(cp)):
+			continue
+		var p2 := _pick_pose(ts2, SkillPoseData.target_poses("", effs[id]))
+		if p2 != "":
+			posed[id] = true
+			until = maxf(until, 0.12 + ts2.play_pose(p2, opts))
 	if tw != null and tw.is_valid():
 		await tw.finished
 	var left := until - (Time.get_ticks_msec() - start) / 1000.0
 	if left > 0.0:
 		await get_tree().create_timer(left).timeout
+	# 탈진: AP 를 다 쓰면 그다음 tired
+	if actor.alive and actor.ap <= 0 and s.has_pose("tired"):
+		await get_tree().create_timer(s.play_pose("tired", opts)).timeout
 	_end_busy()
 
 

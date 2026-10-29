@@ -16,6 +16,8 @@ func _ready() -> void:
 	wedge.polygon = PackedVector2Array([Vector2(900, 0), Vector2(1280, 0), Vector2(1280, 720), Vector2(640, 720)])
 	wedge.color = Color(1.0, 0.12, 0.47) if win else Color(0.22, 1.0, 0.73)
 	add_child(wedge)
+	if not win:
+		_show_pose_art(r, "annoying")
 	var box := VBoxContainer.new()
 	box.position = Vector2(80, 80)
 	box.add_theme_constant_override("separation", 12)
@@ -51,6 +53,37 @@ func _ready() -> void:
 	menu.pressed.connect(func(): Game.go_menu())
 	btns.add_child(menu)
 	Game.maybe_cli_capture()
+
+
+## 패배: 출전 대원 중 그 포즈 그림(annoying = 언짢음)이 있는 대원을 오른쪽에 (SkillPoseData)
+func _show_pose_art(r: Dictionary, pose: String) -> void:
+	var paths: Array[String] = []
+	for a in r.get("allies", []):
+		var u := Game.find_ally(str(a.get("id", "")))
+		var p := CharacterSprite2D.pose_path(u.sprite_id, pose) if u != null else ""
+		if p != "":
+			paths.append(p)
+	var h := 600.0
+	var x := 1250.0
+	for i in mini(paths.size(), 3):
+		var tex := CharacterSprite2D._tex(paths[i])
+		if tex == null:
+			continue
+		var k := h / float(tex.get_height()) * (1.0 if i == 0 else 0.86)
+		var tr := TextureRect.new()
+		tr.texture = tex
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_SCALE
+		tr.size = Vector2(tex.get_width(), tex.get_height()) * k
+		x -= tr.size.x * (1.0 if i == 0 else 0.7)
+		tr.position = Vector2(x, 720.0 - tr.size.y - 10.0)
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if i > 0:
+			tr.modulate = Color(0.75, 0.75, 0.8)
+			tr.show_behind_parent = false
+		add_child(tr)
+		if i > 0:
+			move_child(tr, 2)   # 뒤 대원은 앞 대원 뒤로 (배경·쐐기 다음)
 
 
 func _label(text: String, size: int, color: Color = Color(1, 1, 1)) -> Label:

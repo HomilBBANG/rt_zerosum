@@ -249,8 +249,7 @@ static func _sheet_frames(id: String, anim: String, d: Dictionary) -> void:
 	d.fps = float(d.fps)
 
 
-## 상황별 포즈 이름 목록 (anim.json "pose": true 인 동작 폴더 — 예: shot · hit · miss · stun · dead)
-const POSE_NAMES := {"shot": "공격", "hit": "피격", "miss": "회피", "stun": "기절", "dead": "쓰러짐"}
+## 상황별 포즈 이름 목록 (anim.json "pose": true 인 동작 폴더 — 예: shot · hit · miss · stun · dead, 이름·쓰는 때는 SkillPoseData)
 static func poses(id: String) -> Array[String]:
 	var out: Array[String] = []
 	if not exists(id):
