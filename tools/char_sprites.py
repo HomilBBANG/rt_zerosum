@@ -41,6 +41,9 @@ assets/characters/<id>/
   python3 tools/char_sprites.py export <캐릭터> [idle walk run] [--cols 6] [--out exports/sheets]   프레임 → 스프라이트 시트 한 장씩 (밖으로 내보내기용)
       <out>/<캐릭터>/<동작>_sheet.png (왼쪽 위부터 가로로, 투명 배경) + <동작>_sheet.json (칸 크기·열·행·장 수·fps·발 위치·발자국 프레임)
       모든 동작이 같은 칸 크기 · 같은 발 위치 (동작을 바꿔도 캐릭터가 안 튐), 원본 해상도 그대로. 미리보기 = preview.jpg
+  python3 tools/char_sprites.py rows <캐릭터> [idle walk walk:l run run:l] [--name rows] [--scale 1,0.5]   동작마다 한 줄로 긴 시트 한 장
+      줄마다 동작 하나(왼쪽부터 프레임 순서), ':l' = 좌우 뒤집어 왼쪽 보기. 칸 = 발이 가운데 오는 공통 크기, 짧은 줄 남는 칸은 투명
+      → <out>/<캐릭터>/<name>.png (+ 배율마다 <name>_x0.5.png) + <name>.json (줄마다 동작·방향·장 수·fps·발자국 프레임)
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
 import json
@@ -1163,6 +1166,67 @@ def cmd_export(cid, anims=("idle", "walk", "run"), cols=6, out=None):
     pv.convert("RGB").save(os.path.join(out, "preview.jpg"), quality=85)
 
 
+def cmd_rows(cid, rows=("idle", "walk", "walk:l", "run", "run:l"), name="rows", scales=(1.0, 0.5), out=None):
+    """동작마다 한 줄인 긴 시트 한 장. 'walk:l' = walk 를 좌우로 뒤집은 왼쪽 보기 (원본 프레임 = 오른쪽 보기).
+    칸 = 모든 동작의 발(ground)이 칸 가운데 아래에 오는 공통 크기 → 뒤집어도 발 위치가 같음."""
+    cdir = os.path.join(CHAR_DIR, cid)
+    cj = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    out = os.path.join(out or os.path.join(ROOT, "exports", "sheets"), cid)
+    os.makedirs(out, exist_ok=True)
+    cache, lines = {}, []
+    for spec in rows:
+        anim, _, side = spec.partition(":")
+        if anim not in cache:
+            adir = os.path.join(cdir, anim)
+            names = sorted(f for f in os.listdir(adir) if re.match(r"^\d+\.png$", f)) if os.path.isdir(adir) else []
+            if not names:
+                print(cid, anim, "프레임 없음 — 건너뜀")
+                continue
+            aj = os.path.join(adir, "anim.json")
+            meta = json.load(open(aj, encoding="utf-8")) if os.path.exists(aj) else {}
+            gx, gy = meta.get("ground", cj["ground"])
+            cache[anim] = ([Image.open(os.path.join(adir, f)).convert("RGBA") for f in names], int(gx), int(gy), meta)
+        lines.append((anim, side == "l", *cache[anim]))
+    if not lines:
+        return
+    half = max(max(gx, max(f.width for f in fr) - gx) for _, _, fr, gx, _, _ in lines)
+    top = max(gy for _, _, _, _, gy, _ in lines)
+    bottom = max(max(f.height for f in fr) - gy for _, _, fr, _, gy, _ in lines)
+    cw, ch = half * 2, top + bottom
+    cols = max(len(fr) for _, _, fr, _, _, _ in lines)
+    sheet = Image.new("RGBA", (cw * cols, ch * len(lines)), (0, 0, 0, 0))
+    info_rows = []
+    for r, (anim, flip, frames, gx, gy, meta) in enumerate(lines):
+        for i, f in enumerate(frames):
+            x = half - gx
+            if flip:
+                f = f.transpose(Image.FLIP_LEFT_RIGHT)
+                x = half - (f.width - gx)
+            sheet.paste(f, (i * cw + x, r * ch + top - gy))
+        row = {"row": r, "anim": anim, "facing": "left" if flip else "right", "frames": len(frames),
+               "fps": float(meta.get("fps", cj.get("fps", 12))), "loop": bool(meta.get("loop", True))}
+        for k in ("durations", "steps"):
+            if k in meta:
+                row[k] = meta[k]
+        info_rows.append(row)
+        print(cid, "%d줄" % (r + 1), anim, row["facing"], "%d장 · %.0ffps" % (len(frames), row["fps"]))
+    files = []
+    for sc in scales:
+        img = sheet if sc == 1 else sheet.resize((round(sheet.width * sc), round(sheet.height * sc)), Image.LANCZOS)
+        fn = "%s.png" % name if sc == 1 else "%s_x%g.png" % (name, sc)
+        img.save(os.path.join(out, fn), optimize=True)
+        files.append({"file": fn, "scale": sc, "size": [img.width, img.height], "frame_size": [round(cw * sc), round(ch * sc)],
+                      "ground": [round(half * sc), round(top * sc)]})
+        print(" →", os.path.relpath(os.path.join(out, fn), ROOT), "%d×%d (칸 %d×%d)" % (img.width, img.height, round(cw * sc), round(ch * sc)))
+    json.dump({"character": cid, "cols": cols, "rows": len(lines), "frame_size": [cw, ch], "ground": [half, top],
+               "order": "줄마다 동작 하나, 왼쪽부터 프레임 순서 (짧은 줄의 남는 칸은 투명)", "files": files, "lines": info_rows},
+              open(os.path.join(out, "%s.json" % name), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    pv = sheet.resize((sheet.width // 12, sheet.height // 12), Image.LANCZOS)
+    bg = Image.new("RGBA", pv.size, (40, 44, 52, 255))
+    bg.alpha_composite(pv)
+    bg.convert("RGB").save(os.path.join(out, "%s_preview.jpg" % name), quality=85)
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
@@ -1199,6 +1263,12 @@ if __name__ == "__main__":
         skip = {args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
         names = tuple(a for a in args[2:] if not a.startswith("--") and a not in skip)
         cmd_export(args[1], names or ("idle", "walk", "run"), int(opt.get("cols", 6)), opt.get("out"))
+    elif args[:1] == ["rows"] and len(args) >= 2:
+        opt = {a[2:]: args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
+        skip = {args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
+        specs = tuple(a for a in args[2:] if not a.startswith("--") and a not in skip)
+        cmd_rows(args[1], specs or ("idle", "walk", "walk:l", "run", "run:l"), opt.get("name", "rows"),
+                 tuple(float(v) for v in opt.get("scale", "1,0.5").split(",")), opt.get("out"))
     elif args[:1] == ["steps"] and len(args) >= 2:
         cmd_steps(args[1], tuple(args[2:]) or ("walk", "run"))
     elif args[:1] == ["rig"] and len(args) >= 2:

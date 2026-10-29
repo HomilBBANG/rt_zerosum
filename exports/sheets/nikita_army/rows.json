@@ -1,0 +1,106 @@
+{
+ "character": "nikita_army",
+ "cols": 32,
+ "rows": 5,
+ "frame_size": [
+  616,
+  804
+ ],
+ "ground": [
+  308,
+  797
+ ],
+ "order": "줄마다 동작 하나, 왼쪽부터 프레임 순서 (짧은 줄의 남는 칸은 투명)",
+ "files": [
+  {
+   "file": "rows.png",
+   "scale": 1.0,
+   "size": [
+    19712,
+    4020
+   ],
+   "frame_size": [
+    616,
+    804
+   ],
+   "ground": [
+    308,
+    797
+   ]
+  },
+  {
+   "file": "rows_x0.5.png",
+   "scale": 0.5,
+   "size": [
+    9856,
+    2010
+   ],
+   "frame_size": [
+    308,
+    402
+   ],
+   "ground": [
+    154,
+    398
+   ]
+  }
+ ],
+ "lines": [
+  {
+   "row": 0,
+   "anim": "idle",
+   "facing": "right",
+   "frames": 32,
+   "fps": 12.0,
+   "loop": true
+  },
+  {
+   "row": 1,
+   "anim": "walk",
+   "facing": "right",
+   "frames": 18,
+   "fps": 16.0,
+   "loop": true,
+   "steps": [
+    6,
+    16
+   ]
+  },
+  {
+   "row": 2,
+   "anim": "walk",
+   "facing": "left",
+   "frames": 18,
+   "fps": 16.0,
+   "loop": true,
+   "steps": [
+    6,
+    16
+   ]
+  },
+  {
+   "row": 3,
+   "anim": "run",
+   "facing": "right",
+   "frames": 23,
+   "fps": 22.0,
+   "loop": true,
+   "steps": [
+    6,
+    16
+   ]
+  },
+  {
+   "row": 4,
+   "anim": "run",
+   "facing": "left",
+   "frames": 23,
+   "fps": 22.0,
+   "loop": true,
+   "steps": [
+    6,
+    16
+   ]
+  }
+ ]
+}
