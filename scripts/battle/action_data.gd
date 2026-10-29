@@ -14,6 +14,8 @@ extends Resource
 ## "damage" | "heal" | "ap_grant" | "status"(상태 이상만) | "move" | "weapon_swap"
 @export var effect: String = "damage"
 @export var power: int = 0
+## 명중 (%) — 적에게 쓰는 공격·상태 스킬만 굴림 (명중률 = 이 값 + 쓰는 쪽 명중 - 맞는 쪽 회피, 5~100%). 100 넘게 두면 회피가 높아도 잘 맞음. 밸런스 엑셀 스킬 시트 '명중'
+@export var accuracy: int = 100
 ## 맞은 대상에게 거는 상태 이상 [{id(StatusCatalog), turns, value(% 또는 고정 피해), chance(%)}] — data/skill_status.json (에디터 '스킬 트리' 탭 → 상태 이상)
 @export var statuses: Array[Dictionary] = []
 

@@ -335,6 +335,8 @@ func get_command_options() -> Array[Dictionary]:
 			enabled = false
 			reason = "유효한 대상이 없습니다."
 		var desc := a.description
+		if a.effect in ["damage", "status"] and a.target_rule in ["weapon", "enemy_any"]:
+			desc += "\n명중 %d%% (+ 명중 %+d · 대상 회피만큼 -)" % [a.accuracy, current.accuracy_now()]
 		for st in a.statuses:
 			desc += "\n상태 이상: " + SkillStatusData.summary(st)
 		out.append({"id": a.id, "name": a.display_name, "cost": a.ap_cost, "enabled": enabled, "reason": reason, "kind": a.kind, "desc": desc})

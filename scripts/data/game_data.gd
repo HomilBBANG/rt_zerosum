@@ -66,6 +66,16 @@ static func _table(sheet: Array) -> Array:
 	return out
 
 
+## 스킬 시트 '명중' 이 비었을 때 [임시]: 공격 90 · 상태 이상만 거는 스킬 85 · 나머지(회복·AP·이동) 100 (굴리지 않음)
+static func default_accuracy(effect: String) -> int:
+	match effect:
+		"damage":
+			return 90
+		"status":
+			return 85
+	return 100
+
+
 static func _f(d: Dictionary, key: String, def: float = 0.0) -> float:
 	var v := str(d.get(key, ""))
 	return float(v) if v.is_valid_float() else def
@@ -103,6 +113,7 @@ func _parse(sheets: Dictionary) -> void:
 		a.target_rule = d.get("대상", "weapon")
 		a.effect = d.get("효과", "damage")
 		a.power = _i(d, "위력")
+		a.accuracy = _i(d, "명중", default_accuracy(a.effect))   # 비면 효과별 기본값
 		a.description = d.get("설명", "")
 		actions[a.id] = a
 	# 몬스터 전용 스킬 (data/monster_skills.json — 에디터 '스킬 트리' 탭 → 몬스터 스킬)
@@ -179,6 +190,8 @@ func _unit(d: Dictionary, team: String) -> UnitData:
 	u.max_ap = _i(d, "AP", 6)
 	u.ap_recovery = _i(d, "AP회복", 2)
 	u.defense = _i(d, "방어")
+	u.accuracy = _i(d, "명중")
+	u.evasion = clampi(_i(d, "회피"), 0, 95)
 	u.skill_ids = _list(d, "스킬")
 	var ws: Array[Dictionary] = []
 	for wid in _list(d, "무기"):

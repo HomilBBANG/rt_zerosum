@@ -13,6 +13,9 @@ extends Resource
 @export var max_ap: int = 6
 @export var ap_recovery: int = 2
 @export var defense: int = 0
+## 명중 보너스 (%p, 쓰는 스킬 명중에 더함) · 회피 (%, 맞는 쪽 명중률에서 뺌) — 캐릭터·몬스터 시트 '명중' · '회피' 열 (스킬 트리 효과 accuracy · evasion 으로도 +)
+@export var accuracy: int = 0
+@export var evasion: int = 0
 @export var skill_ids: Array[String] = []
 ## 무기: {id, name, range_type, power_bonus}
 @export var weapons: Array[Dictionary] = []

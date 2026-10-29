@@ -56,6 +56,7 @@ func _init() -> void:
 	_test_rally_status()
 	_test_battle_statuses()
 	_test_status_effects()
+	_test_hit_evasion()
 	_test_codex()
 	_test_balance_data_and_ai_graph()
 	_test_sfx()
@@ -604,6 +605,81 @@ func _test_sfx() -> void:
 
 
 ## 상태 = 이름 + 효과 (data/statuses.json) / 새 효과: 넉백 · 끌어당김 · 표식 · 도발 · 취약 · 재생 · 보호막
+func _test_hit_evasion() -> void:
+	print("[13e] 명중 · 회피")
+	var bc := _make("ally")
+	bc.start_battle()
+	var e: UnitRuntime = bc.slots.living_units("enemy")[0]
+	var a0: UnitRuntime = bc.slots.living_units("ally")[0]
+	var atk := ActionData.new()
+	atk.id = "t_atk"
+	atk.display_name = "시험 공격"
+	atk.effect = "damage"
+	atk.power = 6
+	atk.accuracy = 90
+	a0.data.accuracy = 10
+	e.data.evasion = 25
+	_check(ActionResolver.hit_chance(atk, a0, e) == 75, "명중률 = 스킬 90 + 명중 10 - 회피 25 = %d%%" % ActionResolver.hit_chance(atk, a0, e))
+	e.data.evasion = 200
+	_check(ActionResolver.hit_chance(atk, a0, e) == ActionResolver.HIT_MIN, "아무리 피해도 최소 %d%%" % ActionResolver.HIT_MIN)
+	e.data.evasion = 0
+	atk.accuracy = 150
+	_check(ActionResolver.hit_chance(atk, a0, e) == 100, "100% 위로는 안 감")
+	var heal := ActionData.new()
+	heal.effect = "heal"
+	heal.power = 5
+	heal.accuracy = 10
+	_check(not ActionResolver.rolls_hit(heal, a0, a0) and ActionResolver.hit_chance(heal, a0, a0) == 100, "회복은 굴리지 않음 (늘 성공)")
+	# 빗나감: 피해 없음 · 상태 이상 안 걸림
+	atk.accuracy = 5
+	e.data.evasion = 0
+	a0.data.accuracy = 0
+	atk.statuses = [{"id": "bleed", "turns": 2, "value": 10, "chance": 100}]
+	var rng := RandomNumberGenerator.new()
+	var hp0 := e.hp
+	var misses := 0
+	var hits := 0
+	for i in 200:
+		rng.seed = 1000 + i
+		var ev := ActionResolver.resolve(atk, a0, e, rng)
+		if not ev.hit:
+			misses += 1
+			if e.hp != hp0 or e.statuses.has("bleed") or ev.results[0].kind != "miss" or not ("빗나감" in ev.text):
+				hits = -999
+		else:
+			hits += 1
+			e.hp = hp0
+			e.statuses.clear()
+			e.status_info.clear()
+	_check(misses > 150 and hits > 0, "명중 5%%: 200번 중 빗나감 %d · 맞음 %d (빗나가면 피해·상태 이상 없음)" % [misses, hits])
+	# 기절·구속은 피하지 못함
+	e.data.evasion = 40
+	_check(e.evasion_now() == 40, "회피 40%")
+	e.add_status("stun", 1, 0)
+	_check(e.evasion_now() == 0 and ActionResolver.hit_chance(atk, a0, e) == 5, "기절한 대상은 회피 0")
+	e.remove_status("stun")
+	# 100% 면 난수를 쓰지 않음 (기존 전투 재현성 유지)
+	atk.accuracy = 100
+	e.data.evasion = 0
+	atk.statuses = []
+	var r2 := RandomNumberGenerator.new()
+	r2.seed = 7
+	var st0 := r2.state
+	ActionResolver.resolve(atk, a0, e, r2)
+	var r3 := RandomNumberGenerator.new()
+	r3.seed = 7
+	r3.randi_range(-1, 1)
+	_check(r2.state == r3.state, "명중 100% = 명중 굴림 없음 (피해 흔들림 난수만)")
+	# 엑셀 값
+	var gd := GameData.load_from()
+	var dan: UnitData = GameData._find(gd.allies, "a_dan")
+	var kira: UnitData = GameData._find(gd.allies, "a_kira")
+	_check(gd.actions.basic_attack.accuracy == 95 and gd.actions.heavy_attack.accuracy == 85 and gd.actions.heal.accuracy == 100, "엑셀 스킬 명중: 기본 공격 95 · 강공격 85 · 회복 100")
+	_check(kira.evasion > dan.evasion and gd.monsters.wolf.evasion == 20, "엑셀 회피: 키라 %d > 단 %d · 늑대 %d" % [kira.evasion, dan.evasion, gd.monsters.wolf.evasion])
+	_check(GameData.default_accuracy("damage") == 90 and GameData.default_accuracy("heal") == 100, "명중 칸이 비면 공격 90 · 회복 100")
+	_check(SkillTreeData.EFFECTS.has("accuracy") and SkillTreeData.auto_desc("evasion", 5, {}) == "회피 +5%", "스킬 트리 효과: 명중 · 회피")
+
+
 func _test_status_effects() -> void:
 	print("[13c] 상태 id → 효과, 넉백·끌어당김·표식·도발·취약·재생·보호막")
 	# 같은 효과, 다른 이름

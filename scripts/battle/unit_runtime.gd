@@ -135,6 +135,18 @@ func is_ranged_now() -> bool:
 	return current_weapon().get("range_type", data.range_type) == "ranged"
 
 
+## 지금 명중 보너스 (%p)
+func accuracy_now() -> int:
+	return data.accuracy
+
+
+## 지금 회피 (%) — 기절·구속이면 피하지 못함 (0)
+func evasion_now() -> int:
+	if has_effect("stun") or has_effect("root"):
+		return 0
+	return maxi(0, data.evasion)
+
+
 func display_name() -> String:
 	return data.display_name
 

@@ -2,7 +2,7 @@
 class_name MonsterSkillData
 extends RefCounted
 ## 몬스터 스킬 (data/monster_skills.json, Godot 에디터 '스킬 트리' 탭의 '몬스터 스킬' 에서 편집).
-## skills = 몬스터 전용 스킬 정의 [{id, name, kind, ap, target, effect, power, desc}] (형식은 밸런스 엑셀 스킬 시트와 같음)
+## skills = 몬스터 전용 스킬 정의 [{id, name, kind, ap, target, effect, power, accuracy(명중 %), desc}] (형식은 밸런스 엑셀 스킬 시트와 같음)
 ## kits = 몬스터 id → [스킬 id…] (그 몬스터가 쓰는 스킬, 순서대로). 공용 스킬(기본 공격·강공격·필살기 등 엑셀 스킬 시트)도 넣을 수 있음.
 ## 상태 이상은 data/skill_status.json (같은 탭 '상태 이상' 또는 몬스터 스킬 화면에서 바로).
 ## 몬스터 스탯(HP·속도·AI 등)은 밸런스 엑셀 몬스터 시트. AI 가 실제로 쓰려면 그 몬스터 AI 그래프(data/ai)에 그 스킬 노드가 있어야 함.
@@ -15,7 +15,7 @@ const EFFECTS := {"damage": "피해", "heal": "회복", "ap_grant": "AP 부여",
 
 
 static func new_skill(id: String) -> Dictionary:
-	return {"id": id, "name": "새 몬스터 스킬", "kind": "attack", "ap": 2, "target": "weapon", "effect": "damage", "power": 8, "desc": ""}
+	return {"id": id, "name": "새 몬스터 스킬", "kind": "attack", "ap": 2, "target": "weapon", "effect": "damage", "power": 8, "accuracy": 90, "desc": ""}
 
 
 static func read(path: String = PATH) -> Dictionary:
@@ -29,7 +29,8 @@ static func read(path: String = PATH) -> Dictionary:
 		if s is Dictionary:
 			out.skills.append({"id": str(s.get("id", "")), "name": str(s.get("name", "")), "kind": str(s.get("kind", "attack")),
 				"ap": maxi(0, int(s.get("ap", 1))), "target": str(s.get("target", "weapon")), "effect": str(s.get("effect", "damage")),
-				"power": int(s.get("power", 0)), "desc": str(s.get("desc", ""))})
+				"power": int(s.get("power", 0)), "accuracy": int(s.get("accuracy", GameData.default_accuracy(str(s.get("effect", "damage"))))),
+				"desc": str(s.get("desc", ""))})
 	var k: Variant = j.get("kits", {})
 	if k is Dictionary:
 		for mid in k:
@@ -54,6 +55,7 @@ static func to_action(s: Dictionary) -> ActionData:
 	a.target_rule = s.target
 	a.effect = s.effect
 	a.power = int(s.power)
+	a.accuracy = int(s.get("accuracy", GameData.default_accuracy(a.effect)))
 	a.description = s.desc
 	return a
 

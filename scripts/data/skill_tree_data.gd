@@ -25,8 +25,8 @@ const LEGACY_END_GROUP := "갈래 끝"
 const _DIR_VEC := {"center": Vector2i.ZERO, "n": Vector2i(0, -1), "e": Vector2i(1, 0), "s": Vector2i(0, 1), "w": Vector2i(-1, 0)}
 const _DIR_BRANCH := {"center": "core", "n": "fire", "e": "move", "s": "guard", "w": "tactic"}
 ## 효과 종류 (에디터 목록 순서)
-const EFFECTS := ["hp", "speed", "ap", "ap_rec", "defense", "power", "heal", "skill_power", "skill"]
-const EFFECT_NAME := {"hp": "최대 HP", "speed": "속도", "ap": "최대 AP", "ap_rec": "턴마다 AP 회복", "defense": "방어 (받는 피해 -)",
+const EFFECTS := ["hp", "speed", "ap", "ap_rec", "defense", "accuracy", "evasion", "power", "heal", "skill_power", "skill"]
+const EFFECT_NAME := {"hp": "최대 HP", "speed": "속도", "ap": "최대 AP", "ap_rec": "턴마다 AP 회복", "defense": "방어 (받는 피해 -)", "accuracy": "명중 (%p, 적에게 쓰는 스킬이 잘 맞음)", "evasion": "회피 (%, 적의 공격을 피함)",
 	"power": "모든 공격 위력", "heal": "모든 회복량", "skill_power": "스킬 강화 (그 스킬 위력·회복·AP 지급 +)", "skill": "새 스킬 (전투 스킬 칸에 추가)"}
 ## 에디터 '모양 틀' — [{x, y, req: [앞 칸 번호], all, start, group, branch}] (번호 = 목록 순서)
 const TEMPLATES := {
@@ -281,6 +281,8 @@ static func auto_desc(effect: String, value: int, actions: Dictionary) -> String
 		"ap": return "최대 AP +%d" % value
 		"ap_rec": return "턴마다 AP 회복 +%d" % value
 		"defense": return "받는 피해 -%d (방어 +%d)" % [value, value]
+		"accuracy": return "명중 +%d%%" % value
+		"evasion": return "회피 +%d%%" % value
 		"power": return "모든 공격 위력 +%d" % value
 		"heal": return "모든 회복량 +%d" % value
 	return effect

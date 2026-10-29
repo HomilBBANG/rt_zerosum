@@ -347,6 +347,14 @@ func play_hit() -> void:
 	tw.tween_property(flip, "rotation", 0.0, 0.16)
 
 
+## 빗나감: 뒤로 살짝 물러났다 돌아옴
+func play_dodge() -> void:
+	var back := -1.0 if unit.team == "ally" else 1.0
+	var tw := create_tween()
+	tw.tween_property(flip, "position:x", flip.position.x + back * 26.0, 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(flip, "position:x", flip.position.x, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+
+
 func play_heal() -> void:
 	if chr != null and chr.has_anim("heal"):
 		chr.play("heal")

@@ -471,6 +471,8 @@ func _on_action_resolved(event: Dictionary) -> void:
 			continue
 		if r.kind == "damage":
 			ts.play_hit()
+		elif r.kind == "miss":
+			ts.play_dodge()
 		else:
 			ts.play_heal()
 	if tw.is_valid():

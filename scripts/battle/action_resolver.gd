@@ -16,10 +16,38 @@ static func compute_damage(action: ActionData, actor: UnitRuntime, target: UnitR
 	return maxi(1, base - target.data.defense + variance)
 
 
+const HIT_MIN := 5
+const HIT_MAX := 100
+
+
+## 명중을 굴리는 행동인가: 적에게 쓰는 공격 · 상태 스킬 (회복·AP 지급·자기·이동은 늘 성공)
+static func rolls_hit(action: ActionData, actor: UnitRuntime, target: UnitRuntime) -> bool:
+	return target != null and actor != null and target.team != actor.team and action.effect in ["damage", "status"]
+
+
+## 명중률 (%) = 스킬 명중 + 쓰는 쪽 명중 보너스 - 맞는 쪽 회피 (5~100). 굴리지 않는 행동은 100
+static func hit_chance(action: ActionData, actor: UnitRuntime, target: UnitRuntime) -> int:
+	if not rolls_hit(action, actor, target):
+		return 100
+	return clampi(action.accuracy + actor.accuracy_now() - target.evasion_now(), HIT_MIN, HIT_MAX)
+
+
 static func resolve(action: ActionData, actor: UnitRuntime, target: UnitRuntime, rng: RandomNumberGenerator) -> Dictionary:
 	var event := {
-		"actor": actor, "action": action, "targets": [], "results": [], "text": ""
+		"actor": actor, "action": action, "targets": [], "results": [], "text": "", "hit": true, "hit_chance": 100
 	}
+	# 명중 굴림 (100% 면 굴리지 않음 → 난수 순서가 그대로)
+	var chance := hit_chance(action, actor, target)
+	event.hit_chance = chance
+	if chance < 100:
+		var roll := rng.randi_range(1, 100) if rng != null else 1
+		if roll > chance:
+			event.hit = false
+			event.targets = [target]
+			event.results = [{"target": target, "kind": "miss", "amount": 0, "killed": false, "chance": chance}]
+			event.applied = []
+			event.text = "%s → %s: %s — 빗나감 (명중 %d%%)" % [actor.display_name(), target.display_name(), action.display_name, chance]
+			return event
 	match action.effect:
 		"damage":
 			var dr := StatusRules.deal(target, compute_damage(action, actor, target, rng))   # 취약·보호막 반영

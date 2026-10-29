@@ -1392,7 +1392,8 @@ func _skill_line(sid: String) -> String:
 	var m := _mskill(sid)
 	var eff := ""
 	if not m.is_empty():
-		eff = "%s (%s) · AP %d · %s %d" % [m.name, sid, int(m.ap), MonsterSkillData.EFFECTS.get(m.effect, m.effect), int(m.power)]
+		eff = "%s (%s) · AP %d · %s %d%s" % [m.name, sid, int(m.ap), MonsterSkillData.EFFECTS.get(m.effect, m.effect), int(m.power),
+			" · 명중 %d%%" % int(m.get("accuracy", 90)) if m.effect in ["damage", "status"] else ""]
 	elif actions.has(sid):
 		var a: ActionData = actions[sid]
 		eff = "%s (%s) · AP %d · %s %d · 공용" % [a.display_name, sid, a.ap_cost, MonsterSkillData.EFFECTS.get(a.effect, a.effect), a.power]
@@ -1581,6 +1582,16 @@ func _build_monster_form() -> void:
 				_mark()
 				_fill_monster_lists())
 		_row(grid, "위력" if m.effect == "damage" else ("회복량" if m.effect == "heal" else "AP"), pw)
+	if m.effect in ["damage", "status"]:
+		var acc := _spin(0, 200, 1, int(m.get("accuracy", GameData.default_accuracy(m.effect))), " %")
+		acc.tooltip_text = "명중 — 명중률 = 이 값 + 몬스터 명중 보너스 - 맞는 쪽 회피 (5~100%)"
+		acc.value_changed.connect(func(v):
+			if not _rebuilding:
+				m.accuracy = int(v)
+				_sync_mskill(m)
+				_mark()
+				_fill_monster_lists())
+		_row(grid, "명중", acc)
 	_row(grid, "설명", _line(str(m.desc), func(v):
 		m.desc = v
 		_sync_mskill(m)))

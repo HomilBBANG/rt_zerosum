@@ -3,6 +3,7 @@ extends CanvasLayer
 ## 전투 HUD (GDD 5절). 상단 라운드/선공/타임라인, 유닛 위 HP·AP, 하단 명령 패널, 툴팁, 디버그/로그.
 ## 모든 UI 는 조명 셰이더와 무관한 CanvasLayer 에 두어 가독성을 유지한다.
 
+var _hit_targets: Array = []   # 지금 고르는 행동의 유효 대상 (명중률 표시)
 var controller: BattleController
 var view: BattleViewBase
 var preset: Dictionary
@@ -479,8 +480,14 @@ func _on_battle_started() -> void:
 		ap.visible = false   # AP 는 발밑 파란 칸으로 표시
 		ap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		root.add_child(ap)
+		var hit := _label("", 16, Color(1, 0.95, 0.6))   # 대상 고르는 중: 명중률
+		hit.visible = false
+		hit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hit.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		hit.add_theme_constant_override("outline_size", 5)
+		root.add_child(hit)
 		floating_root.add_child(root)
-		floating[u.instance_id] = {"root": root, "name": nm, "hp": hp, "ap": ap, "unit": u}
+		floating[u.instance_id] = {"root": root, "name": nm, "hp": hp, "ap": ap, "hit": hit, "unit": u}
 	_refresh_floating()
 	result_banner.visible = false
 
@@ -537,7 +544,10 @@ func _status_popups(results: Array, applied: Array) -> void:
 		n[r.target] = k + 1
 		var color := Color(1, 0.3, 0.25)
 		var text := "-%d" % r.amount
-		if r.get("status", "") != "":
+		if r.kind == "miss":
+			color = Color(0.78, 0.85, 0.95)
+			text = "빗나감"
+		elif r.get("status", "") != "":
 			color = StatusCatalog.color_of(r.status)
 			text = "%s %s%d" % [StatusCatalog.get_def(r.status).name, "+" if r.kind == "heal" else "-", r.amount]
 		elif r.kind == "heal":
@@ -587,6 +597,7 @@ func begin_action(action_id: String) -> void:
 	pending_action = action_id
 	var a := controller.get_action(action_id)
 	var targets := controller.get_valid_targets(action_id)
+	_hit_targets = targets
 	view.clear_highlights()
 	view.set_highlight(controller.current, "current")
 	for u in controller.slots.living_units():
@@ -623,6 +634,20 @@ func cancel_pending() -> void:
 	_refresh_panel()
 
 
+## 대상을 고르는 중이면 고를 수 있는 적 머리 위에 명중률 (명중 + 쓰는 쪽 명중 - 대상 회피)
+func _update_hit_label(e: Dictionary) -> void:
+	var lab: Label = e.hit
+	var show := false
+	if pending_action != "" and controller.current != null and e.unit.alive and e.unit in _hit_targets:
+		var a := controller.get_action(pending_action)
+		if a != null and ActionResolver.rolls_hit(a, controller.current, e.unit):
+			var ch := ActionResolver.hit_chance(a, controller.current, e.unit)
+			lab.text = "명중 %d%%" % ch
+			lab.add_theme_color_override("font_color", Color(0.6, 1, 0.6) if ch >= 85 else (Color(1, 0.95, 0.6) if ch >= 60 else Color(1, 0.55, 0.45)))
+			show = true
+	lab.visible = show
+
+
 func _on_unit_clicked(unit: UnitRuntime) -> void:
 	if view.busy or not controller.is_player_turn():
 		return
@@ -631,7 +656,8 @@ func _on_unit_clicked(unit: UnitRuntime) -> void:
 		var sts := PackedStringArray()
 		for sid in unit.statuses:
 			sts.append("%s %d턴" % [StatusCatalog.get_def(sid).name, unit.status_turns(sid)] if StatusCatalog.get_def(sid).get("battle", false) else StatusCatalog.get_def(sid).name)
-		show_toast("%s  Lv%d  속도 %d  HP %d/%d  AP %d/%d  %s%s" % [unit.display_name(), unit.data.level, unit.speed_now(), unit.hp, unit.data.max_hp, unit.ap, unit.data.max_ap, _row_text(unit),
+		show_toast("%s  Lv%d  속도 %d  HP %d/%d  AP %d/%d  명중 %+d  회피 %d%%  %s%s" % [unit.display_name(), unit.data.level, unit.speed_now(), unit.hp, unit.data.max_hp, unit.ap, unit.data.max_ap,
+			unit.accuracy_now(), unit.evasion_now(), _row_text(unit),
 			"  상태: " + ", ".join(sts) if not sts.is_empty() else ""])
 		return
 	var reason := controller.get_target_block_reason(pending_action, unit)
@@ -1115,6 +1141,7 @@ func _process(delta: float) -> void:
 		var r: Rect2 = view.get_unit_back_bar_rect(e.unit)
 		e.hp.position = r.position
 		e.hp.size = r.size
+		_update_hit_label(e)
 	if debug_panel.visible:
 		var d := controller.debug_snapshot()
 		var lines := PackedStringArray()

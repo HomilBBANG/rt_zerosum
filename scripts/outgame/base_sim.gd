@@ -1679,6 +1679,8 @@ func _apply_skill_tree(copy: UnitData, cid: String) -> void:
 			"ap": copy.max_ap += v
 			"ap_rec": copy.ap_recovery += v
 			"defense": copy.defense += v
+			"accuracy": copy.accuracy += v
+			"evasion": copy.evasion = clampi(copy.evasion + v, 0, 95)
 			"power": copy.power_bonus += v
 			"heal": copy.heal_bonus += v
 			_:
