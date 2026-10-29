@@ -249,6 +249,7 @@ func reload_data(keep_edit: bool = true) -> void:
 	if cid == "" or _unit(cid) == null:
 		cid = allies[0].id if not allies.is_empty() else ""
 	if keep_edit and dirty:
+		char_faith = faith.believers   # 편집 중인 믿는 신 (GameData 가 새로 읽은 것으로 바꾸면 신 이름 바꾸기·지우기가 저장 파일에 안 들어감)
 		StatusCatalog.refresh(sdefs)   # GameData 가 파일로 다시 읽었으므로 저장 안 한 상태 정의를 다시 씌움
 		_rebuild()
 	else:
@@ -1727,6 +1728,9 @@ func _delete_god() -> void:
 	for cid2 in char_faith:   # 그 신을 믿던 대원 = 무신앙
 		if char_faith[cid2].god == g.id:
 			char_faith[cid2].god = ""
+	for cid3 in faith.get("divine", {}):   # 정체가 이 신이던 캐릭터 = 남은 첫 신 (검사에서 확인)
+		if str(faith.divine[cid3].get("god", "")) == g.id:
+			faith.divine[cid3].god = god_sel
 	status.text = "'%s' 와 그 신앙 스킬을 지웠습니다 (믿던 대원은 무신앙, 저장 안 함)" % g.name
 	dirty = true
 	_rebuild()
@@ -1772,15 +1776,19 @@ func _build_faith_form() -> void:
 		if not _god(v).is_empty():
 			status.text = "신 id '%s' 는 이미 있습니다" % v
 			return
+		var old_id: String = g.id
 		for f in faith.skills:
-			if f.god == g.id:
+			if f.god == old_id:
 				f.god = v
+		for cid2 in char_faith:   # 믿는 대원도 새 id 로 (id 를 바꾸기 전 이름으로 비교)
+			if char_faith[cid2].god == old_id:
+				char_faith[cid2].god = v
+		for cid3 in faith.get("divine", {}):   # 정체가 이 신인 캐릭터도
+			if str(faith.divine[cid3].get("god", "")) == old_id:
+				faith.divine[cid3].god = v
 		g.id = v
 		god_sel = v
-		for cid2 in char_faith:   # 믿는 대원도 새 id 로
-			if char_faith[cid2].god == g.id:
-				char_faith[cid2].god = v
-		status.text = "신 id 바꿈 → '%s' (믿는 대원도 따라감, 저장 안 함)" % v
+		status.text = "신 id 바꿈 → '%s' (믿는 대원·정체가 이 신인 캐릭터도 따라감, 저장 안 함)" % v
 		dirty = true
 		_rebuild()
 	gid.text_submitted.connect(apply_gid)

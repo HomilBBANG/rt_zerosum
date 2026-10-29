@@ -838,6 +838,10 @@ func _test_faith() -> void:
 	var hi: Dictionary = s.faith_skill_list("a_dan").back()
 	_c(s.faith_state("a_dan", hi.id) == "no_faith", "신앙도 모자라면 '신앙 부족'")
 	var lo: Dictionary = s.faith_skill_list("a_dan").front()
+	var base0: UnitData = GameData._find(battle.allies, "a_dan")
+	var copy0 := UnitData.new()
+	GameData._copy_props(copy0, base0)
+	s.apply_to_ally(copy0, base0)
 	_c(s.learn_faith_skill("a_dan", lo.id).ok and s.has_faith_skill("a_dan", lo.id), "신앙도 충분하면 배움 (포인트 안 씀, 스킬 포인트 %d)" % s.skill_points("a_dan"))
 	s.apply_battle_result({"winner": "ally", "allies": [{"id": "a_dan", "hp": 30, "alive": true, "statuses": []}]})
 	_c(s.faith("a_dan") == f0 + data.inum("faith_battle", 5), "출전하면 신앙도 +%d" % data.inum("faith_battle", 5))
@@ -845,7 +849,7 @@ func _test_faith() -> void:
 	var copy := UnitData.new()
 	GameData._copy_props(copy, base)
 	s.apply_to_ally(copy, base)
-	_c(copy.power_bonus >= 1, "신앙 스킬 효과 → 전투 복제본 (위력 +%d)" % copy.power_bonus)
+	_c(_unit_sig(copy) != _unit_sig(copy0), "신앙 스킬 효과 '%s' (%s) → 전투 복제본에 반영" % [lo.name, lo.effect])
 	var sv := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s.to_dict())))
 	_c(sv.faith("a_dan") == s.faith("a_dan") and sv.has_faith_skill("a_dan", lo.id), "저장/불러오기 후 신앙 유지")
 
@@ -876,7 +880,7 @@ func _test_divine() -> void:
 	s.begin_dialogue("npc_hana")
 	s.end_dialogue("npc_hana")
 	_c(s.quest_status("q_hana_secret") == "done" and s.quest_done("quest:q_hana_secret"), "하나와 대화 → 퀘스트 완료")
-	_c(s.is_divine("a_hana") and got == ["a_hana"] and s.divine_god("a_hana").name == battle.gods.terra.name, "퀘스트 완료 → 하나 정체 해금 (테라), 알림 1번")
+	_c(s.is_divine("a_hana") and got == ["a_hana"] and s.divine_god("a_hana").name == battle.gods[battle.divine.a_hana.god].name, "퀘스트 완료 → 하나 정체 해금 (%s), 알림 1번" % battle.gods[battle.divine.a_hana.god].name)
 	var need := int(s.miracle_list("a_hana")[0].need)
 	_c(s.will("a_hana") == int(battle.divine.a_hana.will) and s.miracle_state("a_hana", mid) == "no_faith", "해금 = 시작 의지 %d, 기적은 의지로 (필요 %d → 의지 부족)" % [s.will("a_hana"), need])
 	s.add_faith("a_hana", 100)
@@ -917,7 +921,7 @@ func _test_divine() -> void:
 	_c(UnlockCond.missions(data, battle).size() == data.job_order.size() + battle.stage_order.size() + data.research_order.size() + battle.quests.size() + battle.cutscenes.size(), "미션 목록 = 의뢰 + 전투 스테이지 + 연구 + 퀘스트 + 컷씬")
 	# 처음부터 해금 (데이터는 그대로 두고 복사본으로)
 	var b2 := GameData.load_from()
-	b2.divine["a_kira"] = {"god": "veyra", "unlocked": true, "condition": {"type": "manual", "value": 0}}
+	b2.divine["a_kira"] = {"god": battle.god_order[0], "unlocked": true, "condition": {"type": "manual", "value": 0}}
 	var s3 := BaseSim.create(data, b2)
 	_c(s3.is_divine("a_kira") and s3.divine_state("a_kira") == "unlocked", "'이미 해금됨' = 새 게임부터 기적 탭")
 	var fd := FaithData.read()
@@ -1156,7 +1160,7 @@ func _test_skill_tree_editor() -> void:
 	_c(s3.cstate_of("a_kira").statuses == ["injured"], "전투 끝: 출혈·기절은 사라지고 부상만 기지로 %s" % [s3.cstate_of("a_kira").statuses])
 	# 신앙 데이터 (data/faith.json)
 	var fd := FaithData.read()
-	_c(fd.gods.size() == 4 and fd.skills.size() == 16 and battle.gods.size() == 4, "faith.json: 신 4 · 신앙 스킬 16")
+	_c(fd.gods.size() >= 2 and fd.skills.size() >= 4 and battle.gods.size() == fd.gods.size(), "faith.json: 신 %d · 신앙 스킬 %d" % [fd.gods.size(), fd.skills.size()])
 	_c(FaithData.check(fd, battle.char_faith, battle.actions).errors.is_empty(), "신앙 데이터 검사 오류 없음")
 	var tmpf := "user://faith_test.json"
 	FaithData.write(fd, tmpf)
@@ -1322,4 +1326,13 @@ func _test_editor_history() -> void:
 		p2._hist_apply(snap0)
 		_c(p2.history != null and p2._hist_snap() == snap0, "%s: 뒤로 감기 기록 · 되돌려도 데이터 그대로" % path.get_file())
 		p2.free()
+
+
+## 전투 캐릭터 능력치 한 줄 (스크립트 변수 전부 — 효과가 반영됐는지 비교용)
+func _unit_sig(u: UnitData) -> String:
+	var parts := PackedStringArray()
+	for p in u.get_property_list():
+		if int(p.usage) & PROPERTY_USAGE_SCRIPT_VARIABLE:
+			parts.append("%s=%s" % [p.name, var_to_str(u.get(p.name))])
+	return ";".join(parts)
 
