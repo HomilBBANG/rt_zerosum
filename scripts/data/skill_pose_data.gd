@@ -22,8 +22,9 @@ const POSES := {
 	"tired": {"name": "지침", "when": "디버프·구속이 걸림 · AP 를 다 씀(탈진)"},
 	"dead": {"name": "쓰러짐", "when": "쓰러짐 (그대로 남음)"},
 	"annoying": {"name": "언짢음", "when": "패배 (결과 화면)"},
+	"awkward": {"name": "머쓱함", "when": "대화용 (전투에서 자동으로 안 씀 — 스킬 포즈로 고를 수는 있음)"},
 }
-const POSE_ORDER := ["shot", "slash", "point_up", "hit", "miss", "stun", "tired", "dead", "annoying"]
+const POSE_ORDER := ["shot", "slash", "point_up", "hit", "miss", "stun", "tired", "dead", "annoying", "awkward"]
 
 
 static func pose_name(p: String) -> String:

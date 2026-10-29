@@ -622,7 +622,7 @@ func _test_poses() -> void:
 	for pz in ["point_up", "tired", "annoying"]:
 		_check(ps.has(pz), "니키타 포즈 '%s' 있음" % pz)
 	var hp := CharacterSprite2D.poses("hero2")
-	for pz in ["hit", "miss", "shot", "slash", "tired"]:
+	for pz in ["hit", "miss", "shot", "slash", "tired", "dead", "point_up", "stun", "annoying", "awkward"]:
 		_check(hp.has(pz), "하나 포즈 '%s' 있음" % pz)
 	# 스킬 포즈 규칙 (SkillPoseData)
 	var bc := _make("ally")
