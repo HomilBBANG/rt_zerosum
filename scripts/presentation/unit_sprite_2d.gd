@@ -3,7 +3,8 @@ extends Node2D
 ## 2D 유닛: 캐릭터 프레임 애니메이션(CharacterSprite2D, assets/characters/<id>) 또는 옛 평면 스프라이트
 ## + 구역 마스크 셰이더 + 무기 레이어 + 클릭 영역 + 하이라이트.
 ## 공격·피격·회복·쓰러짐 애니메이션 프레임이 없으면 간단한 이동·흔들림 트윈으로 대신한다.
-## 상황별 포즈(한 장 그림, anim.json "pose": true — tools/char_sprites.py poses): shot 공격 · hit 피격 · miss 회피 · stun 기절 · dead 쓰러짐.
+## 상황별 포즈(한 장 그림, anim.json "pose": true — tools/char_sprites.py poses): shot 공격 · hit 피격 · miss 회피 · stun 기절 · dead 쓰러짐 …
+##   같은 포즈의 다른 그림 <포즈>_2, _3 … 이 있으면 그때마다 무작위로 하나 (pose_variant).
 ##   dead 를 뺀 포즈는 잠깐 바꿔 보여 줌 (play_pose: 캐릭터 가운데 기준 확대 + 살짝 옆에서 가운데로 흐름 → 원래 크기 · idle).
 
 signal clicked(unit: UnitRuntime)
@@ -349,9 +350,20 @@ func has_pose(pose: String) -> bool:
 
 ## 포즈 잠깐 바꾸기 → 끝날 때까지 걸리는 초. o = 연출 값 (BattleView2D 인스펙터 '포즈 연출'):
 ##   zoom 배율(1.2) · zoom_in 확대에 걸리는 초 · time 포즈 유지 초(1.5) · drift 처음 가로 어긋남(px, - = 뒤쪽) · back 원래로 돌아오는 초
+## 같은 포즈의 다른 그림(<포즈>_2, _3 … 폴더)이 있으면 그중 무작위 하나
+func pose_variant(pose: String) -> String:
+	var vs: Array[String] = [pose]
+	var k := 2
+	while has_pose("%s_%d" % [pose, k]):
+		vs.append("%s_%d" % [pose, k])
+		k += 1
+	return vs[randi() % vs.size()]
+
+
 func play_pose(pose: String, o: Dictionary = {}) -> float:
 	if not has_pose(pose) or not unit.alive:
 		return 0.0
+	pose = pose_variant(pose)
 	var k := float(o.get("zoom", 1.2))
 	var t_in := float(o.get("zoom_in", 0.15))
 	var t_hold := float(o.get("time", 1.5))

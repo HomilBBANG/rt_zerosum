@@ -581,6 +581,7 @@ func _on_unit_moved(unit: UnitRuntime, _from_key: String, _to_key: String) -> vo
 	var s := sprite_of(unit)
 	_begin_busy()
 	s.play_move_steps()
+	s.play_pose("move", pose_opts())   # 자리 이동 포즈 (그림이 있으면, 기다리지 않음)
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(s, "position", unit_position(unit), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
@@ -598,6 +599,7 @@ func _on_units_swapped(a: UnitRuntime, b: UnitRuntime) -> void:
 	_begin_busy()
 	sa.play_move_steps()
 	sb.play_move_steps(0.09)   # 두 사람 발소리가 겹치지 않게 살짝 늦게
+	sa.play_pose("move", pose_opts())   # 자리를 바꾸자고 한 쪽만 (그림이 있으면, 기다리지 않음)
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(sa, "position", unit_position(a), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)

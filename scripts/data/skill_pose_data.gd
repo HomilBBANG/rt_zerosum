@@ -7,7 +7,8 @@ extends RefCounted
 ## 자동 (쓰는 쪽): 다른 편에게 쓰는 피해·상태 스킬 = shot (근접 무기를 들고 있으면 slash, 없으면 shot), 그 밖의 스킬(회복·AP·버프·자기 대상) = point_up.
 ## 맞는 쪽: 피함 = miss · 기절 걸림 = stun · 디버프(부정 상태 이상, 구속 포함) 걸림 = tired · 피해 = hit (앞에 것이 먼저).
 ## 그 밖: AP 를 다 씀(탈진) = tired · 쓰러짐 = dead · 패배 = annoying (결과 화면).
-## 그 캐릭터에게 그 포즈 그림이 없으면 다음 후보(맞는 쪽은 hit), 그것도 없으면 예전 동작.
+## 그 캐릭터에게 그 포즈 그림이 없으면 다음 후보(맞는 쪽은 hit), 그것도 없으면 예전 동작. 자리 이동 = move.
+## 같은 포즈의 다른 그림 <포즈>_2, _3 … 이 있으면 그때마다 무작위 (UnitSprite2D.pose_variant).
 
 const PATH := "res://data/skill_poses.json"
 const NONE := "none"
@@ -22,13 +23,20 @@ const POSES := {
 	"tired": {"name": "지침", "when": "디버프·구속이 걸림 · AP 를 다 씀(탈진)"},
 	"dead": {"name": "쓰러짐", "when": "쓰러짐 (그대로 남음)"},
 	"annoying": {"name": "언짢음", "when": "패배 (결과 화면)"},
+	"move": {"name": "자리 이동", "when": "자리 이동 · 자리 교체할 때 (자동)"},
 	"awkward": {"name": "머쓱함", "when": "대화용 (전투에서 자동으로 안 씀 — 스킬 포즈로 고를 수는 있음)"},
 }
-const POSE_ORDER := ["shot", "slash", "point_up", "hit", "miss", "stun", "tired", "dead", "annoying", "awkward"]
+const POSE_ORDER := ["shot", "slash", "point_up", "hit", "miss", "stun", "tired", "dead", "annoying", "move", "awkward"]
 
 
+## 표시 이름 — 같은 포즈의 다른 그림(hit_2)은 "피격 2"
 static func pose_name(p: String) -> String:
-	return str(POSES.get(p, {}).get("name", p))
+	if POSES.has(p):
+		return str(POSES[p].name)
+	var i := p.rfind("_")
+	if i > 0 and p.substr(i + 1).is_valid_int() and POSES.has(p.substr(0, i)):
+		return "%s %s" % [POSES[p.substr(0, i)].name, p.substr(i + 1)]
+	return p
 
 
 static func read(path: String = PATH) -> Dictionary:
