@@ -1645,7 +1645,7 @@ func _build_faith_box() -> Control:
 			fsel = ""
 			_mark()
 			_rebuild()))
-	sc.add_child(_small("게임: 그 신을 믿는 대원만 배울 수 있음 · 신앙도(0~%d)가 필요 신앙도 이상이면 포인트 없이 배움 (모자라면 회색 + '신앙 부족') · 출전마다 신앙도 + (기지 설정 faith_battle)" % FaithData.FAITH_MAX))
+	sc.add_child(_small("게임: 그 신을 믿는 대원만 배울 수 있음 · 신앙도(0~%d)가 필요 신앙도 이상이면 포인트 없이 배움 (모자라면 회색 + '신앙 부족') · 신앙도는 퀘스트 보상 · 컷씬 행동 · 요청 수락으로 오름 (출전으로는 안 오름) · 무신앙 대원은 신앙도가 안 쌓이고 신앙 스킬도 없음" % FaithData.FAITH_MAX))
 	return box
 
 
@@ -1874,7 +1874,8 @@ func _believer_rows() -> void:
 		o.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_child(o)
 		var sp := _spin(0, FaithData.FAITH_MAX, 1, int(cf.faith), "")
-		sp.tooltip_text = "시작 신앙도 (출전마다 + 기지 설정 faith_battle)"
+		sp.tooltip_text = "시작 신앙도 (그 뒤 퀘스트 보상 · 컷씬 행동 · 요청 수락으로 오름)" if str(cf.god) != "" else "무신앙 — 신앙도가 쌓이지 않음"
+		sp.editable = str(cf.god) != ""
 		sp.value_changed.connect(func(v):
 			if not _rebuilding:
 				cf.faith = int(v)

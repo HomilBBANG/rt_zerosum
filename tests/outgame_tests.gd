@@ -844,7 +844,23 @@ func _test_faith() -> void:
 	s.apply_to_ally(copy0, base0)
 	_c(s.learn_faith_skill("a_dan", lo.id).ok and s.has_faith_skill("a_dan", lo.id), "신앙도 충분하면 배움 (포인트 안 씀, 스킬 포인트 %d)" % s.skill_points("a_dan"))
 	s.apply_battle_result({"winner": "ally", "allies": [{"id": "a_dan", "hp": 30, "alive": true, "statuses": []}]})
-	_c(s.faith("a_dan") == f0 + data.inum("faith_battle", 5), "출전하면 신앙도 +%d" % data.inum("faith_battle", 5))
+	_c(s.faith("a_dan") == f0, "출전해도 신앙도는 그대로 (퀘스트·대화·이벤트로만)")
+	# 신앙도가 오르는 곳: 컷씬 행동 · 요청 수락 (퀘스트 보상은 [34c])
+	var r_ev := s.apply_cutscene_action({"do": "faith", "target": "npc_dan", "value": 7})
+	_c(r_ev.ok and s.faith("a_dan") == f0 + 7, "컷씬 행동 '신앙도 +7' → %s" % r_ev.msg)
+	data.requests["req_faith_test"] = {"id": "req_faith_test", "npc": "npc_dan", "start_day": "", "dialogue": "", "accept_dialogue": "", "effect": "신앙:4", "desc": ""}
+	var r_rq := s.accept_request("req_faith_test")
+	data.requests.erase("req_faith_test")
+	_c(r_rq.ok and s.faith("a_dan") == f0 + 11 and "신앙도 +4" in str(r_rq.msg), "요청 수락효과 '신앙:4' → 신앙도 +4 (%s)" % r_rq.msg)
+	# 무신앙: 신앙도가 안 쌓이고 신앙 스킬도 없음
+	var b3 := GameData.load_from()
+	b3.char_faith["a_kira"] = {"god": "", "faith": 30}
+	var s4 := BaseSim.create(data, b3)
+	var k0 := s4.faith("a_kira")
+	_c(s4.faithless("a_kira") and s4.faith_skill_list("a_kira").is_empty() and s4.god_info("a_kira").is_empty(), "무신앙: 신앙 스킬 비어 있음")
+	_c(s4.add_faith("a_kira", 20, "테스트") == 0 and s4.faith("a_kira") == k0, "무신앙: 신앙도가 쌓이지 않음")
+	var r_nf := s4.apply_cutscene_action({"do": "faith", "target": "npc_kira", "value": 5})
+	_c(not r_nf.ok and "믿음이 없" in str(r_nf.msg), "무신앙에게 신앙도 행동 → '%s'" % r_nf.msg)
 	var base: UnitData = GameData._find(battle.allies, "a_dan")
 	var copy := UnitData.new()
 	GameData._copy_props(copy, base)
@@ -968,6 +984,7 @@ func _test_quests() -> void:
 	_c(s.quest_status("q_rohan_lab") == "done" and done == ["q_rohan_lab"], "로한과 대화 → 완료 (알림 1번)")
 	_c(s.ledger.pending_total() == pend + int(qs[1].rewards.cash), "보상 현금 $%d → 주간 결산 대기" % int(qs[1].rewards.cash))
 	_c(float(s.cstate(s.npcs.npc_rohan).affinity) >= aff0 + float(qs[1].rewards.affinity), "보상 친밀도 → 의뢰인 로한")
+	_c(int(qs[1].rewards.faith) == 5 and s.faith("a_ethan") == int(battle.char_faith.a_ethan.faith) + 5, "보상 신앙도 +5 → 받는 대원 이선 (의뢰인 로한은 전투 캐릭터가 아님)")
 	# 횟수 단계는 그 단계가 시작된 뒤부터 셈
 	var b2 := GameData.load_from()
 	b2.quests = [{"id": "q_t", "name": "테스트", "giver": "", "desc": "", "start": {"type": "manual", "value": 0, "target": ""},

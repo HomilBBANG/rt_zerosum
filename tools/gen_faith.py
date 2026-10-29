@@ -16,7 +16,7 @@ GODS = [
     ["noct", "밤의 여신 녹트", "#8f7bff", "그림자와 은밀함의 신 — 속도·AP (임시)"],
     ["terra", "대지모 테라", "#5fd38a", "땅과 수호의 신 — 방어·체력 (임시)"],
 ]
-# 누가 어느 신을 믿는지 · 시작 신앙도 (0~100, 출전마다 + 기지 설정 faith_battle)
+# 누가 어느 신을 믿는지 · 시작 신앙도 (0~100, 그 뒤 퀘스트 보상 · 컷씬 행동 · 요청 수락으로 오름, 무신앙 = 안 쌓임)
 BELIEVERS = {"a_dan": {"god": "veyra", "faith": 30}, "a_kira": {"god": "noct", "faith": 20}, "a_ethan": {"god": "solus", "faith": 40},
              "a_hana": {"god": "terra", "faith": 10}, "a_alma": {"god": "solus", "faith": 50}, "a_nikita": {"god": "noct", "faith": 25}}
 # [임시] 신 해금 캐릭터: 정체가 신 — 조건을 채우면 신앙 탭이 '기적' 으로 / 그 캐릭터만의 기적 (필요 의지 — 해금될 때 시작 의지, 출전마다 + will_battle)

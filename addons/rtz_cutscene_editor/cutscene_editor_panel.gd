@@ -336,6 +336,14 @@ func _action_targets(d: String) -> Array:
 			if od != null:
 				for id in od.npc_order:
 					out.append([id, str(od.npcs[id].name)])
+		"faith":   # 전투 캐릭터인 대원만 (무신앙이면 게임에서 안 쌓임)
+			if od != null:
+				for id in od.npc_order:
+					var ch := str(od.npcs[id].get("character_id", ""))
+					if ch == "":
+						continue
+					var g := str(gd.char_faith.get(ch, {}).get("god", "")) if gd != null else ""
+					out.append([id, "%s%s" % [od.npcs[id].name, " (무신앙 — 안 쌓임)" if g == "" else ""]])
 	return out
 
 
@@ -778,7 +786,7 @@ func _step_card(c: Dictionary, i: int) -> Control:
 				st.do = str(nv)
 				var ts := _action_targets(str(nv))
 				st.target = str(ts[0][0]) if not ts.is_empty() else ""
-				st.value = 5 if str(nv) == "affinity" else (50 if str(nv) == "cash" else 0)
+				st.value = 5 if str(nv) in ["affinity", "faith"] else (50 if str(nv) == "cash" else 0)
 				_mark()
 				_rebuild()))
 			if st.do == "cash":
@@ -788,8 +796,10 @@ func _step_card(c: Dictionary, i: int) -> Control:
 				_row(g, "대상", _option(_action_targets(st.do), st.target, func(nv):
 					st.target = str(nv)
 					_mark()))
-			if st.do in ["affinity", "cash"]:
-				var sp := _spin(-50 if st.do == "affinity" else -9999, 50 if st.do == "affinity" else 9999, 1, int(st.value), "" if st.do == "affinity" else " $")
+			if st.do in ["affinity", "faith", "cash"]:
+				var lo := -9999 if st.do == "cash" else -50
+				var hi := 9999 if st.do == "cash" else (100 if st.do == "faith" else 50)
+				var sp := _spin(lo, hi, 1, int(st.value), " $" if st.do == "cash" else "")
 				sp.value_changed.connect(func(nv):
 					if not _rebuilding:
 						st.value = int(nv)

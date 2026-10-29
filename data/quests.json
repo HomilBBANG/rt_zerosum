@@ -24,7 +24,7 @@
 				{"kind": "research", "target": "res_shotgun", "count": 1, "desc": "산탄총 설계 연구 끝내기"},
 				{"kind": "talk", "target": "npc_rohan", "count": 1, "desc": "로한에게 결과 듣기"}
 			],
-			"rewards": {"cash": 40, "affinity": 5}
+			"rewards": {"cash": 40, "affinity": 5, "faith": 5, "faith_char": "a_ethan"}
 		}
 	]
 }

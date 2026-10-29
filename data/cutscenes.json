@@ -277,6 +277,12 @@
 					"do": "affinity",
 					"target": "npc_nikita",
 					"value": 3
+				},
+				{
+					"type": "action",
+					"do": "faith",
+					"target": "npc_nikita",
+					"value": 5
 				}
 			]
 		},

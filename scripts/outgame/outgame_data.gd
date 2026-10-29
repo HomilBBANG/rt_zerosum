@@ -183,8 +183,12 @@ func _validate() -> void:
 		var q: Dictionary = requests[id]
 		if not npcs.has(q.npc):
 			warnings.append("요청 %s: 대원 시트에 없는 '%s'" % [id, q.npc])
-		if q.effect.begins_with("의뢰:") and not jobs.has(q.effect.substr(3).strip_edges()):
-			warnings.append("요청 %s: 의뢰 시트에 없는 '%s'" % [id, q.effect.substr(3)])
+		for part in str(q.effect).split(",", false):   # 수락효과: 의뢰:id · 신앙:n (여러 개는 ,)
+			part = part.strip_edges()
+			if part.begins_with("의뢰:") and not jobs.has(part.substr(3).strip_edges()):
+				warnings.append("요청 %s: 의뢰 시트에 없는 '%s'" % [id, part.substr(3)])
+			elif part.begins_with("신앙:") and not part.substr(3).strip_edges().is_valid_int():
+				warnings.append("요청 %s: 수락효과 '%s' — 신앙: 뒤에는 숫자" % [id, part])
 
 
 # ---------------------------------------------------------------- 설정값

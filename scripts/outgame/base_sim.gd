@@ -559,10 +559,18 @@ func accept_request(rid: String) -> Dictionary:
 		_add_affinity(npcs[q.npc], data.num("affinity_request", 5.0))
 	var eff: String = q.effect
 	var msg := "요청 수락"
-	if eff.begins_with("의뢰:"):
-		var cid := eff.substr(3).strip_edges()
-		opened_contracts[cid] = true
-		msg = "요청 수락 — 의뢰 '%s' 이(가) 열렸습니다" % data.jobs.get(cid, {}).get("name", cid)
+	# 수락효과: "의뢰:의뢰 id" · "신앙:5"(그 대원 신앙도 +5) — 여러 개는 , 로
+	for part in eff.split(",", false):
+		part = part.strip_edges()
+		if part.begins_with("의뢰:"):
+			var cid := part.substr(3).strip_edges()
+			opened_contracts[cid] = true
+			msg = "요청 수락 — 의뢰 '%s' 이(가) 열렸습니다" % data.jobs.get(cid, {}).get("name", cid)
+		elif part.begins_with("신앙:"):
+			var ch := str(data.npcs.get(q.npc, {}).get("character_id", ""))
+			if ch != "":
+				var want := int(part.substr(3).strip_edges())
+				msg += " · " + _faith_text(ch, add_faith(ch, want, "요청 수락"), want)
 	_log("%s 의 요청 수락 (%s)" % [data.npc_name(q.npc), rid])
 	return {"ok": true, "msg": msg, "lines": data.dialogues.get(q.accept_dialogue, [])}
 
@@ -1154,19 +1162,39 @@ func faith_max() -> int:
 	return 100
 
 
-func add_faith(cid: String, v: int) -> void:
+## 신앙도 올리기 (퀘스트 보상 · 컷씬 행동 · 요청 수락 — 전투 출전으로는 안 오름).
+## 믿는 신이 없으면(무신앙) 안 쌓이고, 정체가 신이면 신앙도 대신 의지. 반환 = 실제로 바뀐 양. why = 기록에 남길 까닭
+func add_faith(cid: String, v: int, why: String = "") -> int:
+	if battle == null or is_divine(cid):
+		return 0   # 신은 신앙 스킬 대신 기적 (의지)
+	var g := god_of(cid)
+	if g == "":
+		return 0   # 무신앙: 신앙도가 쌓이지 않음
 	var p := _prog(cid)
 	var before := int(p.faith)
 	p.faith = clampi(before + v, 0, faith_max())
+	var gained := int(p.faith) - before
+	if gained != 0 and why != "":
+		_log("%s 신앙도 %+d → %d (%s)" % [_char_label(cid), gained, int(p.faith), why])
 	check_divine()
-	if is_divine(cid):
-		return   # 신은 신앙 스킬 대신 기적 (의지)
-	var g := god_of(cid)
-	if g == "":
-		return
 	for fs in battle.faith_skills.get(g, []):
 		if before < int(fs.need) and int(p.faith) >= int(fs.need):
 			_log("%s 신앙도 %d — 신앙 스킬 '%s' 을(를) 배울 수 있습니다" % [_char_label(cid), p.faith, fs.name])
+	return gained
+
+
+## 믿는 신이 없나 (무신앙 — 신 해금으로 정체가 드러난 신은 아님)
+func faithless(cid: String) -> bool:
+	return god_of(cid) == "" and not is_divine(cid)
+
+
+## 신앙도 보상 결과 글 ("하나 신앙도 +5" / "키라 — 믿음이 없어 신앙도가 쌓이지 않음")
+func _faith_text(cid: String, gained: int, want: int) -> String:
+	if is_divine(cid):
+		return "%s — 신이라 신앙도 대신 의지" % _char_label(cid)
+	if god_of(cid) == "":
+		return "%s — 믿음이 없어 신앙도가 쌓이지 않음" % _char_label(cid)
+	return "%s 신앙도 %+d" % [_char_label(cid), gained if gained != 0 else want]
 
 
 ## 이 캐릭터가 믿는 신의 신앙 스킬 (필요 신앙도 순)
@@ -1426,6 +1454,12 @@ func update_quests() -> void:
 	_questing = false
 
 
+## 퀘스트 신앙도 보상을 받는 전투 캐릭터 ("" = 없음) — faith_char 가 비면 의뢰인
+func quest_faith_char(q: Dictionary) -> String:
+	var fc := str(q.get("rewards", {}).get("faith_char", ""))
+	return fc if fc != "" else _giver_char(q)
+
+
 func _complete_quest(q: Dictionary) -> void:
 	var qs: Dictionary = quests[q.id]
 	qs.state = "done"
@@ -1439,6 +1473,9 @@ func _complete_quest(q: Dictionary) -> void:
 	if int(rw.affinity) != 0 and giver != null:
 		_add_affinity(giver, float(rw.affinity))
 		got.append("%s 친밀도 %+d" % [giver.name, int(rw.affinity)])
+	var fc := quest_faith_char(q)
+	if int(rw.get("faith", 0)) != 0 and fc != "":
+		got.append(_faith_text(fc, add_faith(fc, int(rw.faith), "퀘스트 '%s'" % q.name), int(rw.faith)))
 	_log("◆ 퀘스트 완료: %s%s" % [q.name, " — 보상 " + ", ".join(got) if not got.is_empty() else ""])
 	quest_completed.emit(q.id)
 	trigger_cutscenes("quest_done", q.id)
@@ -1534,6 +1571,12 @@ func apply_cutscene_action(st: Dictionary) -> Dictionary:
 				return _fail("없는 대원")
 			_add_affinity(n, float(v))
 			return {"ok": true, "msg": "%s 친밀도 %+d" % [n.name, v]}
+		"faith":
+			var fn: NpcAgent = npcs.get(t)
+			if fn == null or fn.character_id == "":
+				return _fail("전투 캐릭터가 아닌 대원")
+			var gained := add_faith(fn.character_id, v, "이벤트")
+			return {"ok": gained != 0, "msg": _faith_text(fn.character_id, gained, v)}
 		"cash":
 			var key := "cutscene:%s:%d" % [t, _minute]
 			ledger.add_pending(key, "event", v, t, "이벤트 (%s)" % (t if t != "" else "컷씬"), week_now())
@@ -2229,7 +2272,6 @@ func apply_battle_result(result: Dictionary) -> void:
 		cs.fatigue = clampf(float(cs.fatigue) + data.num("fatigue_battle", 20.0), 0.0, 100.0)
 		var gain := data.inum("xp_win", 100) if str(result.get("winner", "")) == "ally" else data.inum("xp_lose", 40)
 		var ups := add_xp(cid, gain)
-		add_faith(cid, data.inum("faith_battle", 5))
 		add_will(cid, data.inum("will_battle", 5))   # 신 캐릭터만
 		growth.append({"id": cid, "name": _char_label(cid), "xp": gain, "level": char_level(cid), "ups": ups})
 		lines.append("%s HP %d/%d%s" % [_char_label(cid), floori(float(cs.hp)), char_max_hp(cid), " 부상" if "injured" in sts else ""])

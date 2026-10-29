@@ -2,7 +2,8 @@
 class_name QuestData
 extends RefCounted
 ## 퀘스트 (data/quests.json, Godot 에디터 상단 '퀘스트' 탭에서 편집).
-## 퀘스트 = {id, name, giver(의뢰인 대원 npc id, "" = 없음), desc, start(시작 조건 UnlockCond), steps[단계], rewards{cash, affinity}}
+## 퀘스트 = {id, name, giver(의뢰인 대원 npc id, "" = 없음), desc, start(시작 조건 UnlockCond), steps[단계], rewards{cash, affinity, faith, faith_char}}
+## 보상: cash = 현금(주간 결산) · affinity = 의뢰인 친밀도 · faith = 신앙도 (faith_char = 받는 전투 캐릭터 id, "" = 의뢰인 — 무신앙이면 안 쌓임)
 ## 단계 = {kind, target, count, desc} — 앞 단계부터 하나씩. 진행은 BaseSim (start_quest · quest_state · update_quests).
 ##   횟수 단계(의뢰 완료 · 전투 승리 · 대화)는 그 단계가 시작된 뒤부터 셈 / 상태 단계(연구 · 친밀도 · 레벨 · 일차 · 다른 퀘스트)는 그때 맞으면 바로 완료
 ## 시작 조건: 처음부터 / 직접(이벤트·대사에서 BaseSim.start_quest) / 미션 완료(의뢰·전투·연구·다른 퀘스트) / 의뢰인 레벨·신앙도·친밀도 / n일차
@@ -19,7 +20,7 @@ const VALUED := ["affinity", "level", "day"]
 
 static func new_quest(id: String) -> Dictionary:
 	return {"id": id, "name": "새 퀘스트", "giver": "", "desc": "", "start": {"type": "always", "value": 0, "target": ""},
-		"steps": [new_step("contract")], "rewards": {"cash": 0, "affinity": 0}}
+		"steps": [new_step("contract")], "rewards": {"cash": 0, "affinity": 0, "faith": 0, "faith_char": ""}}
 
 
 static func new_step(kind: String) -> Dictionary:
@@ -50,7 +51,8 @@ static func read(path: String = PATH) -> Array:
 		var rw: Dictionary = q.get("rewards", {}) if q.get("rewards") is Dictionary else {}
 		out.append({"id": str(q.get("id", "")), "name": str(q.get("name", "")), "giver": str(q.get("giver", "")), "desc": str(q.get("desc", "")),
 			"start": UnlockCond.norm(q.get("start", {"type": "always"})), "steps": steps,
-			"rewards": {"cash": maxi(0, int(rw.get("cash", 0))), "affinity": int(rw.get("affinity", 0))}})
+			"rewards": {"cash": maxi(0, int(rw.get("cash", 0))), "affinity": int(rw.get("affinity", 0)),
+				"faith": int(rw.get("faith", 0)), "faith_char": str(rw.get("faith_char", ""))}})
 	return out
 
 
@@ -166,6 +168,13 @@ static func check(quests: Array, od: OutgameData, gd: GameData) -> Dictionary:
 				errors.append("%s: 시작 조건이 자기 자신 완료" % where)
 			elif tg == "":
 				errors.append("%s: 시작 조건 '미션 완료' 인데 미션이 없습니다" % where)
+		var rw: Dictionary = q.rewards
+		if int(rw.get("faith", 0)) != 0:
+			var fc := str(rw.get("faith_char", ""))
+			if fc == "" and (str(q.giver) == "" or od == null or str(od.npcs.get(q.giver, {}).get("character_id", "")) == ""):
+				errors.append("%s: 신앙도 보상을 받을 대원이 없습니다 (의뢰인이 없거나 전투 캐릭터가 아님 — 받는 대원을 고르세요)" % where)
+			elif fc != "" and gd != null and not gd.allies.any(func(u): return u.id == fc):
+				errors.append("%s: 신앙도 보상 — 없는 캐릭터 '%s'" % [where, fc])
 		if sc.type == "manual":
 			notes.append("%s: 직접 시작 — 이벤트·대사에서 BaseSim.start_quest('%s') 를 불러야 시작" % [where, q.id])
 		for i in (q.steps as Array).size():

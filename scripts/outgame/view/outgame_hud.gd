@@ -739,7 +739,7 @@ func open_facility(fid: String) -> void:
 # ---------------------------------------------------------------- 스킬 창 (캐릭터마다 액티브 · 패시브 · 신앙)
 const SKILL_MODES := [["active", "액티브 스킬"], ["passive", "패시브 스킬"], ["faith", "신앙 스킬"]]
 const SKILL_MODE_HINT := {"active": "전투에서 쓰는 스킬을 강화 · 새 스킬도 배움", "passive": "늘 적용되는 능력치 (체력·속도·AP·방어·위력)",
-	"faith": "믿는 신에 따라 배울 수 있는 스킬이 다름", "miracle": "정체가 신 — 의지로 기적을 일으킴 (그 캐릭터만의 기적)"}
+	"faith": "믿는 신에 따라 배울 수 있는 스킬이 다름 · 신앙도는 퀘스트·대화·이벤트로", "miracle": "정체가 신 — 의지로 기적을 일으킴 (그 캐릭터만의 기적)"}
 
 
 ## cid = "" 이면 첫 대원. 왼쪽: 대원 목록 (위아래 스크롤) / 위: 액티브 · 패시브 · 신앙 탭
@@ -911,10 +911,14 @@ func _faith_page(row: HBoxContainer, cid: String) -> void:
 	head.add_child(hc)
 	hc.add_child(_label(unit.display_name, 22, GOLD))
 	hc.add_child(_label("%s · Lv%d" % [unit.role, sim.char_level(cid)], 15, Color(0.85, 0.9, 1)))
-	hc.add_child(_label("신앙도 %d" % sim.faith(cid), 17, gcol))
-	info.add_child(_gauge("신앙도", float(sim.faith(cid)), float(sim.faith_max()), gcol, "%d / %d" % [sim.faith(cid), sim.faith_max()]))
-	info.add_child(_label("출전할 때마다 신앙도 +%d" % sim.data.inum("faith_battle", 5), 12, Color(0.7, 0.75, 0.85)))
-	info.add_child(_label("신앙 스킬은 포인트 없이 배움 (임시 데이터)", 12, Color(0.7, 0.75, 0.85)))
+	if gi.is_empty():   # 무신앙: 신앙도가 쌓이지 않고 신앙 스킬도 없음
+		hc.add_child(_label("믿음이 없습니다.", 17, Color(0.8, 0.82, 0.88)))
+		info.add_child(_label("믿는 신이 없어 신앙도가 쌓이지 않고 배울 신앙 스킬도 없습니다.", 13, Color(0.75, 0.78, 0.85)))
+	else:
+		hc.add_child(_label("신앙도 %d" % sim.faith(cid), 17, gcol))
+		info.add_child(_gauge("신앙도", float(sim.faith(cid)), float(sim.faith_max()), gcol, "%d / %d" % [sim.faith(cid), sim.faith_max()]))
+		info.add_child(_label("신앙도는 퀘스트 · 대화 · 이벤트로 오름", 12, Color(0.7, 0.75, 0.85)))
+		info.add_child(_label("신앙 스킬은 포인트 없이 배움 (임시 데이터)", 12, Color(0.7, 0.75, 0.85)))
 	var learned := sim.faith_skill_list(cid).filter(func(fs): return sim.has_faith_skill(cid, fs.id))
 	info.add_child(_label("배운 신앙 스킬", 15, Color(1, 0.95, 0.75)))
 	if learned.is_empty():
@@ -931,7 +935,16 @@ func _faith_page(row: HBoxContainer, cid: String) -> void:
 	var cv := _vbox(4)
 	card.add_child(cv)
 	if gi.is_empty():
-		cv.add_child(_label("무신앙 — 믿는 신이 없습니다", 18, Color(0.8, 0.82, 0.88)))
+		cv.add_child(_label("믿음이 없습니다.", 24, Color(0.85, 0.87, 0.92)))
+		cv.add_child(_label("믿는 신이 없어 신앙 스킬이 비어 있습니다. 신앙도도 쌓이지 않습니다.", 14, Color(0.75, 0.78, 0.85)))
+		var empty := PanelContainer.new()
+		empty.custom_minimum_size = Vector2(740, 200)
+		empty.add_theme_stylebox_override("panel", _panel_style(Color(0.1, 0.1, 0.12, 0.6), Color(0.3, 0.31, 0.35), 10))
+		var el := _label("신앙 스킬 없음", 18, Color(0.5, 0.52, 0.58))
+		el.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		el.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		empty.add_child(el)
+		right.add_child(empty)
 		return
 	var gh := _hbox(12)
 	cv.add_child(gh)
@@ -1509,6 +1522,9 @@ func _quest_card(q: Dictionary, names: Dictionary, open: bool) -> Control:
 			got.append("$%d" % int(rw.cash))
 		if int(rw.affinity) != 0 and not giver.is_empty():
 			got.append("%s 친밀도 %+d" % [giver.name, int(rw.affinity)])
+		var fc := sim.quest_faith_char(q)
+		if int(rw.get("faith", 0)) != 0 and fc != "":
+			got.append("%s 신앙도 %+d%s" % [_char_name(fc), int(rw.faith), " (믿음이 없어 안 쌓임)" if sim.faithless(fc) else ""])
 		for cid in _quest_divine(q.id):
 			got.append("??? (%s의 비밀)" % _char_name(cid) if not sim.is_divine(cid) else "✦ %s의 정체" % _char_name(cid))
 		if not got.is_empty():

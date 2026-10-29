@@ -4,7 +4,7 @@ extends RefCounted
 ## 컷씬 (data/cutscenes.json, Godot 에디터 상단 '컷씬' 탭에서 편집). 재생은 CutscenePlayer, 언제 나오는지는 BaseSim (계기 trigger → 대기열).
 ## 컷씬 = {id, name, kind(분류), trigger{type, target, value}, once(한 번만), next(끝나면 이어질 컷씬 id), steps[컷]}
 ## 컷 종류: say 대사(말하는 대원 · 표시 이름 · 왼쪽/오른쪽 서기) / narration 나레이션 / cg 이미지 CG(image "" = 끄기, 글은 아래 상자) /
-##   bg 배경(image "" = 기지 화면 어둡게) / choice 선택지(고른 것의 next 컷씬으로 이어짐, "" = 끝) / action 행동(퀘스트 시작 · 신 정체 해금 · 친밀도 · 현금)
+##   bg 배경(image "" = 기지 화면 어둡게) / choice 선택지(고른 것의 next 컷씬으로 이어짐, "" = 끝) / action 행동(퀘스트 시작 · 신 정체 해금 · 친밀도 · 신앙도 · 현금)
 ## 이어지기: 컷씬 끝 → next, 선택지 → 그 선택지의 next. 이어진 컷씬도 '본 컷씬' 으로 기록 (퀘스트 단계 '컷씬 보기', 미션 'cutscene:id').
 ## 이미지는 assets/cg/ 의 PNG (1280x720 권장, 원본 PNG 를 바로 읽어서 임포트 전에 넣어도 보임).
 
@@ -17,8 +17,8 @@ const TRIGGERS := {"none": "없음 (이어지기·직접 재생만)", "new_game"
 const TRIGGER_ORDER := ["none", "new_game", "quest_start", "quest_step", "quest_done", "talk", "overhear", "day", "divine", "battle_win"]
 const STEP_TYPES := {"say": "대사", "narration": "나레이션", "cg": "CG", "bg": "배경", "choice": "선택지", "action": "행동"}
 const STEP_ORDER := ["say", "narration", "cg", "bg", "choice", "action"]
-const ACTIONS := {"start_quest": "퀘스트 시작", "unlock_divine": "신 정체 해금", "affinity": "대원 친밀도 +/-", "cash": "현금 (주간 결산 때)"}
-const ACTION_ORDER := ["start_quest", "unlock_divine", "affinity", "cash"]
+const ACTIONS := {"start_quest": "퀘스트 시작", "unlock_divine": "신 정체 해금", "affinity": "대원 친밀도 +/-", "faith": "대원 신앙도 +/- (무신앙이면 안 쌓임)", "cash": "현금 (주간 결산 때)"}
+const ACTION_ORDER := ["start_quest", "unlock_divine", "affinity", "faith", "cash"]
 const SIDES := {"left": "왼쪽", "right": "오른쪽"}
 
 static func new_cutscene(id: String, kind: String = "event") -> Dictionary:
@@ -153,7 +153,7 @@ static func step_text(st: Dictionary, npc_names: Dictionary = {}) -> String:
 		"choice":
 			return "[선택지] %s — %s" % [st.text, " / ".join(PackedStringArray((st.options as Array).map(func(o): return "%s → %s" % [o.text, o.next if str(o.next) != "" else "끝"])))]
 		"action":
-			return "[행동] %s %s%s" % [ACTIONS.get(st.do, st.do), st.target, " %+d" % int(st.value) if st.do in ["affinity", "cash"] else ""]
+			return "[행동] %s %s%s" % [ACTIONS.get(st.do, st.do), st.target, " %+d" % int(st.value) if st.do in ["affinity", "faith", "cash"] else ""]
 	return str(st.type)
 
 
@@ -277,6 +277,9 @@ static func check(cuts: Array, npcs: Dictionary, quests: Array, convs: Array = [
 						"affinity":
 							if not npcs.has(st.target):
 								errors.append("%s: 없는 대원 '%s'" % [w, st.target])
+						"faith":
+							if not npcs.has(st.target) or str(npcs[st.target].get("character_id", "")) == "":
+								errors.append("%s: 신앙도 — 전투 캐릭터가 아닌 대원 '%s'" % [w, st.target])
 	if openings > 1:
 		notes.append("새 게임 시작 컷씬이 %d개 — 목록 순서대로 모두 재생" % openings)
 	return {"errors": errors, "notes": notes}

@@ -388,6 +388,10 @@ func _fill_preview() -> void:
 		got.append("$%d" % int(q.rewards.cash))
 	if int(q.rewards.affinity) != 0 and str(q.giver) != "":
 		got.append("%s 친밀도 %+d" % [_npc_name(str(q.giver)), int(q.rewards.affinity)])
+	if int(q.rewards.get("faith", 0)) != 0:
+		var fc2 := str(q.rewards.get("faith_char", ""))
+		var who2 := _char_name(fc2) if fc2 != "" else _npc_name(str(q.giver))
+		got.append("%s 신앙도 %+d" % [who2, int(q.rewards.faith)])
 	for cid in _divine_of(q.id):
 		got.append("??? (%s의 비밀 — 완료하면 정체 해금)" % _char_name(cid))
 	if not got.is_empty():
@@ -550,6 +554,30 @@ func _build_form() -> void:
 	_row(g3, "의뢰인 친밀도", aff)
 	if int(q.rewards.affinity) != 0 and str(q.giver) == "":
 		form.add_child(_warn("의뢰인이 없으면 친밀도 보상은 안 줌"))
+	var fa := _spin(-50, 100, 1, int(q.rewards.get("faith", 0)), "")
+	fa.value_changed.connect(func(v):
+		if not _rebuilding:
+			q.rewards.faith = int(v)
+			_mark())
+	_row(g3, "신앙도", fa)
+	var who := [["", "의뢰인 (%s)" % (_npc_name(str(q.giver)) if str(q.giver) != "" else "없음")]]
+	if gd != null:
+		for u in gd.allies:
+			who.append([u.id, "%s (%s)" % [u.display_name, u.id]])
+	_row(g3, "신앙도 받는 대원", _option(who, q.rewards.get("faith_char", ""), func(v):
+		q.rewards.faith_char = str(v)
+		_mark()
+		_rebuild()))
+	if int(q.rewards.get("faith", 0)) != 0:
+		var fc := str(q.rewards.get("faith_char", ""))
+		if fc == "" and od != null:
+			fc = str(od.npcs.get(str(q.giver), {}).get("character_id", ""))
+		var fbel: Dictionary = gd.char_faith.get(fc, {}) if gd != null else {}
+		if fc == "":
+			form.add_child(_warn("신앙도를 받을 대원이 없습니다 (의뢰인이 없거나 전투 캐릭터가 아님)"))
+		elif str(fbel.get("god", "")) == "":
+			form.add_child(_warn("%s 는 믿음이 없어(무신앙) 신앙도가 쌓이지 않습니다" % _char_name(fc)))
+	form.add_child(_small("신앙도는 전투 출전으로는 안 오르고 퀘스트 보상 · 컷씬 행동 · 요청 수락(엑셀 요청 시트 수락효과 '신앙:5')으로만 오름. 정체가 드러난 신은 신앙도 대신 의지."))
 
 
 func _step_card(q: Dictionary, i: int) -> Control:
