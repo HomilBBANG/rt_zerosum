@@ -67,6 +67,8 @@ var kit_add: OptionButton
 
 ## 스킬 포즈 (kind == "pose") — data/skill_poses.json {스킬 id: 포즈}
 var spose: Dictionary = {}
+var wpose: Dictionary = {}           # 캐릭터 스프라이트 id → {무기 스프라이트 → 공격 포즈} (같은 파일 "weapons")
+var wpose_box: VBoxContainer
 var pose_skill := ""
 var pose_char := ""
 var pose_box: Control
@@ -286,6 +288,7 @@ func _load() -> void:
 		sdef_sel = sdefs[0].id if not sdefs.is_empty() else ""
 	mdata = MonsterSkillData.read()
 	spose = SkillPoseData.read()
+	wpose = SkillPoseData.read_weapons()
 	if not monsters.has(mon_sel) and not monsters.is_empty():
 		mon_sel = str(monsters.keys()[0])
 	if skill_sel == "" and not actions.is_empty():
@@ -305,7 +308,7 @@ func _save() -> void:
 	var err3 := SkillStatusData.write(sstat)
 	err3 = maxi(err3, MonsterSkillData.write(mdata))
 	err3 = maxi(err3, StatusCatalog.write(sdefs))
-	err3 = maxi(err3, SkillPoseData.write(spose))
+	err3 = maxi(err3, SkillPoseData.write(spose, wpose))
 	if err == OK and err2 == OK and err3 == OK:
 		dirty = false
 		var errs: int = SkillTreeData.check(nodes, allies, actions).errors.size() + FaithData.check(faith, char_faith, actions).errors.size() \
@@ -647,8 +650,11 @@ func _refresh_view() -> void:
 		_show_check(FaithData.check(faith, char_faith, actions))
 		return
 	if kind == "pose":
-		info_label.text = "포즈를 정한 스킬 %d개 (나머지 = 자동) · 포즈 그림이 있는 캐릭터 %d명" % [spose.size(), _pose_chars().size()]
-		_show_check(SkillPoseData.check(spose, actions, _known_poses()))
+		var nw := 0
+		for cid in wpose:
+			nw += (wpose[cid] as Dictionary).size()
+		info_label.text = "포즈를 정한 스킬 %d개 (나머지 = 자동) · 무기별 공격 포즈 %d개 · 포즈 그림이 있는 캐릭터 %d명" % [spose.size(), nw, _pose_chars().size()]
+		_show_check(SkillPoseData.check(spose, actions, _known_poses(), wpose))
 		return
 	if kind == "statusdef":
 		var effs := {}
@@ -2313,19 +2319,81 @@ func _build_pose_box() -> Control:
 	pose_char_opt = OptionButton.new()
 	pose_char_opt.item_selected.connect(func(i):
 		pose_char = str(pose_char_opt.get_item_metadata(i))
-		_fill_pose_gallery())
+		_fill_pose_gallery()
+		_fill_weapon_poses())
 	hr.add_child(pose_char_opt)
 	var sc := ScrollContainer.new()
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	rc.add_child(sc)
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(col)
+	wpose_box = VBoxContainer.new()   # 무기별 공격 포즈 (위) — 바로 보이게
+	col.add_child(wpose_box)
+	col.add_child(HSeparator.new())
 	pose_gallery = GridContainer.new()
 	pose_gallery.columns = 4
 	pose_gallery.add_theme_constant_override("h_separation", 6)
 	pose_gallery.add_theme_constant_override("v_separation", 6)
-	sc.add_child(pose_gallery)
+	col.add_child(pose_gallery)
 	rc.add_child(_small("새 그림: python3 tools/char_sprites.py poses <캐릭터> <포즈>=<그림> … (README '상황별 포즈 그림'). 컷씬 대사에서도 고를 수 있음."))
 	return box
+
+
+## 고른 캐릭터의 무기마다 공격 포즈 고르기 (자동 = <포즈>_<무기> 그림 → shot / slash)
+func _fill_weapon_poses() -> void:
+	for c in wpose_box.get_children():
+		c.queue_free()
+	var u := _unit(pose_char)
+	if u == null:
+		return
+	wpose_box.add_child(_head("%s 의 무기별 공격 포즈" % u.display_name))
+	if u.weapons.is_empty():
+		wpose_box.add_child(_small("무기가 없습니다 (엑셀 캐릭터 시트 '무기' 열)"))
+		return
+	var spr := u.sprite_id
+	var have := CharacterSprite2D.poses(spr)
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 4)
+	wpose_box.add_child(grid)
+	for w in u.weapons:
+		var wk := str(w.get("sprite", w.get("id", "")))
+		var melee := str(w.get("range_type", "ranged")) != "ranged"
+		grid.add_child(_lab("%s (%s)" % [str(w.get("name", wk)), wk]))
+		# 자동일 때 실제로 쓰일 그림
+		var auto_c: Array = ["%s_%s" % ["slash" if melee else "shot", wk], "slash" if melee else "shot", "shot"]
+		var auto_p := ""
+		for c in auto_c:
+			if have.has(c):
+				auto_p = str(c)
+				break
+		var opts := [["", "자동 — %s" % (("%s (%s)" % [SkillPoseData.pose_name(auto_p), auto_p]) if auto_p != "" else "그림 없음 (예전 동작)")]]
+		for pz in _known_poses():
+			if have.has(pz):
+				opts.append([pz, "%s (%s)" % [SkillPoseData.pose_name(pz), pz]])
+		var cur := str((wpose.get(spr, {}) as Dictionary).get(wk, ""))
+		if cur != "" and not have.has(cur):
+			opts.append([cur, "%s (그림 없음)" % cur])
+		var o := _option(opts, cur, func(v):
+			var m: Dictionary = wpose.get_or_add(spr, {})
+			if str(v) == "":
+				m.erase(wk)
+				if m.is_empty():
+					wpose.erase(spr)
+			else:
+				m[wk] = str(v)
+			_mark()
+			_fill_weapon_poses())
+		o.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(o)
+		var shown := cur if cur != "" else auto_p
+		var th := _pose_thumb(spr, shown, shown != "" and have.has(shown), 72)
+		(th.get_child(1) as Label).text = SkillPoseData.pose_name(shown) if shown != "" else "예전 동작"
+		grid.add_child(th)
+	wpose_box.add_child(_small("그 무기를 들고 적에게 공격·상태 스킬을 쓸 때 이 그림. 스킬에 따로 정한 포즈가 있으면 그쪽이 먼저. 컷씬·다른 캐릭터와는 무관."))
 
 
 func _fill_pose_lists() -> void:
@@ -2355,6 +2423,7 @@ func _fill_pose_lists() -> void:
 		if u.id == pose_char:
 			pose_char_opt.select(pose_char_opt.item_count - 1)
 	_fill_pose_gallery()
+	_fill_weapon_poses()
 
 
 ## 고른 캐릭터의 포즈 그림 (작은 그림 + 이름 + 쓰는 때)
@@ -2452,7 +2521,7 @@ func _build_pose_form() -> void:
 
 ## 편집 중인 데이터 전체 (var_to_str — 정수·실수 그대로)
 func _hist_snap() -> String:
-	return var_to_str([nodes, faith, sstat, sdefs, mdata, spose])
+	return var_to_str([nodes, faith, sstat, sdefs, mdata, spose, wpose])
 
 
 func _hist_apply(s: String) -> void:
@@ -2465,5 +2534,6 @@ func _hist_apply(s: String) -> void:
 	StatusCatalog.refresh(sdefs)
 	mdata = v[4]
 	spose = v[5] if v.size() > 5 else spose
+	wpose = v[6] if v.size() > 6 else wpose
 	dirty = true
 	_rebuild()

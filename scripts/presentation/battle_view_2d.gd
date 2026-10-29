@@ -251,6 +251,7 @@ static func zone_for_slot(team: String, row: int) -> String:
 
 func _ready() -> void:
 	skill_poses = SkillPoseData.read()
+	weapon_poses = SkillPoseData.read_weapons()
 	var f := FileAccess.open("res://assets/sprites/manifest.json", FileAccess.READ)
 	manifest = JSON.parse_string(f.get_as_text())
 	set_camera(_camera_dict())
@@ -583,6 +584,7 @@ func clear_slot_markers() -> void:
 # ---------------------------------------------------------------- 컨트롤러 이벤트 → 연출
 ## 스킬마다 쓰는 포즈 (data/skill_poses.json — 에디터 '스킬 트리' 탭 → '스킬 포즈'). 규칙은 SkillPoseData
 var skill_poses: Dictionary = {}
+var weapon_poses: Dictionary = {}   # 캐릭터 · 무기별 공격 포즈 (같은 파일 "weapons")
 
 
 ## 후보 중 그 캐릭터에게 그림이 있는 첫 포즈 ("" = 없음)
@@ -606,7 +608,7 @@ func _on_action_resolved(event: Dictionary) -> void:
 	var tw: Tween = null
 	# 쓰는 쪽: 스킬 포즈 (자동 = 적에게 쓰는 피해·상태 스킬 shot — 근접 무기면 slash, 그 밖 point_up) — 그림이 없으면 공격 애니메이션
 	var tgt: Variant = (event.targets as Array)[0] if not (event.targets as Array).is_empty() else null
-	var cp := _pick_pose(s, SkillPoseData.caster_poses(event.action, actor, tgt, skill_poses))
+	var cp := _pick_pose(s, SkillPoseData.caster_poses(event.action, actor, tgt, skill_poses, weapon_poses))
 	var focused := false   # 카메라 줌은 한 행동에 한 캐릭터 (쓰는 쪽 포즈가 먼저, 없으면 맞는 쪽)
 	if cp != "":
 		until = _pose(s, cp, true)

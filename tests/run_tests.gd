@@ -651,6 +651,16 @@ func _test_poses() -> void:
 	a0.data.weapons = pw
 	a0.weapon_index = 0
 	_check(SkillPoseData.caster_poses(atk, a0, e, {}) == ["shot_pistol", "shot"], "권총을 들면 shot_pistol 먼저 (무기별 그림)")
+	var wtab := {a0.data.sprite_id: {"pistol": "point_up"}}
+	_check(SkillPoseData.caster_poses(atk, a0, e, {}, wtab) == ["point_up", "shot_pistol", "shot"], "캐릭터 · 무기에 정한 공격 포즈가 자동보다 먼저")
+	_check(SkillPoseData.caster_poses(heal, a0, a1, {}, wtab).back() == "point_up" and not SkillPoseData.caster_poses(heal, a0, a1, {}, wtab).has("shot"), "무기별 포즈는 공격에만 (회복은 그대로)")
+	_check(SkillPoseData.caster_poses(atk, a0, e, {"t_pose_atk": "stun"}, wtab)[-1] == "stun", "스킬에 정한 포즈가 무기별 포즈보다 먼저")
+	var tmpw := "user://t_skill_poses_w.json"
+	SkillPoseData.write({}, {"hero2": {"bayonet": "slash", "rifle": ""}}, tmpw)
+	var rw := SkillPoseData.read_weapons(tmpw)
+	_check(rw == {"hero2": {"bayonet": "slash"}}, "무기별 포즈 저장 · 읽기 (빈 값은 안 씀)")
+	var bad2 := SkillPoseData.check({}, bc.actions, [], {"hero2": {"rifle": "__nope"}})
+	_check(Array(bad2.errors).any(func(x): return x.contains("무기별 포즈")), "없는 그림을 정하면 검사 오류")
 	a0.data.weapons = keep_w
 	a0.weapon_index = keep_i
 	var melee := bc.slots.living_units("ally").filter(func(u): return not u.is_ranged_now())
@@ -669,7 +679,7 @@ func _test_poses() -> void:
 	_check(SkillPoseData.target_poses("damage", ["knockback"]) == ["hit"], "넉백(즉시)은 디버프로 안 침 = hit")
 	_check(SkillPoseData.target_poses("", ["regen"]).is_empty(), "버프만 걸림 = 포즈 없음")
 	var tmp := "user://t_skill_poses.json"
-	SkillPoseData.write({"basic_attack": "point_up", "x": ""}, tmp)
+	SkillPoseData.write({"basic_attack": "point_up", "x": ""}, {}, tmp)
 	var rd := SkillPoseData.read(tmp)
 	_check(rd.size() == 1 and rd.basic_attack == "point_up", "스킬 포즈 저장 · 읽기 (빈 값은 안 씀)")
 	_check(SkillPoseData.read().is_empty() or SkillPoseData.read() is Dictionary, "data/skill_poses.json 읽힘")

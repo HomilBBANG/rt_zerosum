@@ -299,6 +299,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   **크기 확인**: `python3 tools/char_sprites.py posecheck <캐릭터> [출력.jpg]` — idle · 걷기 · 뛰기 · 모든 포즈를 게임과 같은 배율 · 같은 발 위치로 한 장에 (초록 선 = 기본 그림 키). 지금 세 캐릭터 모두 기본 그림과 키 ±2% · 눈 사이 폭 ±4% 안 ([니키타](docs/screenshots/posecheck_nikita_army.jpg) · [하나](docs/screenshots/posecheck_hero2.jpg) · [키라](docs/screenshots/posecheck_kira.jpg) · [이선](docs/screenshots/posecheck_ethan.jpg)). 전투에서 포즈가 보일 때 크게 보이는 것은 카메라 줌(1.5배, View 인스펙터 `포즈 연출`) — 줌 없이 보기 `--pose_zoom=1`.
   모든 포즈 같은 배율(`--ref` 그림의 키 = 기본 그림 키), 발 = 선 자세는 발 가운데 · 누운 그림(가로가 긴 그림)은 가운데 아래. 새 이름의 포즈도 그대로 넣으면 에디터 목록에 나옴. 그림이 없는 캐릭터는 예전 연출 그대로.
 - **스킬마다 쓰는 쪽 포즈 = Godot 에디터 `스킬 트리` 탭 → `스킬 포즈`** (`data/skill_poses.json`): 스킬 목록(→ 지금 포즈) · `이 스킬을 쓸 때 포즈`(**자동** · **포즈 없음**(예전 공격 동작) · 포즈 이름) · 캐릭터별 미리보기 · 오른쪽 캐릭터별 포즈 그림 모음. 맞는 쪽 포즈는 상황으로 자동 (위 표).
+- **캐릭터 · 무기별 공격 그림 = 같은 화면 오른쪽 `<캐릭터> 의 무기별 공격 포즈`** (`skill_poses.json` → `weapons`): 캐릭터를 고르면 그 캐릭터의 무기(엑셀 `무기` 열)마다 공격할 때 쓸 그림을 고름 — **자동**(그 무기 이름 그림 `shot_pistol` 같은 것이 있으면 그것, 없으면 원거리 shot / 근접 slash — 실제로 쓰일 그림을 함께 표시) 또는 그 캐릭터에게 있는 아무 포즈. 그 무기를 들고 적에게 공격·상태 스킬을 쓸 때 적용. 우선순위: 스킬에 정한 포즈 → 무기별 포즈 → 자동. 그림이 없는 포즈를 고르면 검사 오류.
   맞는 쪽 우선순위: 피함 miss → 기절 stun → 디버프 tired → 피해 hit (그 캐릭터에게 그림이 없으면 다음 후보). 넉백·끌어당김(즉시 효과)은 디버프로 안 침.
 - **자리 이동 클릭**: 자리 이동 중에는 발밑 파란 표시뿐 아니라 **교체할 대원의 몸을 클릭해도** 그 자리와 바꿈 (바꿀 수 없는 대원은 안내, 자기 자신 클릭 = 취소). ![자리 이동 — 대원 몸 클릭](docs/screenshots/battle_move_click.jpg)
 - **전투 연출 (카메라)**: 잠깐 바꾸는 포즈는 **카메라가 그 캐릭터 가운데로 빠르게(0.15초) 1.5배 줌** (캐릭터 가운데가 아래 HUD 위 화면 가운데쯤 `pose_screen_y` 290px 에 오게) — 캐릭터 크기는 그대로. 처음엔 캐릭터가 화면 가운데보다 **x −5px**(뒤쪽 — 적에게서 먼 쪽)에 있다가 **1.5초 동안 천천히 가운데로** → 끝나면 카메라가 움직이지 않고 **바로 원래 화면**, 캐릭터는 **idle**.
@@ -319,7 +320,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![키라 slash · tired / shot(소총) · shot_pistol(권총)](docs/screenshots/battle_poses_kira2.jpg)
 ![이선 hit · slash / tired · dead](docs/screenshots/battle_poses_ethan.jpg)
 ![패배 결과 화면 — 니키타 · 하나 · 키라 annoying](docs/screenshots/result_lose_poses.jpg)
-![스킬 포즈 에디터 (스킬 트리 탭 → 스킬 포즈)](docs/screenshots/skill_pose_editor.png)
+![스킬 포즈 에디터 (스킬 트리 탭 → 스킬 포즈) — 오른쪽 위 무기별 공격 포즈](docs/screenshots/skill_pose_editor.png)
 
 ## 기지 대원 조명 · 그림자 (실시간)
 기지 대원은 방 프리셋 색을 한 번에 입는 게 아니라 **지금 서 있는 자리에 실제로 닿는 방 스폿 조명**으로 매 프레임 칠합니다 (`BaseView3D.light_probe` → `NpcView`).
