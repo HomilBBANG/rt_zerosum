@@ -263,10 +263,9 @@ func set_highlight(kind: String) -> void:
 
 
 func _draw() -> void:
-	# 바닥 접지 그림자 + 하이라이트 링 (UI 요소: 조명과 무관한 색)
+	# 하이라이트 링 (UI 요소: 조명과 무관한 색). 발밑 그림자는 3D 배경이 실루엣으로 드리움 (둥근 그림자는 2026-10-29 제거)
 	var r := Vector2(44, 13)
 	draw_set_transform(Vector2(0, 2), 0.0, Vector2.ONE)
-	draw_ellipse_poly(Vector2.ZERO, r, Color(0, 0, 0, 0.35), true)
 	match highlight_kind:
 		"current":
 			draw_ellipse_poly(Vector2.ZERO, r + Vector2(10, 4), ui_accent, false, 4.0)

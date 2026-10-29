@@ -1,6 +1,8 @@
 class_name NpcView
 extends Node2D
-## 기지 대원 화면 노드: 전투와 같은 캐릭터 프레임 애니메이션(CharacterSprite2D)을, 3D 기지 위 그 대원의 발 위치(투영)에 원근 크기로, 지금 있는 방의 조명색으로.
+## 기지 대원 화면 노드: 전투와 같은 캐릭터 프레임 애니메이션(CharacterSprite2D)을, 3D 기지 위 그 대원의 발 위치(투영)에 원근 크기로.
+## 조명은 방 프리셋 색이 아니라 **지금 자리에 실제로 닿는 스폿 조명**(BaseView3D.light_probe)으로 매 프레임: 빛 쪽·그림자 면·림이 걸어가는 동안 따라 바뀜 (부드럽게 섞음).
+## 발밑 그림자 = 3D 쪽 실루엣 판(BaseView3D.set_shadow_proxy)이 방 조명으로 드리움 (둥근 그림자 없음).
 ## 머리 위: '!' 요청 마커, 수면 Zz, 마우스를 올리면 이름·상태. 화면 좌표 노드 (BaseHub 의 화면 층).
 
 var npc_id: String = ""
@@ -13,6 +15,8 @@ var hovered: bool = false
 var selected: bool = false   # 플레이어가 고른 대원 (발밑 고리·이름·목적지 선)
 var _anim := ""
 var _light := ""
+var _foot3 := Vector3.ZERO          # 이번 프레임 3D 발 위치 (조명 탐침 · 그림자 판)
+var _lit := {"has": false, "color": Color.WHITE, "k": 0.0, "right": true, "behind": false, "rim": false, "rim_color": Color.WHITE, "rim_k": 0.0}
 var _font: Font
 var _bold: Font
 
@@ -59,6 +63,7 @@ func _place(n: NpcAgent, delta: float = 1.0) -> void:
 	_z = want_z if _z > 900.0 else move_toward(_z, want_z, 2.5 * delta)
 	var h_m := n.height_cm / 100.0
 	var foot: Vector3 = v3d.to3d(n.pos, _z)
+	_foot3 = foot
 	var ppm: float = (hub.project(foot + Vector3.UP) - hub.project(foot)).length()
 	_s = ppm * 1.75 / 230.0
 	match _pose:
@@ -106,7 +111,8 @@ func _process(delta: float) -> void:
 			chr.rotation = 0.0
 			chr.scale = Vector2(_s * n.facing, _s)
 		_update_anim(n)
-		_update_light(n)
+		_update_light(n, delta)
+	_update_shadow(n)
 	queue_redraw()
 
 
@@ -134,19 +140,71 @@ func _update_anim(n: NpcAgent) -> void:
 		chr.play(want)
 
 
-func _update_light(n: NpcAgent) -> void:
+## 지금 자리에 닿는 스폿 조명으로 캐릭터 셰이더 갱신 (전투 UnitSprite2D.apply_light_probe 와 같은 규칙)
+## 방 프리셋은 그림자·주변광 색만. 빛의 색·세기는 가장 센 조명, 반대쪽에서 오는 두 번째 조명은 림. 바뀔 때 0.25초쯤에 걸쳐 섞음.
+func _update_light(n: NpcAgent, delta: float) -> void:
 	var fid := n.facility
 	var light: String = sim.data.facilities.get(fid, {}).get("light", "g1")
-	if light == _light:
-		return
-	_light = light
 	var p := LightingPresets.get_preset(light)
-	chr.set_param("shadow_tint", p.shadow)
-	chr.set_param("ambient_tint", p.ambient)
-	chr.set_param("key_color", p.key)
-	chr.set_param("accent_color", p.accent)
-	chr.set_param("key_mix", p.char_key_mix)
-	chr.set_param("accent_mix", p.char_accent_mix)
+	if light != _light:
+		_light = light
+		chr.set_param("shadow_tint", p.shadow)
+		chr.set_param("ambient_tint", p.ambient)
+	var h_m := n.height_cm / 100.0
+	var probes: Array = hub.v3d.light_probe(_foot3, h_m)
+	var key: Dictionary = probes[0] if not probes.is_empty() and float(probes[0].intensity) > 0.3 else {}
+	var rim: Dictionary = {}
+	if not key.is_empty():
+		for pr in probes.slice(1):
+			if pr.from_right != key.from_right and float(pr.intensity) > 0.3:
+				rim = pr
+				break
+	var t := clampf(delta * 8.0, 0.0, 1.0)
+	var ambient: Color = p.ambient
+	if key.is_empty():
+		_lit.color = (_lit.color as Color).lerp(ambient.lightened(0.5), t)
+		_lit.k = lerpf(float(_lit.k), 0.0, t)
+		_lit.has = float(_lit.k) > 0.02
+	else:
+		_lit.color = (_lit.color as Color).lerp(key.color, t)
+		_lit.k = lerpf(float(_lit.k), clampf(float(key.intensity) / 3.0, 0.25, 1.0), t)
+		_lit.has = true
+		if absf(float(key.dx)) > 0.15:   # 바로 머리 위를 지날 때 좌우가 떨리지 않게
+			_lit.right = key.from_right
+		_lit.behind = bool(key.behind)
+	_lit.rim = not rim.is_empty() and Game.rim_enabled
+	if _lit.rim:
+		_lit.rim_color = (_lit.rim_color as Color).lerp(rim.color, t)
+		_lit.rim_k = lerpf(float(_lit.rim_k), clampf(0.45 + float(rim.intensity) / 4.0, 0.45, 0.85), t)
+	var k := float(_lit.k)
+	chr.set_param("key_color", _lit.color)
+	chr.set_param("key_mix", lerpf(0.25, lerpf(0.45, 0.70, k), k) if _lit.has else 0.25)
+	chr.set_param("shadow_depth", lerpf(0.86, 0.80, k))
+	chr.set_param("shadow_hue", lerpf(0.30, 0.35, k))
+	chr.set_param("use_near_rim", _lit.has and bool(_lit.behind) and Game.rim_enabled)
+	chr.set_param("near_rim_color", _lit.color)
+	chr.set_param("near_rim_mix", lerpf(0.7, 0.92, k))
+	chr.set_param("use_rim", _lit.rim)
+	if _lit.rim:
+		chr.set_param("accent_color", _lit.rim_color)
+		chr.set_param("accent_mix", float(_lit.rim_k))
+	# 텍스처 기준 빛 방향: 왼쪽을 보면(가로 반전) 세계의 오른쪽 빛이 텍스처의 왼쪽에 닿음
+	chr.set_light_direction(bool(_lit.right) if n.facing >= 0 else not bool(_lit.right))
+
+
+## 3D 쪽 그림자 판: 서 있으면 발 위치, 앉으면 의자 높이에서 앉은 키로, 누우면 안 보임
+func _update_shadow(n: NpcAgent) -> void:
+	var v3d: BaseView3D = hub.v3d
+	var h_m := n.height_cm / 100.0
+	var post: Dictionary = sim.posture(n)
+	var shown := visible and _pose != "lie"
+	var pos := _foot3
+	var h := h_m
+	if _pose == "sit":
+		var hip := (chr.hip_ratio("sit") if chr != null else 0.5) * h_m
+		pos = _foot3 + Vector3(0.0, float(post.height) + 0.05 - hip, 0.0)
+		h = float(post.height) + h_m - hip
+	v3d.set_shadow_proxy(npc_id, pos, h, shown, n.sprite, n.facing < 0)
 
 
 func _draw() -> void:
@@ -156,11 +214,6 @@ func _draw() -> void:
 	var top := Vector2(0, -screen_h - 14)
 	if _pose == "lie":
 		top = Vector2(-hit_rect().size.x * 0.8, -screen_h * 1.2)
-	elif _pose == "stand":
-		# 발밑 그림자
-		draw_set_transform(Vector2(0, 0), 0, Vector2(1, 0.3))
-		draw_circle(Vector2.ZERO, screen_h * 0.24, Color(0, 0, 0, 0.35))
-		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 	if selected:
 		_draw_selected(n)
 	if not sim.active_request(npc_id).is_empty():

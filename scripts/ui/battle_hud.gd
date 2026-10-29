@@ -617,7 +617,7 @@ func begin_move() -> void:
 	view.clear_highlights()
 	view.set_highlight(controller.current, "current")
 	view.show_slot_markers(controller.get_move_options())
-	hint_label.text = "자리 이동 (AP 1): 파란 표시 = 이동·교체 가능. 다시 누르거나 우클릭하면 취소."
+	hint_label.text = "자리 이동 (AP 1): 파란 표시 = 이동·교체 가능 (교체할 대원 몸을 클릭해도 됨). 다시 누르거나 우클릭하면 취소."
 	_refresh_panel()
 
 
@@ -650,6 +650,16 @@ func _update_hit_label(e: Dictionary) -> void:
 
 func _on_unit_clicked(unit: UnitRuntime) -> void:
 	if view.busy or not controller.is_player_turn():
+		return
+	if pending_move:   # 자리 이동 중: 교체할 대원 몸을 클릭해도 그 자리로 (발밑 표시와 같음)
+		for o in controller.get_move_options():
+			if o.kind == "swap" and o.other == unit:
+				_on_slot_clicked(str(o.key))
+				return
+		if unit == controller.current:
+			cancel_pending()
+		else:
+			show_toast("%s 와는 자리를 바꿀 수 없습니다." % unit.display_name())
 		return
 	if pending_action == "":
 		# 대상 지정 중이 아니면 유닛 정보 툴팁
