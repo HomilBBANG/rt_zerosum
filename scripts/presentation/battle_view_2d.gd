@@ -513,12 +513,12 @@ func _on_action_resolved(event: Dictionary) -> void:
 	var until := 0.0   # 시작부터 포즈가 끝나는 초
 	var shook := false
 	var tw: Tween = null
-	# 쓰는 쪽: 스킬 포즈 (자동 = 적에게 쓰는 피해·상태 스킬 shot, 그 밖 point_up) — 그림이 없으면 공격 애니메이션
+	# 쓰는 쪽: 스킬 포즈 (자동 = 적에게 쓰는 피해·상태 스킬 shot — 근접 무기면 slash, 그 밖 point_up) — 그림이 없으면 공격 애니메이션
 	var tgt: Variant = (event.targets as Array)[0] if not (event.targets as Array).is_empty() else null
-	var cp := SkillPoseData.caster_pose(event.action, actor, tgt, skill_poses)
-	if cp != "" and s.has_pose(cp):
+	var cp := _pick_pose(s, SkillPoseData.caster_poses(event.action, actor, tgt, skill_poses))
+	if cp != "":
 		until = s.play_pose(cp, opts)
-		if cp == "shot":
+		if cp in ["shot", "slash"]:
 			shake_camera()
 			shook = true
 	else:
@@ -552,7 +552,7 @@ func _on_action_resolved(event: Dictionary) -> void:
 	# 피해 없이 상태만 걸린 대상 (기절 → stun, 디버프 → tired)
 	for id in effs:
 		var ts2: UnitSprite2D = sprites.get(id, null)
-		if ts2 == null or posed.has(id) or not ts2.unit.alive or (id == actor.instance_id and cp != "" and s.has_pose(cp)):
+		if ts2 == null or posed.has(id) or not ts2.unit.alive or (id == actor.instance_id and cp != ""):
 			continue
 		var p2 := _pick_pose(ts2, SkillPoseData.target_poses("", effs[id]))
 		if p2 != "":

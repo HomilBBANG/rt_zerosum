@@ -138,11 +138,11 @@ func _run_cli() -> void:
 				hud.begin_move()
 				break
 			if auto.begins_with("pose"):
-				# --autoplay=pose:<shot|hit|miss|stun|dead>[:초] — 포즈 그림이 있는 첫 아군에게 그 연출, 초 뒤에 찍음 (기본 0.6)
+				# --autoplay=pose:<shot|hit|miss|stun|dead…>[:초] — 포즈 그림이 있는 첫 아군(--pose_char=스프라이트 id 로 고르기)에게 그 연출, 초 뒤에 찍음 (기본 0.6)
 				var pz := auto.get_slice(":", 1)
 				for id in view.sprites:
 					var sp: UnitSprite2D = view.sprites[id]
-					if sp.has_pose(pz):
+					if sp.has_pose(pz) and Game.cli.get("pose_char", sp.unit.data.sprite_id) == sp.unit.data.sprite_id:
 						if pz == "dead":
 							sp.play_death()
 						else:

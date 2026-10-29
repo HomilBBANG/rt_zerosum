@@ -2303,7 +2303,7 @@ func _build_pose_box() -> Control:
 		pose_skill = str(pose_list.get_item_metadata(i))
 		_rebuild())
 	lc.add_child(pose_list)
-	lc.add_child(_small("자동 = 적에게 쓰는 피해·상태 스킬은 shot(공격), 그 밖의 스킬(회복·AP·버프)은 point_up. 맞는 쪽은 상황으로 자동: 피함 miss · 기절 stun · 디버프·구속 tired · 피해 hit. AP 를 다 쓰면 tired, 쓰러지면 dead, 패배 결과 화면은 annoying. 그림이 없는 캐릭터는 예전 동작."))
+	lc.add_child(_small("자동 = 적에게 쓰는 피해·상태 스킬은 shot(공격 — 근접 무기를 들고 있으면 slash, 그림이 없으면 shot), 그 밖의 스킬(회복·AP·버프)은 point_up. 맞는 쪽은 상황으로 자동: 피함 miss · 기절 stun · 디버프·구속 tired · 피해 hit. AP 를 다 쓰면 tired, 쓰러지면 dead, 패배 결과 화면은 annoying. 그림이 없는 캐릭터는 예전 동작."))
 	var rc := VBoxContainer.new()
 	rc.custom_minimum_size.x = 330
 	box.add_child(rc)

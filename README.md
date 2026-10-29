@@ -276,11 +276,12 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![도감 — 도시 배경](docs/screenshots/outgame/codex_cities.png)
 
 ## 상황별 포즈 그림 (전투 · 컷씬)
-캐릭터마다 상황별 한 장 그림을 넣으면 전투와 컷씬 대사에서 씁니다. 지금은 **니키타**(`nikita_army`) 8장 (원본 = `art_src/nikita_army/`):
+캐릭터마다 상황별 한 장 그림을 넣으면 전투와 컷씬 대사에서 씁니다. 지금은 **니키타**(`nikita_army`) 8장 · **하나**(`hero2`) 5장 (hit · miss · shot(저격총) · slash(대검) · tired) (원본 = `art_src/<캐릭터>/`):
 
 | 포즈 | 이름 | 전투에서 쓰는 때 |
 |---|---|---|
 | `shot` | 공격 | 적에게 쓰는 피해·상태 스킬 (자동) |
+| `slash` | 근접 공격 | 근접 무기(대검 등)를 들고 공격 (자동, 그림이 없으면 shot) |
 | `point_up` | 버프·스킬 | 회복·AP·버프 등 그 밖의 스킬 (자동) |
 | `hit` | 피격 | 공격에 맞음 |
 | `miss` | 회피 | 공격을 피함 |
@@ -290,17 +291,19 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 | `annoying` | 언짢음 | **패배** — 결과 화면 오른쪽에 출전 대원 그림 |
 
 - 넣기: `python3 tools/char_sprites.py poses nikita_army dead=… hit=… miss=… shot=… stun=… point_up=… tired=… annoying=… --ref miss` → `<포즈>/0001.png` + 조명·선화·눈 마스크 + `anim.json {"pose": true}`.
+  하나: `python3 tools/char_sprites.py poses hero2 hit=… miss=… shot=… slash=… tired=… --ref hit --band 0.25` (`--band` = 아래 25% 줄의 좌우 끝 가운데를 발로 — 한 발을 앞으로 뻗은 자세도 몸 가운데에).
   모든 포즈 같은 배율(`--ref` 그림의 키 = 기본 그림 키), 발 = 선 자세는 발 가운데 · 누운 그림(가로가 긴 그림)은 가운데 아래. 새 이름의 포즈도 그대로 넣으면 에디터 목록에 나옴. 그림이 없는 캐릭터는 예전 연출 그대로.
 - **스킬마다 쓰는 쪽 포즈 = Godot 에디터 `스킬 트리` 탭 → `스킬 포즈`** (`data/skill_poses.json`): 스킬 목록(→ 지금 포즈) · `이 스킬을 쓸 때 포즈`(**자동** · **포즈 없음**(예전 공격 동작) · 포즈 이름) · 캐릭터별 미리보기 · 오른쪽 캐릭터별 포즈 그림 모음. 맞는 쪽 포즈는 상황으로 자동 (위 표).
   맞는 쪽 우선순위: 피함 miss → 기절 stun → 디버프 tired → 피해 hit (그 캐릭터에게 그림이 없으면 다음 후보). 넉백·끌어당김(즉시 효과)은 디버프로 안 침.
 - **전투 연출**: 잠깐 바꾸는 포즈는 캐릭터 가운데 기준 **20% 빠르게 확대**(0.15초) · 처음엔 가운데보다 **x −5px**(뒤쪽 — 적에게서 먼 쪽)에서 **1.5초 동안 천천히 가운데로** → 원래 크기로 돌아오며 **idle**. 카메라는 그대로.
   `shot` · `hit` 때 처음 **0.2초 카메라 흔들림** (한 행동에 한 번). 쓰러지는 공격을 맞으면 hit 없이 바로 dead. AP 를 다 쓴 행동은 그 포즈 뒤에 tired. 차례 시작 상태 이상 피해(출혈 등)는 포즈 없이 예전처럼 흔들림만.
   수치 조절 = `battle_2d.tscn` → View 노드 인스펙터 **`포즈 연출`**: 확대 배율 · 확대 시간 · 보여 주는 시간 · 처음 가로 어긋남 · 돌아오는 시간 · 흔들림 시간 · 세기.
-  확인: `godot --path . ++ --scene=battle --ambush=ally --autoplay=pose:shot` (`point_up` · `hit` · `miss` · `stun` · `tired` · `dead`) · 패배 화면 `--scene=result --winner=enemy`.
+  확인: `godot --path . ++ --scene=battle --ambush=ally --autoplay=pose:shot` (`slash` · `point_up` · `hit` · `miss` · `stun` · `tired` · `dead`, 캐릭터 고르기 `--pose_char=hero2`) · 패배 화면 `--scene=result --winner=enemy`.
 - **컷씬**: 대사 컷의 `포즈` — 8장 모두 고를 수 있음 (컷씬 항목).
 
 ![전투 포즈 — shot · hit / miss · stun / dead](docs/screenshots/battle_poses.jpg)
 ![패배 결과 화면 annoying · 전투 point_up / tired](docs/screenshots/battle_poses2.jpg)
+![하나 포즈 — hit · miss / shot · slash / tired](docs/screenshots/battle_poses_hana.jpg)
 ![스킬 포즈 에디터 (스킬 트리 탭 → 스킬 포즈)](docs/screenshots/skill_pose_editor.png)
 
 ## 전투 명중 · 회피

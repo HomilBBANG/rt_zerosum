@@ -621,6 +621,9 @@ func _test_poses() -> void:
 	_check(CutsceneData.norm_step({"type": "say", "text": "a"}).pose == "", "포즈 비우면 기본 그림")
 	for pz in ["point_up", "tired", "annoying"]:
 		_check(ps.has(pz), "니키타 포즈 '%s' 있음" % pz)
+	var hp := CharacterSprite2D.poses("hero2")
+	for pz in ["hit", "miss", "shot", "slash", "tired"]:
+		_check(hp.has(pz), "하나 포즈 '%s' 있음" % pz)
 	# 스킬 포즈 규칙 (SkillPoseData)
 	var bc := _make("ally")
 	bc.start_battle()
@@ -633,7 +636,13 @@ func _test_poses() -> void:
 	var heal := ActionData.new()
 	heal.id = "t_pose_heal"
 	heal.effect = "heal"
-	_check(SkillPoseData.caster_pose(atk, a0, e, {}) == "shot", "자동: 적에게 공격 = shot")
+	_check(SkillPoseData.caster_poses(atk, a0, e, {}) == (["shot"] if a0.is_ranged_now() else ["slash", "shot"]), "자동: 적에게 공격 = shot (근접 무기면 slash → shot)")
+	var melee := bc.slots.living_units("ally").filter(func(u): return not u.is_ranged_now())
+	var ranged := bc.slots.living_units("ally").filter(func(u): return u.is_ranged_now())
+	if not melee.is_empty():
+		_check(SkillPoseData.caster_pose(atk, melee[0], e, {}) == "slash", "근접 무기 공격 = slash 먼저")
+	if not ranged.is_empty():
+		_check(SkillPoseData.caster_pose(atk, ranged[0], e, {}) == "shot", "원거리 무기 공격 = shot")
 	_check(SkillPoseData.caster_pose(heal, a0, a1, {}) == "point_up", "자동: 회복·버프 = point_up")
 	_check(SkillPoseData.caster_pose(atk, a0, e, {"t_pose_atk": "point_up"}) == "point_up", "스킬 포즈를 정하면 그 포즈")
 	_check(SkillPoseData.caster_pose(atk, a0, e, {"t_pose_atk": "none"}) == "", "포즈 없음 = 예전 동작")

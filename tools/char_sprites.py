@@ -44,9 +44,9 @@ assets/characters/<id>/
   python3 tools/char_sprites.py rows <캐릭터> [idle walk walk:l run run:l] [--name rows] [--scale 1,0.5]   동작마다 한 줄로 긴 시트 한 장
       줄마다 동작 하나(왼쪽부터 프레임 순서), ':l' = 좌우 뒤집어 왼쪽 보기. 칸 = 발이 가운데 오는 공통 크기, 짧은 줄 남는 칸은 투명
       → <out>/<캐릭터>/<name>.png (+ 배율마다 <name>_x0.5.png) + <name>.json (줄마다 동작·방향·장 수·fps·발자국 프레임)
-  python3 tools/char_sprites.py poses <캐릭터> <이름>=<그림> … [--ref <이름>]   상황별 한 장 그림(포즈) → <이름>/0001.png (+ 조명·선화·눈 마스크, anim.json "pose": true)
+  python3 tools/char_sprites.py poses <캐릭터> <이름>=<그림> … [--ref <이름>] [--band 0.25]   상황별 한 장 그림(포즈) → <이름>/0001.png (+ 조명·선화·눈 마스크, anim.json "pose": true)
       예: dead=90.webp hit=91.webp miss=92.webp shot=93.webp stun=94.webp. 배율 = 기준 그림(--ref, 기본 = 가장 키 큰 선 자세)의 키가 figure_px 가 되게 — 모든 포즈 같은 배율
-      발 = 선 자세는 맨 아래 발 가운데, 누운 자세(가로가 긴 그림)는 그림 가운데 아래. 전투(피격·회피·공격·기절·쓰러짐)·컷씬 대사에서 씀
+      발 = 선 자세는 맨 아래 발 가운데(--band 0.25 = 아래 25% 줄 좌우 끝 가운데 — 한 발을 뻗은 자세), 누운 자세(가로가 긴 그림)는 그림 가운데 아래. 전투(피격·회피·공격·기절·쓰러짐)·컷씬 대사에서 씀
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
 import json
@@ -1230,7 +1230,7 @@ def cmd_rows(cid, rows=("idle", "walk", "walk:l", "run", "run:l"), name="rows", 
     bg.convert("RGB").save(os.path.join(out, "%s_preview.jpg" % name), quality=85)
 
 
-def cmd_poses(cid, pairs, ref=None):
+def cmd_poses(cid, pairs, ref=None, band=None):
     """상황별 한 장 그림 → 한 장짜리 동작 폴더 (<이름>/0001.png + 마스크 + anim.json {"pose": true, "loop": true, ground, figure_px})."""
     cdir = os.path.join(CHAR_DIR, cid)
     info = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
@@ -1253,6 +1253,10 @@ def cmd_poses(cid, pairs, ref=None):
         lying = im2.width > im2.height
         if lying:
             gx = can.width / 2
+        elif band:   # 발 = 아래 band(키 비율) 줄의 좌우 끝 가운데 — 한 발을 앞으로 뻗은 자세(찌르기 등)도 몸 가운데로
+            a = can.split()[3].point(lambda v: 255 if v > 40 else 0)
+            strip = a.crop((0, round(pad + im2.height * (1 - band)), can.width, pad + im2.height)).getbbox()
+            gx = (strip[0] + strip[2]) / 2 if strip else can.width / 2
         else:
             _bb, gx = _feet(can)
         gy = pad + im2.height
@@ -1316,7 +1320,8 @@ if __name__ == "__main__":
         cmd_export(args[1], names or ("idle", "walk", "run"), int(opt.get("cols", 6)), opt.get("out"))
     elif args[:1] == ["poses"] and len(args) >= 3:
         opt = {a[2:]: args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
-        cmd_poses(args[1], [tuple(a.split("=", 1)) for a in args[2:] if "=" in a and not a.startswith("--")], opt.get("ref"))
+        cmd_poses(args[1], [tuple(a.split("=", 1)) for a in args[2:] if "=" in a and not a.startswith("--")], opt.get("ref"),
+                  float(opt["band"]) if "band" in opt else None)
     elif args[:1] == ["rows"] and len(args) >= 2:
         opt = {a[2:]: args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
         skip = {args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
