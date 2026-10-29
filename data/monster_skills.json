@@ -2,44 +2,44 @@
 	"version": 1,
 	"skills": [
 		{
+			"ap": 2,
+			"desc": "맞으면 출혈",
+			"effect": "damage",
 			"id": "rend",
-			"name": "할퀴기",
 			"kind": "heavy",
-			"ap": 2,
-			"target": "weapon",
-			"effect": "damage",
+			"name": "할퀴기",
 			"power": 9,
-			"desc": "맞으면 출혈"
+			"target": "weapon"
 		},
 		{
+			"ap": 2,
+			"desc": "열 무관, 맞으면 동상",
+			"effect": "damage",
 			"id": "grave_chill",
+			"kind": "attack",
 			"name": "무덤의 냉기",
-			"kind": "attack",
-			"ap": 2,
-			"target": "enemy_any",
-			"effect": "damage",
 			"power": 4,
-			"desc": "열 무관, 맞으면 동상"
+			"target": "enemy_any"
 		},
 		{
-			"id": "hamstring",
-			"name": "발목 물기",
-			"kind": "attack",
 			"ap": 2,
-			"target": "weapon",
+			"desc": "맞으면 구속 (자리 이동 불가)",
 			"effect": "damage",
+			"id": "hamstring",
+			"kind": "attack",
+			"name": "발목 물기",
 			"power": 7,
-			"desc": "맞으면 구속 (자리 이동 불가)"
+			"target": "weapon"
 		},
 		{
-			"id": "sand_kick",
-			"name": "모래 차기",
-			"kind": "attack",
 			"ap": 1,
-			"target": "weapon",
+			"desc": "맞으면 실명 (대상 무작위)",
 			"effect": "damage",
+			"id": "sand_kick",
+			"kind": "attack",
+			"name": "모래 차기",
 			"power": 2,
-			"desc": "맞으면 실명 (대상 무작위)"
+			"target": "weapon"
 		}
 	],
 	"kits": {
@@ -50,16 +50,16 @@
 			"grave_chill",
 			"ultimate"
 		],
+		"slime": [
+			"basic_attack",
+			"heavy_attack"
+		],
 		"wolf": [
 			"basic_attack",
 			"heavy_attack",
 			"hamstring",
 			"sand_kick",
 			"ultimate"
-		],
-		"slime": [
-			"basic_attack",
-			"heavy_attack"
 		]
 	}
 }
