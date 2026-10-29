@@ -1,10 +1,16 @@
 @tool
 extends Control
 ## 스토리 흐름 그림: StoryGraph 의 노드(상자)와 선(화살표)을 그림. 왼쪽 = 먼저, 오른쪽 = 나중.
-## 노드 클릭 = 고르기 · 빈 곳 끌기 = 화면 옮기기 · 휠 = 확대/축소 · 더블클릭 = 그 탭으로 (panel 이 처리)
+## 노드 클릭 = 고르기 · 노드 끌기 = 자리 옮기기 · 빈 곳 끌기 = 화면 옮기기 · 휠 = 확대/축소 · 더블클릭 = 그 탭으로
+## **Shift+노드에서 끌어 다른 노드에 놓기 = 선 긋기** (뜻은 panel 이 물어봄) · 선 클릭 = 선 고르기 · Delete = 고른 선/노드 지우기 (panel 이 처리)
 
 signal node_clicked(id: String)
 signal node_double_clicked(id: String)
+signal node_moved(id: String, pos: Vector2)
+signal edge_clicked(index: int)
+signal link_requested(from_id: String, to_id: String)
+signal delete_pressed()
+signal background_clicked()
 
 const COLORS := {
 	"start": Color(0.42, 0.44, 0.52), "quest": Color(0.85, 0.62, 0.22), "cutscene": Color(0.36, 0.62, 0.92),
@@ -13,6 +19,7 @@ const COLORS := {
 
 var graph: StoryGraph
 var selected := ""
+var selected_edge := -1
 var hovered := ""
 var hide_kinds: Dictionary = {}   # kind → true 면 숨김
 var font: Font
@@ -21,8 +28,13 @@ var offset := Vector2(0, 0)
 var zoom := 1.0
 var _drag_start := Vector2.ZERO
 var _drag_off := Vector2.ZERO
-var _dragging := false
+var _dragging := false            # 화면 옮기기
+var _drag_node := ""              # 노드 옮기기
+var _drag_node_from := Vector2.ZERO
+var _link_from := ""              # Shift 끌기 선 긋기
+var _link_pos := Vector2.ZERO
 var _moved := false
+var _edge_pts: Array = []         # 그린 선의 점들 (선 클릭 판정)
 
 
 func _ready() -> void:
@@ -36,6 +48,8 @@ func _ready() -> void:
 func show_graph(g: StoryGraph, sel: String) -> void:
 	graph = g
 	selected = sel
+	if graph != null and selected_edge >= graph.edges.size():
+		selected_edge = -1
 	queue_redraw()
 
 
@@ -67,22 +81,31 @@ func _to_screen(p: Vector2) -> Vector2:
 	return p * zoom + offset
 
 
+func _to_world(p: Vector2) -> Vector2:
+	return (p - offset) / zoom
+
+
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.11, 0.12, 0.15))
 	if graph == null:
 		return
 	var k := zoom
 	var labels := []   # [자리, 글, 색] — 노드를 그린 뒤 맨 위에
+	_edge_pts.clear()
 	# 선 (노드 아래)
-	for e in graph.edges:
+	for ei in graph.edges.size():
+		var e: Dictionary = graph.edges[ei]
 		if not _visible(e.from) or not _visible(e.to):
+			_edge_pts.append(PackedVector2Array())
 			continue
 		var a: Dictionary = graph.nodes[e.from]
 		var b: Dictionary = graph.nodes[e.to]
 		var p0 := _to_screen(a.pos + Vector2(a.size.x, a.size.y * 0.5))
 		var p1 := _to_screen(b.pos + Vector2(0.0, b.size.y * 0.5))
-		var lit: bool = e.from == selected or e.to == selected
+		var lit: bool = e.from == selected or e.to == selected or ei == selected_edge
 		var col: Color = (COLORS.get(a.kind, Color.WHITE) as Color).lightened(0.25 if lit else 0.0)
+		if ei == selected_edge:
+			col = Color(1.0, 0.95, 0.6)
 		col.a = 1.0 if lit else 0.55
 		var back := p1.x < p0.x + 20.0 * k   # 되돌아가는 선: 아래로 크게 돌아감
 		var pts := PackedVector2Array()
@@ -96,13 +119,20 @@ func _draw() -> void:
 		for i in steps + 1:
 			var t := float(i) / steps
 			pts.append(p0.bezier_interpolate(c0, c1, p1, t))
-		draw_polyline(pts, col, (3.0 if lit else 1.8) * k, true)
+		_edge_pts.append(pts)
+		draw_polyline(pts, col, (3.5 if ei == selected_edge else (3.0 if lit else 1.8)) * k, true)
 		# 화살촉
 		var d := (pts[steps] - pts[steps - 1]).normalized()
 		var nrm := Vector2(-d.y, d.x)
 		draw_colored_polygon(PackedVector2Array([p1, p1 - d * 10.0 * k + nrm * 5.0 * k, p1 - d * 10.0 * k - nrm * 5.0 * k]), col)
 		if str(e.label) != "" and k >= 0.45:
-			labels.append([pts[steps / 2] if not back else pts[steps / 2], str(e.label), col])
+			labels.append([pts[steps / 2], str(e.label), col])
+	# 선 긋는 중 (고무줄)
+	if _link_from != "" and graph.nodes.has(_link_from):
+		var a: Dictionary = graph.nodes[_link_from]
+		var p0 := _to_screen(a.pos + Vector2(a.size.x, a.size.y * 0.5))
+		draw_line(p0, _link_pos, Color(1.0, 0.95, 0.6), 2.5 * k, true)
+		draw_circle(_link_pos, 5.0 * k, Color(1.0, 0.95, 0.6))
 	# 노드
 	for id in graph.order:
 		if not _visible(id):
@@ -112,11 +142,11 @@ func _draw() -> void:
 		var col: Color = COLORS.get(n.kind, Color.WHITE)
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(0.16, 0.17, 0.21) if n.kind != "start" else Color(0.14, 0.15, 0.18)
-		sb.border_color = col.lightened(0.3) if id == selected else (col if id == hovered else col.darkened(0.25))
-		sb.set_border_width_all(roundi((3.0 if id == selected else 1.5) * k))
+		var target_hi := _link_from != "" and id == hovered and id != _link_from
+		sb.border_color = Color(1.0, 0.95, 0.6) if target_hi else (col.lightened(0.3) if id == selected else (col if id == hovered else col.darkened(0.25)))
+		sb.set_border_width_all(roundi((3.0 if id == selected or target_hi else 1.5) * k))
 		sb.set_corner_radius_all(roundi(6 * k))
 		draw_style_box(sb, r)
-		# 머리띠
 		draw_rect(Rect2(r.position, Vector2(r.size.x, StoryGraph.HEAD_H * k)), Color(col, 0.28 if n.kind != "start" else 0.18))
 		var fs := maxi(8, roundi(13.0 * k))
 		var tag: String = StoryGraph.KIND_NAME.get(n.kind, "")
@@ -139,7 +169,7 @@ func _draw() -> void:
 		draw_rect(Rect2(mid - Vector2(w * 0.5 + 4, fs * 0.8), Vector2(w + 8, fs + 4)), Color(0.11, 0.12, 0.15, 0.9))
 		draw_string(font, mid - Vector2(w * 0.5, 0), lb[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, (lb[2] as Color).lightened(0.2))
 	if graph.order.is_empty():
-		draw_string(bold, Vector2(20, 40), "퀘스트 · 컷씬 데이터가 없습니다", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.7, 0.7, 0.75))
+		draw_string(bold, Vector2(20, 40), "퀘스트 · 컷씬이 없습니다 — 위 '+ 퀘스트' · '+ 컷씬' 으로 시작", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.7, 0.7, 0.75))
 
 
 func _clip(t: String, max_w: float, fs: float, f: Font) -> String:
@@ -165,7 +195,24 @@ func node_at(p: Vector2) -> String:
 	return ""
 
 
+func edge_at(p: Vector2) -> int:
+	var best := -1
+	var best_d := 7.0
+	for i in _edge_pts.size():
+		var pts: PackedVector2Array = _edge_pts[i]
+		for j in range(1, pts.size()):
+			var d := Geometry2D.get_closest_point_to_segment(p, pts[j - 1], pts[j]).distance_to(p)
+			if d < best_d:
+				best_d = d
+				best = i
+	return best
+
+
 func _gui_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_DELETE or event.keycode == KEY_BACKSPACE):
+		delete_pressed.emit()
+		accept_event()
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
@@ -180,24 +227,61 @@ func _gui_input(event: InputEvent) -> void:
 		if mb.button_index == MOUSE_BUTTON_LEFT or mb.button_index == MOUSE_BUTTON_MIDDLE:
 			if mb.pressed:
 				grab_focus()
-				_dragging = true
 				_moved = false
 				_drag_start = mb.position
-				_drag_off = offset
+				var id := node_at(mb.position)
+				if mb.button_index == MOUSE_BUTTON_LEFT and id != "" and mb.shift_pressed:
+					_link_from = id   # Shift+끌기 = 선 긋기
+					_link_pos = mb.position
+				elif mb.button_index == MOUSE_BUTTON_LEFT and id != "":
+					_drag_node = id
+					_drag_node_from = graph.nodes[id].pos
+				else:
+					_dragging = true
+					_drag_off = offset
 			else:
-				_dragging = false
-				if not _moved and mb.button_index == MOUSE_BUTTON_LEFT:
-					var id := node_at(mb.position)
-					if mb.double_click and id != "":
-						node_double_clicked.emit(id)
+				if _link_from != "":
+					var to := node_at(mb.position)
+					if to != "" and to != _link_from:
+						link_requested.emit(_link_from, to)
+					_link_from = ""
+					queue_redraw()
+				elif _drag_node != "":
+					if _moved:
+						node_moved.emit(_drag_node, graph.nodes[_drag_node].pos)
 					else:
-						selected = id
-						node_clicked.emit(id)
+						if mb.double_click:
+							node_double_clicked.emit(_drag_node)
+						else:
+							selected = _drag_node
+							selected_edge = -1
+							node_clicked.emit(_drag_node)
+					_drag_node = ""
+					queue_redraw()
+				else:
+					_dragging = false
+					if not _moved and mb.button_index == MOUSE_BUTTON_LEFT:
+						var ei := edge_at(mb.position)
+						selected_edge = ei
+						if ei >= 0:
+							edge_clicked.emit(ei)
+						else:
+							selected = ""
+							background_clicked.emit()
 						queue_redraw()
 			accept_event()
 	elif event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
-		if _dragging:
+		if _link_from != "":
+			_link_pos = mm.position
+			hovered = node_at(mm.position)
+			queue_redraw()
+		elif _drag_node != "":
+			if (mm.position - _drag_start).length() > 3.0:
+				_moved = true
+				graph.nodes[_drag_node].pos = _drag_node_from + (mm.position - _drag_start) / zoom
+				queue_redraw()
+		elif _dragging:
 			if (mm.position - _drag_start).length() > 3.0:
 				_moved = true
 				offset = _drag_off + (mm.position - _drag_start)

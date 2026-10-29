@@ -59,6 +59,7 @@ func _init() -> void:
 	_test_hit_evasion()
 	_test_poses()
 	_test_story_graph()
+	_test_story_edit()
 	_test_codex()
 	_test_balance_data_and_ai_graph()
 	_test_sfx()
@@ -716,6 +717,63 @@ func _test_story_graph() -> void:
 	_check(Array(g2.notes).any(func(x): return x.contains("직접 시작")), "직접 시작인데 아무도 안 시작 → 안내")
 	_check(Array(g2.notes).any(func(x): return x.contains("이어지지 않음")), "계기 없는 컷씬이 어디서도 안 이어짐 → 안내")
 	_check(Array(g2.errors).any(func(x): return x.contains("없음")), "없는 다음 컷씬 → 오류")
+
+
+func _test_story_edit() -> void:
+	print("[13h] 스토리 흐름 편집 (선 긋기 · 지우기 · 노드 추가 · 삭제)")
+	var d := {"quests": [], "cutscenes": [], "divine": {}}
+	var q1 := StoryEdit.add_quest(d)
+	var q2 := StoryEdit.add_quest(d)
+	var c1 := StoryEdit.add_cutscene(d)
+	var c2 := StoryEdit.add_cutscene(d)
+	_check(str(q1.id) == "q_new_1" and str(q2.id) == "q_new_2" and str(c1.id) == "cs_new_1" and str(c2.id) == "cs_new_2", "새 노드 id 는 겹치지 않게 번호")
+	_check(str(q1.start.type) == "manual" and str(c1.trigger.type) == "none", "새 퀘스트 = 직접 시작 · 새 컷씬 = 계기 없음")
+	# 가능한 뜻
+	_check(StoryEdit.link_options("s:new_game", "c:cs_new_1", d).size() == 1, "새 게임 → 컷씬: 뜻 하나 (오프닝)")
+	_check(StoryEdit.link_options("q:q_new_1", "c:cs_new_1", d).size() == 3, "퀘스트 → 컷씬: 시작 · 단계 · 완료 때")
+	_check(StoryEdit.link_options("c:cs_new_1", "c:cs_new_2", d).size() == 2, "컷씬 → 컷씬: 다음 · 선택지")
+	_check(StoryEdit.link_options("d:a_x", "q:q_new_1", d).is_empty() and StoryEdit.link_options("s:new_game", "q:q_new_1", d).is_empty(), "이을 수 없는 짝은 빈 목록 (해금 → 퀘스트 · 새 게임 → 퀘스트)")
+	# 선 긋기 → 데이터
+	_check(StoryEdit.apply_link("c_new_game", "s:new_game", "c:cs_new_1", d) == "" and str(c1.trigger.type) == "new_game", "새 게임 → 컷씬 = 계기 new_game")
+	_check(StoryEdit.apply_link("cc_next", "c:cs_new_1", "c:cs_new_2", d) == "" and str(c1.next) == "cs_new_2", "컷씬 → 컷씬 다음 = next")
+	_check(StoryEdit.apply_link("cc_next", "c:cs_new_1", "c:cs_new_1", d) != "", "자기 자신으로 다음은 거절")
+	_check(StoryEdit.apply_link("cq_action", "c:cs_new_2", "q:q_new_1", d) == "" and c2.steps.any(func(st): return str(st.type) == "action" and str(st.do) == "start_quest" and str(st.target) == "q_new_1"), "컷씬 → 퀘스트 행동 = action start_quest")
+	_check(StoryEdit.apply_link("qq_start", "q:q_new_1", "q:q_new_2", d) == "" and str(q2.start.target) == "quest:q_new_1", "퀘스트 → 퀘스트 = 시작 조건 quest:")
+	_check(StoryEdit.apply_link("qc_done", "q:q_new_2", "c:cs_new_2", d) == "" and str(c2.trigger.type) == "quest_done" and str(c2.trigger.target) == "q_new_2", "퀘스트 → 컷씬 완료 때 = 계기 quest_done")
+	_check(StoryEdit.apply_link("qd_cond", "q:q_new_2", "d:a_hana", d) == "" and d.divine.has("a_hana") and str(d.divine.a_hana.condition.target) == "quest:q_new_2", "퀘스트 → 신 해금 = 해금 조건 (없던 캐릭터는 새로 만듦)")
+	_check(StoryEdit.apply_link("cc_choice", "c:cs_new_1", "c:cs_new_2", d) == "" and c1.steps.any(func(st): return str(st.type) == "choice" and st.options.size() == 1 and str(st.options[0].next) == "cs_new_2"), "컷씬 → 컷씬 선택지 = 선택지 컷 생성 + next")
+	_check(StoryEdit.apply_link("mq_step", "m:contract:c_ext_escort", "q:q_new_1", d) == "" and q1.steps.size() == 1 and str(q1.steps[0].kind) == "contract" and str(q1.steps[0].target) == "c_ext_escort", "미션 → 퀘스트 단계")
+	# 그래프에 선이 생기고, 그 선의 src 로 지울 수 있음
+	var g := StoryGraph.new()
+	g.build(d.quests, d.cutscenes, d.divine, {}, {}, {})
+	_check(g.errors.is_empty(), "그어 만든 데이터는 끊긴 곳 없음 (%s)" % ", ".join(g.errors))
+	var e_next: Array = g.edges.filter(func(e): return e.from == "c:cs_new_1" and e.to == "c:cs_new_2" and e.label == "다음")
+	_check(e_next.size() == 1 and str(e_next[0].src.k) == "cnext", "선마다 어디서 왔는지(src) 기록")
+	_check(StoryEdit.unlink(e_next[0].src, d) == "" and str(c1.next) == "", "선 지우기: 다음 → 비움")
+	var e_tr: Array = g.edges.filter(func(e): return e.to == "c:cs_new_2" and str(e.src.get("k", "")) == "ctrig")
+	_check(e_tr.size() == 1 and StoryEdit.unlink(e_tr[0].src, d) == "" and str(c2.trigger.type) == "none", "선 지우기: 계기 → 없음")
+	var e_st: Array = g.edges.filter(func(e): return e.to == "q:q_new_1" and str(e.src.get("k", "")) == "qstep")
+	_check(e_st.size() == 1 and StoryEdit.unlink(e_st[0].src, d) == "" and q1.steps.is_empty(), "선 지우기: 단계 삭제")
+	var e_act: Array = g.edges.filter(func(e): return str(e.src.get("k", "")) == "caction")
+	_check(e_act.size() == 1 and StoryEdit.unlink(e_act[0].src, d) == "" and not c2.steps.any(func(st): return str(st.type) == "action"), "선 지우기: 행동 삭제")
+	_check(StoryEdit.unlink({"k": "???"}, d) != "", "모르는 선은 거절")
+	# 노드 삭제 → 가리키던 곳 정리
+	StoryEdit.remove_quest(d, "q_new_1")
+	_check(d.quests.size() == 1 and str(q2.start.type) == "manual", "퀘스트 삭제 → 그걸 조건으로 쓰던 퀘스트는 직접 시작")
+	StoryEdit.apply_link("cc_next", "c:cs_new_1", "c:cs_new_2", d)
+	StoryEdit.remove_cutscene(d, "cs_new_2")
+	_check(d.cutscenes.size() == 1 and str(c1.next) == "" and c1.steps.any(func(st): return str(st.type) == "choice" and str(st.options[0].next) == ""), "컷씬 삭제 → 다음 · 선택지 next 비움")
+	var g3 := StoryGraph.new()
+	g3.extra_starts = [["day:3", "3일차"]]
+	g3.manual_pos["c:cs_new_1"] = Vector2(999, 77)
+	g3.build(d.quests, d.cutscenes, d.divine, {}, {}, {})
+	_check(g3.nodes.has("s:day:3") and g3.nodes["c:cs_new_1"].pos == Vector2(999, 77), "아직 안 이은 계기 노드 · 끌어 놓은 자리 반영")
+	_check(StoryEdit.apply_link("c_day", "s:day:3", "c:cs_new_1", d) == "" and str(c1.trigger.type) == "day" and int(c1.trigger.value) == 3, "n일차 계기 → 컷씬 = 계기 day 3")
+	# 저장 · 다시 읽기 왕복
+	var tmp := "user://_story_edit_test.json"
+	_check(QuestData.write(d.quests, tmp) == OK and QuestData.read(tmp).size() == 1 and str(QuestData.read(tmp)[0].id) == "q_new_2", "퀘스트 저장 → 다시 읽기")
+	_check(CutsceneData.write(d.cutscenes, tmp) == OK and str(CutsceneData.read(tmp)[0].trigger.type) == "day", "컷씬 저장 → 다시 읽기")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
 
 
 func _test_hit_evasion() -> void:

@@ -4,7 +4,9 @@ extends RefCounted
 ## 스토리 흐름 그래프 (Godot 에디터 '스토리' 탭): 퀘스트 · 컷씬 · 신 정체 해금 · 미션(의뢰·전투·연구) · 계기(새 게임 · n일차 · 말 걸기 …)를 노드로,
 ## "무엇이 무엇을 시작·이어 주는지"를 선으로. 데이터는 읽기만 (고치는 건 퀘스트 · 컷씬 · 기적 탭).
 ## 노드 = {id, kind(start|quest|cutscene|divine|mission), ref(원본 id), title, sub[줄], col, row, pos, size}
-## 선 = {from, to, label}  (from 이 먼저 일어나고 → to)
+## 선 = {from, to, label, src}  (from 이 먼저 일어나고 → to, src = 이 선이 적힌 데이터 자리 — StoryEdit.unlink 가 씀)
+## 편집(선 긋기 · 지우기 · 노드 추가 · 이름 고치기)은 StoryEdit — 이 탭에서 저장하면 quests.json · cutscenes.json · faith.json(divine) 에 씀.
+## 자리: 자동 배치(열 · 행) 위에 사용자가 끌어 놓은 자리(manual_pos, data/story_layout.json)가 있으면 그것.
 ## 선 규칙:
 ##   퀘스트 시작 조건: 처음부터/직접/n일차/의뢰인 조건 → 계기 노드, 미션 완료 → 그 미션(퀘스트·컷씬·의뢰·전투·연구) 노드에서
 ##   퀘스트 단계(퀘스트·컷씬·의뢰·전투·연구) → 그 노드에서 "n단계" / 퀘스트 → 컷씬 (계기 퀘스트 시작·단계·완료)
@@ -27,12 +29,18 @@ var notes := PackedStringArray()
 
 ## quests = QuestData.read(), cutscenes = CutsceneData.read(), divine = FaithData.read().divine,
 ## names = QuestData.target_names (kind:id → 이름), npc_names = npc id → 이름, char_names = 전투 캐릭터 id → 이름
+var manual_pos: Dictionary = {}     # 노드 id → Vector2 (사용자가 끌어 놓은 자리)
+var extra_starts: Array = []        # [[key, title]] 아직 아무것도 안 잇는 계기 노드 (탭에서 '+ 계기' 로 만든 것)
+
+
 func build(quests: Array, cutscenes: Array, divine: Dictionary, names: Dictionary = {}, npc_names: Dictionary = {}, char_names: Dictionary = {}) -> void:
 	nodes.clear()
 	order.clear()
 	edges.clear()
 	errors.clear()
 	notes.clear()
+	for es in extra_starts:
+		_start(str(es[0]), str(es[1]))
 	var qids := {}
 	for q in quests:
 		qids[str(q.id)] = q
@@ -80,102 +88,108 @@ func build(quests: Array, cutscenes: Array, divine: Dictionary, names: Dictionar
 	for q in quests:
 		var qn := "q:" + str(q.id)
 		var sc: Dictionary = q.start
+		var qsrc := {"k": "qstart", "q": str(q.id)}
 		match str(sc.type):
 			"always":
-				_edge(_start("always", "처음부터"), qn, "시작")
+				_edge(_start("always", "처음부터"), qn, "시작", qsrc)
 			"manual":
-				_edge(_start("manual", "직접 (스크립트)"), qn, "start_quest")
+				_edge(_start("manual", "직접 (스크립트)"), qn, "start_quest", qsrc)
 			"day":
-				_edge(_start("day:%d" % int(sc.value), "%d일차" % int(sc.value)), qn, "시작")
+				_edge(_start("day:%d" % int(sc.value), "%d일차" % int(sc.value)), qn, "시작", qsrc)
 			"quest":
 				var t := str(sc.get("target", ""))
 				if t == "":
 					errors.append("퀘스트 %s: 시작 조건 '미션 완료' 인데 미션이 없음" % q.name)
 				else:
-					_edge(_mission_node(t, qids, cids, names), qn, "완료 후 시작")
+					_edge(_mission_node(t, qids, cids, names), qn, "완료 후 시작", qsrc)
 			_:
-				_edge(_start("stat:" + str(q.id), UnlockCond.describe(sc, names) + " (의뢰인 %s)" % npc_names.get(q.giver, q.giver)), qn, "시작")
+				_edge(_start("stat:" + str(q.id), UnlockCond.describe(sc, names) + " (의뢰인 %s)" % npc_names.get(q.giver, q.giver)), qn, "시작", qsrc)
 		for i in (q.steps as Array).size():
 			var st: Dictionary = q.steps[i]
 			var k := str(st.kind)
 			var t := str(st.target)
 			if k in ["quest", "cutscene", "contract", "research"] or (k == "stage" and t != ""):
-				_edge(_mission_node(k + ":" + t, qids, cids, names), qn, "%d단계" % (i + 1))
+				_edge(_mission_node(k + ":" + t, qids, cids, names), qn, "%d단계" % (i + 1), {"k": "qstep", "q": str(q.id), "i": i})
 	for c in cutscenes:
 		var cn := "c:" + str(c.id)
 		var tr: Dictionary = c.trigger
 		var tt := str(tr.get("target", ""))
+		var csrc := {"k": "ctrig", "c": str(c.id)}
 		match str(tr.type):
 			"new_game":
-				_edge(_start("new_game", "새 게임"), cn, "오프닝")
+				_edge(_start("new_game", "새 게임"), cn, "오프닝", csrc)
 			"day":
-				_edge(_start("day:%d" % int(tr.value), "%d일차" % int(tr.value)), cn, "아침")
+				_edge(_start("day:%d" % int(tr.value), "%d일차" % int(tr.value)), cn, "아침", csrc)
 			"talk":
-				_edge(_start("talk:" + tt, "말 걸기: %s" % npc_names.get(tt, tt)), cn, "")
+				_edge(_start("talk:" + tt, "말 걸기: %s" % npc_names.get(tt, tt)), cn, "", csrc)
 			"overhear":
-				_edge(_start("overhear", "대원끼리 대화 엿듣기"), cn, "")
+				_edge(_start("overhear", "대원끼리 대화 엿듣기"), cn, "", csrc)
 			"battle_win":
-				_edge(_start("battle_win", "전투 승리"), cn, "")
+				_edge(_start("battle_win", "전투 승리"), cn, "", csrc)
 			"quest_start":
-				_link_quest(tt, cn, "시작 때", qids, c)
+				_link_quest(tt, cn, "시작 때", qids, c, csrc)
 			"quest_step":
-				_link_quest(tt, cn, "%d단계 시작 때" % int(tr.value), qids, c)
+				_link_quest(tt, cn, "%d단계 시작 때" % int(tr.value), qids, c, csrc)
 			"quest_done":
-				_link_quest(tt, cn, "완료 때", qids, c)
+				_link_quest(tt, cn, "완료 때", qids, c, csrc)
 			"divine":
 				if tt != "" and divine.has(tt):
-					_edge("d:" + tt, cn, "정체 드러날 때")
+					_edge("d:" + tt, cn, "정체 드러날 때", csrc)
 				elif tt != "":
 					errors.append("컷씬 %s: 계기 '신의 정체' — 신 해금 캐릭터가 아닌 '%s'" % [c.name, tt])
 				else:
-					_edge(_start("divine_any", "누군가의 정체가 드러날 때"), cn, "")
+					_edge(_start("divine_any", "누군가의 정체가 드러날 때"), cn, "", csrc)
 		if str(c.next) != "":
 			if cids.has(c.next):
-				_edge(cn, "c:" + str(c.next), "다음")
+				_edge(cn, "c:" + str(c.next), "다음", {"k": "cnext", "c": str(c.id)})
 			else:
 				errors.append("컷씬 %s: 다음 컷씬 '%s' 없음" % [c.name, c.next])
-		for st in c.steps:
+		for si in (c.steps as Array).size():
+			var st: Dictionary = c.steps[si]
 			match str(st.type):
 				"choice":
-					for op in st.options:
+					for oi in (st.options as Array).size():
+						var op: Dictionary = st.options[oi]
 						var nx := str(op.next)
 						if nx == "":
 							continue
 						if cids.has(nx):
-							_edge(cn, "c:" + nx, "선택: " + str(op.text))
+							_edge(cn, "c:" + nx, "선택: " + str(op.text), {"k": "cchoice", "c": str(c.id), "step": si, "opt": oi})
 						else:
 							errors.append("컷씬 %s: 선택지 '%s' → 없는 컷씬 '%s'" % [c.name, op.text, nx])
 				"action":
+					var asrc := {"k": "caction", "c": str(c.id), "step": si}
 					if str(st.do) == "start_quest":
 						if qids.has(st.target):
-							_edge(cn, "q:" + str(st.target), "퀘스트 시작")
+							_edge(cn, "q:" + str(st.target), "퀘스트 시작", asrc)
 						else:
 							errors.append("컷씬 %s: 행동 '퀘스트 시작' → 없는 퀘스트 '%s'" % [c.name, st.target])
 					elif str(st.do) == "unlock_divine":
 						if divine.has(st.target):
-							_edge(cn, "d:" + str(st.target), "정체 해금")
+							_edge(cn, "d:" + str(st.target), "정체 해금", asrc)
 						else:
 							errors.append("컷씬 %s: 행동 '신 정체 해금' → 신 해금 캐릭터가 아닌 '%s'" % [c.name, st.target])
 	for cid in divine:
 		var dv: Dictionary = divine[cid]
 		var dn := "d:" + str(cid)
+		var dsrc := {"k": "dcond", "d": str(cid)}
 		if bool(dv.get("unlocked", false)):
-			_edge(_start("always", "처음부터"), dn, "해금")
+			_edge(_start("always", "처음부터"), dn, "해금", dsrc)
 			continue
 		var cond: Dictionary = dv.get("condition", {})
 		match str(cond.get("type", "manual")):
 			"always":
-				_edge(_start("always", "처음부터"), dn, "해금")
+				_edge(_start("always", "처음부터"), dn, "해금", dsrc)
 			"manual":
 				pass   # 컷씬 행동 '정체 해금' 이 선을 그음 (없으면 아래 검사)
 			"day":
-				_edge(_start("day:%d" % int(cond.value), "%d일차" % int(cond.value)), dn, "해금")
+				_edge(_start("day:%d" % int(cond.value), "%d일차" % int(cond.value)), dn, "해금", dsrc)
 			"quest":
 				var t := str(cond.get("target", ""))
 				if t != "":
-					_edge(_mission_node(t, qids, cids, names), dn, "완료 후 해금")
+					_edge(_mission_node(t, qids, cids, names), dn, "완료 후 해금", dsrc)
 			_:
-				_edge(_start("stat:d:" + str(cid), UnlockCond.describe(cond, names)), dn, "해금")
+				_edge(_start("stat:d:" + str(cid), UnlockCond.describe(cond, names)), dn, "해금", dsrc)
 	# ---- 검사
 	for q in quests:
 		if str(q.start.type) == "manual" and not _has_in("q:" + str(q.id), "퀘스트 시작"):
@@ -228,18 +242,18 @@ func _mission_node(target: String, qids: Dictionary, cids: Dictionary, names: Di
 	return _add("m:" + target, "mission", id, "%s: %s" % [UnlockCond.MISSION_KINDS.get(kind, kind), nm], [] as Array[String]).id
 
 
-func _link_quest(qid: String, cn: String, label: String, qids: Dictionary, c: Dictionary) -> void:
+func _link_quest(qid: String, cn: String, label: String, qids: Dictionary, c: Dictionary, src: Dictionary) -> void:
 	if qids.has(qid):
-		_edge("q:" + qid, cn, label)
+		_edge("q:" + qid, cn, label, src)
 	else:
 		errors.append("컷씬 %s: 계기 퀘스트 '%s' 없음" % [c.name, qid])
 
 
-func _edge(from: String, to: String, label: String) -> void:
+func _edge(from: String, to: String, label: String, src: Dictionary = {}) -> void:
 	for e in edges:
 		if e.from == from and e.to == to and e.label == label:
 			return
-	edges.append({"from": from, "to": to, "label": label})
+	edges.append({"from": from, "to": to, "label": label, "src": src})
 
 
 func _in_edges(id: String) -> Array:
@@ -312,6 +326,9 @@ func _layout() -> void:
 			y += float(n.size.y) + GAP_Y
 			row += 1
 		x += W + GAP_X
+	for id in manual_pos:
+		if nodes.has(id):
+			nodes[id].pos = manual_pos[id]
 
 
 var _cycle_hits := 0
