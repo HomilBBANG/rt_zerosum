@@ -108,7 +108,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![무기고](docs/screenshots/outgame/armory.png)
 
 ## 밸런스 데이터 (엑셀) · AI 에디터 · 스테이지 에디터
-에디터는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`, `addons/rtz_sortie_editor`, `addons/rtz_skill_editor`, `addons/rtz_quest_editor`, `addons/rtz_cutscene_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` · `출정 대사` · `스킬 트리` · `퀘스트` · `컷씬` 이 있습니다.
+에디터는 Godot 에디터 플러그인(`addons/rtz_ai_editor`, `addons/rtz_stage_editor`, `addons/rtz_schedule_editor`, `addons/rtz_battle_editor`, `addons/rtz_sortie_editor`, `addons/rtz_skill_editor`, `addons/rtz_quest_editor`, `addons/rtz_cutscene_editor`)으로, `./play.sh edit` (Windows `play.bat edit`) 로 에디터를 열면 상단 탭에 `AI` · `스테이지` · `일정` · `전투 발생` · `출정 대사` · `스킬 트리` · `퀘스트` · `컷씬` · `스토리`(흐름 보기) 가 있습니다.
 **모든 탭 공통: `Ctrl+Z` = 뒤로 감기 · `Ctrl+Y` (또는 `Ctrl+Shift+Z`) = 앞으로 감기** (Mac 은 Cmd, 탭마다 200단계, 글자를 이어 치면 한 단계로 묶임). 글자 칸에 커서가 있으면 그 칸 글자만 되돌리고, 칸 밖을 한 번 누르면 탭 전체 뒤로 감기. 파일을 다시 읽으면(`되돌리기` · 다른 파일/대원 열기) 기록은 새로 시작. 저장은 따로 (`Ctrl+S`).
 **밸런스 수치는 `data/balance.xlsx`** 한 파일에 시트별로 있습니다: `캐릭터` · `몬스터` · `아이템` · `스킬` · `스테이지` (+ 열 설명 `읽어보기`).
 - 엑셀(또는 Numbers·LibreOffice)로 열어 고치고 **저장하면 1초 안에 게임이 다시 읽어 바로 적용** — 진행 중인 전투의 HP·AP·위력·이름까지.
@@ -261,6 +261,16 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![컷씬 — 대사 포즈 (니키타 miss)](docs/screenshots/cutscene_pose.jpg)
 ![컷씬 — 선택지 (기지 화면 위)](docs/screenshots/cutscene_choice.png)
 ![컷씬 에디터 (Godot 에디터 상단 '컷씬' 탭)](docs/screenshots/cutscene_editor.png)
+
+## 스토리 흐름 (에디터)
+**Godot 에디터 상단 `스토리` 탭** (`addons/rtz_story_editor`, 읽기 전용): 퀘스트 · 컷씬 · 신 정체 해금 · 미션(의뢰·전투·연구) · 계기(새 게임 · n일차 · 말 걸기 · 엿듣기 · 전투 승리)가 **어떻게 이어지는지 한 그림으로**.
+- **왼쪽이 먼저, 오른쪽이 나중** (열 = 계기에서 몇 단계 뒤인지). 선 위 글 = 어떻게 이어지는지: `시작` · `n단계` · `완료 후 시작` · `시작 때 / n단계 시작 때 / 완료 때`(퀘스트 → 계기 컷씬) · `다음` · `선택: …` · `퀘스트 시작` · `정체 해금` · `완료 후 해금`.
+- 노드 색: 퀘스트(주황, 단계·보상) · 컷씬(파랑, 분류·대사 수·행동) · 신 정체 해금(보라) · 미션(초록) · 계기(회색). 위 `보기` 체크로 종류를 숨김.
+- 노드 클릭 → 오른쪽에 내용(퀘스트 단계·시작 조건 / 컷씬 계기·앞 대사 몇 줄) + **어디서 오나 / 어디로 가나**(눌러서 따라가기) + `▶ 그 탭에서 열기`(퀘스트 · 컷씬 · 스킬 트리(기적) 탭으로 가서 그 항목을 고름). 더블클릭 = 바로 열기. 끌기 = 옮기기, 휠 = 확대, `전체 보기`.
+- 검사: 없는 퀘스트·컷씬·캐릭터를 가리킴(오류) · 직접 시작 퀘스트인데 아무 컷씬도 시작 안 함 · 계기 없는 컷씬이 어디서도 안 이어짐 · 직접 해금인데 해금하는 컷씬 없음 · 되돌아가는 흐름(순환).
+- 고치는 건 퀘스트 · 컷씬 · 스킬 트리 탭에서 — 저장한 뒤 `스토리` 탭을 다시 열면(또는 `다시 읽기`) 반영. 규칙 코드 = `scripts/data/story_graph.gd` (StoryGraph).
+
+![스토리 흐름 탭](docs/screenshots/story_editor.png)
 
 ## 세계관 도감
 기지 상단 **`도감`** 버튼 (또는 신 아이콘 클릭). 탭 = **등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경**. 왼쪽 목록(위아래 스크롤) → 오른쪽 그림·이름·부제·설명 + 게임 기록.
@@ -582,7 +592,7 @@ scripts/ui/        battle_hud, title, main_menu, formation, result
 scripts/outgame/   기지 규칙 (화면 비의존): outgame_data(엑셀·일정·단면 좌표), world_clock, room_route_service, npc_schedule_resolver,
                    npc_agent, economy_ledger, base_sim(해금·이동·대화·위생·의뢰·결산·점검·제작·저장) / base_hub(씬)
 scripts/outgame/view/  base_view_3d(3D 단면 건물·조명·카메라), base_overlay(이름표·자물쇠·오염·말풍선 — 화면 좌표), npc_view(대원 스프라이트), outgame_hud(HUD·창)
-addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor, rtz_sortie_editor, rtz_skill_editor, rtz_quest_editor, rtz_cutscene_editor (Godot 에디터 상단 탭)
+addons/            rtz_ai_editor, rtz_stage_editor, rtz_schedule_editor, rtz_battle_editor, rtz_sortie_editor, rtz_skill_editor, rtz_quest_editor, rtz_cutscene_editor, rtz_story_editor(흐름 보기) (Godot 에디터 상단 탭)
 data/              balance.xlsx(전투), skill_tree.json(스킬 트리 노드), skill_poses.json(스킬마다 쓰는 포즈), faith.json(신·신앙 스킬·믿는 신·신 해금 캐릭터·기적), codex.json(세계관 도감), quests.json(퀘스트), cutscenes.json(컷씬), statuses.json(상태 정의: 이름 → 효과), skill_status.json(스킬 상태 이상), monster_skills.json(몬스터 스킬), outgame.xlsx(기지), ai/, stages/, outgame/schedules/
 scripts/data/      test_roster (임시 테스트 데이터 12인 + 행동 7종)
 shaders/           cel_character (2D 캐릭터), outline_group (캐릭터 외곽선), flat_zone_fill, cel_3d, outline_3d, unlit_3d

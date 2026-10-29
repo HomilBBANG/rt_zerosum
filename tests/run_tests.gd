@@ -58,6 +58,7 @@ func _init() -> void:
 	_test_status_effects()
 	_test_hit_evasion()
 	_test_poses()
+	_test_story_graph()
 	_test_codex()
 	_test_balance_data_and_ai_graph()
 	_test_sfx()
@@ -689,6 +690,32 @@ func _test_poses() -> void:
 	_check(fd.gods.all(func(g): return g.has("icon")), "신 데이터에 아이콘 그림 칸")
 	var bad := FaithData.check({"gods": [{"id": "g1", "name": "시험신", "icon": "res://assets/gods/__nope.png"}], "skills": [], "divine": {}, "miracles": []}, {}, {})
 	_check(Array(bad.errors).any(func(x): return x.contains("아이콘 그림")), "없는 아이콘 그림 = 검사 오류")
+
+
+func _test_story_graph() -> void:
+	print("[13g] 스토리 흐름 그래프")
+	var quests := QuestData.read()
+	var cuts := CutsceneData.read()
+	var dv: Dictionary = FaithData.read().get("divine", {})
+	var g := StoryGraph.new()
+	g.build(quests, cuts, dv, {}, {}, {})
+	_check(g.errors.is_empty(), "지금 데이터: 끊긴 대상 없음 (%s)" % ", ".join(g.errors))
+	_check(g.nodes.has("q:q_hana_secret") and g.nodes.has("c:cs_opening") and g.nodes.has("d:a_hana"), "퀘스트 · 컷씬 · 신 해금 노드")
+	_check(g.edges.any(func(e): return e.from == "q:q_hana_secret" and e.to == "c:cs_hana_reveal" and e.label == "완료 때"), "퀘스트 완료 → 계기 컷씬 선")
+	_check(g.edges.any(func(e): return e.from == "c:cs_opening" and e.to == "c:cs_opening_hana" and e.label == "다음"), "컷씬 → 다음 컷씬 선")
+	_check(g.edges.any(func(e): return e.from == "c:cs_opening_hana" and e.to == "c:cs_hana_first" and str(e.label).begins_with("선택")), "선택지 → 컷씬 선")
+	_check(g.edges.any(func(e): return e.from == "q:q_hana_secret" and e.to == "d:a_hana"), "퀘스트 완료 → 신 정체 해금 선")
+	_check(g.edges.any(func(e): return e.from == "m:contract:c_ext_escort" and e.to == "q:q_hana_secret" and e.label == "1단계"), "의뢰 미션 노드 → 퀘스트 n단계 선")
+	_check(g.edges.any(func(e): return e.from == "s:new_game" and e.to == "c:cs_opening"), "새 게임 계기 → 오프닝")
+	_check(int(g.nodes["s:new_game"].col) == 0 and int(g.nodes["c:cs_opening"].col) == 1 and int(g.nodes["c:cs_hana_first"].col) == 3, "열 = 흐름 순서 (계기 0 → 오프닝 1 → … → 하나 첫 대화 3)")
+	_check(int(g.nodes["d:a_hana"].col) > int(g.nodes["q:q_hana_secret"].col), "신 해금은 그 퀘스트보다 오른쪽")
+	# 끊긴 흐름 검사
+	var g2 := StoryGraph.new()
+	g2.build([{"id": "qm", "name": "직접 시작", "giver": "", "desc": "", "start": {"type": "manual", "value": 0, "target": ""}, "steps": [], "rewards": {}}],
+		[{"id": "lone", "name": "외톨이", "kind": "event", "trigger": {"type": "none", "target": "", "value": 1}, "once": true, "next": "nope", "steps": []}], {}, {}, {}, {})
+	_check(Array(g2.notes).any(func(x): return x.contains("직접 시작")), "직접 시작인데 아무도 안 시작 → 안내")
+	_check(Array(g2.notes).any(func(x): return x.contains("이어지지 않음")), "계기 없는 컷씬이 어디서도 안 이어짐 → 안내")
+	_check(Array(g2.errors).any(func(x): return x.contains("없음")), "없는 다음 컷씬 → 오류")
 
 
 func _test_hit_evasion() -> void:
