@@ -60,6 +60,7 @@ func _init() -> void:
 	_test_poses()
 	_test_story_graph()
 	_test_story_edit()
+	_test_skill_export()
 	_test_codex()
 	_test_balance_data_and_ai_graph()
 	_test_sfx()
@@ -791,6 +792,38 @@ func _test_story_edit() -> void:
 	var tmp := "user://_story_edit_test.json"
 	_check(QuestData.write(d.quests, tmp) == OK and QuestData.read(tmp).size() == 1 and str(QuestData.read(tmp)[0].id) == "q_new_2", "퀘스트 저장 → 다시 읽기")
 	_check(CutsceneData.write(d.cutscenes, tmp) == OK and str(CutsceneData.read(tmp)[0].trigger.type) == "day", "컷씬 저장 → 다시 읽기")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+
+
+func _test_skill_export() -> void:
+	print("[13i] 스킬 에디터 → 엑셀 내보내기 (XlsxWriter → XlsxReader 왕복)")
+	var tmp := "user://_skill_export_test.xlsx"
+	_check(XlsxWriter.write(tmp, [{"name": "가/나[1]", "rows": [["이름", "값", "참"], ["<&\"특수\">\n둘째 줄", 42, true], ["", 1.5]]}, {"name": "가 나 1", "rows": [["x"]]}]) == OK, "XlsxWriter 로 쓰기")
+	var back := XlsxReader.read(tmp)
+	_check(back.has("가 나 1") and back.has("가 나 1 2"), "못 쓰는 글자는 빼고 겹치는 시트 이름은 번호 (%s)" % ", ".join(back.keys()))
+	var r: Array = back.get("가 나 1", [])
+	_check(r.size() == 3 and str(r[1][0]) == "<&\"특수\">\n둘째 줄" and str(r[1][1]) == "42" and str(r[2][1]) == "1.5", "특수 글자 · 줄바꿈 · 숫자 왕복 (%s)" % str(r))
+	_check(XlsxWriter.col_name(0) == "A" and XlsxWriter.col_name(25) == "Z" and XlsxWriter.col_name(26) == "AA" and XlsxWriter.col_name(701) == "ZZ", "열 이름 A · Z · AA · ZZ")
+	_check(SkillExport.export(tmp) == OK, "스킬 엑셀 내보내기")
+	var x := XlsxReader.read(tmp)
+	for sh in ["읽어보기", "스킬 트리", "신", "신앙 스킬", "믿는 신", "신 해금", "기적", "스킬 상태 이상", "상태 정의", "몬스터 스킬", "몬스터 기술 묶음", "스킬 포즈", "무기별 포즈"]:
+		_check_quiet(x.has(sh))
+	_check(x.size() == 13, "시트 13개 (%s)" % ", ".join(x.keys()))
+	var nodes := SkillTreeData.read()
+	var tree: Array = x.get("스킬 트리", [])
+	_check(tree.size() == nodes.size() + 1 and str(tree[0][3]) == "노드 id", "스킬 트리 = 노드 수 + 머리 줄 (%d / %d)" % [tree.size(), nodes.size()])
+	var ids := {}
+	for row in tree.slice(1):
+		ids[str(row[3])] = true
+	_check(nodes.all(func(n): return ids.has(str(n.id))), "모든 노드가 들어감")
+	var f := FaithData.read()
+	_check((x.get("신앙 스킬", []) as Array).size() == (f.skills as Array).size() + 1 and (x.get("기적", []) as Array).size() == (f.miracles as Array).size() + 1, "신앙 스킬 · 기적 수")
+	_check((x.get("스킬 상태 이상", []) as Array).size() == SkillStatusData.read().size() + 1 and (x.get("상태 정의", []) as Array).size() == StatusCatalog.read().size() + 1, "상태 이상 · 상태 정의 수")
+	# 편집 중인 데이터(저장 안 함)로 내보내기
+	var edited := nodes.duplicate(true)
+	edited[0].name = "편집중_이름"
+	SkillExport.export(tmp, {"nodes": edited})
+	_check((XlsxReader.read(tmp).get("스킬 트리", []) as Array).any(func(row): return str(row[4]) == "편집중_이름"), "에디터가 편집 중인 데이터로 내보내기")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
 
 
