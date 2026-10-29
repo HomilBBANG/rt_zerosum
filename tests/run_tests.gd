@@ -625,7 +625,7 @@ func _test_poses() -> void:
 	for pz in ["hit", "miss", "shot", "slash", "tired", "dead", "point_up", "stun", "annoying", "awkward", "hit_2", "move", "shot_pistol"]:
 		_check(hp.has(pz), "하나 포즈 '%s' 있음" % pz)
 	var ep := CharacterSprite2D.poses("ethan")
-	for pz in ["dead", "hit", "tired", "slash"]:
+	for pz in ["dead", "hit", "tired", "slash", "shot", "miss", "annoying", "stun", "shot_pistol"]:
 		_check(ep.has(pz), "이선 포즈 '%s' 있음" % pz)
 	var kp := CharacterSprite2D.poses("kira")
 	for pz in ["stun", "miss", "hit", "hit_2", "slash", "tired", "annoying", "shot", "shot_pistol", "point_up"]:

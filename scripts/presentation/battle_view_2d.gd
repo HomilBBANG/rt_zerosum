@@ -33,11 +33,12 @@ const UNIT_SCRIPT := preload("res://scripts/presentation/unit_sprite_2d.gd")
 @export_group("포즈 연출")
 ## 상황별 포즈 그림(shot 공격 · hit 피격 · miss 회피 · stun 기절 …)으로 잠깐 바꿀 때 카메라 연출. 그림이 있는 캐릭터만 (tools/char_sprites.py poses)
 ## 카메라가 그 캐릭터 가운데로 빠르게 줌 → 캐릭터가 화면 가운데보다 가로로 조금 어긋난 데서 천천히 가운데로 → 끝나면 원래 화면으로 (캐릭터 크기는 그대로)
-@export_range(1.0, 3.0, 0.01) var pose_zoom := 1.2           ## 카메라 줌 배율 (캐릭터 가운데 기준)
+@export_range(1.0, 3.0, 0.01) var pose_zoom := 1.5           ## 카메라 줌 배율 (캐릭터 가운데 기준)
 @export_range(0.02, 1.0, 0.01, "suffix:초") var pose_zoom_in := 0.15   ## 줌 · 캐릭터로 다가가는 시간 (빠르게)
 @export_range(0.2, 5.0, 0.05, "suffix:초") var pose_time := 1.5        ## 포즈를 보여 주는 시간 (그동안 가로로 천천히 가운데로)
 @export_range(-60.0, 60.0, 0.5, "suffix:px") var pose_drift := -5.0  ## 처음 화면 가운데에서 캐릭터가 어긋난 가로 거리 (- = 뒤쪽, 적에게서 먼 쪽)
 @export_range(0.0, 1.0, 0.01, "suffix:초") var pose_back := 0.0        ## 원래 화면으로 돌아오는 시간 (0 = 바로, 카메라가 움직이지 않고 원래 화면)
+@export_range(100.0, 620.0, 1.0, "suffix:px") var pose_screen_y := 290.0   ## 줌할 때 캐릭터 가운데가 올 화면 높이 (1280×720 기준 — 아래 HUD 위 가운데쯤)
 @export var pose_keep_in_view := true   ## 줌해도 원래 화면 밖(방 바깥 빈 곳)은 안 보이게 — 가장자리 캐릭터는 가운데까지 못 옴
 @export_range(0.0, 1.0, 0.01, "suffix:초") var shake_time := 0.2       ## 공격(shot·slash) · 피격(hit) 때 카메라 흔들림 시간
 @export_range(0.0, 40.0, 0.5, "suffix:px") var shake_px := 7.0       ## 카메라 흔들림 세기
@@ -76,10 +77,10 @@ func focus_camera(s: UnitSprite2D, o: Dictionary = {}, at: Variant = null) -> vo
 	var run := func(t: float) -> void:
 		var zi := 1.0 - pow(1.0 - clampf(t / t_in, 0.0, 1.0), 3.0)   # 빠르게 다가감
 		var dr := sin(clampf(t / t_hold, 0.0, 1.0) * PI * 0.5)        # 천천히 가운데로
-		var aim := c - Vector2(dx * (1.0 - dr) / k, 0.0)              # 캐릭터가 화면 가운데에서 dx(화면 px)만큼 어긋나 보이게
+		var aim := c - (Vector2(home.x + dx * (1.0 - dr), pose_screen_y) - home) / k   # 캐릭터가 화면 (가운데 + dx, pose_screen_y) 에 보이게
 		_cam_zoom = lerpf(start_zoom, k, zi)
 		_cam_pos = _keep_in_view(start_pos.lerp(aim, zi), _cam_zoom)
-	var from := _keep_in_view(c, k)
+	var from := _keep_in_view(c - (Vector2(home.x, pose_screen_y) - home) / k, k)
 	var back := func(t: float) -> void:
 		_cam_zoom = lerpf(k, 1.0, t)
 		_cam_pos = _keep_in_view(from.lerp(home, t), _cam_zoom)
