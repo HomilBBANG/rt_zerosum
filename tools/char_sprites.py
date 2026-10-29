@@ -27,7 +27,7 @@ assets/characters/<id>/
   python3 tools/char_sprites.py rig <캐릭터> [칸 수=32] [--blink]   리깅 idle: 원화 한 장을 부위별로 휨 → <캐릭터>/idle/ (숨쉬기 시트 대신)
       다리·골반 고정 · 몸통 숨쉬기 · 머리 = 목(head_rect 아래) 기준 갸웃·끄덕 · 팔 = 어깨 기준 흔들림(팔·몸통 사이 빈틈으로 팔 영역)
       --blink = 눈 깜빡임 1번 (눈 자리를 피부색으로 덮어 그림 — 그림체에 따라 어색할 수 있어 기본은 끔)
-  python3 tools/char_sprites.py head <캐릭터> <동작> [--cut y] [--deg 14] [--scale 0.85-1.15]   AI 시트 얼굴이 뭉개졌을 때: 프레임마다 머리를 원화(base.png) 머리로 바꿔 붙임
+  python3 tools/char_sprites.py head <캐릭터> <동작> [--cut y] [--deg 14] [--scale 0.85-1.15] [--keep-deg 3] [--no-smooth]   AI 시트 얼굴이 뭉개졌을 때: 프레임마다 머리를 원화(base.png) 머리로 바꿔 붙임
       원화에서 턱 아래(cut = 원화 y, 턱 바로 아래로)까지 잘라 원화 머리 대표 색(머리카락·피부·모자) 영역이 가장 잘 겹치는 크기·기울기·위치에 붙이고,
       삐져나온 원래 머리카락은 지움 (sheet 다음에 실행). 고개가 엉뚱하게 기울면 --deg 로 기울기 찾는 폭을 줄임
   python3 tools/char_sprites.py report <시트.png> [--grid 6x6] [--align ground|cell] [--loop 8-36]
@@ -869,10 +869,59 @@ def _palette_labels(rgba, centers, tol=55.0):
     return lab
 
 
-def cmd_head(cid, anim, cut=None, src=None, max_deg=14, scales=(0.85, 1.15)):
+def _circ_smooth(vals, w):
+    """둥글게 이어지는(반복) 값 매끄럽게 — 삼각 가중 평균, 처음·끝 프레임이 이어짐"""
+    n = len(vals)
+    if n == 0 or w <= 0:
+        return list(vals)
+    out = []
+    for i in range(n):
+        tot = wsum = 0.0
+        for k in range(-w, w + 1):
+            wt = w + 1 - abs(k)
+            tot += vals[(i + k) % n] * wt
+            wsum += wt
+        out.append(tot / wsum)
+    return out
+
+
+def _torso_offsets(frames, box, hair_masks, search=36, step=2):
+    """프레임마다 윗몸(어깨·가슴, 머리카락 색 뺌)이 첫 프레임보다 얼마나 옮겨졌나 [(dx, dy)] — 반 크기에서 차이가 가장 작은 이동"""
+    import numpy as np
+    x0, y0, x1, y1 = box
+    def gray(fa, hm):
+        g = fa[..., :3].astype(np.float32).mean(-1) * (fa[..., 3] > 120)
+        g[hm] = -1.0   # 머리카락 = 비교 안 함
+        return g[::2, ::2]
+    ref = gray(frames[0], hair_masks[0])
+    hx0, hy0, hx1, hy1 = x0 // 2, y0 // 2, x1 // 2, y1 // 2
+    r = ref[hy0:hy1, hx0:hx1]
+    out = [(0.0, 0.0)]
+    for fa, hm in zip(frames[1:], hair_masks[1:]):
+        g = gray(fa, hm)
+        best = None
+        for dy in range(-search // 2, search // 2 + 1, step // 2 or 1):
+            for dx in range(-search // 2, search // 2 + 1, step // 2 or 1):
+                if hy0 + dy < 0 or hx0 + dx < 0 or hy1 + dy > g.shape[0] or hx1 + dx > g.shape[1]:
+                    continue
+                w = g[hy0 + dy:hy1 + dy, hx0 + dx:hx1 + dx]
+                ok = (w >= 0) & (r >= 0) & ((w > 0) | (r > 0))
+                if ok.sum() < r.size * 0.2:
+                    continue
+                d = np.abs(w[ok] - r[ok]).mean()
+                if best is None or d < best[0]:
+                    best = (d, dx * 2.0, dy * 2.0)
+        out.append((best[1], best[2]) if best else (0.0, 0.0))
+    return out
+
+
+def cmd_head(cid, anim, cut=None, src=None, max_deg=14, scales=(0.85, 1.15), smooth=True, keep_deg=3.0):
     """<동작>/ 프레임마다 머리를 원화(base.png) 머리로 바꿔 붙임 — AI 시트 얼굴이 뭉개졌을 때.
     원화에서 턱 아래(cut, 기본 = head_rect 아래 끝보다 키의 3.5% 위)까지 잘라, 프레임마다 원화 머리 대표 색(머리카락·피부·모자…) 영역이 가장 잘 겹치는
-    크기(0.85~1.15배)·기울기(±14°)·위치를 찾아 붙이고, 그 밖으로 삐져나온 원래 머리카락은 지움. 목 쪽은 부드럽게 섞음.
+    크기(0.85~1.15배)·기울기(±14°)·위치를 찾음. smooth(기본) = 그 값을 프레임마다 따로 쓰지 않고 머리를 목에 붙임:
+      · 크기·기울기 = 모든 프레임 같은 값 (찾은 값들의 가운데, 기울기는 ±keep_deg 안)
+      · 위치 = 목·옷깃·어깨가 첫 프레임보다 옮겨진 만큼만 따라감 (그 기준 머리 자리 = 찾은 값들의 가운데)
+    → 걷기·뛰기에서 머리가 몸과 따로 흔들리지 않고 목 위에서 몸과 같이 움직임. 그 밖으로 삐져나온 원래 머리카락은 지움. 목 쪽은 부드럽게 섞음.
     조명·선화·눈 마스크도 다시 (눈 = 원화 눈 마스크를 같은 위치로)."""
     import math
     import numpy as np
@@ -914,17 +963,14 @@ def cmd_head(cid, anim, cut=None, src=None, max_deg=14, scales=(0.85, 1.15)):
     adir = os.path.join(cdir, anim)
     names = sorted(f for f in os.listdir(adir) if re.match(r"^\d+\.png$", f))
     k = 0.5                                               # 찾기는 반 크기로
-    log = []
-    for fn in names:
-        path = os.path.join(adir, fn)
-        fr = Image.open(path).convert("RGBA")
-        fa = np.array(fr)
+
+    def fit(fa, sc_list, deg_list):
         fys = np.nonzero(fa[..., 3].max(1) > 20)[0]
         top = int(fys.min())
         fl = labels(fa)
         best = None
-        for sc in np.arange(scales[0], scales[1] + 0.001, 0.05):
-            for deg in range(-max_deg, max_deg + 1, 2):
+        for sc in sc_list:
+            for deg in deg_list:
                 t = head_im.resize((max(1, int(head_im.width * sc * k)), max(1, int(head_im.height * sc * k))), Image.BILINEAR)
                 ax, ay = anchor[0] * sc * k, anchor[1] * sc * k
                 t = t.rotate(deg, resample=Image.BILINEAR, center=(ax, ay), expand=False)
@@ -946,6 +992,31 @@ def cmd_head(cid, anim, cut=None, src=None, max_deg=14, scales=(0.85, 1.15)):
                         score = ((win == tl) & nz & (tl < other)).sum() / max(1, both.sum())
                         if best is None or score > best[0]:
                             best = (score, sc, deg, (px + ax) / k, (py + ay) / k)
+        return best
+
+    frames = [np.array(Image.open(os.path.join(adir, fn)).convert("RGBA")) for fn in names]
+    sc_list = list(np.arange(scales[0], scales[1] + 0.001, 0.05))
+    deg_list = list(range(-max_deg, max_deg + 1, 2))
+    fits = [fit(fa, sc_list, deg_list) for fa in frames]
+    if smooth and len(frames) > 2:
+        sc_med = float(np.median([f[1] for f in fits]))
+        deg_lim = int(min(max_deg, max(2, keep_deg * 2)))
+        fits = [fit(fa, [sc_med], list(range(-deg_lim, deg_lim + 1, 1))) for fa in frames]   # 같은 크기로 다시 찾기
+        deg_c = float(np.clip(np.median([f[2] for f in fits]), -keep_deg, keep_deg))
+        # 윗몸(턱 선 바로 아래 목·옷깃·어깨) 이동
+        nx_m, ny_m = float(np.median([f[3] for f in fits])), float(np.median([f[4] for f in fits]))
+        hw = int(fig * 0.085)   # 목·옷깃·어깨 윗부분 (팔이 잘 안 들어오는 곳)
+        box = (max(0, int(nx_m - hw)), int(ny_m + fig * 0.005), min(frames[0].shape[1], int(nx_m + hw)), min(frames[0].shape[0], int(ny_m + fig * 0.085)))
+        hairs = [np.isin(labels(fa), head_only) for fa in frames]
+        offs = _torso_offsets(frames, box, hairs)
+        offs = list(zip(_circ_smooth([o[0] for o in offs], 1), _circ_smooth([o[1] for o in offs], 1)))
+        rel_x = float(np.median([f[3] - o[0] for f, o in zip(fits, offs)]))
+        rel_y = float(np.median([f[4] - o[1] for f, o in zip(fits, offs)]))
+        fits = [(f[0], sc_med, deg_c, rel_x + o[0], rel_y + o[1]) for f, o in zip(fits, offs)]
+    log = []
+    for fn, fa, best in zip(names, frames, fits):
+        path = os.path.join(adir, fn)
+        fr = Image.fromarray(fa)
         score, sc, deg, nx, ny = best
         # 원래 크기로 붙이기
         t = head_im.resize((max(1, round(head_im.width * sc)), max(1, round(head_im.height * sc))), Image.LANCZOS)
@@ -966,6 +1037,7 @@ def cmd_head(cid, anim, cut=None, src=None, max_deg=14, scales=(0.85, 1.15)):
         # 자른 선 바로 아래로 늘어진 원래 머리카락(몸에는 없는 색)도 지움
         fl_now = labels(fa)
         erase |= near & (v >= -feather) & (v < fig * 0.04) & (la < 0.5) & np.isin(fl_now, head_only)
+        fa = fa.copy()
         fa[..., 3] = np.where(erase, 0, fa[..., 3])
         out = Image.fromarray(fa)
         out.alpha_composite(layer)
@@ -987,8 +1059,8 @@ def cmd_head(cid, anim, cut=None, src=None, max_deg=14, scales=(0.85, 1.15)):
         eye_layer = Image.new("L", fr.size, 0)
         eye_layer.paste(e, (ox, oy))
         eye_layer.save(stem + "_eye.png")
-        log.append("%s %.2f배 %+d° 점수 %.2f" % (fn, sc, deg, score))
-    print(cid, anim, "머리 바꿔 붙임:", ", ".join(log))
+        log.append("%s %.2f배 %+.1f° (%d,%d)" % (fn, sc, deg, round(nx), round(ny)))
+    print(cid, anim, "머리 바꿔 붙임%s:" % (" (윗몸에 붙임 — 크기·기울기 고정)" if smooth else ""), ", ".join(log))
 
 
 # ---------------------------------------------------------------- 발 닿는 프레임 (발자국 소리 맞추기)
@@ -1058,7 +1130,8 @@ if __name__ == "__main__":
     elif args[:1] == ["head"] and len(args) >= 3:
         opt = {a[2:]: args[i + 1] for i, a in enumerate(args) if a.startswith("--") and i + 1 < len(args)}
         cmd_head(args[1], args[2], opt.get("cut"), None, int(opt.get("deg", 14)),
-                 tuple(float(v) for v in opt.get("scale", "0.85-1.15").split("-")))
+                 tuple(float(v) for v in opt.get("scale", "0.85-1.15").split("-")),
+                 "--no-smooth" not in args, float(opt.get("keep-deg", 3.0)))
     elif args[:1] == ["steps"] and len(args) >= 2:
         cmd_steps(args[1], tuple(args[2:]) or ("walk", "run"))
     elif args[:1] == ["rig"] and len(args) >= 2:
