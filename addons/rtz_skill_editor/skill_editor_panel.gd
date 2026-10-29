@@ -9,7 +9,6 @@ extends Control
 ## 상태 정의: 상태 이상 이름·머리 위 글자·색 + 쓰는 효과(규칙) → data/statuses.json. 같은 효과를 이름만 다르게 여러 개 (예: 진통제·자가 치유 = 재생).
 ## 가운데: 격자 위 자유 모양 (캐릭터마다 다르게) — 빈 칸 클릭 = 새 노드(고른 노드에서 이어짐), 끌기 = 옮기기, Shift+클릭 = 선행 잇기/끊기, Delete = 삭제.
 ## 오른쪽: 고른 노드의 id · 이름 · 갈래 색 · 시작 노드 · 필요 레벨 · 선행(하나라도/모두) · 택일 그룹 · 효과 · 값 · 설명, 옮기기 · 삭제, 아래 검사.
-## 위 '엑셀로 내보내기' = 이 탭 내용 전부를 exports/skills.xlsx 로 (SkillExport — 보기 · 공유용).
 ## 게임 규칙(BaseSim): 시작 노드는 처음부터 습득, 선행을 배워야 다음, 같은 택일 그룹은 트리마다 하나만, 스킬 포인트는 두 트리 공용.
 
 const CANVAS := preload("res://addons/rtz_skill_editor/skill_tree_canvas.gd")
@@ -115,9 +114,6 @@ func _ready() -> void:
 	top.add_child(_btn("되돌리기", func(): _load()))
 	play_btn = _btn("기지 스킬 창 테스트 플레이", _play)
 	top.add_child(play_btn)
-	var xb := _btn("엑셀로 내보내기", _export_xlsx)
-	xb.tooltip_text = "지금 편집 중인 스킬 트리 · 신앙 · 기적 · 상태 이상 · 몬스터 스킬 · 스킬 포즈를 exports/skills.xlsx 로 (보기 · 공유용, 고쳐도 게임엔 안 들어감)"
-	top.add_child(xb)
 	level_lab = _lab("레벨")
 	top.add_child(level_lab)
 	play_level = _spin(1, 20, 1, 9, "")
@@ -324,17 +320,6 @@ func _save() -> void:
 				EditorInterface.get_resource_filesystem().update_file(path)
 	else:
 		status.text = "저장 실패 (%d / %d / %d)" % [err, err2, err3]
-
-
-## 편집 중인 내용 그대로 엑셀로 (저장 안 한 것도 포함)
-func _export_xlsx() -> void:
-	var err := SkillExport.export(SkillExport.DEFAULT_PATH, {"nodes": nodes, "faith": faith, "sstat": sstat, "sdefs": sdefs, "mdata": mdata, "spose": spose, "wpose": wpose})
-	if err == OK:
-		var abs := ProjectSettings.globalize_path(SkillExport.DEFAULT_PATH)
-		status.text = "엑셀로 내보냄: exports/skills.xlsx" + (" (저장 안 한 편집 포함)" if dirty else "")
-		OS.shell_show_in_file_manager(abs)
-	else:
-		status.text = "엑셀 내보내기 실패 (%d) — exports/skills.xlsx 가 엑셀에 열려 있으면 닫고 다시" % err
 
 
 func _mark() -> void:
