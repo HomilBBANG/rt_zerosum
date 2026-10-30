@@ -314,6 +314,10 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![기지 인벤토리](docs/screenshots/outgame_inventory.jpg)
 ![전투 스킬 · 필살기 칸](docs/screenshots/battle_skill_slots.jpg)
 
+- **의뢰 수락 / 거절 버튼** (원본 `art_src/ui/buttons_accept_decline.webp` → `assets/ui/btn_accept.png` 초록 · `btn_decline.png` 회색): 대원 요청 대화의 수락 · 나중에, 의뢰 게시판의 지시에만. 코드 `scripts/ui/ui_button.gd` (`UiButton.apply(버튼, "accept"|"decline")`).
+
+![요청 대화 수락 · 나중에](docs/screenshots/outgame_request_buttons.jpg)
+
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
 
 ## 세계관 도감

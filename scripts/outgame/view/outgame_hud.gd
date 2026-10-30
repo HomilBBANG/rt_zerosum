@@ -676,6 +676,8 @@ func open_dialogue(npc_id: String) -> void:
 	btns.add_child(next)
 	var accept := _button("수락", Color(0.4, 0.9, 0.5), 15, 90)
 	var later := _button("나중에", Color(0.6, 0.6, 0.65), 15, 90)
+	UiButton.apply(accept, "accept")   # 의뢰 수락 / 거절 버튼 그림
+	UiButton.apply(later, "decline")
 	var close := _button("닫기", Color(0.6, 0.6, 0.65), 15, 90)
 	for b in [accept, later, close]:
 		btns.add_child(b)
@@ -1479,6 +1481,7 @@ func open_contracts(npc_id: String) -> void:
 		l.custom_minimum_size.x = 560
 		row.add_child(l)
 		var b := _button("지시", Color(0.4, 0.9, 0.5), 14, 70)
+		UiButton.apply(b, "accept")   # 의뢰 수락 버튼 그림
 		b.pressed.connect(func():
 			var who: String = npc_id if npc_id != "" else ids[maxi(0, pick.selected)]
 			var r := sim.issue_job(who, cid)
