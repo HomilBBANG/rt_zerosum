@@ -6,7 +6,7 @@
 			"name": "아우로라",
 			"color": "#faff66",
 			"symbol": "",
-			"icon": "",
+			"icon": "res://assets/gods/aurora.png",
 			"desc": "새벽과 여명의 신"
 		},
 		{
@@ -14,7 +14,7 @@
 			"name": "루브라스",
 			"color": "#ff5a4e",
 			"symbol": "",
-			"icon": "",
+			"icon": "res://assets/gods/rubrath.png",
 			"desc": "분노의 핏빛 달"
 		},
 		{
@@ -22,7 +22,7 @@
 			"name": "테네브리쿨루스",
 			"color": "#8f7bff",
 			"symbol": "",
-			"icon": "",
+			"icon": "res://assets/gods/tenebriculus.png",
 			"desc": "심연의 눈이자 공허의 신"
 		},
 		{
@@ -30,7 +30,7 @@
 			"name": "요슈아",
 			"color": "#cf5fd3",
 			"symbol": "",
-			"icon": "",
+			"icon": "res://assets/gods/yoshua.png",
 			"desc": "인간을 사랑하는 신"
 		},
 		{
@@ -38,7 +38,7 @@
 			"name": "유성회",
 			"color": "#2cdcf3",
 			"symbol": "",
-			"icon": "",
+			"icon": "res://assets/gods/alpha.png",
 			"desc": "종말의 겨울"
 		},
 		{
@@ -46,7 +46,7 @@
 			"name": "오메가",
 			"color": "#ff7d00",
 			"symbol": "",
-			"icon": "",
+			"icon": "res://assets/gods/omrga.png",
 			"desc": "무한한 광기와 쾌락"
 		},
 		{
@@ -54,7 +54,7 @@
 			"name": "녹스",
 			"color": "#08b071",
 			"symbol": "",
-			"icon": "",
+			"icon": "res://assets/gods/nox.png",
 			"desc": "세상의 멸망과 창조 사이의 존재"
 		}
 	],

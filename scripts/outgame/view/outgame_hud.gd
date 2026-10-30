@@ -144,43 +144,117 @@ func _vbox(sep: int = 6) -> VBoxContainer:
 
 
 # ================================================================ 위쪽 바
+const UI_DIR := "res://assets/ui/outgame/"
+
+
+## 상단: 왼쪽 = 날짜 바(day_bar 그림) + 속도 버튼 / 돈(지폐 그림) + 정보 줄, 오른쪽 = 아이콘 버튼 (UI 패키지에서 자른 assets/ui/outgame/icons)
 func _build_top() -> void:
-	var left := PanelContainer.new()
-	left.add_theme_stylebox_override("panel", _panel_style())
+	var left := _vbox(6)
 	left.position = Vector2(10, 8)
 	add_child(left)
-	var lv := _vbox(2)
-	left.add_child(lv)
-	var row := _hbox(10)
-	lv.add_child(row)
+	var row := _hbox(8)
+	left.add_child(row)
+	# 날짜 바: 그림 양 끝(팔각 모서리)은 그대로, 가운데만 늘림
+	var day := PanelContainer.new()
+	var em := StyleBoxEmpty.new()
+	em.content_margin_left = 30
+	em.content_margin_right = 30
+	em.content_margin_top = 6
+	em.content_margin_bottom = 6
+	day.add_theme_stylebox_override("panel", em)
+	day.mouse_filter = MOUSE_FILTER_IGNORE
+	_nine_bg(day, load(UI_DIR + "day_bar.png"), 44, 16)
 	date_label = _label("", 22, Color(1, 1, 1))
-	row.add_child(date_label)
+	date_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	day.add_child(date_label)
+	row.add_child(day)
+	var sp_box := _hbox(4)
+	sp_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(sp_box)
 	for sp in [[0, "정지"], [1, "1x"], [4, "4x"], [16, "16x"]]:
-		var b := _button(sp[1], Color(0.45, 0.7, 0.9), 14, 44)
+		var b := _button(sp[1], Color(0.55, 0.65, 0.42), 14, 44)
+		b.size_flags_vertical = SIZE_SHRINK_CENTER
 		var v: int = sp[0]
 		b.pressed.connect(func(): hub.set_speed(v))
-		row.add_child(b)
+		sp_box.add_child(b)
 		speed_buttons.append(b)
-	var row2 := _hbox(16)
-	lv.add_child(row2)
+	var row2 := PanelContainer.new()
+	var ps := _panel_style(Color(0.05, 0.06, 0.05, 0.82), Color(0.33, 0.38, 0.27), 6)
+	ps.content_margin_top = 4
+	ps.content_margin_bottom = 4
+	ps.content_margin_left = 8
+	row2.add_theme_stylebox_override("panel", ps)
+	row2.mouse_filter = MOUSE_FILTER_IGNORE
+	left.add_child(row2)
+	var r2 := _hbox(8)
+	row2.add_child(r2)
+	var money := TextureRect.new()
+	money.texture = load(UI_DIR + "money.png")
+	money.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	money.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	money.custom_minimum_size = Vector2(52, 24)
+	money.mouse_filter = MOUSE_FILTER_IGNORE
+	r2.add_child(money)
 	cash_label = _label("", 20, GOLD)
-	row2.add_child(cash_label)
+	r2.add_child(cash_label)
+	r2.add_child(_label("|", 14, Color(0.4, 0.45, 0.35)))
 	info_label = _label("", 14, Color(0.85, 0.92, 1.0))
-	row2.add_child(info_label)
+	r2.add_child(info_label)
 
-	var right := _hbox(6)
-	right.position = Vector2(0, 10)
-	right.set_anchors_preset(PRESET_TOP_RIGHT)
+	var right := _hbox(4)
+	right.position = Vector2(0, 6)
 	add_child(right)
-	var specs := [["스킬", Color(0.85, 0.6, 1.0), func(): open_skills("")], ["도감", Color(1.0, 0.85, 0.45), func(): open_codex()], ["퀘스트", QUEST_COL, func(): open_quests()], ["의뢰", Color(0.45, 0.7, 0.9), func(): open_contracts("")], ["무기고", Color(0.45, 0.7, 0.9), func(): open_armory()],
-		["원장", Color(0.45, 0.7, 0.9), func(): open_ledger()], ["저장", Color(0.45, 0.9, 0.6), func(): hub.save_now()],
-		["전투 출전", Color(1.0, 0.5, 0.3), func(): open_sortie()], ["타이틀", Color(0.6, 0.6, 0.65), func(): hub.to_title()]]
+	var specs := [["스킬", "skill", null, func(): open_skills("")], ["도감", "codex", null, func(): open_codex()], ["퀘스트", "quest", QUEST_COL, func(): open_quests()],
+		["의뢰", "contract", null, func(): open_contracts("")], ["무기고", "tools", null, func(): open_armory()], ["원장", "ledger", null, func(): open_ledger()],
+		["저장", "bookmark", Color(0.6, 0.95, 0.65), func(): hub.save_now()], ["전투 출전", "sword", Color(1.0, 0.55, 0.35), func(): open_sortie()],
+		["타이틀", "gear", Color(0.7, 0.7, 0.72), func(): hub.to_title()]]
 	for s in specs:
-		var b := _button(s[0], s[1], 16 if s[0] == "전투 출전" else 14)
-		b.pressed.connect(s[2])
-		right.add_child(b)
+		right.add_child(_icon_button(s[0], s[1], s[2] if s[2] != null else Color(0.88, 0.86, 0.76), s[3]))
 	right.position.x = 1280 - 10 - right.get_combined_minimum_size().x
 	right.resized.connect(func(): right.position.x = 1280 - 10 - right.size.x)
+
+
+## 그림 배경(9칸 늘리기)을 그 컨트롤 전체에 그림: 양 끝 모서리는 그대로, 가운데만 늘림.
+## 그림은 2배 해상도로 만들어 두었으므로 반으로 줄여 그림 (2560×1440 창에서 1:1). 컨테이너의 안쪽 여백과 상관없이 테두리까지 채움
+func _nine_bg(c: Control, tex: Texture2D, side: int, cap: int) -> void:
+	var sb := StyleBoxTexture.new()
+	sb.texture = tex
+	sb.texture_margin_left = side
+	sb.texture_margin_right = side
+	sb.texture_margin_top = cap
+	sb.texture_margin_bottom = cap
+	c.draw.connect(func():
+		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2(0.5, 0.5))
+		c.draw_style_box(sb, Rect2(Vector2.ZERO, c.size * 2.0))
+		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE))
+
+
+## 아이콘 버튼 + 아래 이름 (마우스를 올리면 밝게 · 살짝 커짐)
+func _icon_button(text: String, icon: String, col: Color, cb: Callable) -> Control:
+	var box := _vbox(0)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var b := TextureButton.new()
+	b.texture_normal = load(UI_DIR + "icons/%s.png" % icon)
+	b.ignore_texture_size = true
+	b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	b.custom_minimum_size = Vector2(42, 42)
+	b.size_flags_horizontal = SIZE_SHRINK_CENTER
+	b.tooltip_text = text
+	b.focus_mode = FOCUS_NONE
+	b.pivot_offset = Vector2(21, 21)
+	b.mouse_entered.connect(func():
+		b.modulate = Color(1.25, 1.25, 1.2)
+		b.scale = Vector2(1.06, 1.06))
+	b.mouse_exited.connect(func():
+		b.modulate = Color.WHITE
+		b.scale = Vector2.ONE)
+	b.pressed.connect(cb)
+	box.add_child(b)
+	var l := _label(text, 12, col, true)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.custom_minimum_size.x = 48
+	box.add_child(l)
+	return box
 
 
 func _build_log() -> void:
@@ -399,7 +473,7 @@ func refresh(delta: float) -> void:
 	date_label.text = sim.clock.label()
 	for i in speed_buttons.size():
 		speed_buttons[i].modulate = Color(1, 1, 0.5) if [0, 1, 4, 16][i] == hub.speed else Color(1, 1, 1)
-	cash_label.text = "$%d" % sim.ledger.cash
+	cash_label.text = "%d" % sim.ledger.cash   # 지폐 그림이 $ 표시
 	_update_battle_bar()
 	if _sel_id != "":
 		_sel_t -= delta
@@ -1297,6 +1371,12 @@ func open_context(npc_id: String, at: Vector2) -> void:
 	pm.add_item("의무실로 (치료·휴식)", 5)
 	if not n.command.is_empty() and n.state != NpcAgent.UNAVAILABLE:
 		pm.add_item("지시 그만두기 → 일정대로", 6)
+	# 메뉴 아이콘 (UI 패키지): 대화 · 연구 · 정보 · 스킬 · 의뢰
+	pm.add_theme_constant_override("icon_max_width", 22)
+	for pair in [[0, "mail"], [7, "search"], [4, "book"], [8, "skill"], [2, "contract"]]:
+		var ix := pm.get_item_index(pair[0])
+		if ix >= 0:
+			pm.set_item_icon(ix, load(UI_DIR + "icons/%s.png" % pair[1]))
 	for id in [1, 2]:
 		pm.set_item_disabled(pm.get_item_index(id), not n.is_free())
 	if sim.is_combatant(n):

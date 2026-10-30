@@ -229,6 +229,8 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![신앙 스킬 — 전쟁신 베이라 (신앙 부족 = 회색 + 붉은 글씨)](docs/screenshots/skill_faith.png)
 ![신앙 스킬 에디터 (스킬 트리 탭 → 신앙 스킬)](docs/screenshots/faith_editor.png)
 ![무신앙 — 믿음이 없습니다 (신앙 스킬 비어 있음, 신앙도 안 쌓임)](docs/screenshots/faith_none.png)
+- **신 아이콘 7개 적용** (사용자 제공, 2026-10-30): 아우로라 · 루브라스 · 테네브리쿨루스 · 요슈아 · 유성회(alpha) · 오메가(omrga) · 녹스 → `assets/gods/<신 id>.png` (256×256, 원본 `art_src/gods/`), faith.json 각 신의 아이콘 그림으로 연결.
+
 ![신 아이콘 그림 (예시 그림 — 아우로라)](docs/screenshots/god_icon_image.jpg)
 ![신앙 스킬 에디터 — 아이콘 그림 고르기](docs/screenshots/faith_editor_icon.jpg)
 ![기적 탭 (정체가 신으로 드러난 하나)](docs/screenshots/skill_miracle.png)
@@ -288,6 +290,15 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![스토리 흐름 탭 — 선 고름 · 선 긋는 중](docs/screenshots/story_editor_edit.png)
 
+## 기지 상단 UI
+- 왼쪽 위: **날짜 바**(`assets/ui/outgame/day_bar.png` — 양 끝 팔각 모서리는 그대로, 가운데만 날짜 길이만큼 늘림) + 속도 버튼 · 그 아래 **지폐 그림**(`money.png`) + 돈 · 정보 줄.
+- 오른쪽 위: **아이콘 버튼** + 아래 이름 — 스킬(번개) · 도감(눈 달린 책) · 퀘스트(체크 클립보드) · 의뢰(봉인 문서) · 무기고(공구) · 원장(장부) · 저장(책갈피) · 전투 출전(검) · 타이틀(톱니). 마우스를 올리면 밝게 · 살짝 커짐, 툴팁 = 이름.
+- 대원 우클릭 메뉴에도 아이콘: 대화(편지) · 무기 연구(돋보기) · 정보·장비(책) · 스킬 트리(번개) · 업무·의뢰 지시(문서).
+- 아이콘 20개 = 사용자 UI 패키지에서 잘라 `assets/ui/outgame/icons/<이름>.png` (96×96): skill · sword · faith · levelup · book · codex · search · bookmark · contract · quest · mail · scroll · schedule · calendar_check · ledger · calendar · gear · tools · sliders · gear_wrench. 원본 `art_src/ui/`.
+- UI 그림은 2560×1440 창에서 1:1 이 되게 2배 해상도로 만들고 반으로 줄여 그림 (게임 기준 1280×720).
+
+![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
+
 ## 세계관 도감
 기지 상단 **`도감`** 버튼 (또는 신 아이콘 클릭). 탭 = **등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경**. 왼쪽 목록(위아래 스크롤) → 오른쪽 그림·이름·부제·설명 + 게임 기록.
 - 등장인물: 아군 + 전투에 안 나가는 대원(로한) — 병과·레벨·키·HP·속도·AP·방어·사거리, **믿는 신 아이콘(누르면 그 신)**.
@@ -302,7 +313,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![도감 — 도시 배경](docs/screenshots/outgame/codex_cities.png)
 
 ## 상황별 포즈 그림 (전투 · 컷씬)
-캐릭터마다 상황별 한 장 그림을 넣으면 전투와 컷씬 대사에서 씁니다. 지금은 **니키타**(`nikita_army`) 12장 (… · shot_pistol(자동권총 — 권총을 들 때) · annoying_2(주먹 쥐고 화남 — 팔짱과 무작위) · point_up_2(붕대 들기 — 가리키기와 무작위) · smirk(턱 괴고 웃음 — 대화용)) · **앨마**(`alma`) 12장 (shot(권총) · shot_2(리볼버 — 사격 때 무작위) · slash(나이프) · point_up(무릎 꿇고 붕대 — 회복·버프) · miss(몸 틀어 피함) · stun(이마 짚음) · hit(팔 감싸며 움찔) · annoying(팔짱 · 찡그림) · dead · smile(뒷짐 미소 — 대화용) · smile_2(팔짱 미소 — 대화용) · smirk(팔짱 · 음흉한 웃음 — 대화용)) · **단**(`dan`) 9장 (hit(뒤로 휘청) · dead · slash(나이프 — 지금 무기 도끼로 근접 공격할 때도 이 그림) · slash_2(주먹 — 나이프와 무작위) · miss(몸 낮춰 피함) · stun(머리 짚음) · tired(무릎 짚고 헐떡임) · annoying(주먹 쥐고 화남) · smile(허리에 손 · 크게 웃음 — 대화용)) · **하나**(`hero2`) 12장 (hit · hit_2 · miss · shot(저격총) · slash(대검) · tired · dead · point_up(주먹 자세) · stun(이마 짚음) · annoying(얼굴 가림) · move(총 들고 이동) · awkward(목 뒤 — 대화용) · shot_pistol(권총 — 권총을 들 때)) · **키라**(`kira`) 10장 (hit · hit_2 · miss · stun · slash(단검) · tired · annoying(앉아서 외면) · shot(소총) · shot_pistol(권총) · point_up(관자놀이 — 생각)) · **이선**(`ethan`) 9장 (dead · hit · tired · slash(대검) · shot(소총) · shot_pistol(권총) · miss(움찔 피함) · stun(머리 짚음) · annoying(주먹 쥐고 분함)) (원본 = `art_src/<캐릭터>/`):
+캐릭터마다 상황별 한 장 그림을 넣으면 전투와 컷씬 대사에서 씁니다. 지금은 **니키타**(`nikita_army`) 12장 (… · shot_pistol(자동권총 — 권총을 들 때) · annoying_2(주먹 쥐고 화남 — 팔짱과 무작위) · point_up_2(붕대 들기 — 가리키기와 무작위) · smirk(턱 괴고 웃음 — 대화용)) · **앨마**(`alma`) 12장 (shot(권총) · shot_2(리볼버 — 사격 때 무작위) · slash(나이프) · point_up(무릎 꿇고 붕대 — 회복·버프) · miss(몸 틀어 피함) · stun(이마 짚음) · hit(팔 감싸며 움찔) · annoying(팔짱 · 찡그림) · dead · smile(뒷짐 미소 — 대화용) · smile_2(팔짱 미소 — 대화용) · smirk(팔짱 · 음흉한 웃음 — 대화용)) · **단**(`dan`) 9장 (hit(뒤로 휘청) · dead · slash(나이프 — 지금 무기 도끼로 근접 공격할 때도 이 그림) · slash_2(주먹 — 나이프와 무작위) · miss(몸 낮춰 피함) · stun(머리 짚음) · tired(무릎 짚고 헐떡임) · annoying(주먹 쥐고 화남) · smile(허리에 손 · 크게 웃음 — 대화용)) · **하나**(`hero2`) 12장 (hit · hit_2 · miss · shot(저격총) · slash(대검) · tired · dead · point_up(주먹 자세) · stun(이마 짚음) · annoying(얼굴 가림) · move(총 들고 이동) · awkward(목 뒤 — 대화용) · shot_pistol(권총 — 권총을 들 때)) · **키라**(`kira`) 11장 (hit · hit_2 · miss · stun · slash(단검) · tired · annoying(앉아서 외면) · shot(소총) · shot_pistol(권총) · point_up(관자놀이 — 생각) · dead) · **이선**(`ethan`) 9장 (dead · hit · tired · slash(대검) · shot(소총) · shot_pistol(권총) · miss(움찔 피함) · stun(머리 짚음) · annoying(주먹 쥐고 분함)) (원본 = `art_src/<캐릭터>/`):
 
 | 포즈 | 이름 | 전투에서 쓰는 때 |
 |---|---|---|
@@ -625,6 +636,7 @@ tools/             gen_sprites.py (원화·마스크 생성기), char_sprites.py
 tests/             run_tests.gd, outgame_tests.gd
 art_src/           캐릭터 원본 그림 (포즈 등, tools/char_sprites.py 입력 — Godot 는 안 읽음)
 assets/gods/       신 아이콘 그림 (에디터 '그림 가져오기')
+assets/ui/outgame/ 기지 상단 UI 그림 (날짜 바 · 지폐 · 아이콘 20개)
 exports/sheets/    캐릭터 동작 스프라이트 시트 내보내기 (tools/char_sprites.py export, Godot 는 안 읽음)
 docs/              design/ (기획서 사본, outgame/ = 아웃게임 기획 01~04 + 구현 현황 05), screenshots/, 2D_vs_3D_comparison.md
 ```
