@@ -443,6 +443,11 @@ func set_tired(on: bool) -> void:
 	rest_pose = "tired" if on and unit.alive and has_pose("tired") else ""
 
 
+## 몬스터 = 적 중 분류(몬스터 시트 '분류')가 '인간'이 아닌 것 — 인간 적군은 아군처럼 쓰러진 그림(dead)으로 죽음
+func is_monster() -> bool:
+	return unit.team != "ally" and str(unit.data.role) != "인간"
+
+
 ## 몬스터 사망 연출: 그 자리에서 멈춰 얼룩지며 검게 탐 → 위에서부터 불꽃 테두리와 함께 재가 되어 사라짐 + 위로 날리는 불티 (BURN_TIME 초)
 const BURN_TIME := 2.6
 var burning := false   # 타는 중
@@ -499,7 +504,7 @@ func play_move_steps(delay: float = 0.0) -> void:
 
 func play_death() -> void:
 	Sfx.play_at(self, Sfx.common("dead"), Sfx.DEAD_DB)   # 쓰러지는 소리 (공용)
-	if unit.team != "ally" and chr != null:   # 몬스터: 불에 타듯 검게 타 들어가며 사라짐
+	if is_monster() and chr != null:   # 몬스터: 불에 타듯 검게 타 들어가며 사라짐 (인간 적군은 아래 쓰러진 그림 dead)
 		play_burn()
 		return
 	if has_pose("dead"):   # 쓰러진 그림으로 바꿈 (회색 처리 · 쓰러지는 회전 없음)

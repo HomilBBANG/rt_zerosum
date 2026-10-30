@@ -531,6 +531,8 @@ func _test_balance_data_and_ai_graph() -> void:
 	_check(d.monsters.has("ghoul") and d.monsters.ghoul.row_span == 1 and d.monsters.wolf.row_span == 2 and d.monsters.wolf.ai_id == "aggressive", "몬스터 차지칸(구울 1 · 늑대 2)·AI 열")
 	_check(d.actions.flank.status_ids() == ["bleed"] and int(d.actions.flank.statuses[0].turns) == 2 and int(d.actions.sand_kick.statuses[0].chance) == 70 and d.actions.hamstring.status_ids() == ["root"], "data/skill_status.json → 스킬 상태 이상 (턴·확률)")
 	_check(d.monsters.ghoul.skill_ids.has("rend") and d.monsters.wolf.skill_ids.has("sand_kick"), "몬스터 상태 이상 스킬")
+	var am: UnitData = d.monsters.get("army_m")
+	_check(am != null and am.role == "인간" and am.row_span == 1 and am.weapons.size() == 3 and am.skill_ids.has("ultimate") and am.sprite_id == "army_m", "인간 적군 AU군 병사 (분류 인간 · 무기 3 · 스킬 kit)")
 	_check(d.warnings.is_empty(), "밸런스·스킬 트리·신앙 데이터 경고 없음 %s" % [d.warnings])
 	var kira := GameData._find(d.allies, "a_kira")
 	_check(kira != null and kira.weapons[0].sprite == "knife" and kira.weapons.size() == 2, "아이템 시트 → 무기 (스프라이트 포함)")

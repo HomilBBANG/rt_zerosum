@@ -354,6 +354,13 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![구울 배치 · 공격 · 피격](docs/screenshots/ghoul_poses_battle.jpg)
 ![늑대 공격 · 공격 2 · 피격, 구울 공격(크기 조정)](docs/screenshots/wolf_poses_battle.jpg)
+
+- **인간 적군 AU군 병사** (`army_m`, 사용자 제공 그림 9장 — 원본 `art_src/army_m/`): balance.xlsx 몬스터 시트에 추가 (분류 **인간**, 원거리, 무기 권총 · 기관단총 · 단검 — 수치 [임시]), 스킬 = monster_skills.json kits (기본 · 강공격 · 필살기). 스테이지 에디터에서 배치.
+  - 모션: idle = 기본 그림 리깅(숨쉬기 · 머리 · 팔), 공격 `shot`/`shot_pistol`(권총) · `shot_smg`(기관단총 들었을 때) · `slash`(근접), 비공격 스킬 `point_up`(시전), `hit` · `miss` · `tired`(숨쉬기 리깅) · `dead`.
+  - **사망 = 쓰러진 그림(dead)** — 몬스터(분류가 인간이 아닌 적)만 불에 타 사라짐.
+
+![AU군 병사 — 배치 · 권총 사격 · 쓰러짐(늑대는 탐)](docs/screenshots/army_m_battle.jpg)
+![AU군 병사 포즈 크기 비교](docs/screenshots/army_m_poses.png)
 ![몬스터 사망 — 불에 타 사라짐 (0.6 · 1.3 · 2.0 · 2.9초)](docs/screenshots/monster_burn_death.jpg)
 
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)

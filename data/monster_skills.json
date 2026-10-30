@@ -47,6 +47,11 @@
 		}
 	],
 	"kits": {
+		"army_m": [
+			"basic_attack",
+			"heavy_attack",
+			"ultimate"
+		],
 		"ghoul": [
 			"basic_attack",
 			"heavy_attack",
