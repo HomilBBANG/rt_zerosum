@@ -342,6 +342,10 @@ var _music_no: Label
 const MUSIC_W := 360.0
 
 
+func music_open() -> bool:
+	return music_panel != null and music_panel.visible
+
+
 func toggle_music() -> void:
 	if music_panel == null:
 		_build_music()

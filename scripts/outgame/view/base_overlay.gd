@@ -11,6 +11,7 @@ var v3d: BaseView3D
 var hub: Node
 var mode: String = "under"
 var hover_fid: String = ""
+var juke_hover := false   # 마우스가 주크박스 위 (대원 선택 없음) → 테두리 + "음악"
 var move_mark: Dictionary = {}       # 이동 목표 표시 {pos, t, run} (BaseHub 가 채움)
 var bubble_rects: Dictionary = {}   # chat key → Rect2 (화면)
 var _font: Font
@@ -56,6 +57,10 @@ func _draw() -> void:
 		_draw_room(fid)
 	_draw_floor_labels()
 	_draw_move_mark()
+	if juke_hover:
+		var jr: Rect2 = hub.jukebox_rect()
+		draw_rect(jr, Color(1, 0.85, 0.3, 0.9), false, 2.0)
+		_text(Vector2(jr.get_center().x, jr.position.y - 6), "클릭: 음악", 14, Color(1, 0.85, 0.3), _font)
 
 
 func _draw_room(fid: String) -> void:

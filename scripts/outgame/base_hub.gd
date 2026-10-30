@@ -151,11 +151,12 @@ func _make_3d() -> void:
 
 
 ## 3D 위치 → 논리 화면 좌표 (1280×720)
-## 공용실 주크박스의 화면 사각형 (없으면 크기 0)
+## 공용실 주크박스의 화면 사각형 (주크박스 전체 + 여유 0.1m, 없으면 크기 0)
 func jukebox_rect() -> Rect2:
 	var a := v3d.jukebox
 	if a.size == Vector3.ZERO:
 		return Rect2()
+	a = a.grow(0.1)
 	var r := Rect2(project(a.position), Vector2.ZERO)
 	for i in 8:
 		r = r.expand(project(a.get_endpoint(i)))
@@ -308,9 +309,13 @@ func _update_hover() -> void:
 		_hover_npc = n
 		if npc_views.has(n):
 			npc_views[n].hovered = true
-	under.hover_fid = "" if n != "" else under.facility_at_screen(p)
+	var juke := n == "" and selected == "" and jukebox_rect().has_point(p)   # 주크박스 위 (대원 선택 안 했을 때만 누를 수 있음)
+	under.hover_fid = "" if n != "" or juke else under.facility_at_screen(p)
+	if under.juke_hover != juke:
+		under.juke_hover = juke
+		under.queue_redraw()
 	var go := selected != "" and under.hover_fid != ""
-	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if (n != "" or _bubble_at(p) != "" or go) else Input.CURSOR_ARROW)
+	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if (n != "" or _bubble_at(p) != "" or go or juke) else Input.CURSOR_ARROW)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -406,8 +411,9 @@ func _left_click(p: Vector2, dbl: bool = false) -> void:
 		hud.open_dialogue(mk)
 		return
 	var n := _npc_at(p)
-	if n == "" and jukebox_rect().has_point(p):   # 공용실 주크박스 = 음악 카세트 창 (다시 누르면 닫힘)
-		hud.toggle_music()
+	if n == "" and selected == "" and jukebox_rect().has_point(p):   # 공용실 주크박스 (대원 선택 안 했을 때) = 음악 카세트 창, 다시 누르면 닫힘
+		if not dbl or not hud.music_open():   # 더블클릭의 두 번째 클릭은 닫지 않음
+			hud.toggle_music()
 		return
 	if n != "" and sim.is_researcher(n) and not dbl:   # 연구원(로한) 클릭 = 무기 연구 창
 		hud.open_research()
@@ -583,6 +589,9 @@ func _cli_ui(spec: String) -> void:
 				print("[hit] %s head=%s chest=%s corner=%s marker=%s" % [id, _npc_at(head), _npc_at(chest), _npc_at(r.position + Vector2(2, 2)), _marker_at(v.position + v.marker_at) if v.marker_at != Vector2.INF else "-"])
 		"room_menu":   # room_menu:시설 id — 방 빈 곳 우클릭 메뉴
 			hud.open_room_menu(p[1], Vector2(640, 360))
+		"juke_hover":   # 주크박스에 마우스를 올린 표시 (확인용)
+			await get_tree().process_frame
+			get_viewport().warp_mouse(jukebox_rect().get_center())
 		"jukebox":   # 주크박스를 누른 것처럼 (클릭 판정 확인용)
 			_left_click(jukebox_rect().get_center())
 		"music":   # music[:곡 번호(0부터)] — 음악 카세트 창 (그 곡으로)
