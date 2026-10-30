@@ -578,6 +578,16 @@ func _cli_ui(spec: String) -> void:
 					var a := kv.split("=")
 					sim.add_loot(a[0], int(a[1]) if a.size() > 1 else 1)
 			hud.open_supply()
+		"inventory":   # inventory[:아이템=개수,…] — 전리품(PX 물건 id 면 선물)을 넣고 인벤토리 창
+			if p.size() > 1:
+				for kv in p[1].split(",", false):
+					var a3 := kv.split("=")
+					var k3 := int(a3[1]) if a3.size() > 1 else 1
+					if sim.data.px_items.has(a3[0]):
+						sim.gifts[a3[0]] = int(sim.gifts.get(a3[0], 0)) + k3
+					else:
+						sim.add_loot(a3[0], k3)
+			hud.open_inventory()
 		"general":   # general[:아이템=개수,…] — 창고에 넣고 장군 점검 지금
 			if p.size() > 1:
 				for kv in p[1].split(",", false):

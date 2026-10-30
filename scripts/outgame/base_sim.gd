@@ -65,6 +65,7 @@ var log_lines: Array = []
 var chars: Dictionary = {}           # 전투 캐릭터 id → {hp, statuses, fatigue, affinity, talk_day} (기지·전투 공통 몸 상태)
 var seat_owner: Dictionary = {}      # 오브젝트 id → 대원 id
 var food: int = 0                    # 식재료 (1 = 한 끼)
+var water: int = 0                   # 물 (병) — 인벤토리에 보임. 아직 쓰는 곳 없음 (supply.xlsx 설정 water_start)
 var gifts: Dictionary = {}           # PX 선물 id → 개수
 var growth: Array = []               # 마지막 전투 결과의 성장 [{id, name, xp, level, ups}] (결과 화면 표시용, 저장 안 함)
 var pending_battle: Dictionary = {}  # 발생했지만 아직 끝나지 않은 전투 {rule, name, stage, minute, label, allow_skip}
@@ -94,6 +95,7 @@ func _new_game() -> void:
 	_add_missing_npcs()
 	_init_inventory()
 	food = data.inum("food_start", 10)
+	water = supply().inum("water_start", 12)
 	_minute = clock.minute_int()
 	_day = clock.day_index(_minute)
 	_month = clock.month_key(_minute)
@@ -2440,7 +2442,7 @@ func to_dict() -> Dictionary:
 		nd[id] = npcs[id].to_dict()
 	return {"version": SAVE_VERSION, "total_minutes": clock.total_minutes, "minute": _minute, "day": _day, "month": _month,
 		"rng_seed": str(rng.seed), "rng_state": str(rng.state), "ledger": ledger.to_dict(), "unlocked": unlocked.keys(),
-		"loot": loot, "deliveries": deliveries, "loyalty": loyalty, "npcs": nd, "chats": chats, "jobs": jobs, "claimed_contracts": claimed_contracts.keys(),
+		"loot": loot, "water": water, "deliveries": deliveries, "loyalty": loyalty, "npcs": nd, "chats": chats, "jobs": jobs, "claimed_contracts": claimed_contracts.keys(),
 		"opened_contracts": opened_contracts.keys(), "request_state": request_state, "conv_counts": conv_counts, "heard": heard,
 		"story_seen": story_seen, "inspections": inspections, "progression": progression, "inventory": inventory,
 		"workshop": workshop, "researched": researched.keys(), "research": research, "counters": counters, "log": log_lines.slice(maxi(0, log_lines.size() - 100)),
@@ -2477,6 +2479,7 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 			done[str(it)] = int(e0.done[it])
 		s.deliveries[str(k)] = {"req": req, "done": done}
 	s.loyalty = int(d.get("loyalty", s.supply().inum("loyalty_start", 50)))
+	s.water = int(d.get("water", s.supply().inum("water_start", 12)))
 	s.jobs = d.get("jobs", [])
 	for c in d.get("claimed_contracts", []):
 		s.claimed_contracts[str(c)] = true

@@ -432,6 +432,7 @@ func _test_save_load() -> void:
 	s.add_loot("scrap", 3)
 	s.deliver("scrap", 1)
 	s.loyalty = 63
+	s.water = 7
 	s.issue_job("npc_kira", "c_task_office")
 	s.skip(1440 * 8 + 37)
 	var j := JSON.stringify(s.to_dict())
@@ -439,6 +440,7 @@ func _test_save_load() -> void:
 	_c(t.ledger.cash == s.ledger.cash and t.clock.label() == s.clock.label(), "달러·날짜 (%s, $%d)" % [t.clock.label(), t.ledger.cash])
 	_c(t.unlocked.keys().size() == s.unlocked.keys().size() and t.is_unlocked("f1_mess"), "해금 상태")
 	_c(t.loot == s.loot and t.loyalty == s.loyalty and var_to_str(t.deliveries) == var_to_str(s.deliveries), "전리품 · 납품 · 충성심 (%d)" % t.loyalty)
+	_c(t.water == 7, "물 저장 · 불러오기 (%d)" % t.water)
 	_c(t.ledger.settled_weeks == s.ledger.settled_weeks and t.ledger.entries.size() == s.ledger.entries.size(), "결산 기록")
 	_c(t.inspections.keys() == s.inspections.keys(), "점검 기록")
 	var same_pos := true

@@ -781,12 +781,12 @@ func _refresh_panel() -> void:
 		if i < skills.size():
 			_add_skill_slot(skills[i], is_player)
 		else:
-			_add_slot(slots_row, {})
+			_add_slot(slots_row, {"art": "skill"})
 	_add_gap()
 	if not ult.is_empty():
 		_add_skill_slot(ult, is_player)
 	else:
-		_add_slot(slots_row, {"caption": "필살기", "ult": true})
+		_add_slot(slots_row, {"caption": "필살기", "ult": true, "art": "ult"})
 	end_btn.disabled = not is_player
 	_refresh_statuses(u)
 
@@ -844,7 +844,7 @@ func _add_skill_slot(o: Dictionary, is_player: bool) -> void:
 	var icon_id := id if ResourceLoader.exists("res://assets/textures/ui_%s.png" % id) else ("ultimate" if o.kind == "ultimate" else "basic_attack")
 	_add_slot(slots_row, {"icon": load("res://assets/textures/ui_%s.png" % icon_id), "caption": o.name, "cost": o.cost,
 		"enabled": is_player and o.enabled, "mark": "selected" if pending_action == id else "", "tip": tip,
-		"ult": o.kind == "ultimate", "press": func(_b):
+		"ult": o.kind == "ultimate", "art": "ult" if o.kind == "ultimate" else "skill", "press": func(_b):
 			if pending_action == id:
 				cancel_pending()   # 다시 누르면 취소
 			else:
@@ -861,7 +861,7 @@ func _add_gap() -> void:
 ## 슬롯 하나: 버튼 + 아래 이름. d 키:
 ##   icon, caption, cost(-1 = 표시 없음), enabled, tip, press(Callable(btn)),
 ##   mark: "" | "equipped"(노란 테두리) | "selected"(선택 중 테두리) | "move_on"(자리 이동 선택: 파란 바탕 + 화살표 흔들림)
-##   weapon(세로로 긴 무기 칸), ult(필살기 바탕)
+##   weapon(세로로 긴 무기 칸), ult(필살기 바탕), art("skill" | "ult" = 정사각형 패널 그림 바탕 — 일반 스킬 · 필살기 칸에만, UiSlot)
 ## 사용할 수 없으면 회색 처리, 비용은 붉은 "-AP" (사용 가능하면 파란 "-AP")
 func _add_slot(parent: Container, d: Dictionary) -> void:
 	var icon: Texture2D = d.get("icon", null)
@@ -903,14 +903,19 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	if not usable:
 		sb.bg_color = Color(0.24, 0.24, 0.26, 0.9)   # 회색 처리
 		sb.border_color = Color(1, 1, 1, 0.1)
-	btn.add_theme_stylebox_override("normal", sb)
-	var hov: StyleBoxFlat = sb.duplicate()
-	hov.bg_color = sb.bg_color.lightened(0.12)
-	if mark == "":
-		hov.border_color = Color(1, 1, 1, 0.6)
-	btn.add_theme_stylebox_override("hover", hov)
-	btn.add_theme_stylebox_override("pressed", hov)
-	btn.add_theme_stylebox_override("disabled", sb)
+	var art: String = d.get("art", "")
+	if art != "":
+		# 일반 스킬 = 2번 패널, 필살기 = 3번 패널 (선택 중 = 파란 테두리, 쓸 수 없음 = 어둡게)
+		UiSlot.apply(btn, art, not usable, sb.border_color if mark != "" else Color(0, 0, 0, 0))
+	else:
+		btn.add_theme_stylebox_override("normal", sb)
+		var hov: StyleBoxFlat = sb.duplicate()
+		hov.bg_color = sb.bg_color.lightened(0.12)
+		if mark == "":
+			hov.border_color = Color(1, 1, 1, 0.6)
+		btn.add_theme_stylebox_override("hover", hov)
+		btn.add_theme_stylebox_override("pressed", hov)
+		btn.add_theme_stylebox_override("disabled", sb)
 	if icon != null:
 		var tr := TextureRect.new()
 		tr.texture = icon

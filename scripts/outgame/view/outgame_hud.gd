@@ -197,7 +197,7 @@ func _build_top() -> void:
 	right.position = Vector2(0, 6)
 	add_child(right)
 	var specs := [["스킬", "skill", null, func(): open_skills("")], ["도감", "codex", null, func(): open_codex()], ["퀘스트", "quest", QUEST_COL, func(): open_quests()],
-		["의뢰", "contract", null, func(): open_contracts("")], ["무기고", "tools", null, func(): open_armory()], ["납품", "calendar_check", GOLD, func(): open_supply()], ["원장", "ledger", null, func(): open_ledger()],
+		["의뢰", "contract", null, func(): open_contracts("")], ["무기고", "tools", null, func(): open_armory()], ["인벤토리", "scroll", null, func(): open_inventory()], ["납품", "calendar_check", GOLD, func(): open_supply()], ["원장", "ledger", null, func(): open_ledger()],
 		["저장", "bookmark", Color(0.6, 0.95, 0.65), func(): hub.save_now()], ["전투 출전", "sword", Color(1.0, 0.55, 0.35), func(): open_sortie()],
 		["타이틀", "gear", Color(0.7, 0.7, 0.72), func(): hub.to_title()]]
 	for s in specs:
@@ -2107,6 +2107,102 @@ func _fill_supply(body: VBoxContainer) -> void:
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size.x = 660
 	body.add_child(l)
+
+
+# ---------------------------------------------------------------- 인벤토리 (1번 정사각형 패널 칸)
+const INV_COLS := 8
+const INV_MIN_SLOTS := 24
+const INV_KIND := {"supply": ["보급", Color(0.6, 0.85, 1.0)], "loot": ["전투 보상", Color(1.0, 0.85, 0.45)], "px": ["PX 선물", Color(1.0, 0.65, 0.8)]}
+
+
+## 인벤토리 안 물건 [{kind, id, name, count, desc}] — 식량 · 물 → 전투 보상(전리품) → PX 선물(호감도)
+func inventory_items() -> Array:
+	var out := []
+	out.append({"kind": "supply", "id": "food", "name": "식량", "count": sim.food, "desc": "식재료 (1 = 한 끼). 식사 때 1끼씩 씀 — 식당에서 공급"})
+	out.append({"kind": "supply", "id": "water", "name": "물", "count": sim.water, "desc": "식수 (병). 아직 쓰는 곳 없음"})
+	var sp := sim.supply()
+	for it in sp.item_order:
+		if sim.loot_count(it) > 0:
+			out.append({"kind": "loot", "id": it, "name": sim.item_label(it), "count": sim.loot_count(it), "desc": str(sp.items[it].get("desc", ""))})
+	for it in sim.loot:
+		if not sp.items.has(it) and sim.loot_count(it) > 0:
+			out.append({"kind": "loot", "id": it, "name": it, "count": sim.loot_count(it), "desc": ""})
+	for g in sim.data.px_order:
+		if int(sim.gifts.get(g, 0)) > 0:
+			var px: Dictionary = sim.data.px_items[g]
+			out.append({"kind": "px", "id": g, "name": str(px.name), "count": int(sim.gifts[g]), "desc": "%s\n대원에게 선물 → 친밀도 (기본 +%d)" % [str(px.get("desc", "")), int(px.base)]})
+	return out
+
+
+func open_inventory() -> void:
+	var win := _window("인벤토리", 700)
+	_fill_inventory(win.body)
+
+
+func _fill_inventory(body: VBoxContainer, pick: String = "") -> void:
+	for c in body.get_children():
+		body.remove_child(c)
+		c.queue_free()
+	var items := inventory_items()
+	var info := _label("", 14, Color(0.85, 0.88, 0.92))
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.custom_minimum_size = Vector2(650, 44)
+	var legend := _hbox(16)
+	body.add_child(legend)
+	for k in INV_KIND:
+		var n := items.filter(func(e): return e.kind == k).size()
+		legend.add_child(_label("■ %s %d종" % [INV_KIND[k][0], n], 14, INV_KIND[k][1]))
+	var grid := GridContainer.new()
+	grid.columns = INV_COLS
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	body.add_child(grid)
+	var total := maxi(INV_MIN_SLOTS, ceili(items.size() / float(INV_COLS)) * INV_COLS)
+	for i in total:
+		grid.add_child(_inv_slot(items[i] if i < items.size() else {}, body, pick))
+	body.add_child(info)
+	var sel: Array = items.filter(func(e): return "%s:%s" % [e.kind, e.id] == pick)
+	if sel.is_empty():
+		info.text = "칸을 누르면 설명 — 전투 보상은 전투 승리 · 대원과 하루 첫 대화에서, PX 선물은 PX 에서 삼"
+	else:
+		var e: Dictionary = sel[0]
+		info.text = "%s ×%d  ·  %s\n%s" % [e.name, e.count, INV_KIND[e.kind][0], e.desc]
+
+
+func _inv_slot(e: Dictionary, body: VBoxContainer, pick: String) -> Control:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(75, 75)
+	b.focus_mode = FOCUS_NONE
+	var key := "" if e.is_empty() else "%s:%s" % [e.kind, e.id]
+	UiSlot.apply(b, "item", false, GOLD if key != "" and key == pick else Color(0, 0, 0, 0))
+	if e.is_empty():
+		b.modulate = Color(1, 1, 1, 0.55)   # 빈 칸
+		b.mouse_filter = MOUSE_FILTER_IGNORE
+		return b
+	var col: Color = INV_KIND[e.kind][1]
+	var nl := _label(str(e.name), 13, col, true)
+	nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	nl.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	nl.offset_left = 6
+	nl.offset_right = -6
+	nl.offset_top = 6
+	nl.offset_bottom = -16
+	nl.mouse_filter = MOUSE_FILTER_IGNORE
+	b.add_child(nl)
+	var cnt := _label("×%d" % int(e.count), 13, Color(1, 1, 1) if int(e.count) > 0 else BAD, true)
+	cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	cnt.set_anchors_and_offsets_preset(PRESET_BOTTOM_WIDE)
+	cnt.offset_left = 6
+	cnt.offset_right = -8
+	cnt.offset_top = -22
+	cnt.offset_bottom = -5
+	cnt.mouse_filter = MOUSE_FILTER_IGNORE
+	b.add_child(cnt)
+	b.tooltip_text = "%s ×%d (%s)\n%s" % [e.name, int(e.count), INV_KIND[e.kind][0], e.desc]
+	b.pressed.connect(func(): _fill_inventory(body, "" if key == pick else key))
+	return b
 
 
 # ---------------------------------------------------------------- 출전

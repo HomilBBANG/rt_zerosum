@@ -308,6 +308,12 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![전투 하단 패널 — UI 공용 패널](docs/screenshots/battle_ui_panel.jpg)
 
+- **정사각형 슬롯 패널** (원본 `art_src/ui/square_panels.webp` → `assets/ui/slot_item.png` · `slot_skill.png` · `slot_ult.png`, 150×150 = 75칸의 2배): 1번 = 기지 인벤토리 칸, 2번 = 전투 일반 스킬 칸, 3번 = 필살기 칸 — 이 셋에만. 코드 `scripts/ui/ui_slot.gd` (`UiSlot.apply(버튼, "item"|"skill"|"ult", 회색, 테두리색)`).
+- **인벤토리** (기지 상단 '인벤토리' 버튼): 식량 · 물 · 전투 보상(전리품) · PX 선물을 칸으로. 칸을 누르면 설명. 확인용 `--base_ui=inventory:scrap=4,gift_coffee=2` (PX 물건 id 면 선물로 넣음).
+
+![기지 인벤토리](docs/screenshots/outgame_inventory.jpg)
+![전투 스킬 · 필살기 칸](docs/screenshots/battle_skill_slots.jpg)
+
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
 
 ## 세계관 도감
