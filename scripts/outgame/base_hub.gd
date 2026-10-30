@@ -38,7 +38,6 @@ var screen_root: Node2D
 var npc_views: Dictionary = {}     # npc id → NpcView
 var hud: OutgameHud
 var speed: int = 1                 # 0 = 정지, 1 / 4 / 16 배
-var _pick_npc: String = ""         # 청소 장소 고르는 중인 대원
 var selected: String = ""          # 선택한 대원 (클릭) — 방 클릭 = 그 방으로 이동, 더블클릭 = 뛰어감, 도착 후 우클릭 = 행동
 var move_mark: Dictionary = {}     # 이동 목표 표시 {pos(화면), t, run}
 var _hover_npc: String = ""
@@ -301,7 +300,7 @@ func _update_hover() -> void:
 			npc_views[n].hovered = true
 	under.hover_fid = "" if n != "" else under.facility_at_screen(p)
 	var go := selected != "" and under.hover_fid != ""
-	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if (n != "" or _bubble_at(p) != "" or _pick_npc != "" or go) else Input.CURSOR_ARROW)
+	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if (n != "" or _bubble_at(p) != "" or go) else Input.CURSOR_ARROW)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -310,9 +309,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_ESCAPE:
-				if _pick_npc != "":
-					_end_pick()
-				elif hud.modal_open():
+				if hud.modal_open():
 					hud.close_top()
 				elif selected != "":
 					select("")
@@ -389,13 +386,6 @@ func _update_zoom(delta: float) -> void:
 ## 왼쪽 클릭: 대원 = 선택 (선택한 대원을 한 번 더 = 대화) / 선택한 대원이 있으면 방 = 그 위치로 걸어감, 더블클릭 = 뛰어감 /
 ## 선택 없으면 방 = 시설 창(잠긴 방 = 해금). 빈 곳 = 선택 해제
 func _left_click(p: Vector2, dbl: bool = false) -> void:
-	if _pick_npc != "":
-		var fid := under.facility_at_screen(p)
-		var r := sim.issue_clean(_pick_npc, fid)
-		hud.show_toast(r.msg, OutgameHud.GOOD if r.ok else OutgameHud.BAD)
-		if r.ok or fid == "":
-			_end_pick()
-		return
 	var key := _bubble_at(p)
 	if key != "":
 		hud.open_overhear(key)
@@ -442,9 +432,6 @@ func room_x_at(fid: String, p: Vector2) -> float:
 
 ## 오른쪽 클릭: 대원 = 그 대원 선택 + 행동 메뉴 / 선택한 대원이 있는 방 = 그 방에서 할 행동 메뉴
 func _right_click(p: Vector2, screen: Vector2) -> void:
-	if _pick_npc != "":
-		_end_pick()
-		return
 	var n := _npc_at(p)
 	if n != "":
 		select(n)
@@ -471,18 +458,6 @@ func select(npc_id: String) -> void:
 	if npc_views.has(selected):
 		npc_views[selected].selected = true
 	hud.show_selection(selected)
-
-
-func begin_clean_pick(npc_id: String) -> void:
-	_pick_npc = npc_id
-	under.pick_mode = true
-	hud.set_banner("%s: 청소할 장소를 클릭하세요 (우클릭·Esc 취소)" % sim.data.npc_name(npc_id))
-
-
-func _end_pick() -> void:
-	_pick_npc = ""
-	under.pick_mode = false
-	hud.set_banner("")
 
 
 # ================================================================ 버튼 동작
@@ -512,12 +487,6 @@ func debug_skip(minutes: int) -> void:
 
 func debug_battle() -> void:
 	sim.debug_trigger_battle()
-
-
-func debug_dirt() -> void:
-	var cands := sim.data.facility_order.filter(func(f): return sim.is_unlocked(f) and sim.cleanable(f))
-	if not cands.is_empty():
-		sim.add_dirt(cands[randi() % cands.size()])
 
 
 func debug_delete_save() -> void:
@@ -603,8 +572,18 @@ func _cli_ui(spec: String) -> void:
 			var v: NpcView = npc_views[p[1]]
 			v._place(sim.npcs[p[1]])   # 시간 건너뛴 직후라 화면 위치 갱신
 			hud.open_context(p[1], v.position + Vector2(20, -40))
-		"clean":
-			begin_clean_pick(p[1])
+		"supply":   # supply[:아이템:개수,…] — 창고에 전리품 넣고 납품 창
+			if p.size() > 1:
+				for kv in p[1].split(",", false):
+					var a := kv.split("=")
+					sim.add_loot(a[0], int(a[1]) if a.size() > 1 else 1)
+			hud.open_supply()
+		"general":   # general[:아이템=개수,…] — 창고에 넣고 장군 점검 지금
+			if p.size() > 1:
+				for kv in p[1].split(",", false):
+					var a2 := kv.split("=")
+					sim.add_loot(a2[0], int(a2[1]) if a2.size() > 1 else 1)
+			sim.debug_inspect_now()
 		"debug":
 			hud.toggle_debug()
 		"battle_event":

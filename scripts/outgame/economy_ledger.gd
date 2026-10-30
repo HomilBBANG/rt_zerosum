@@ -1,7 +1,7 @@
 class_name EconomyLedger
 extends RefCounted
 ## 달러 원장. 모든 입출금은 고유 id 를 가진 항목으로만 반영 → 같은 거래(해금·작업 수익·지원금·점검 보너스)가 두 번 들어가지 않는다.
-## 작업·의뢰 수익과 점검 보너스는 '미지급(pending)'으로 쌓였다가 주간 결산 때 현금으로 들어온다 [임시 권장 방식].
+## 작업·의뢰 수익과 장군 추가금/차감은 '미지급(pending)'으로 쌓였다가 주간 결산 때 현금으로 들어온다 [임시 권장 방식].
 
 var cash: int = 0
 var entries: Array = []          # [{id, minute, date, source, amount, ref, label, week}]
@@ -47,14 +47,14 @@ func pending_total() -> int:
 	return t
 
 
-## week 주 결산: 행정 지원금 + 그 주까지 쌓인 미지급. 이미 결산한 주면 {}
-func settle(week: int, subsidy: int, minute: int, date: String) -> Dictionary:
+## week 주 결산: 주급(기지는 기본 주급 × 납품 비율) + 그 주까지 쌓인 미지급(의뢰 수익 · 장군 추가금/차감). 이미 결산한 주면 {}
+func settle(week: int, subsidy: int, minute: int, date: String, label: String = "주간 행정 지원금", source: String = "subsidy") -> Dictionary:
 	if week in settled_weeks:
 		return {}
 	var items := []
-	var sid := "subsidy:w%d" % week
-	if post(sid, minute, date, "subsidy", subsidy, "w%d" % week, "주간 행정 지원금", week):
-		items.append({"id": sid, "label": "주간 행정 지원금", "amount": subsidy, "source": "subsidy"})
+	var sid := "%s:w%d" % [source, week]
+	if post(sid, minute, date, source, subsidy, "w%d" % week, label, week):
+		items.append({"id": sid, "label": label, "amount": subsidy, "source": source})
 	var keep := []
 	for p in pending:
 		if int(p.week) <= week:

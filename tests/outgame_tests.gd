@@ -23,7 +23,7 @@ func run(p_check: Callable) -> void:
 	_test_routes()
 	_test_schedules()
 	_test_dialogue()
-	_test_cleaning()
+	_test_supply()
 	_test_settlement()
 	_test_inspection()
 	_test_progression()
@@ -248,36 +248,65 @@ func _test_dialogue() -> void:
 	_c(int(s2.conv_counts.get("conv_story_01", 0)) == 1, "스토리 대화는 최대 1회 (무한 반복 없음)")
 
 
-func _test_cleaning() -> void:
-	print("[20] 일일 오염 / 우클릭 → 청소 → 장소 / 위임")
+func _test_supply() -> void:
+	print("[20] 보급: 전리품 창고 · 전투 보상 · 대원 선물 · 주마다 납품 목록 · 납품 비율 → 주급")
+	var sp: SupplyData = data.supply
+	_c(sp != null and sp.items.size() >= 10 and not sp.battle_loot.is_empty() and not sp.demands.is_empty() and not sp.deliveries.is_empty(), "data/supply.xlsx 읽기")
+	_c(sp.warnings.is_empty(), "보급 데이터 참조 오류 없음 %s" % [sp.warnings])
+	_c(SupplyData.parse_list("scrap:4, gunpowder:2,bandage") == {"scrap": 4, "gunpowder": 2, "bandage": 1}, "납품 목록 글 'scrap:4, …' 읽기")
+	_c(sp.delivery_for(0.0, 0) != sp.delivery_for(0.0, 1), "같은 진행률 줄이 둘 → 주마다 번갈아")
+	_c(sp.delivery_for(50.0, 0) != sp.delivery_for(0.0, 0) and sp.delivery_for(49.0, 0) == sp.delivery_for(0.0, 0), "진행률 50% 이상이면 다른 목록")
 	var s := _sim()
-	var before := s.dirt.size()
-	s.skip_to_next_day()
-	var n_new := s.dirt.size() - before
-	_c(n_new >= 1 and n_new <= 2, "날짜가 바뀌면 오염 1~2건 생성 (%d)" % n_new)
-	for dd in s.dirt:
-		_c(s.is_unlocked(dd.facility) and s.cleanable(dd.facility), "오염은 해금된 청소 구역에만 (%s)" % dd.facility)
-	var s2 := _sim()
-	s2.add_dirt("f1_lounge")
-	_c(s2.cleanliness.f1_lounge < 90.0, "오염 → 청결도 감소")
-	_c(not s2.issue_clean("npc_kira", "f1_mess").ok, "잠긴 방 청소 지시 → 이유 표시하고 실행 안 함")
-	_c(not s2.issue_clean("npc_kira", "f1_stair_w").ok, "계단(청소 대상 아님) → 실행 안 함")
-	var r := s2.issue_clean("npc_kira", "f1_lounge")
-	_c(r.ok and r.executor == "npc_kira", "키라에게 공용실 청소 지시")
-	_c(not s2.issue_clean("npc_hana", "f1_lounge").ok, "같은 곳 중복 청소 지시 방지")
-	s2.skip(60)
-	_c(s2.cleanliness.f1_lounge == 100.0 and s2.dirt_in("f1_lounge").is_empty(), "이동 → 청소 → 오염 제거, 청결 100")
-	_c(s2.npcs.npc_kira.command.is_empty(), "청소 끝나면 원래 일정으로 복귀")
-	var r2 := s2.issue_clean("npc_dan", "f1_office")
-	_c(r2.ok and r2.executor != "npc_dan" and r2.executor in ["npc_hana", "npc_kira"], "단(위임 성향) → 하나·키라 중 한 명이 대신 청소 (%s)" % r2.get("executor", ""))
-	var last: Dictionary = s2.cleaning_log[-1]
-	_c(last.requested == "npc_dan" and last.executing == r2.executor, "로그: 요청자 단 / 실제 수행자 분리 기록")
+	s.inspections["2048-04"].minute = s.clock.month_bounds().y - 1   # 장군 요구가 이 검사에 섞이지 않게 월말로
+	_c(s.story_progress() == 0.0 and not s.delivery().req.is_empty() and s.delivery_rate() == 0.0 and s.expected_pay() == 0, "처음: 진행률 0% · 납품 0% → 주급 $0")
+	# 사용자 예: 기본 주급 150, 50% 납품 → 75
+	s.deliveries[str(s.week_now())] = {"req": {"scrap": 2, "gunpowder": 2}, "done": {}}
+	_c(not s.deliver("scrap").ok, "창고에 없으면 납품 안 됨")
+	_c(not s.deliver("whiskey").ok, "목록에 없는 물품 → 안 됨")
+	s.add_loot("scrap", 5)
+	var r := s.deliver("scrap", 999)
+	_c(r.ok and int(s.delivery().done.scrap) == 2 and s.loot_count("scrap") == 3, "모두 내기 = 필요한 만큼만 (2개 냄, 창고 3개 남음)")
+	_c(not s.deliver("scrap").ok, "다 낸 물품 → 더 안 받음")
+	_c(is_equal_approx(s.delivery_rate(), 0.5) and s.expected_pay() == 75, "납품 50% → 주급 $75 (기본 $150)")
+	var sts := []
+	s.statement_ready.connect(func(st): sts.append(st))
+	var cash0 := s.ledger.cash
+	s.skip_to_next_week()
+	var pay_items: Array = sts[0].items.filter(func(it): return it.source == "pay") if not sts.is_empty() else []
+	_c(pay_items.size() == 1 and int(pay_items[0].amount) == 75 and str(pay_items[0].label).contains("50%") and s.ledger.cash == cash0 + 75, "결산: 주급 (납품 50%) $75")
+	# 스토리 진행률 → 다음 주 목록
+	s.quests["q_hana_secret"] = {"state": "done", "step": 0, "base": 0, "started": 1, "finished": 2}
+	_c(is_equal_approx(s.story_progress(), 50.0), "퀘스트 2개 중 1개 완료 → 진행률 50%")
+	_c(s.delivery().req == sp.delivery_for(50.0, s.week_now()), "새 주 납품 목록은 그때 진행률로")
+	# 전투 승리 전리품
+	var b := _sim()
+	b.pending_battle = {"stage": "stage_01", "rule": ""}
+	b.apply_battle_result({"winner": "ally", "allies": [], "stage": "stage_01"})
+	_c(not b.last_loot.is_empty() and b.loot_count("scrap") >= 1, "전투 승리 → 전리품 창고 (고철은 100%%) %s" % [b.last_loot])
+	var before := b.loot.duplicate()
+	b.apply_battle_result({"winner": "enemy", "allies": [], "stage": "stage_01"})
+	_c(b.last_loot.is_empty() and b.loot == before, "패배 → 전리품 없음")
+	# 대원 선물 (하루 첫 대화)
+	var g := _sim()
+	var saved := sp.crew_gifts.duplicate(true)
+	for e in sp.crew_gifts:
+		if e.npc == "npc_alma":
+			e.chance = 100
+	var d1 := g.begin_dialogue("npc_alma")
+	g.end_dialogue("npc_alma")
+	var d2 := g.begin_dialogue("npc_alma")
+	g.end_dialogue("npc_alma")
+	sp.crew_gifts = saved
+	_c(str(d1.get("gift", {}).get("item", "")) == "bandage" and g.loot_count("bandage") == 1, "앨마와 하루 첫 대화 → 붕대를 건넴 (창고 +1)")
+	_c(d2.get("gift", {}).is_empty(), "같은 날 두 번째 대화 → 선물 없음")
+	# 청결 요소 없음
+	_c(not ("cleanliness" in g.to_dict()) and not g.room_actions("npc_dan").any(func(x): return x.id == "clean_here"), "청결 · 청소 지시 없음")
 
 
 func _test_settlement() -> void:
-	print("[21] 주간 결산: 지원금·작업 수익이 한 번씩, 시간 건너뛰기 후에도 중복 없음")
+	print("[21] 주간 결산: 주급·작업 수익이 한 번씩, 시간 건너뛰기 후에도 중복 없음")
 	var s := _sim()
-	s.inspections["2048-04"].minute = s.clock.month_bounds().y - 1   # 점검 보너스가 이 검사에 섞이지 않게 월말로
+	s.inspections["2048-04"].minute = s.clock.month_bounds().y - 1   # 장군 요구가 이 검사에 섞이지 않게 월말로
 	var r := s.issue_job("npc_kira", "c_task_office")
 	_c(r.ok, "키라에게 '서류 정리' 작업 지시")
 	_c(not s.issue_job("npc_kira", "c_task_workshop").ok, "같은 대원 중복 지시 방지")
@@ -292,21 +321,21 @@ func _test_settlement() -> void:
 	var sts := []
 	s.statement_ready.connect(func(st): sts.append(st))
 	s.skip_to_next_week()
-	_c(sts.size() == 1 and s.ledger.cash == cash0 + 100 + 65, "1주차 결산: 지원금 $100 + 수익 $65 (잔액 $%d)" % s.ledger.cash)
+	_c(sts.size() == 1 and s.ledger.cash == cash0 + 0 + 65, "1주차 결산: 주급 $0 (납품 0%%) + 수익 $65 (잔액 $%d)" % s.ledger.cash)
 	_c(s.ledger.pending.is_empty(), "결산 후 미지급 0")
 	s.skip(3 * 7 * 1440)
 	_c(sts.size() == 4 and s.ledger.settled_weeks == [0, 1, 2, 3], "4주 → 결산 4번, 주마다 1번 (%s)" % [s.ledger.settled_weeks])
 	var subs := 0
 	for e in s.ledger.entries:
-		if e.source == "subsidy":
+		if e.source == "pay":
 			subs += 1
-	_c(subs == 4, "지원금 4번만")
+	_c(subs == 4, "주급 4번만")
 	_c(s.ledger.settle(1, 100, s.minute(), "").is_empty(), "이미 결산한 주 다시 결산 → 무시")
 	_c(not s.ledger.add_pending("job:job_1", "task", 25, "", "", 9), "이미 지급된 작업 수익 다시 넣기 → 무시")
 
 
 func _test_inspection() -> void:
-	print("[22] 장군 점검: 매월 정확히 1회, 보너스는 그 주 결산에만")
+	print("[22] 장군 점검: 매월 1회 · 아이템 요구(매번 다름) → 준다/안 준다 → 그 주 결산 추가금/차감 · 충성심")
 	var s := _sim()
 	var ins := s.inspection_this_month()
 	_c(not ins.is_empty() and int(ins.minute) >= s.minute() and int(ins.minute) < s.clock.month_bounds().y, "4월 점검 시각이 4/7 이후 4월 안에서 정해짐")
@@ -317,32 +346,45 @@ func _test_inspection() -> void:
 	s.skip_to_next_month()
 	s.skip_to_next_month()
 	_c(done == ["2048-04", "2048-05", "2048-06"], "3달 → 달마다 1회 (%s)" % [done])
-	var rec: Dictionary = s.inspections["2048-05"]
-	var found_week := -1
-	var count := 0
+	var items := ["2048-04", "2048-05", "2048-06"].map(func(k): return str(s.inspections[k].get("item", "")))
+	_c(items[0] != "" and items[0] != items[1] and items[1] != items[2], "요구 아이템은 매번 다름 %s" % [items])
+	# 대답 안 하면 결산 때 거절 (차감 · 충성심 -10)
+	var refused := 0
 	for st in s.ledger.statements:
 		for it in st.items:
-			if it.id == "inspection:2048-05":
-				found_week = int(st.week)
-				count += 1
-	_c(count == 1 and found_week == int(rec.week), "5월 점검 보너스는 점검한 주(%d)의 결산에 1번만" % int(rec.week))
-	# 달 중간 저장 → 불러오기 후에도 1회
+			if str(it.id).begins_with("general:") and int(it.amount) == -data.supply.inum("general_penalty", 40):
+				refused += 1
+	_c(refused >= 2 and s.loyalty == data.supply.inum("loyalty_start", 50) - 10 * refused, "대답 없이 결산 → 거절 처리 (차감 %d번, 충성심 %d)" % [refused, s.loyalty])
+	# 준다
+	var g := _sim()
+	g.debug_inspect_now()
+	var rec: Dictionary = g.pending_demand()
+	_c(not rec.is_empty() and int(rec.count) >= 1 and str(rec.answer) == "", "점검 → 장군 요구 (대답 기다림): %s ×%d" % [rec.get("item", ""), int(rec.get("count", 0))])
+	_c(not g.answer_demand(true).ok, "창고에 없으면 줄 수 없음")
+	g.add_loot(str(rec.item), int(rec.count) + 1)
+	var r := g.answer_demand(true)
+	_c(r.ok and g.loot_count(str(rec.item)) == 1 and g.loyalty == 55 and g.ledger.pending_total() == data.supply.inum("general_bonus", 40), "준다 → 창고에서 빠짐 · 충성심 +5 (55) · 결산 추가금 +$40 미지급")
+	_c(not g.answer_demand(false).ok and g.pending_demand().is_empty(), "한 번 대답하면 끝")
+	var sts := []
+	g.statement_ready.connect(func(st): sts.append(st))
+	g.skip_to_next_week()
+	_c(sts.size() == 1 and sts[0].items.any(func(it): return it.source == "general" and int(it.amount) == 40), "그 주 결산에 추가금")
+	# 안 준다
+	var h := _sim()
+	h.debug_inspect_now()
+	h.add_loot(str(h.pending_demand().item), 9)
+	var r2 := h.answer_demand(false)
+	_c(r2.ok and h.loyalty == 40 and h.ledger.pending_total() == -40 and h.loot_count(str(h.inspection_this_month().item)) == 9, "안 준다 → 물건은 그대로 · 충성심 -10 (40) · 결산 차감 -$40")
+	# 저장 → 불러오기 후에도 1회 · 상태 유지
 	var s2 := _sim()
 	var ins2: Dictionary = s2.inspection_this_month()
 	s2.skip(int(ins2.minute) - s2.minute() + 5)
-	_c(ins2.done, "점검 시각 지나면 실행")
+	_c(ins2.done and not s2.pending_demand().is_empty(), "점검 시각 지나면 장군 요구")
 	var s3 := BaseSim.from_dict(data, battle, JSON.parse_string(JSON.stringify(s2.to_dict())))
 	var again := []
-	s3.inspection_completed.connect(func(r2): again.append(r2.month))
+	s3.inspection_completed.connect(func(r3): again.append(r3.month))
 	s3.skip(s3.clock.month_bounds(s3.minute()).y - s3.minute() - 1)
 	_c(again.is_empty(), "저장 후 불러와도 같은 달 재점검 없음")
-	# 청결이 점수에 반영
-	var s4 := _sim()
-	for f in data.facility_order:
-		if s4.cleanable(f):
-			s4.cleanliness[f] = 100.0
-	s4.debug_inspect_now()
-	_c(s4.inspection_this_month().grade == "만족" and s4.ledger.pending_total() == 60, "청결 100 → 만족, 보너스 $60 미지급")
 
 
 func _test_progression() -> void:
@@ -383,18 +425,20 @@ func _test_progression() -> void:
 
 
 func _test_save_load() -> void:
-	print("[24] 저장/불러오기: 잠금·달러·날짜·대원 위치·위생·정산/점검·성장 복구")
+	print("[24] 저장/불러오기: 잠금·달러·날짜·대원 위치·전리품·납품·충성심·정산/점검·성장 복구")
 	var s := _sim()
 	s.ledger.cash = 400
 	s.try_unlock("f1_mess")
-	s.add_dirt("f1_office")
+	s.add_loot("scrap", 3)
+	s.deliver("scrap", 1)
+	s.loyalty = 63
 	s.issue_job("npc_kira", "c_task_office")
 	s.skip(1440 * 8 + 37)
 	var j := JSON.stringify(s.to_dict())
 	var t := BaseSim.from_dict(data, battle, JSON.parse_string(j))
 	_c(t.ledger.cash == s.ledger.cash and t.clock.label() == s.clock.label(), "달러·날짜 (%s, $%d)" % [t.clock.label(), t.ledger.cash])
 	_c(t.unlocked.keys().size() == s.unlocked.keys().size() and t.is_unlocked("f1_mess"), "해금 상태")
-	_c(t.dirt.size() == s.dirt.size() and is_equal_approx(t.hygiene_score(), s.hygiene_score()), "위생")
+	_c(t.loot == s.loot and t.loyalty == s.loyalty and var_to_str(t.deliveries) == var_to_str(s.deliveries), "전리품 · 납품 · 충성심 (%d)" % t.loyalty)
 	_c(t.ledger.settled_weeks == s.ledger.settled_weeks and t.ledger.entries.size() == s.ledger.entries.size(), "결산 기록")
 	_c(t.inspections.keys() == s.inspections.keys(), "점검 기록")
 	var same_pos := true
@@ -405,7 +449,7 @@ func _test_save_load() -> void:
 	_c(t.inventory.size() == s.inventory.size(), "무기고")
 	s.skip(1440 * 9)
 	t.skip(1440 * 9)
-	_c(t.ledger.cash == s.ledger.cash and t.dirt.size() == s.dirt.size() and t.clock.label() == s.clock.label(), "불러온 뒤 9일 더 진행해도 원본과 같은 결과 (난수 상태 복구)")
+	_c(t.ledger.cash == s.ledger.cash and t.loot == s.loot and t.loyalty == s.loyalty and t.clock.label() == s.clock.label(), "불러온 뒤 9일 더 진행해도 원본과 같은 결과 (난수 상태 복구)")
 
 
 func _test_stairs_walk() -> void:
@@ -623,7 +667,7 @@ func _test_player_control() -> void:
 	s.skip(30)
 	_c(dan.facility == "b1_quarters" and dan.state == NpcAgent.STAYING, "숙소 도착")
 	acts = s.room_actions("npc_dan").map(func(x): return x.id)
-	_c(acts.has("sleep") and acts.has("rest") and acts.has("clean_here"), "숙소 행동 = 잠자기·쉬기·청소 %s" % [acts])
+	_c(acts.has("sleep") and acts.has("rest") and not acts.has("clean_here"), "숙소 행동 = 잠자기·쉬기 (청소 없음) %s" % [acts])
 	s.chars[dan.character_id].fatigue = 50.0
 	var r3 := s.issue_activity("npc_dan", "sleep")
 	s.skip(5)

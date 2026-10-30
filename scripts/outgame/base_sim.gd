@@ -1,10 +1,10 @@
 class_name BaseSim
 extends RefCounted
 ## 아웃게임 기지 시뮬레이션 (화면과 분리 — 헤드리스 테스트 가능).
-## 시계 · 시설 해금 · 대원 주간 일정 이동 · 대화/엿듣기/요청 · 일일 오염/청소/위임 · 업무/외부 의뢰 ·
-## 주간 결산 · 월 1회 장군 점검 · 훈련/제작/강화 · 저장/불러오기 ·
+## 시계 · 시설 해금 · 대원 주간 일정 이동 · 대화/엿듣기/요청 · 업무/외부 의뢰 ·
+## 주간 결산(주급 = 기본 주급 × 납품 비율) · 전리품 창고 · 납품 · 월 1회 장군 점검(아이템 요구 · 충성심) · 훈련/제작/강화 · 저장/불러오기 ·
 ## 대원 몸 상태(체력·상태 이상·피로·친밀도) · 오브젝트(침대·소파·의자·의무침대) · 식재료 · PX 선물 · 의무실 · 전투 발생 규칙.
-## 처리 순서 (매 게임 분): 날짜 전환(결산 → 월 전환 → 일일 오염) → 정각 → 점검 → 작업실 → 대원 → 대화.
+## 처리 순서 (매 게임 분): 날짜 전환(결산 → 월 전환) → 정각 → 점검 → 작업실 → 대원 → 대화.
 ## 날짜가 바뀌는 판단은 시계만 하고, UI 는 이 클래스의 함수만 호출한다 (03_IMPLEMENTATION_HANDOFF 4절).
 
 signal hour_changed(minute: int)
@@ -12,7 +12,7 @@ signal day_changed(day: int)
 signal month_changed(key: String)
 signal room_unlocked(fid: String)
 signal npc_state_changed(npc_id: String)
-signal cleanliness_changed(fid: String)
+signal loot_changed()
 signal job_completed(job: Dictionary)
 signal inspection_completed(record: Dictionary)
 signal statement_ready(statement: Dictionary)
@@ -35,8 +35,10 @@ var clock := WorldClock.new()
 var rng := RandomNumberGenerator.new()
 var ledger := EconomyLedger.new()
 var unlocked: Dictionary = {}        # fid → true
-var cleanliness: Dictionary = {}     # fid → 0~100
-var dirt: Array = []                 # [{id, facility, x(방 폭 비율), kind}]
+var loot: Dictionary = {}            # 전리품 창고: 아이템 id(data/supply.xlsx 아이템) → 개수 — 전투 승리 · 대원 선물로 얻고 납품 · 장군 요구에 씀
+var deliveries: Dictionary = {}      # 주 번호(문자열) → {req: {아이템: 개수}, done: {아이템: 개수}} 그 주 납품 목록 (처음 볼 때 진행률로 정함)
+var loyalty: int = 50                # 장군 충성심 0~100
+var last_loot: Array = []            # 마지막 전투 승리 전리품 [{item, name, count}] (결과 화면 표시용, 저장 안 함)
 var npcs: Dictionary = {}            # npc id → NpcAgent
 var chats: Array = []                # [{key, conv, a, b, facility, end, story}]
 var jobs: Array = []                 # [{uid, contract, npc, state, minute}]
@@ -46,7 +48,7 @@ var request_state: Dictionary = {}   # 요청 id → "accepted"
 var conv_counts: Dictionary = {}     # 대화이벤트 id → 발생 횟수
 var heard: Dictionary = {}           # 대화이벤트 id → 엿들은 횟수
 var story_seen: Dictionary = {}      # 스토리 이벤트 id → 처음 엿들은 시각 라벨
-var inspections: Dictionary = {}     # "YYYY-MM" → {month, minute, done, score, grade, bonus, week, date}
+var inspections: Dictionary = {}     # "YYYY-MM" → {month, minute, done, item, count, line, answer("" 대답 전 · give · refuse), week, date}
 var progression: Dictionary = {}     # 전투 캐릭터 id → {training, level, xp, skills: [배운 스킬 트리 노드 id], faith, faith_skills: [배운 신앙 스킬 id], miracles: [배운 기적 id]}
 var divine_unlocked: Dictionary = {}  # 정체(신)가 드러난 캐릭터 id → true (처음부터 해금인 캐릭터는 넣지 않아도 신)
 var quests: Dictionary = {}          # 퀘스트 id → {state: active|done, step(지금 단계 번호), base(그 단계 시작 때 횟수), started, finished(일차)}
@@ -58,9 +60,8 @@ var inventory: Array = []            # [{uid, item, plus, owner(캐릭터 id 또
 var workshop: Dictionary = {}        # {kind: craft|enhance, recipe?, uid?, remaining, total}
 var researched: Dictionary = {}      # 연구 id → true (완료)
 var research: Dictionary = {}        # 진행 중 연구 {id, remaining, total} (한 번에 하나)
-var counters: Dictionary = {"dirt": 0, "job": 0, "inv": 0, "chat": 0}
+var counters: Dictionary = {"job": 0, "inv": 0, "chat": 0}
 var log_lines: Array = []
-var cleaning_log: Array = []         # [{minute, requested, executing, facility, result}]
 var chars: Dictionary = {}           # 전투 캐릭터 id → {hp, statuses, fatigue, affinity, talk_day} (기지·전투 공통 몸 상태)
 var seat_owner: Dictionary = {}      # 오브젝트 id → 대원 id
 var food: int = 0                    # 식재료 (1 = 한 끼)
@@ -89,7 +90,7 @@ func _new_game() -> void:
 	for fid in data.facility_order:
 		if data.facilities[fid].initial_open:
 			unlocked[fid] = true
-		cleanliness[fid] = data.num("initial_cleanliness", 90.0)
+	loyalty = supply().inum("loyalty_start", 50)
 	_add_missing_npcs()
 	_init_inventory()
 	food = data.inum("food_start", 10)
@@ -142,8 +143,6 @@ func _init_inventory() -> void:
 func set_data(newer: OutgameData) -> void:
 	data = newer
 	for fid in data.facility_order:
-		if not cleanliness.has(fid):
-			cleanliness[fid] = data.num("initial_cleanliness", 90.0)
 		if data.facilities[fid].initial_open:
 			unlocked[fid] = true
 	_add_missing_npcs()
@@ -236,7 +235,6 @@ func _new_day(d: int) -> void:
 		_month = key
 		month_changed.emit(key)
 		_schedule_inspection(d * 1440)
-	_daily_dirt()
 	for n in npcs.values():
 		n.need_think = true
 
@@ -263,7 +261,6 @@ func try_unlock(fid: String) -> Dictionary:
 	if not ledger.post("unlock:" + fid, _minute, clock.label(_minute), "unlock", -cost, fid, "%s 해금" % data.facility_name(fid), week_now()):
 		return {"ok": false, "msg": "이미 처리된 해금입니다"}
 	unlocked[fid] = true
-	cleanliness[fid] = data.num("initial_cleanliness", 90.0)
 	for n in npcs.values():
 		n.need_think = true   # 해금 → 일정 분기 재평가 (생활 변화)
 	_log("%s 해금 (-$%d)" % [data.facility_name(fid), cost])
@@ -425,9 +422,6 @@ func _arrive(n: NpcAgent) -> void:
 			"move":
 				n.state = NpcAgent.STAYING
 				n.activity = str(c.get("activity", "idle"))
-			"clean":
-				n.state = NpcAgent.CLEANING
-				n.busy = data.num("clean_minutes", 20.0)
 			"train":
 				n.state = NpcAgent.TRAINING
 				n.busy = data.num("train_minutes", 120.0)
@@ -464,12 +458,14 @@ func begin_dialogue(npc_id: String) -> Dictionary:
 	talk_counts[npc_id] = int(talk_counts.get(npc_id, 0)) + 1
 	check_divine()   # 퀘스트 '대원과 대화' 단계
 	var cs := cstate(n)
-	if int(cs.get("talk_day", -1)) != _day:   # 하루 첫 대화 → 친밀도 조금
+	var gift := {}
+	if int(cs.get("talk_day", -1)) != _day:   # 하루 첫 대화 → 친밀도 조금 + 확률로 선물(전리품, supply.xlsx 대원 선물)
 		cs.talk_day = _day
 		_add_affinity(n, data.num("affinity_talk", 1.0))
+		gift = _crew_gift(n)
 	var req := active_request(npc_id)
 	if not req.is_empty():
-		return {"lines": data.dialogues.get(req.dialogue, []), "request": req, "affinity_need": -1, "new_talk": false}
+		return {"lines": data.dialogues.get(req.dialogue, []), "request": req, "affinity_need": -1, "new_talk": false, "gift": gift}
 	# 친밀도 대화: 해금됐지만 안 본 대화부터, 다 봤으면 해금된 가장 높은 단계, 없으면 기본 대사
 	var dlg := str(data.npcs.get(npc_id, {}).get("talk", ""))
 	var need := -1
@@ -490,7 +486,7 @@ func begin_dialogue(npc_id: String) -> Dictionary:
 			_log("%s 친밀도 %d 대화를 봤습니다" % [n.name, need])
 			npc_state_changed.emit(n.id)
 	var cut := _take_cutscene("talk", npc_id)   # 그 대원에게 말 걸기 컷씬이 있으면 평소 대사 대신
-	return {"lines": data.dialogues.get(dlg, []), "request": {}, "affinity_need": need, "new_talk": fresh, "cutscene": cut}
+	return {"lines": data.dialogues.get(dlg, []), "request": {}, "affinity_need": need, "new_talk": fresh, "cutscene": cut, "gift": gift}
 
 
 ## 친밀도로 해금된 대화 (낮은 단계부터)
@@ -664,52 +660,6 @@ func overhear(key: String) -> Dictionary:
 		"title": "%s · %s 의 대화" % [data.npc_name(ch.a), data.npc_name(ch.b)], "cutscene": _take_cutscene("overhear", c.id)}
 
 
-# ================================================================ 위생 · 청소
-func cleanable(fid: String) -> bool:
-	return data.facilities.get(fid, {}).get("cleanable", false)
-
-
-func hygiene_score() -> float:
-	var total := 0.0
-	var n := 0
-	for fid in data.facility_order:
-		if unlocked.has(fid) and cleanable(fid):
-			total += float(cleanliness.get(fid, 100.0))
-			n += 1
-	return total / n if n > 0 else 100.0
-
-
-func dirt_in(fid: String) -> Array:
-	return dirt.filter(func(d): return d.facility == fid)
-
-
-func add_dirt(fid: String) -> void:
-	counters.dirt += 1
-	dirt.append({"id": "dirt_%d" % counters.dirt, "facility": fid, "x": rng.randf_range(0.14, 0.86), "kind": rng.randi_range(0, 2)})
-	cleanliness[fid] = maxf(0.0, float(cleanliness.get(fid, 100.0)) - data.num("dirt_amount", 20.0))
-	_log("%s 이(가) 더러워졌습니다 (청결 %d)" % [data.facility_name(fid), int(cleanliness[fid])])
-	cleanliness_changed.emit(fid)
-
-
-func _daily_dirt() -> void:
-	var cands: Array[String] = []
-	for fid in data.facility_order:
-		if unlocked.has(fid) and cleanable(fid):
-			cands.append(fid)
-	if cands.is_empty():
-		return
-	var count := rng.randi_range(data.inum("dirt_min", 1), maxi(data.inum("dirt_min", 1), data.inum("dirt_max", 2)))
-	for i in count:
-		add_dirt(cands[rng.randi() % cands.size()])
-
-
-func cleaner_of(fid: String) -> String:
-	for n in npcs.values():
-		if str(n.command.get("type", "")) == "clean" and n.command.get("target", "") == fid:
-			return n.id
-	return ""
-
-
 ## 플레이어 직접 이동: 선택한 대원을 그 방의 그 위치(x, 없으면 자리)로. run = 뛰기 (이미 그쪽으로 걷는 중이면 뛰기로만 바꿈).
 ## 도착하면 그 방에 머묾 → 우클릭으로 행동 지시. 다음 일정 블록이 시작되면 일정으로 복귀. {ok, msg}
 func issue_move(npc_id: String, fid: String, x: float = NAN, run: bool = false) -> Dictionary:
@@ -759,10 +709,6 @@ func room_actions(npc_id: String) -> Array:
 		out.append({"id": "rest", "label": "쉬기", "enabled": free, "why": ""})
 	if tag == "식당":
 		out.append({"id": "eat", "label": "식사 (식재료 %d끼)" % food, "enabled": free, "why": ""})
-	if cleanable(fid):
-		var dirty := float(cleanliness.get(fid, 100.0)) < 100.0 or not dirt_in(fid).is_empty()
-		out.append({"id": "clean_here", "label": "이 방 청소 (청결 %d)" % roundi(float(cleanliness.get(fid, 100.0))),
-			"enabled": free and dirty and cleaner_of(fid) == "", "why": "이미 깨끗함" if not dirty else "다른 대원이 청소 중"})
 	if tag == "연구" and is_researcher(npc_id):
 		out.append({"id": "research", "label": "무기 연구", "enabled": true, "why": ""})
 	if tag == "훈련" and is_combatant(n):
@@ -833,72 +779,6 @@ func cancel_command(npc_id: String) -> Dictionary:
 	npc_state_changed.emit(n.id)
 	_log("%s: 지시 취소 — 일정대로 움직입니다" % n.name)
 	return {"ok": true, "msg": "%s: 지시 취소 — 일정대로 움직입니다" % n.name}
-
-
-## 우클릭 → 청소 → 장소. {ok, msg, executor}. 위임 성향이 있으면 다른 대원이 대신 함
-func issue_clean(npc_id: String, fid: String, direct: bool = false) -> Dictionary:
-	var n: NpcAgent = npcs.get(npc_id)
-	if n == null:
-		return _fail("없는 대원")
-	if not n.is_free():
-		return _fail("%s 은(는) 지금 다른 일을 하고 있습니다 (%s)" % [n.name, n.state_name()])
-	if not data.facilities.has(fid):
-		return _fail("청소할 장소를 클릭하세요")
-	if not unlocked.has(fid):
-		return _fail("잠긴 방은 청소할 수 없습니다")
-	if not cleanable(fid):
-		return _fail("%s 은(는) 청소 대상이 아닙니다" % data.facility_name(fid))
-	if float(cleanliness.get(fid, 100.0)) >= 100.0 and dirt_in(fid).is_empty():
-		return _fail("%s 은(는) 이미 깨끗합니다" % data.facility_name(fid))
-	var other := cleaner_of(fid)
-	if other != "":
-		return _fail("%s 이(가) 이미 청소하러 가는 중입니다" % data.npc_name(other))
-	var exec := n
-	var msg := ""
-	var rules: Dictionary = data.schedules.get(npc_id, {}).get("delegation_rules", {})
-	if not direct and rules.get("can_delegate_cleaning", false) and rng.randf() < float(rules.get("chance", 1.0)):
-		var cand := _delegate_candidate(n, fid, rules)
-		if cand != null:
-			exec = cand
-			msg = "%s 이(가) 청소를 %s 에게 넘겼습니다" % [n.name, cand.name]
-		elif not rules.get("self_if_none", true):
-			cleaning_log.append({"minute": _minute, "requested": npc_id, "executing": "", "facility": fid, "result": "위임 실패"})
-			return _fail("%s 이(가) 청소를 맡길 사람이 없다며 거절했습니다" % n.name)
-	if not reachable(exec.facility, fid):
-		return _fail("%s 에서 %s 까지 갈 수 있는 길이 없습니다 (잠긴 방)" % [data.facility_name(exec.facility), data.facility_name(fid)])
-	_start_command(exec, {"type": "clean", "target": fid, "issuer": npc_id})
-	cleaning_log.append({"minute": _minute, "requested": npc_id, "executing": exec.id, "facility": fid, "result": "지시"})
-	if msg == "":
-		msg = "%s 이(가) %s 청소하러 갑니다" % [exec.name, data.facility_name(fid)]
-	_log(msg)
-	return {"ok": true, "msg": msg, "executor": exec.id}
-
-
-func _delegate_candidate(n: NpcAgent, fid: String, rules: Dictionary) -> NpcAgent:
-	var best: NpcAgent = null
-	var best_d := INF
-	var ids: Array = rules.get("delegate_to", [])
-	if ids.is_empty():
-		ids = data.npc_order
-	for id in ids:
-		var c: NpcAgent = npcs.get(str(id))
-		if c == null or c == n or not c.is_free() or c.state == NpcAgent.CHATTING:
-			continue
-		if not reachable(c.facility, fid):
-			continue
-		var d := c.pos.distance_to(n.pos)
-		if d < best_d:
-			best = c
-			best_d = d
-	return best
-
-
-func _complete_clean(fid: String, by: NpcAgent) -> void:
-	dirt = dirt.filter(func(d): return d.facility != fid)
-	cleanliness[fid] = 100.0
-	cleaning_log.append({"minute": _minute, "requested": by.command.get("issuer", by.id), "executing": by.id, "facility": fid, "result": "완료"})
-	_log("%s 이(가) %s 청소를 마쳤습니다" % [by.name, data.facility_name(fid)])
-	cleanliness_changed.emit(fid)
 
 
 # ================================================================ 업무 · 외부 의뢰 · 훈련
@@ -1712,8 +1592,6 @@ func _start_command(n: NpcAgent, cmd: Dictionary) -> void:
 func _finish_command(n: NpcAgent) -> void:
 	var c := n.command
 	match str(c.get("type", "")):
-		"clean":
-			_complete_clean(str(c.target), n)
 		"job":
 			_complete_job(str(c.uid), n)
 			if n.state == NpcAgent.UNAVAILABLE:
@@ -2282,7 +2160,9 @@ func apply_battle_result(result: Dictionary) -> void:
 		"rule": str(pending_battle.get("rule", "")), "winner": w})
 	pending_battle = {}
 	_log("전투 결과: %s — %s" % ["승리" if w == "ally" else "패배", ", ".join(lines)])
+	last_loot = []
 	if w == "ally":
+		last_loot = _battle_loot(str(battle_history.back().stage))
 		trigger_cutscenes("battle_win", str(battle_history.back().stage))
 	check_divine()   # 미션(전투 승리) 완료 조건
 
@@ -2294,12 +2174,140 @@ func _char_label(character_id: String) -> String:
 	return character_id
 
 
-# ================================================================ 경제 · 결산 · 점검
+# ================================================================ 경제 · 결산 · 전리품 · 납품 · 장군 점검
+## 보급 데이터 (data/supply.xlsx — 아이템 · 전투 보상 · 대원 선물 · 장군 요구 · 납품 목록 · 주급)
+func supply() -> SupplyData:
+	if data.supply == null:
+		data.supply = SupplyData.new()
+	return data.supply
+
+
+func item_label(id: String) -> String:
+	return supply().item_name(id)
+
+
+func loot_count(id: String) -> int:
+	return int(loot.get(id, 0))
+
+
+func add_loot(id: String, n: int, why: String = "") -> void:
+	if n <= 0 or id == "":
+		return
+	loot[id] = loot_count(id) + n
+	if why != "":
+		_log("%s: %s ×%d" % [why, item_label(id), n])
+	loot_changed.emit()
+
+
+func _take_loot(id: String, n: int) -> bool:
+	if n <= 0 or loot_count(id) < n:
+		return false
+	loot[id] = loot_count(id) - n
+	if int(loot[id]) <= 0:
+		loot.erase(id)
+	loot_changed.emit()
+	return true
+
+
+## 전투 승리 전리품: 그 스테이지 줄 + "*" 줄을 확률로 굴려 창고에. [{item, name, count}]
+func _battle_loot(stage: String) -> Array:
+	var got := {}
+	var order: Array = []
+	for r in supply().battle_loot:
+		if str(r.stage) != "*" and str(r.stage) != stage:
+			continue
+		if rng.randi_range(1, 100) > int(r.chance):
+			continue
+		var n := rng.randi_range(int(r.min), int(r.max))
+		if n <= 0:
+			continue
+		if not got.has(r.item):
+			order.append(r.item)
+		got[r.item] = int(got.get(r.item, 0)) + n
+	var out := []
+	for it in order:
+		add_loot(it, got[it])
+		out.append({"item": it, "name": item_label(it), "count": got[it]})
+	if not out.is_empty():
+		_log("전리품: " + ", ".join(out.map(func(e): return "%s ×%d" % [e.name, e.count])))
+	return out
+
+
+## 대원 선물: 그 대원과 하루 첫 대화 때 확률로 (최소 친밀도 이상). 준 것 {item, name, count} 또는 {}
+func _crew_gift(n: NpcAgent) -> Dictionary:
+	for r in supply().crew_gifts:
+		if str(r.npc) != n.id or float(cstate(n).get("affinity", 0.0)) < float(r.affinity):
+			continue
+		if rng.randi_range(1, 100) <= int(r.chance):
+			add_loot(str(r.item), 1, "%s 이(가) 건넴" % n.name)
+			return {"item": str(r.item), "name": item_label(str(r.item)), "count": 1}
+	return {}
+
+
+## 스토리 진행률 % = 완료한 퀘스트 / 전체 퀘스트 (퀘스트가 없으면 0) — 주마다 납품 목록을 고르는 기준
+func story_progress() -> float:
+	var defs := quest_defs()
+	if defs.is_empty():
+		return 0.0
+	var done := 0
+	for q in defs:
+		if quest_status(str(q.id)) == "done":
+			done += 1
+	return 100.0 * done / defs.size()
+
+
+## 그 주 납품 {req: {아이템: 개수}, done: {아이템: 개수}} — 처음 볼 때 그때의 스토리 진행률로 목록을 정해 둠 (주 중간에 바뀌지 않게)
+func delivery(week: int = -1) -> Dictionary:
+	if week < 0:
+		week = week_now()
+	var k := str(week)
+	if not deliveries.has(k):
+		deliveries[k] = {"req": supply().delivery_for(story_progress(), week), "done": {}}
+	return deliveries[k]
+
+
+## 납품 비율 0~1 (목록 개수 합 중 낸 개수, 목록이 없으면 1)
+func delivery_rate(week: int = -1) -> float:
+	var d := delivery(week)
+	var need := 0
+	var got := 0
+	for it in d.req:
+		need += int(d.req[it])
+		got += mini(int(d.done.get(it, 0)), int(d.req[it]))
+	return 1.0 if need == 0 else float(got) / need
+
+
+## 그 주 주급 = 기본 주급 × 납품 비율
+func expected_pay(week: int = -1) -> int:
+	return roundi(supply().inum("base_pay", 150) * delivery_rate(week))
+
+
+## 이번 주 납품: 창고에서 그 아이템을 n개(남은 만큼까지) 냄. {ok, msg}
+func deliver(item: String, n: int = 1) -> Dictionary:
+	var d := delivery()
+	var left := int(d.req.get(item, 0)) - int(d.done.get(item, 0))
+	if left <= 0:
+		return _fail("%s 은(는) 이번 주 납품 목록에 없거나 다 냈습니다" % item_label(item))
+	var k := mini(n, mini(left, loot_count(item)))
+	if k <= 0:
+		return _fail("창고에 %s 이(가) 없습니다" % item_label(item))
+	_take_loot(item, k)
+	d.done[item] = int(d.done.get(item, 0)) + k
+	var msg := "납품: %s ×%d — 이번 주 %d%% (주급 $%d 예정)" % [item_label(item), k, roundi(delivery_rate() * 100.0), expected_pay()]
+	_log(msg)
+	return {"ok": true, "msg": msg}
+
+
 func _settle(week: int) -> void:
-	var st := ledger.settle(week, data.inum("weekly_subsidy", 100), _minute, clock.label(_minute))
+	_close_demand(week)   # 결산까지 대답 안 한 장군 요구 = 거절
+	var rate := delivery_rate(week)
+	var pay := roundi(supply().inum("base_pay", 150) * rate)
+	var st := ledger.settle(week, pay, _minute, clock.label(_minute), "주급 (납품 %d%%)" % roundi(rate * 100.0), "pay")
 	if st.is_empty():
 		return
-	_log("%d주차 결산: +$%d (잔액 $%d)" % [week + 1, st.total, st.cash])
+	st.delivery = delivery(week).duplicate(true)
+	st.rate = rate
+	_log("%d주차 결산: %s$%d (주급 $%d · 납품 %d%%, 잔액 $%d)" % [week + 1, "+" if int(st.total) >= 0 else "-", absi(int(st.total)), pay, roundi(rate * 100.0), st.cash])
 	statement_ready.emit(st)
 
 
@@ -2315,28 +2323,93 @@ func inspection_this_month() -> Dictionary:
 	return inspections.get(clock.month_key(_minute), {})
 
 
+## 장군 점검: 그 달 정한 시각이 되면 장군이 와서 아이템을 요구 (supply.xlsx 장군 요구 — 지난번과 다른 것). 결산 전까지 준다/안 준다
 func _check_inspection(m: int) -> void:
 	var ins: Dictionary = inspections.get(clock.month_key(m), {})
 	if ins.is_empty() or ins.done or m < int(ins.minute):
 		return
-	var score := hygiene_score()
-	var grade := "불만"
-	var bonus := data.inum("inspect_bad_bonus", 0)
-	if score >= data.num("inspect_good_score", 80.0):
-		grade = "만족"
-		bonus = data.inum("inspect_good_bonus", 60)
-	elif score >= data.num("inspect_ok_score", 50.0):
-		grade = "보통"
-		bonus = data.inum("inspect_ok_bonus", 30)
+	var dm := _pick_demand(str(ins.month))
 	ins.done = true
-	ins.score = snappedf(score, 0.1)
-	ins.grade = grade
-	ins.bonus = bonus
+	ins.item = str(dm.get("item", ""))
+	ins.count = int(dm.get("count", 0))
+	ins.line = str(dm.get("line", ""))
+	ins.answer = "" if ins.item != "" else "none"
 	ins.week = week_now()
 	ins.date = clock.label(m)
-	ledger.add_pending("inspection:" + str(ins.month), "inspection", bonus, str(ins.month), "장군 점검 보너스 (%s, %s)" % [ins.month, grade], ins.week)
-	_log("장군 점검: 환경 미화 %d점 → %s, 이번 주 결산 보너스 $%d" % [roundi(score), grade, bonus])
+	if ins.item != "":
+		_log("장군 점검: %s ×%d 을(를) 요구 — 이번 주 결산 전까지 대답 (창고 %d개)" % [item_label(ins.item), ins.count, loot_count(ins.item)])
+	else:
+		_log("장군 점검: 요구 없음")
 	inspection_completed.emit(ins)
+
+
+## 요구 아이템: 가중치로 고르되 지난 점검과 다른 것 (후보가 하나뿐이면 같아도)
+func _pick_demand(month: String) -> Dictionary:
+	var prev := ""
+	var keys := inspections.keys()
+	keys.sort()
+	for k in keys:
+		if str(k) < month and str(inspections[k].get("item", "")) != "":
+			prev = str(inspections[k].item)
+	var pool := supply().demands.filter(func(d): return int(d.weight) > 0 and str(d.item) != "")
+	if pool.size() > 1:
+		pool = pool.filter(func(d): return str(d.item) != prev)
+	if pool.is_empty():
+		return {}
+	var total := 0
+	for d in pool:
+		total += int(d.weight)
+	var roll := rng.randi_range(1, total)
+	for d in pool:
+		roll -= int(d.weight)
+		if roll <= 0:
+			return d
+	return pool.back()
+
+
+## 대답을 기다리는 장군 요구 (없으면 {})
+func pending_demand() -> Dictionary:
+	for k in inspections:
+		var r: Dictionary = inspections[k]
+		if bool(r.done) and str(r.get("item", "")) != "" and str(r.get("answer", "")) == "":
+			return r
+	return {}
+
+
+## 장군 요구에 대답: give = 창고에서 그 아이템을 줌 → 그 주 결산 추가금 · 충성심 +, 안 줌 → 결산 차감 · 충성심 −. {ok, msg}
+func answer_demand(give: bool, why: String = "") -> Dictionary:
+	var r := pending_demand()
+	if r.is_empty():
+		return _fail("대답할 장군 요구가 없습니다")
+	var sp := supply()
+	var msg := ""
+	if give:
+		if not _take_loot(str(r.item), int(r.count)):
+			return _fail("창고에 %s 이(가) %d개 있어야 합니다 (지금 %d개)" % [item_label(str(r.item)), int(r.count), loot_count(str(r.item))])
+		r.answer = "give"
+		var bonus := sp.inum("general_bonus", 40)
+		ledger.add_pending("general:" + str(r.month), "general", bonus, str(r.month), "장군 요구에 응함 (%s ×%d)" % [item_label(str(r.item)), int(r.count)], int(r.week))
+		_add_loyalty(sp.inum("loyalty_give", 5))
+		msg = "장군에게 %s ×%d 을(를) 줬습니다 — 결산 때 +$%d, 충성심 %d" % [item_label(str(r.item)), int(r.count), bonus, loyalty]
+	else:
+		r.answer = "refuse"
+		var pen := sp.inum("general_penalty", 40)
+		ledger.add_pending("general:" + str(r.month), "general", -pen, str(r.month), "장군 요구 거절 (%s ×%d)%s" % [item_label(str(r.item)), int(r.count), why], int(r.week))
+		_add_loyalty(sp.inum("loyalty_refuse", -10))
+		msg = "장군의 요구를 거절했습니다%s — 결산 때 -$%d, 충성심 %d" % [why, pen, loyalty]
+	_log(msg)
+	return {"ok": true, "msg": msg}
+
+
+## 결산: 그 주(또는 그 전)의 요구에 대답이 없으면 거절로 처리
+func _close_demand(week: int) -> void:
+	var r := pending_demand()
+	if not r.is_empty() and int(r.week) <= week:
+		answer_demand(false, " — 결산까지 대답 없음")
+
+
+func _add_loyalty(v: int) -> void:
+	loyalty = clampi(loyalty + v, 0, 100)
 
 
 ## 디버그: 이번 달 점검을 지금 실행 (이미 했으면 아무것도 안 함)
@@ -2367,10 +2440,10 @@ func to_dict() -> Dictionary:
 		nd[id] = npcs[id].to_dict()
 	return {"version": SAVE_VERSION, "total_minutes": clock.total_minutes, "minute": _minute, "day": _day, "month": _month,
 		"rng_seed": str(rng.seed), "rng_state": str(rng.state), "ledger": ledger.to_dict(), "unlocked": unlocked.keys(),
-		"cleanliness": cleanliness, "dirt": dirt, "npcs": nd, "chats": chats, "jobs": jobs, "claimed_contracts": claimed_contracts.keys(),
+		"loot": loot, "deliveries": deliveries, "loyalty": loyalty, "npcs": nd, "chats": chats, "jobs": jobs, "claimed_contracts": claimed_contracts.keys(),
 		"opened_contracts": opened_contracts.keys(), "request_state": request_state, "conv_counts": conv_counts, "heard": heard,
 		"story_seen": story_seen, "inspections": inspections, "progression": progression, "inventory": inventory,
-		"workshop": workshop, "researched": researched.keys(), "research": research, "counters": counters, "log": log_lines.slice(maxi(0, log_lines.size() - 100)), "cleaning_log": cleaning_log,
+		"workshop": workshop, "researched": researched.keys(), "research": research, "counters": counters, "log": log_lines.slice(maxi(0, log_lines.size() - 100)),
 		"chars": chars, "food": food, "gifts": gifts, "pending_battle": pending_battle, "battle_history": battle_history, "divine_unlocked": divine_unlocked.keys(),
 		"quests": quests, "talk_counts": talk_counts,
 		"cutscene_queue": cutscene_queue, "cutscenes_seen": cutscenes_seen}
@@ -2390,12 +2463,20 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 	s.ledger.from_dict(d.get("ledger", {}))
 	for f in d.get("unlocked", []):
 		s.unlocked[str(f)] = true
-	for k in d.get("cleanliness", {}):
-		s.cleanliness[k] = float(d.cleanliness[k])
-	for fid in p_data.facility_order:
-		if not s.cleanliness.has(fid):
-			s.cleanliness[fid] = p_data.num("initial_cleanliness", 90.0)
-	s.dirt = d.get("dirt", [])
+	var lt: Dictionary = d.get("loot", {})
+	for k in lt:
+		s.loot[str(k)] = int(lt[k])
+	var dv: Dictionary = d.get("deliveries", {})
+	for k in dv:
+		var e0: Dictionary = dv[k]
+		var req := {}
+		var done := {}
+		for it in e0.get("req", {}):
+			req[str(it)] = int(e0.req[it])
+		for it in e0.get("done", {}):
+			done[str(it)] = int(e0.done[it])
+		s.deliveries[str(k)] = {"req": req, "done": done}
+	s.loyalty = int(d.get("loyalty", s.supply().inum("loyalty_start", 50)))
 	s.jobs = d.get("jobs", [])
 	for c in d.get("claimed_contracts", []):
 		s.claimed_contracts[str(c)] = true
@@ -2408,6 +2489,9 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 	s.inspections = d.get("inspections", {})
 	for k in s.inspections:
 		s.inspections[k].minute = int(s.inspections[k].minute)
+		for f in ["count", "week"]:
+			if s.inspections[k].has(f):
+				s.inspections[k][f] = int(s.inspections[k][f])
 	s.progression = d.get("progression", {})
 	for c in d.get("divine_unlocked", []):
 		s.divine_unlocked[str(c)] = true
@@ -2452,7 +2536,6 @@ static func from_dict(p_data: OutgameData, p_battle: GameData, d: Dictionary) ->
 	s.pending_battle = d.get("pending_battle", {})
 	s.battle_history = d.get("battle_history", [])
 	s.log_lines = d.get("log", [])
-	s.cleaning_log = d.get("cleaning_log", [])
 	s._add_missing_npcs()
 	var nd: Dictionary = d.get("npcs", {})
 	for id in nd:

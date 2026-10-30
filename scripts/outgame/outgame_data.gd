@@ -39,6 +39,7 @@ var object_order: Array[String] = []
 var px_items: Dictionary = {}       # id → {id, name, price, base, values: {npc id: 친밀도 상승량}, desc}
 var px_order: Array[String] = []
 var affinity_talks: Dictionary = {}  # npc id → [{id, need, dialogue}] (need 오름차순)
+var supply: SupplyData              # data/supply.xlsx — 전리품 · 납품 · 장군 요구 · 주급
 var battle_rules: Array = []        # [{id, name, enabled, mode, interval_minutes, anchor, weekdays, start_day, times, date, stages, allow_skip, note}]
 var schedules: Dictionary = {}      # npc id → {npc_id, preferred_facility_ids, weekly_schedule, delegation_rules}
 var warnings: PackedStringArray = []
@@ -52,7 +53,10 @@ static func load_from(path: String = PATH) -> OutgameData:
 	d._parse(sheets)
 	d.load_schedules()
 	d.battle_rules = read_battle_rules()
+	d.supply = SupplyData.load_from()
 	d._validate()
+	for w in d.supply.warnings:
+		d.warnings.append(w)
 	return d
 
 
@@ -387,7 +391,7 @@ static func write_battle_rules(rules: Array) -> int:
 
 ## 일정·전투 규칙 파일들의 가장 최근 수정 시각 (실행 중 에디터 저장 감지용)
 func schedules_mtime() -> int:
-	var t := FileAccess.get_modified_time(RULES_PATH)
+	var t := maxi(FileAccess.get_modified_time(RULES_PATH), FileAccess.get_modified_time(SupplyData.PATH))
 	for id in npc_order:
 		t = maxi(t, FileAccess.get_modified_time(schedule_path(id)))
 	return t

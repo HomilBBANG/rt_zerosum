@@ -1,7 +1,7 @@
 class_name OutgameHud
 extends Control
 ## 기지 화면 HUD 와 창들. 표시와 명령 전달만 하고 규칙은 BaseSim 에 맡긴다 (03_HANDOFF 2절).
-## 위: 날짜·시각·배속 / 달러·미지급·결산까지 / 위생·점검 / 버튼(의뢰·무기고·원장·저장·출전·타이틀)
+## 위: 날짜·시각·배속 / 달러·미지급·결산 D-day / 버튼(스킬·도감·퀘스트·의뢰·무기고·납품·원장·저장·출전·타이틀)
 ## 창(모달)이 열려 있으면 시계가 멈춘다 [임시 규칙].
 
 const PANEL_BG := Color(0.05, 0.07, 0.10, 0.92)
@@ -197,7 +197,7 @@ func _build_top() -> void:
 	right.position = Vector2(0, 6)
 	add_child(right)
 	var specs := [["스킬", "skill", null, func(): open_skills("")], ["도감", "codex", null, func(): open_codex()], ["퀘스트", "quest", QUEST_COL, func(): open_quests()],
-		["의뢰", "contract", null, func(): open_contracts("")], ["무기고", "tools", null, func(): open_armory()], ["원장", "ledger", null, func(): open_ledger()],
+		["의뢰", "contract", null, func(): open_contracts("")], ["무기고", "tools", null, func(): open_armory()], ["납품", "calendar_check", GOLD, func(): open_supply()], ["원장", "ledger", null, func(): open_ledger()],
 		["저장", "bookmark", Color(0.6, 0.95, 0.65), func(): hub.save_now()], ["전투 출전", "sword", Color(1.0, 0.55, 0.35), func(): open_sortie()],
 		["타이틀", "gear", Color(0.7, 0.7, 0.72), func(): hub.to_title()]]
 	for s in specs:
@@ -462,7 +462,10 @@ func _build_debug() -> void:
 	g.add_theme_constant_override("v_separation", 6)
 	v.add_child(g)
 	var acts := [["+1시간", func(): hub.debug_skip(60)], ["다음 날", func(): hub.debug_skip(-1)], ["다음 주", func(): hub.debug_skip(-7)],
-		["다음 달", func(): hub.debug_skip(-30)], ["오염 추가", func(): hub.debug_dirt()], ["점검 지금", func(): sim.debug_inspect_now()],
+		["다음 달", func(): hub.debug_skip(-30)], ["전리품 +2", func():
+			for it in sim.supply().item_order:
+				sim.add_loot(it, 2)
+			show_toast("모든 전리품 +2")], ["점검 지금", func(): sim.debug_inspect_now()],
 		["달러 +100", func(): sim.ledger.cash += 100], ["전투 발생", func(): hub.debug_battle()], ["저장 지우기", func(): hub.debug_delete_save()],
 		["닫기", func(): debug_panel.visible = false]]
 	for a in acts:
@@ -493,12 +496,9 @@ func refresh(delta: float) -> void:
 			_fill_selection()
 	zoom_label.text = "%d%%" % hub.zoom_percent()
 	var left := sim.minutes_to_settlement()
-	var ins := sim.inspection_this_month()
-	var ins_text := "이번 달 장군 점검: %s" % ("완료 (%s, %d점)" % [ins.grade, roundi(float(ins.score))] if ins.get("done", false) else "예정 (날짜 모름)")
-	var nb := sim.next_battle()
-	var nb_text := "다음 전투 %s" % sim.clock.label(int(nb.minute)).right(14) if not nb.is_empty() else "예정 전투 없음"
-	var info := "미지급 $%d · 결산까지 %d일 %d시간 · 식재료 %d끼  |  위생 %d점 · %s  |  %s" % [sim.ledger.pending_total(),
-		floori(left / 1440.0), floori(fmod(left, 1440.0) / 60.0), sim.food, roundi(sim.hygiene_score()), ins_text.replace("이번 달 장군 점검", "점검"), nb_text]
+	var pend := sim.ledger.pending_total()
+	var info := "미지급 %s$%d  ·  결산 D-%d (%d일 %d시간)" % ["-" if pend < 0 else "", absi(pend), ceili(left / 1440.0),
+		floori(left / 1440.0), floori(fmod(left, 1440.0) / 60.0)]
 	if info != info_label.text:
 		info_label.text = info
 		_fit_top.call_deferred()
@@ -657,6 +657,9 @@ func open_dialogue(npc_id: String) -> void:
 	txt.custom_minimum_size = Vector2(480, 64)
 	col.add_child(txt)
 	body.add_child(_status_card(npc_id))
+	var got: Dictionary = d.get("gift", {})
+	if not got.is_empty():   # 하루 첫 대화 선물 (전리품 → 창고, 납품 · 장군 요구에 씀)
+		body.add_child(_label("%s 이(가) %s 을(를) 건넸습니다 → 전리품 창고 (지금 %d개)" % [sim.data.npc_name(npc_id), got.name, sim.loot_count(got.item)], 15, GOLD))
 	body.add_child(_gift_row(npc_id))
 	var btns := _hbox(8)
 	btns.alignment = BoxContainer.ALIGNMENT_END
@@ -784,12 +787,6 @@ func open_facility(fid: String) -> void:
 		if n.facility == fid and n.state != NpcAgent.UNAVAILABLE:
 			here.append(n.name)
 	body.add_child(_label("%s · 기능: %s · 머무는 대원: %s" % [sim.data.floor_name(f.floor), f.tag, ", ".join(here) if not here.is_empty() else "없음"], 15, Color(0.85, 0.9, 1)))
-	if f.cleanable:
-		var cl := float(sim.cleanliness.get(fid, 100.0))
-		var who := sim.cleaner_of(fid)
-		body.add_child(_label("청결 %d / 100 · 오염 %d곳%s" % [roundi(cl), sim.dirt_in(fid).size(), " · %s 청소하러 가는 중" % sim.data.npc_name(who) if who != "" else ""],
-			15, GOOD if cl >= 80 else (GOLD if cl >= 50 else BAD)))
-		body.add_child(_label("청소: 대원 우클릭 → 청소 → 이 방 클릭", 13, Color(0.7, 0.75, 0.85)))
 	if f.tag in ["작업", "무기고"]:
 		_armory_section(body)
 		_workshop_section(body)
@@ -1378,7 +1375,6 @@ func open_context(npc_id: String, at: Vector2) -> void:
 			pm.add_item(act.label if act.enabled or str(act.why) == "" else "%s — %s" % [act.label, act.why], id)
 			pm.set_item_disabled(pm.get_item_index(id), not act.enabled)
 	pm.add_separator("어디서나")
-	pm.add_item("청소 지시 → 장소 클릭", 1)
 	pm.add_item("업무·의뢰 지시", 2)
 	if sim.is_combatant(n):
 		pm.add_item("훈련실로 (훈련)", 3)
@@ -1391,8 +1387,7 @@ func open_context(npc_id: String, at: Vector2) -> void:
 		var ix := pm.get_item_index(pair[0])
 		if ix >= 0:
 			pm.set_item_icon(ix, load(UI_DIR + "icons/%s.png" % pair[1]))
-	for id in [1, 2]:
-		pm.set_item_disabled(pm.get_item_index(id), not n.is_free())
+	pm.set_item_disabled(pm.get_item_index(2), not n.is_free())
 	if sim.is_combatant(n):
 		pm.set_item_disabled(pm.get_item_index(3), not n.is_free() or sim.training_facility() == "")
 	var cs := sim.cstate(n)
@@ -1409,8 +1404,6 @@ func _on_context(id: int, npc_id: String, room_act: String = "") -> void:
 	match room_act:
 		"sleep", "rest", "eat":
 			r = sim.issue_activity(npc_id, room_act)
-		"clean_here":
-			r = sim.issue_clean(npc_id, sim.npcs[npc_id].facility, true)
 		"train":
 			r = sim.issue_train(npc_id)
 		"medical":
@@ -1430,8 +1423,6 @@ func _on_context(id: int, npc_id: String, room_act: String = "") -> void:
 	match id:
 		0:
 			open_dialogue(npc_id)
-		1:
-			hub.begin_clean_pick(npc_id)
 		2:
 			open_contracts(npc_id)
 		3:
@@ -1921,32 +1912,201 @@ func open_armory() -> void:
 func open_ledger() -> void:
 	var win := _window("달러 원장", 700)
 	var body: VBoxContainer = win.body
-	body.add_child(_label("잔액 $%d · 미지급 $%d (다음 결산 때 지급)" % [sim.ledger.cash, sim.ledger.pending_total()], 18, GOLD))
+	body.add_child(_label("잔액 $%d · 미지급 $%d (다음 결산 때) · 장군 충성심 %d" % [sim.ledger.cash, sim.ledger.pending_total(), sim.loyalty], 18, GOLD))
 	var list := _scroll(body, 380)
 	for p in sim.ledger.pending:
-		list.add_child(_label("[미지급] %s  +$%d" % [p.label, p.amount], 14, Color(0.7, 0.85, 1)))
+		list.add_child(_label("[미지급] %s  %s$%d" % [p.label, "+" if int(p.amount) >= 0 else "-", absi(int(p.amount))], 14, Color(0.7, 0.85, 1) if int(p.amount) >= 0 else BAD))
 	var es: Array = sim.ledger.entries.duplicate()
 	es.reverse()
 	for e in es.slice(0, 60):
 		list.add_child(_label("%s  %s  %s$%d" % [e.date, e.label, "+" if int(e.amount) >= 0 else "-", absi(int(e.amount))], 14, GOOD if int(e.amount) >= 0 else BAD))
 
 
-# ---------------------------------------------------------------- 결산 · 점검 알림
+# ---------------------------------------------------------------- 결산 · 납품 · 장군 점검
 func open_statement(st: Dictionary) -> void:
-	var win := _window("%d주차 결산" % (int(st.week) + 1), 520)
+	var win := _window("%d주차 결산" % (int(st.week) + 1), 560)
 	var body: VBoxContainer = win.body
 	body.add_child(_label(str(st.date), 14, Color(0.75, 0.8, 0.9)))
+	if st.has("rate"):
+		var dl: Dictionary = st.get("delivery", {})
+		var parts := PackedStringArray()
+		for it in dl.get("req", {}):
+			parts.append("%s %d/%d" % [sim.item_label(it), mini(int(dl.done.get(it, 0)), int(dl.req[it])), int(dl.req[it])])
+		body.add_child(_label("납품 %d%%  —  %s" % [roundi(float(st.rate) * 100.0), " · ".join(parts) if not parts.is_empty() else "목록 없음"], 14, Color(0.85, 0.9, 1)))
 	for it in st.items:
-		body.add_child(_label("%s   +$%d" % [it.label, it.amount], 16, GOLD if it.source == "inspection" else Color(1, 1, 1)))
-	body.add_child(_label("합계 +$%d  →  잔액 $%d" % [st.total, st.cash], 21, GOOD))
+		var amt := int(it.amount)
+		body.add_child(_label("%s   %s$%d" % [it.label, "+" if amt >= 0 else "-", absi(amt)], 16, (GOLD if amt >= 0 else BAD) if it.source == "general" else Color(1, 1, 1)))
+	body.add_child(_label("합계 %s$%d  →  잔액 $%d" % ["+" if int(st.total) >= 0 else "-", absi(int(st.total)), st.cash], 21, GOOD if int(st.total) >= 0 else BAD))
 
 
+## 충성심 막대 (0~100)
+func _loyalty_bar(w: float = 260.0) -> Control:
+	var row := _hbox(8)
+	row.add_child(_label("장군 충성심", 15, Color(0.9, 0.9, 0.8)))
+	var bar := ProgressBar.new()
+	bar.min_value = 0
+	bar.max_value = 100
+	bar.value = sim.loyalty
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(w, 14)
+	bar.size_flags_vertical = SIZE_SHRINK_CENTER
+	var fg := StyleBoxFlat.new()
+	fg.bg_color = Color(0.85, 0.7, 0.3) if sim.loyalty >= 30 else BAD
+	fg.set_corner_radius_all(3)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.12, 0.13, 0.12)
+	bg.set_corner_radius_all(3)
+	bar.add_theme_stylebox_override("fill", fg)
+	bar.add_theme_stylebox_override("background", bg)
+	row.add_child(bar)
+	row.add_child(_label("%d / 100" % sim.loyalty, 15, GOLD))
+	return row
+
+
+## 장군 점검: 장군이 아이템을 요구 → 준다 / 안 준다 / 나중에 (결산 전까지 '납품' 창에서 대답)
 func open_inspection(rec: Dictionary) -> void:
-	var win := _window("장군 점검 (%s)" % rec.month, 480)
+	var win := _window("장군 점검 (%s)" % rec.month, 560)
 	var body: VBoxContainer = win.body
-	body.add_child(_label(str(rec.date), 14, Color(0.75, 0.8, 0.9)))
-	body.add_child(_label("환경 미화 %d점 → 장군 만족도: %s" % [roundi(float(rec.score)), rec.grade], 20, GOLD))
-	body.add_child(_label("이번 주 결산 보너스 $%d" % int(rec.bonus), 17, GOOD if int(rec.bonus) > 0 else BAD))
+	body.add_child(_label(str(rec.get("date", "")), 14, Color(0.75, 0.8, 0.9)))
+	var item := str(rec.get("item", ""))
+	if item == "":
+		body.add_child(_label("장군이 기지를 한 바퀴 둘러보고 돌아갔습니다.", 17))
+		body.add_child(_loyalty_bar())
+		return
+	var row := _hbox(12)
+	body.add_child(row)
+	var badge := TextureRect.new()
+	badge.texture = load(UI_DIR + "icons/sword.png")
+	badge.custom_minimum_size = Vector2(64, 64)
+	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	row.add_child(badge)
+	var col := _vbox(4)
+	col.size_flags_horizontal = SIZE_EXPAND_FILL
+	row.add_child(col)
+	col.add_child(_label("장군", 17, GOLD))
+	var line := str(rec.get("line", ""))
+	var t := _label("\"%s\"" % (line if line != "" else "%s %d개를 내놓게." % [sim.item_label(item), int(rec.count)]), 17)
+	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	t.custom_minimum_size.x = 440
+	col.add_child(t)
+	var have := sim.loot_count(item)
+	body.add_child(_label("요구: %s ×%d   ·   창고에 %d개" % [sim.item_label(item), int(rec.count), have], 16, GOOD if have >= int(rec.count) else BAD))
+	body.add_child(_loyalty_bar())
+	if str(rec.get("answer", "")) != "":
+		body.add_child(_label("이미 대답했습니다: %s" % ("줬음" if rec.answer == "give" else "거절"), 15, Color(0.75, 0.8, 0.9)))
+		return
+	var sp := sim.supply()
+	var btns := _hbox(8)
+	btns.alignment = BoxContainer.ALIGNMENT_END
+	body.add_child(btns)
+	var give := _button("준다  (결산 +$%d · 충성심 %+d)" % [sp.inum("general_bonus", 40), sp.inum("loyalty_give", 5)], Color(0.45, 0.9, 0.55), 15)
+	give.disabled = have < int(rec.count)
+	if give.disabled:
+		give.tooltip_text = "창고에 %d개가 있어야 합니다 — 전투 승리 · 대원에게서 얻음" % int(rec.count)
+	var refuse := _button("안 준다  (결산 -$%d · 충성심 %d)" % [sp.inum("general_penalty", 40), sp.inum("loyalty_refuse", -10)], Color(1.0, 0.45, 0.4), 15)
+	var later := _button("나중에", Color(0.6, 0.6, 0.65), 15)
+	later.tooltip_text = "이번 주 결산 전까지 '납품' 창에서 대답 — 그때까지 대답이 없으면 거절"
+	for b in [give, refuse, later]:
+		btns.add_child(b)
+	give.pressed.connect(func():
+		var r := sim.answer_demand(true)
+		show_toast(r.msg, GOOD if r.ok else BAD)
+		if r.ok:
+			close_top())
+	refuse.pressed.connect(func():
+		var r := sim.answer_demand(false)
+		show_toast(r.msg, BAD if r.ok else BAD)
+		close_top())
+	later.pressed.connect(close_top)
+
+
+## 납품 창: 이번 주 납품 목록(창고에서 내기) · 예상 주급 · 장군 충성심과 대답 기다리는 요구 · 전리품 창고
+func open_supply() -> void:
+	var win := _window("납품 · 장군", 700)
+	_fill_supply(win.body)
+
+
+func _fill_supply(body: VBoxContainer) -> void:
+	for c in body.get_children():
+		body.remove_child(c)
+		c.queue_free()
+	var left := sim.minutes_to_settlement()
+	var d := sim.delivery()
+	body.add_child(_label("%d주차 납품 목록  ·  결산 D-%d (%d일 %d시간)  ·  스토리 진행률 %d%%" % [sim.week_now() + 1, ceili(left / 1440.0), floori(left / 1440.0),
+		floori(fmod(left, 1440.0) / 60.0), roundi(sim.story_progress())], 15, Color(0.85, 0.9, 1)))
+	var grid := GridContainer.new()
+	grid.columns = 6
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 4)
+	body.add_child(grid)
+	for h in ["물품", "필요", "냄", "창고", "", ""]:
+		grid.add_child(_label(h, 13, Color(0.7, 0.75, 0.8)))
+	for it in d.req:
+		var need := int(d.req[it])
+		var done := int(d.done.get(it, 0))
+		var have := sim.loot_count(it)
+		grid.add_child(_label(sim.item_label(it), 16, GOOD if done >= need else Color(1, 1, 1)))
+		grid.add_child(_label(str(need), 16))
+		grid.add_child(_label(str(done), 16, GOOD if done >= need else GOLD))
+		grid.add_child(_label(str(have), 16, Color(0.8, 0.85, 0.9)))
+		var one := _button("1개 내기", Color(0.55, 0.65, 0.42), 13)
+		var all := _button("모두 내기", Color(0.55, 0.65, 0.42), 13)
+		one.disabled = done >= need or have <= 0
+		all.disabled = one.disabled
+		var item: String = it
+		one.pressed.connect(func():
+			var r := sim.deliver(item, 1)
+			show_toast(r.msg, GOOD if r.ok else BAD)
+			_fill_supply(body))
+		all.pressed.connect(func():
+			var r := sim.deliver(item, 999)
+			show_toast(r.msg, GOOD if r.ok else BAD)
+			_fill_supply(body))
+		grid.add_child(one)
+		grid.add_child(all)
+	if d.req.is_empty():
+		body.add_child(_label("이번 주 납품 목록 없음 (data/supply.xlsx 납품)", 14, Color(0.7, 0.75, 0.8)))
+	var base := sim.supply().inum("base_pay", 150)
+	body.add_child(_label("납품 %d%%  →  이번 주 주급 $%d  (기본 $%d × 납품 비율)" % [roundi(sim.delivery_rate() * 100.0), sim.expected_pay(), base], 19, GOLD))
+	body.add_child(HSeparator.new())
+	body.add_child(_loyalty_bar())
+	var dm := sim.pending_demand()
+	if not dm.is_empty():
+		var have2 := sim.loot_count(str(dm.item))
+		body.add_child(_label("장군 요구 (대답 기다림): %s ×%d  ·  창고 %d개  —  결산 전까지 대답 없으면 거절" % [sim.item_label(str(dm.item)), int(dm.count), have2], 15, GOLD))
+		var row := _hbox(8)
+		body.add_child(row)
+		var give := _button("준다", Color(0.45, 0.9, 0.55), 14, 90)
+		give.disabled = have2 < int(dm.count)
+		var refuse := _button("안 준다", Color(1.0, 0.45, 0.4), 14, 90)
+		give.pressed.connect(func():
+			var r := sim.answer_demand(true)
+			show_toast(r.msg, GOOD if r.ok else BAD)
+			_fill_supply(body))
+		refuse.pressed.connect(func():
+			var r := sim.answer_demand(false)
+			show_toast(r.msg, BAD)
+			_fill_supply(body))
+		row.add_child(give)
+		row.add_child(refuse)
+	else:
+		var ins := sim.inspection_this_month()
+		var st: String = "아직 (날짜 모름)" if not ins.get("done", false) else {"give": "요구에 응함", "refuse": "요구 거절", "none": "요구 없음"}.get(str(ins.get("answer", "")), "")
+		body.add_child(_label("이번 달 장군 점검: %s" % st, 14, Color(0.8, 0.85, 0.9)))
+	body.add_child(HSeparator.new())
+	body.add_child(_label("전리품 창고 (전투 승리 · 대원에게서 얻음)", 15, Color(0.9, 0.9, 0.8)))
+	var parts := PackedStringArray()
+	for it in sim.supply().item_order:
+		if sim.loot_count(it) > 0:
+			parts.append("%s ×%d" % [sim.item_label(it), sim.loot_count(it)])
+	for it in sim.loot:
+		if not sim.supply().items.has(it):
+			parts.append("%s ×%d" % [it, sim.loot_count(it)])
+	var l := _label(" · ".join(parts) if not parts.is_empty() else "비어 있음", 14, Color(0.85, 0.85, 0.8))
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = 660
+	body.add_child(l)
 
 
 # ---------------------------------------------------------------- 출전
