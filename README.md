@@ -349,9 +349,11 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 - **몬스터 사망**: 불에 타듯 검게 타 들어가며 위에서부터 사라짐 (셰이더 `burn`, `UnitSprite2D.play_burn`). 확인 `--autoplay=burn:1.3`.
 
-- **구울 포즈** (사용자 제공 3장, 원본 `art_src/ghoul/`): 공격 `slash`(앞으로 할퀴며 덤빔) · `slash_2`(웅크려 포효 — 공격 때 둘 중 무작위) · 피격 `hit`(고개가 젖혀짐).
+- **구울 포즈** (사용자 제공 3장, 원본 `art_src/ghoul/`): 공격 `slash`(앞으로 할퀴며 덤빔 — 머리 끝이 기본 키 선까지) · `slash_2`(웅크려 포효 — 공격 때 둘 중 무작위) · 피격 `hit`(고개가 젖혀짐).
+- **늑대 포즈** (사용자 제공 3장, 원본 `art_src/wolf/`): 공격 `slash`(앞으로 덮침) · `slash_2`(웅크려 하늘로 울부짖음) · 피격 `hit`(상체를 세우고 고개가 젖혀짐).
 
 ![구울 배치 · 공격 · 피격](docs/screenshots/ghoul_poses_battle.jpg)
+![늑대 공격 · 공격 2 · 피격, 구울 공격(크기 조정)](docs/screenshots/wolf_poses_battle.jpg)
 ![몬스터 사망 — 불에 타 사라짐 (0.6 · 1.3 · 2.0 · 2.9초)](docs/screenshots/monster_burn_death.jpg)
 
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
