@@ -330,8 +330,8 @@ func _test_large_units() -> void:
 	var ghoul := _unit(bc, "구울")
 	var wolf := _unit(bc, "늑대")
 	_check(ghoul != null and wolf != null and _unit(bc, "슬라임") == null, "괴물 2마리 배치 (슬라임 제외)")
-	_check(bc.slots.unit_at("enemy:2:0") == wolf and wolf.slot_keys().size() == 1, "늑대는 후방 한 칸")
-	_check(bc.slots.unit_at("enemy:0:1") == ghoul and bc.slots.unit_at("enemy:1:1") == ghoul, "구울이 전방·중앙 두 칸 차지")
+	_check(bc.slots.unit_at("enemy:0:1") == ghoul and ghoul.slot_keys().size() == 1, "구울은 전방 한 칸")
+	_check(bc.slots.unit_at("enemy:1:0") == wolf and bc.slots.unit_at("enemy:2:0") == wolf, "늑대가 중앙·후방 두 칸 차지")
 	_check(bc.slots.living_units("enemy").size() == 2, "적 유닛 수는 2 (칸 수 아님)")
 	_check(bc.slots.living_units("ally").size() == 6, "아군 6인")
 	var kira := _unit(bc, "키라")
@@ -340,13 +340,13 @@ func _test_large_units() -> void:
 	_check(melee_targets.size() == 1 and melee_targets.has(ghoul), "근접: 전방을 막은 구울만 공격 가능 (후방 늑대 불가)")
 	_check(TargetValidator.block_reason(basic, kira, ghoul, bc.slots) == "", "근접: 구울 공격 가능")
 	# 큰 몸집은 이동·교환 불가, 다른 유닛도 큰 몸집과 교환 불가
-	var res := bc.slots.move_or_swap(ghoul, "enemy:2:1")
+	var res := bc.slots.move_or_swap(wolf, "enemy:0:0")
 	_check(not res.ok, "큰 몸집 이동 거부")
-	_check(bc.slots.unit_at("enemy:0:1") == ghoul, "거부 후 자리 유지")
-	# 구울 사망 → 두 칸 모두 비움
-	ghoul.alive = false
+	_check(bc.slots.unit_at("enemy:1:0") == wolf, "거부 후 자리 유지")
+	# 늑대 사망 → 두 칸 모두 비움
+	wolf.alive = false
 	bc.slots.remove_dead_from_slots()
-	_check(bc.slots.unit_at("enemy:0:1") == null and bc.slots.unit_at("enemy:1:1") == null, "사망 시 두 칸 모두 비움")
+	_check(bc.slots.unit_at("enemy:1:0") == null and bc.slots.unit_at("enemy:2:0") == null, "사망 시 두 칸 모두 비움")
 	bc.queue_free()
 
 
@@ -528,14 +528,14 @@ func _test_balance_data_and_ai_graph() -> void:
 	if d == null:
 		return
 	_check(d.allies.size() == 6 and d.actions.size() >= 7, "캐릭터 6 · 스킬 7 이상")
-	_check(d.monsters.has("ghoul") and d.monsters.ghoul.row_span == 2 and d.monsters.wolf.ai_id == "aggressive", "몬스터 차지칸·AI 열")
+	_check(d.monsters.has("ghoul") and d.monsters.ghoul.row_span == 1 and d.monsters.wolf.row_span == 2 and d.monsters.wolf.ai_id == "aggressive", "몬스터 차지칸(구울 1 · 늑대 2)·AI 열")
 	_check(d.actions.flank.status_ids() == ["bleed"] and int(d.actions.flank.statuses[0].turns) == 2 and int(d.actions.sand_kick.statuses[0].chance) == 70 and d.actions.hamstring.status_ids() == ["root"], "data/skill_status.json → 스킬 상태 이상 (턴·확률)")
 	_check(d.monsters.ghoul.skill_ids.has("rend") and d.monsters.wolf.skill_ids.has("sand_kick"), "몬스터 상태 이상 스킬")
 	_check(d.warnings.is_empty(), "밸런스·스킬 트리·신앙 데이터 경고 없음 %s" % [d.warnings])
 	var kira := GameData._find(d.allies, "a_kira")
 	_check(kira != null and kira.weapons[0].sprite == "knife" and kira.weapons.size() == 2, "아이템 시트 → 무기 (스프라이트 포함)")
 	var es := d.build_stage_enemies("stage_01")
-	_check(es.size() == 2 and es[0].default_row == 0 and es[0].default_index == 1 and es[0].row_span == 2, "스테이지 배치: 구울 전방·중앙")
+	_check(es.size() == 2 and es[0].default_row == 0 and es[0].default_index == 1 and es[0].row_span == 1 and es[1].default_row == 1 and es[1].row_span == 2, "스테이지 배치: 구울 전방 · 늑대 중앙·후방")
 	# 즉시 반영: 같은 객체가 갱신되는지
 	var newer := GameData.load_from()
 	GameData._find(newer.allies, "a_kira").max_hp = 77
