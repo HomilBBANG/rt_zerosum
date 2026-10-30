@@ -552,6 +552,7 @@ func _cli_ui(spec: String) -> void:
 		"codex":   # codex[:탭[:항목 id]] — 세계관 도감 (탭: characters · monsters · statuses · gods · cities)
 			hud.open_codex(p[1] if p.size() > 1 else "characters", p[2] if p.size() > 2 else "")
 		"contracts": hud.open_contracts("")
+		"armory": hud.open_armory()
 		"statement":
 			if not sim.ledger.statements.is_empty():
 				hud.open_statement(sim.ledger.statements[-1])

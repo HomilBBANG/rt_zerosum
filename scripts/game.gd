@@ -52,7 +52,10 @@ func _fit_window() -> void:
 		return
 	var win := get_window()
 	if cli.has("shot"):
-		win.size = RENDER_SIZE   # 스크린샷은 항상 QHD
+		win.size = RENDER_SIZE   # 스크린샷은 항상 QHD (--win=가로x세로 = 다른 창 크기 · 비율 확인용)
+		if cli.has("win"):
+			var wh := str(cli.win).split("x")
+			win.size = Vector2i(int(wh[0]), int(wh[1]))
 		return
 	var usable := DisplayServer.screen_get_usable_rect(win.current_screen)
 	var s := minf(1.0, minf(float(usable.size.x) / RENDER_SIZE.x, float(usable.size.y - 60) / RENDER_SIZE.y))

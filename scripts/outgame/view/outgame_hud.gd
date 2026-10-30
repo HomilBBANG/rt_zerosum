@@ -268,16 +268,23 @@ func _icon_button(text: String, icon: String, col: Color, cb: Callable) -> Contr
 	return box
 
 
+const LOG_LINES := 4
+
+
 func _build_log() -> void:
 	log_panel = PanelContainer.new()
 	UiPanel.apply(log_panel, Vector4(14, 10, 14, 10), 0.9)   # UI 공용 패널
-	log_panel.position = Vector2(10, 628)
-	log_panel.custom_minimum_size = Vector2(470, 84)
+	# 높이 = 정확히 LOG_LINES 줄 (줄이 반쯤 잘려 보이지 않게) + 화면 아래에 여백
+	var text_h := ceilf(font.get_height(12)) * LOG_LINES
+	log_panel.custom_minimum_size = Vector2(470, 0)
+	log_panel.position = Vector2(10, 720 - 14 - (text_h + 20))
 	log_panel.mouse_filter = MOUSE_FILTER_PASS
 	add_child(log_panel)
 	log_label = RichTextLabel.new()
 	log_label.add_theme_font_override("normal_font", font)
 	log_label.add_theme_font_size_override("normal_font_size", 12)
+	log_label.add_theme_constant_override("line_separation", 0)
+	log_label.custom_minimum_size.y = text_h
 	log_label.scroll_following = true
 	log_label.mouse_filter = MOUSE_FILTER_PASS
 	log_panel.add_child(log_label)
@@ -571,6 +578,9 @@ func close_all() -> void:
 
 
 ## {root, body}. 화면을 어둡게 덮고 가운데 창
+const WIN_EDGE := 4.0   # 창과 화면 가장자리 사이 최소 여백 (화면을 거의 채우는 스킬 · 도감 창도 스크롤 없이 들어가게 작게)
+
+
 func _window(title: String, w: float, on_close: Callable = Callable()) -> Dictionary:
 	var root := Control.new()
 	root.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
@@ -595,12 +605,30 @@ func _window(title: String, w: float, on_close: Callable = Callable()) -> Dictio
 	var x := _button("닫기 (Esc)", Color(0.6, 0.6, 0.65), 13)
 	x.pressed.connect(close_top)
 	head.add_child(x)
+	# 내용이 화면보다 길면 (무기고 등) 창 높이를 화면 안으로 묶고 내용은 스크롤 — 닫기 버튼이 늘 화면 안에
+	var sc := ScrollContainer.new()
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(sc)
 	var body := _vbox(8)
-	v.add_child(body)
+	body.size_flags_horizontal = SIZE_EXPAND_FILL
+	sc.add_child(body)
+	var fit_h := func():
+		var max_h := 720.0 - 2.0 * WIN_EDGE - 36.0 - head.get_combined_minimum_size().y - 8.0   # 화면 − 위아래 여백 − 창 안쪽 여백 − 제목 줄
+		var want := body.get_combined_minimum_size().y
+		sc.custom_minimum_size.y = minf(want, max_h)
+		sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO if want > max_h + 0.5 else ScrollContainer.SCROLL_MODE_DISABLED
+	body.minimum_size_changed.connect(fit_h)
+	fit_h.call()
 	if on_close.is_valid():
 		root.set_meta("on_close", on_close)
 	_modals.append(root)
-	panel.resized.connect(func(): panel.position = (Vector2(1280, 720) - panel.size) * 0.5)
+	panel.resized.connect(func():
+		# 가운데. 화면에 들어가면 가장자리 여백을 지킴 (화면보다 넓은 창은 가운데 그대로)
+		var p := (Vector2(1280, 720) - panel.size) * 0.5
+		if panel.size.x <= 1280.0 - 2.0 * WIN_EDGE:
+			p.x = maxf(p.x, WIN_EDGE)
+		p.y = maxf(p.y, WIN_EDGE)
+		panel.position = p)
 	return {"root": root, "body": body, "panel": panel}
 
 

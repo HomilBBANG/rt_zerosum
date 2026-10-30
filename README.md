@@ -322,6 +322,10 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![대화 선택지 (위 = 마우스 올림)](docs/screenshots/cutscene_choice_buttons.jpg)
 
+- **기지 창 화면 맞춤**: 창 내용이 화면보다 길면 창 안에서 스크롤 (닫기 버튼은 늘 화면 안). 기지 로그창은 4줄 높이. 확인용 `--base_ui=armory` (무기고 창), 다른 창 크기 `--win=1920x1200`.
+
+![무기고 창 — 화면 안에 맞춤 + 스크롤](docs/screenshots/outgame_armory_fit.jpg)
+
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
 
 ## 세계관 도감
