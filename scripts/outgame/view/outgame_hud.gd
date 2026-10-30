@@ -335,7 +335,7 @@ func set_log_open(on: bool) -> void:
 
 
 # ---------------------------------------------------------------- 음악 카세트 (공용실 주크박스를 누르면 화면 왼쪽에)
-## 카세트 그림(assets/ui/outgame/music_cassette.png, 원본 art_src/ui/music_cassette.webp)의 빈 칸에 지금 곡 제목, 위 ▲ = 이전 곡 · 아래 ▼ = 다음 곡
+## 주크박스 바로 왼쪽에 뜸. 카세트 그림(assets/ui/outgame/music_cassette.png, 원본 art_src/ui/music_cassette.webp)의 빈 칸에 지금 곡 제목, 위 ▲ = 이전 곡 · 아래 ▼ = 다음 곡
 var music_panel: Control
 var _music_title: Label
 var _music_no: Label
@@ -347,6 +347,7 @@ func toggle_music() -> void:
 		_build_music()
 	music_panel.visible = not music_panel.visible
 	_refresh_music()
+	_place_music()
 
 
 func _build_music() -> void:
@@ -410,6 +411,18 @@ func _tri_button(up: bool, tip: String, cb: Callable) -> Control:
 		cb.call()
 		_refresh_music())
 	return b
+
+
+## 카세트 창 = 주크박스 바로 왼쪽 (세로 가운데 맞춤) — 카메라를 움직이거나 확대해도 따라감, 화면 밖으로는 안 나감
+func _place_music() -> void:
+	if music_panel == null or not music_panel.visible:
+		return
+	var r: Rect2 = hub.jukebox_rect()
+	if r.size == Vector2.ZERO:
+		return
+	var sz := music_panel.get_combined_minimum_size()
+	var pos := Vector2(r.position.x - 10.0 - sz.x, r.get_center().y - sz.y * 0.5)
+	music_panel.position = pos.clamp(Vector2(4, 4), Vector2(1280, 720) - sz - Vector2(4, 4))
 
 
 func _refresh_music() -> void:
@@ -575,6 +588,7 @@ func refresh(delta: float) -> void:
 		speed_buttons[i].modulate = Color(1.3, 1.15, 0.55) if on else (Color(1.15, 1.15, 1.12) if hov else Color(0.82, 0.82, 0.84))   # 지금 속도 = 금빛
 	cash_label.text = "%d" % sim.ledger.cash   # 지폐 그림이 $ 표시
 	_update_battle_bar()
+	_place_music()
 	zoom_label.text = "%d%%" % hub.zoom_percent()
 	var left := sim.minutes_to_settlement()
 	var pend := sim.ledger.pending_total()
