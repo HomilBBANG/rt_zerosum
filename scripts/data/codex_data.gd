@@ -1,13 +1,13 @@
 @tool
 class_name CodexData
 extends RefCounted
-## 세계관 도감 (data/codex.json). 탭 = 등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경.
+## 세계관 도감 (data/codex.json). 탭 = 등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경 · 기지 시설.
 ## 항목 = {id, title, subtitle, body, sprite?(그림 — 등장인물·몬스터), color?(#rrggbb — 도시)}.
 ## 등장인물·몬스터·상태이상·신은 게임 데이터(엑셀·statuses.json·faith.json)에 있는 것을 자동으로 넣고, 이 파일은 설명(body)·부제·순서만 덧붙임.
-## 제목을 비우면 게임 데이터 이름. 도시 배경은 이 파일에만 있음.
+## 제목을 비우면 게임 데이터 이름. 도시 배경은 이 파일에만 있음. 기지 시설은 outgame.xlsx 시설 시트 (설명 = 시트 '설명', 이 파일 body 가 있으면 그것).
 
 const PATH := "res://data/codex.json"
-const TABS := [["characters", "등장인물"], ["monsters", "몬스터"], ["statuses", "상태이상"], ["gods", "종교(신)"], ["cities", "도시 배경"]]
+const TABS := [["characters", "등장인물"], ["monsters", "몬스터"], ["statuses", "상태이상"], ["gods", "종교(신)"], ["cities", "도시 배경"], ["facilities", "기지 시설"]]
 
 
 static func read(path: String = PATH) -> Dictionary:
@@ -39,8 +39,9 @@ static func write(d: Dictionary, path: String = PATH) -> int:
 
 
 ## 그 탭 항목 목록 (도감 순서 → 게임 데이터에만 있는 것은 뒤에, 설명 "기록 없음").
-## gd = GameData (아군·몬스터·신), npcs = 기지 대원 데이터 {npc id → {name, sprite, character_id, desc}} (전투에 안 나가는 대원 = 로한 등)
-static func entries(codex: Dictionary, tab: String, gd: GameData, npcs: Dictionary = {}) -> Array:
+## gd = GameData (아군·몬스터·신), npcs = 기지 대원 데이터 {npc id → {name, sprite, character_id, desc}} (전투에 안 나가는 대원 = 로한 등),
+## facilities = 기지 시설 {시설 id → {name, subtitle, desc}} (시설 순서대로)
+static func entries(codex: Dictionary, tab: String, gd: GameData, npcs: Dictionary = {}, facilities: Dictionary = {}) -> Array:
 	var auto := []   # [{id, title, subtitle, sprite, color}]
 	match tab:
 		"characters":
@@ -60,6 +61,10 @@ static func entries(codex: Dictionary, tab: String, gd: GameData, npcs: Dictiona
 			for sid in StatusCatalog.battle_ids() + StatusCatalog.SYSTEM.keys():
 				var sd := StatusCatalog.get_def(sid)
 				auto.append({"id": sid, "title": str(sd.name), "subtitle": "긍정" if sd.get("positive", false) else "부정", "color": "#" + StatusCatalog.color_of(sid).to_html(false)})
+		"facilities":
+			for fid in facilities:
+				var f: Dictionary = facilities[fid]
+				auto.append({"id": fid, "title": str(f.get("name", fid)), "subtitle": str(f.get("subtitle", "")), "body": str(f.get("desc", ""))})
 		"gods":
 			if gd != null:
 				for g in gd.god_order:
@@ -77,7 +82,7 @@ static func entries(codex: Dictionary, tab: String, gd: GameData, npcs: Dictiona
 		seen[e.id] = true
 	for a in auto:
 		if not seen.has(a.id):
-			out.append(_merge(a, {"body": "(기록 없음 — data/codex.json 에 설명을 넣으세요)"}))
+			out.append(_merge(a, {"body": str(a.get("body", "")) if str(a.get("body", "")) != "" else "(기록 없음 — data/codex.json 에 설명을 넣으세요)"}))
 	return out
 
 

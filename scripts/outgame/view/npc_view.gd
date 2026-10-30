@@ -19,6 +19,7 @@ var _foot3 := Vector3.ZERO          # 이번 프레임 3D 발 위치 (조명 탐
 var _lit := {"has": false, "color": Color.WHITE, "k": 0.0, "right": true, "behind": false, "rim": false, "rim_color": Color.WHITE, "rim_k": 0.0}
 var _font: Font
 var _bold: Font
+var marker_at := Vector2.INF   # 머리 위 '!' 요청 마커 가운데 (이 노드 기준, 없으면 INF) — 누르면 요청 대화
 
 
 func setup(p_hub: Node, p_sim: BaseSim, id: String) -> void:
@@ -93,6 +94,20 @@ func hit_rect() -> Rect2:
 		return Rect2(position + Vector2(-len, -screen_h), Vector2(len, screen_h + 8))
 	var w := maxf(22.0, screen_h * 0.42)
 	return Rect2(position + Vector2(-w * 0.5, -screen_h - 6), Vector2(w, screen_h + 10))
+
+
+## 그 점이 이 대원의 몸 위인가: 그림이 있으면 지금 프레임의 불투명 픽셀 (몸 어디든, 빈 곳은 안 잡힘), 없으면 사각형
+func hits(p: Vector2) -> bool:
+	if chr == null or chr.body == null or chr.body.texture == null:
+		return hit_rect().has_point(p)
+	if not chr.drawn_rect().grow(4.0).has_point(p):   # 그려진 그림 전체 (예전 사각형은 상반신을 놓침)
+		return false
+	return chr.hits(p, 3.0)
+
+
+## 그 점이 머리 위 '!' 요청 마커 위인가
+func marker_hits(p: Vector2) -> bool:
+	return marker_at != Vector2.INF and visible and p.distance_to(position + marker_at) <= 20.0
 
 
 func _process(delta: float) -> void:
@@ -220,9 +235,11 @@ func _draw() -> void:
 		top = Vector2(-hit_rect().size.x * 0.8, -screen_h * 1.2)
 	if selected:
 		_draw_selected(n)
+	marker_at = Vector2.INF
 	if not sim.active_request(npc_id).is_empty():
 		var b := sin(Time.get_ticks_msec() / 180.0) * 3.0
 		var c := top + Vector2(0, -12 + b)
+		marker_at = top + Vector2(0, -12)
 		draw_circle(c, 15, Color(1, 0.85, 0.15))
 		draw_circle(c, 15, Color(0.06, 0.05, 0.08), false, 3.0)
 		_text(c + Vector2(0, 8), "!", 22, Color(0.06, 0.05, 0.08), _bold, false)

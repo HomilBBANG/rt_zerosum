@@ -326,7 +326,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![무기고 창 — 화면 안에 맞춤 + 스크롤](docs/screenshots/outgame_armory_fit.jpg)
 
-- **전투 행동 연출**: 화면 가운데로 살짝 줌 + 행동한 캐릭터가 가운데로 나왔다가 제자리로, 명중 시 카메라 흔들림. 값은 BattleView2D 인스펙터 '행동 연출'. 확인 `--autoplay=act:0.45`.
+- **전투 행동 연출**: 화면 가운데로 살짝 줌 (행동한 캐릭터는 제자리), 명중 시 카메라 흔들림. 값은 BattleView2D 인스펙터 '행동 연출'. 확인 `--autoplay=act:0.45`.
 - **기지 조작**: 선택한 대원을 한 번 더 클릭하면 선택 해제. 대원 정보는 우클릭 → '정보 보기' (화면 가운데 창). 로그창은 오른쪽 위 아이콘으로 접기 · 펴기.
 
 ![전투 행동 연출 (가운데로 나온 니키타 · 화면 가운데 줌)](docs/screenshots/battle_action_stage.jpg)
@@ -336,6 +336,12 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - **날짜 속도 버튼**: ■ 정지 · ▶ 1배 · 4x · 16x (사용자 제공 그림, `assets/ui/outgame/speed_*.png`).
 
 ![공용실 주크박스 · 음악 카세트 창 · 속도 버튼](docs/screenshots/outgame_jukebox_music.jpg)
+
+- **기지 클릭**: 대원 몸 어디든 클릭 = 선택 (그림 픽셀 판정), 머리 위 **'!'** 클릭 = 요청 대화, **방 빈 곳 우클릭 → '정보 보기'** = 도감 '기지 시설' 탭.
+- **전투 지침 자세**: AP 0~1 이면 숨 쉬는 지침 자세 유지. 지침 그림(포즈 tired)을 바꾸면 `python3 tools/char_sprites.py breathe-pose <캐릭터> tired` 로 숨쉬기 프레임 다시 만들기.
+
+![방 빈 곳 우클릭 메뉴](docs/screenshots/outgame_room_menu.jpg)
+![전투 지침 자세 유지 (AP 1)](docs/screenshots/battle_tired_hold.jpg)
 
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
 

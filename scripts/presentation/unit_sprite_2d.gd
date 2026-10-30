@@ -33,6 +33,9 @@ var chr: CharacterSprite2D = null
 var chr_height: float = 232.0
 var _pose_tw: Tween
 var _pose_name := ""
+var _rest_shown := ""
+## 쉬는 자세: "" = idle, "tired" = 지침 (AP 0~1 동안 — 지침 그림이 있으면 숨 쉬는 지침 자세를 idle 대신 계속)
+var rest_pose := ""
 
 
 ## 좌우 반전 여부: 적은 왼쪽(아군)을 보게 뒤집는다. 원화가 이미 왼쪽을 보면(art_faces_left, 예: 구울) 반대로.
@@ -297,6 +300,13 @@ func draw_ellipse_poly(center: Vector2, radii: Vector2, color: Color, filled: bo
 func _process(delta: float) -> void:
 	if not unit.alive:
 		return
+	# 쉬는 자세 유지: 다른 동작 · 포즈가 끝나 idle 로 돌아오면 지침 자세로 (지침이 풀리면 idle 로)
+	if chr != null and _pose_name == "":
+		if rest_pose != "" and chr.current == "idle":
+			chr.play(rest_pose)
+		elif chr.current != "idle" and chr.current == _rest_shown and rest_pose != _rest_shown:
+			chr.play("idle")
+		_rest_shown = rest_pose if chr.current == rest_pose else ""
 	_bob_t += delta * (2.2 if highlight_kind == "current" else 1.4)
 	var amp := 2.5 if highlight_kind == "current" else 1.5
 	if chr == null:
@@ -423,6 +433,11 @@ func play_heal() -> void:
 
 
 ## 전투 자리 이동(0.35초 미끄러짐) 동안 발자국 두 걸음 (그 캐릭터 걷기 소리가 있을 때만)
+## AP 0~1 = 지침: 지침 그림(tired)이 있으면 쉬는 자세를 그걸로 (숨 쉬는 반복 프레임 — tools/char_sprites.py breathe-pose), 없으면 idle 그대로
+func set_tired(on: bool) -> void:
+	rest_pose = "tired" if on and unit.alive and has_pose("tired") else ""
+
+
 func play_move_steps(delay: float = 0.0) -> void:
 	if chr == null:
 		return

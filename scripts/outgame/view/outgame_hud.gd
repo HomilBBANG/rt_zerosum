@@ -1464,11 +1464,43 @@ func _char_name(character_id: String) -> String:
 
 # ---------------------------------------------------------------- 대원 우클릭 메뉴
 ## 우클릭 메뉴: 그 대원이 지금 있는 방에서 할 행동 (도착해 있을 때) + 어디서나 할 지시
-func open_context(npc_id: String, at: Vector2) -> void:
+## 도감 '기지 시설' 탭에 넣을 시설 {id → {name, subtitle(층 · 기능 · 잠김), desc}}
+func codex_facilities() -> Dictionary:
+	var out := {}
+	for fid in sim.data.facility_order:
+		var f: Dictionary = sim.data.facilities[fid]
+		out[fid] = {"name": str(f.name), "subtitle": "%s · %s%s" % [sim.data.floor_name(str(f.floor)), str(f.tag), "" if sim.is_unlocked(fid) else " · 잠김 ($%d)" % int(f.cost)],
+			"desc": str(f.get("desc", ""))}
+	return out
+
+
+## 방 빈 곳 우클릭: '정보 보기' (그 방 도감) + 선택한 대원(here)이 그 방에 있으면 그 방에서 할 행동
+func open_room_menu(fid: String, at: Vector2, here: String = "") -> void:
+	if here != "":
+		open_context(here, at, fid)
+		return
+	var pm := PopupMenu.new()
+	pm.add_theme_font_override("font", font)
+	pm.add_theme_font_size_override("font_size", 15)
+	pm.add_separator(sim.data.facility_name(fid))
+	pm.add_item("정보 보기", 0)
+	pm.add_theme_constant_override("icon_max_width", 22)
+	pm.set_item_icon(pm.get_item_index(0), load(UI_DIR + "icons/codex.png"))
+	add_child(pm)
+	pm.id_pressed.connect(func(_id): open_codex("facilities", fid))
+	pm.popup_hide.connect(pm.queue_free)
+	pm.position = Vector2i(at)
+	pm.popup()
+
+
+func open_context(npc_id: String, at: Vector2, room_fid: String = "") -> void:
 	var n: NpcAgent = sim.npcs[npc_id]
 	var pm := PopupMenu.new()
 	pm.add_theme_font_override("font", font)
 	pm.add_theme_font_size_override("font_size", 15)
+	if room_fid != "":   # 방 빈 곳 우클릭 (그 방에 선택한 대원이 있음): 맨 위에 방 정보
+		pm.add_separator(sim.data.facility_name(room_fid))
+		pm.add_item("정보 보기", 20)
 	pm.add_separator(n.name)
 	pm.add_item("대화", 0)
 	if sim.is_researcher(npc_id):
@@ -1501,7 +1533,7 @@ func open_context(npc_id: String, at: Vector2) -> void:
 		pm.add_item("지시 그만두기 → 일정대로", 6)
 	# 메뉴 아이콘 (UI 패키지): 대화 · 연구 · 정보 · 스킬 · 의뢰
 	pm.add_theme_constant_override("icon_max_width", 22)
-	for pair in [[0, "mail"], [7, "search"], [4, "book"], [8, "skill"], [2, "contract"]]:
+	for pair in [[0, "mail"], [7, "search"], [4, "book"], [8, "skill"], [2, "contract"], [20, "codex"]]:
 		var ix := pm.get_item_index(pair[0])
 		if ix >= 0:
 			pm.set_item_icon(ix, load(UI_DIR + "icons/%s.png" % pair[1]))
@@ -1511,7 +1543,11 @@ func open_context(npc_id: String, at: Vector2) -> void:
 	var cs := sim.cstate(n)
 	pm.set_item_disabled(pm.get_item_index(5), not n.is_free() or sim.infirmary_facility() == "" or ((cs.statuses as Array).is_empty() and float(cs.hp) >= sim.char_max_hp(sim.ckey(n))))
 	add_child(pm)
-	pm.id_pressed.connect(func(id): _on_context(id, npc_id, room_ids.get(id, "")))
+	pm.id_pressed.connect(func(id):
+		if id == 20:
+			open_codex("facilities", room_fid)
+		else:
+			_on_context(id, npc_id, room_ids.get(id, "")))
 	pm.popup_hide.connect(pm.queue_free)
 	pm.position = Vector2i(at)
 	pm.popup()
@@ -1826,13 +1862,13 @@ func open_character(npc_id: String) -> void:
 
 
 # ---------------------------------------------------------------- 세계관 도감 (data/codex.json · 탭: 등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경)
-const CODEX_COL := {"characters": Color(0.55, 0.8, 1.0), "monsters": Color(1.0, 0.5, 0.4), "statuses": Color(0.85, 0.6, 1.0), "gods": Color(1.0, 0.85, 0.45), "cities": Color(0.5, 0.95, 0.7)}
+const CODEX_COL := {"characters": Color(0.55, 0.8, 1.0), "monsters": Color(1.0, 0.5, 0.4), "statuses": Color(0.85, 0.6, 1.0), "gods": Color(1.0, 0.85, 0.45), "cities": Color(0.5, 0.95, 0.7), "facilities": Color(0.95, 0.75, 0.5)}
 
 
 ## tab = CodexData.TABS id, pick = 항목 id ("" = 첫 항목). 신 아이콘을 누르면 open_codex("gods", 신 id)
 func open_codex(tab: String = "characters", pick: String = "") -> void:
 	var codex := CodexData.read()
-	var list := CodexData.entries(codex, tab, sim.battle, sim.data.npcs)
+	var list := CodexData.entries(codex, tab, sim.battle, sim.data.npcs, codex_facilities())
 	var cur: Dictionary = {}
 	for e in list:
 		if e.id == pick:

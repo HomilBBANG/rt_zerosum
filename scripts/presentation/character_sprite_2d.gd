@@ -276,6 +276,7 @@ static func pose_path(id: String, pose: String) -> String:
 
 ## 에디터·게임에서 프레임을 새로 넣었을 때 다시 읽기
 static func clear_cache() -> void:
+	_hit_maps.clear()
 	_cache.clear()
 	_info_cache.clear()
 	_portrait_cache.clear()
@@ -485,6 +486,48 @@ func set_light_direction(tex_from_right: bool) -> void:
 func set_param(key: String, value: Variant) -> void:
 	for m in mats:
 		m.set_shader_parameter(key, value)
+
+
+## 화면(캔버스) 점 p 가 지금 프레임 그림의 몸(불투명 픽셀) 위인가 — 기지 대원 클릭 판정. tol = 이 정도(화면 px) 가까우면 몸으로 침
+static var _hit_maps: Dictionary = {}   # 텍스처 RID → BitMap (불투명 픽셀)
+
+
+## 지금 프레임 그림이 그려진 화면(캔버스) 사각형
+func drawn_rect() -> Rect2:
+	if body == null or body.texture == null:
+		return Rect2()
+	var xf := body.get_global_transform()
+	var sz := body.texture.get_size()
+	var r := Rect2(xf * Vector2.ZERO, Vector2.ZERO)
+	for c in [Vector2(sz.x, 0), Vector2(0, sz.y), sz]:
+		r = r.expand(xf * c)
+	return r
+
+
+func hits(p: Vector2, tol: float = 3.0) -> bool:
+	if body == null or body.texture == null:
+		return false
+	var tex := body.texture
+	var key := tex.get_rid()
+	var bm: BitMap = _hit_maps.get(key, null)
+	if bm == null:
+		var img := tex.get_image()
+		if img == null:
+			return false
+		if img.is_compressed():
+			img.decompress()
+		bm = BitMap.new()
+		bm.create_from_image_alpha(img, 0.35)
+		_hit_maps[key] = bm
+	var xf := body.get_global_transform()
+	var q := xf.affine_inverse() * p
+	var r := tol / maxf(0.0001, xf.get_scale().abs().x)   # 화면 px → 그림 px
+	var sz := bm.get_size()
+	for o in [Vector2.ZERO, Vector2(r, 0), Vector2(-r, 0), Vector2(0, r), Vector2(0, -r)]:
+		var t: Vector2 = q + o
+		if t.x >= 0 and t.y >= 0 and t.x < sz.x and t.y < sz.y and bm.get_bitv(Vector2i(t)):
+			return true
+	return false
 
 
 ## 정수리 위치 (발 기준, 화면 px)

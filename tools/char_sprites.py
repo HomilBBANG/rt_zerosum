@@ -48,6 +48,9 @@ assets/characters/<id>/
       예: dead=90.webp hit=91.webp miss=92.webp shot=93.webp stun=94.webp. 그림*0.8 = 그 그림만 배율 더 곱하기 (다른 크기로 그려진 그림 — 모자 폭 등으로 맞춤), 그림@fit = 그 그림의 키를 기본 그림 키에 맞춤 (서 있는데 작게 그려진 그림).
       무기별 공격 그림 = shot_<무기 스프라이트>(예: shot_pistol), slash_<무기> — 그 무기를 들었을 때 먼저 씀. 배율 = 기준 그림(--ref, 기본 = 가장 키 큰 선 자세)의 키가 figure_px 가 되게 — 모든 포즈 같은 배율
       발 = 선 자세는 맨 아래 발 가운데(--band 0.25 = 아래 25% 줄 좌우 끝 가운데 — 한 발을 뻗은 자세), 누운 자세(가로가 긴 그림)는 그림 가운데 아래. 전투(피격·회피·공격·기절·쓰러짐)·컷씬 대사에서 씀
+  python3 tools/char_sprites.py breathe-pose <캐릭터> [포즈=tired] [칸 수=16]   포즈 한 장(<포즈>/0001.png)을 리깅해 숨 쉬는 반복 프레임으로 (idle 처럼)
+      발 · 다리 · 골반 아래 고정, 골반 위 상체가 숨 쉬듯 오르내리고 가슴이 살짝 넓어짐 + 머리 살짝 끄덕임. 조명 · 선화 · 눈 마스크도 같이.
+      원본 한 장은 art_src/poses/<캐릭터>/<포즈>/ 에 보관 (다시 돌려도 원본에서 만듦). 전투에서 AP 0~1 일 때 계속 보이는 지침(tired) 자세에 씀
   python3 tools/char_sprites.py posecheck <캐릭터> [출력.png]   idle · 걷기 · 모든 포즈를 게임과 같은 배율 · 같은 발 위치로 한 장에 (크기 비교 — 초록 선 = 기본 그림 키)
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
@@ -1330,6 +1333,70 @@ def cmd_posecheck(cid, out=None):
     print(cid, "크기 비교", len(tiles), "장 →", os.path.relpath(out, ROOT))
 
 
+# ---------------------------------------------------------------- 포즈 한 장 → 숨쉬기 반복 (지침 자세 등)
+def cmd_breathe_pose(cid, pose="tired", frames=16, fps=8.0, breath=0.007):
+    """<포즈>/0001.png 한 장을 리깅해 숨쉬기 프레임 → 같은 폴더 0001~ (anim.json loop · fps). 원본은 art_src/poses 에 보관"""
+    import math
+    import shutil
+    import numpy as np
+    from scipy.ndimage import map_coordinates
+    cdir = os.path.join(CHAR_DIR, cid)
+    pdir = os.path.join(cdir, pose)
+    src_dir = os.path.join(ROOT, "art_src", "poses", cid, pose)
+    if not os.path.exists(os.path.join(src_dir, "0001.png")):   # 처음: 지금 한 장을 원본으로 보관
+        if not os.path.exists(os.path.join(pdir, "0001.png")):
+            print(cid, pose, "포즈 그림이 없습니다")
+            return
+        os.makedirs(src_dir, exist_ok=True)
+        for fn in os.listdir(pdir):
+            if fn.startswith("0001") and fn.endswith(".png"):
+                shutil.copy(os.path.join(pdir, fn), os.path.join(src_dir, fn))
+    meta_p = os.path.join(pdir, "anim.json")
+    meta = json.load(open(meta_p, encoding="utf-8")) if os.path.exists(meta_p) else {"pose": True}
+    base = np.array(Image.open(os.path.join(src_dir, "0001.png")).convert("RGBA")).astype(np.float32)
+    H, W = base.shape[:2]
+    ys, xs = np.nonzero(base[..., 3] > 40)
+    top, bottom = float(ys.min()), float(meta.get("ground", [0, ys.max()])[1])
+    fig = float(meta.get("figure_px", bottom - top))
+    hip = float(meta.get("hip_y", bottom - (bottom - top) * 0.5))
+    hip = min(hip, bottom - (bottom - top) * 0.3)
+    shoulder = top + (hip - top) * 0.3          # 어깨쯤 (상체 위 30%)
+    cx = float(xs[(ys > shoulder) & (ys < hip)].mean()) if ((ys > shoulder) & (ys < hip)).any() else W / 2.0
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+
+    def sstep(e0, e1, v):
+        t = np.clip((v - e0) / (e1 - e0), 0.0, 1.0)
+        return t * t * (3 - 2 * t)
+    w_up = sstep(hip, shoulder, yy)                     # 골반 0 → 어깨 1 (위로 갈수록 많이 움직임)
+    w_chest = sstep(hip, shoulder + (hip - shoulder) * 0.3, yy) * (1 - sstep(shoulder + (hip - shoulder) * 0.15, shoulder - fig * 0.05, yy))
+    w_head = sstep(shoulder, shoulder - fig * 0.06, yy)
+    srcs = {}
+    for suf in ("_mask_r", "_mask_l", "_line", "_eye"):
+        mp = os.path.join(src_dir, "0001" + suf + ".png")
+        if os.path.exists(mp):
+            srcs[suf] = np.array(Image.open(mp).convert("L")).astype(np.float32)
+    for fn in os.listdir(pdir):
+        if re.match(r"\d{4}.*\.png(\.import)?$", fn):
+            os.remove(os.path.join(pdir, fn))
+    for i in range(frames):
+        ph = 2 * math.pi * i / frames
+        b = 0.5 - 0.5 * math.cos(ph)                    # 0 → 들숨 1 → 0
+        DY = -fig * breath * b * w_up - fig * 0.002 * math.sin(ph - 0.5) * w_head
+        DX = (xx - cx) * 0.008 * b * w_chest
+        sy, sx = yy - DY, xx - DX
+        stem = os.path.join(pdir, "%04d" % (i + 1))
+        out = np.zeros_like(base)
+        for ch in range(4):
+            out[..., ch] = map_coordinates(base[..., ch], [sy, sx], order=1, mode="constant", cval=0.0)
+        Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)).save(stem + ".png")
+        for suf, m in srcs.items():
+            w = map_coordinates(m, [sy, sx], order=1, mode="constant", cval=85.0 if "_mask_" in suf else 0.0)
+            Image.fromarray(np.clip(w, 0, 255).astype(np.uint8)).save(stem + suf + ".png")
+    meta.update({"pose": True, "loop": True, "fps": fps, "breathe": frames})
+    json.dump(meta, open(meta_p, "w", encoding="utf-8"), ensure_ascii=False)
+    print(cid, pose, "숨쉬기", frames, "장 (골반 y%d · 어깨 y%d)" % (hip, shoulder))
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
@@ -1380,6 +1447,10 @@ if __name__ == "__main__":
                  tuple(float(v) for v in opt.get("scale", "1,0.5").split(",")), opt.get("out"))
     elif args[:1] == ["steps"] and len(args) >= 2:
         cmd_steps(args[1], tuple(args[2:]) or ("walk", "run"))
+    elif args[:1] == ["breathe-pose"] and len(args) >= 2:
+        nums = [a for a in args[2:] if a.isdigit()]
+        names = [a for a in args[2:] if not a.isdigit()]
+        cmd_breathe_pose(args[1], names[0] if names else "tired", int(nums[0]) if nums else 16)
     elif args[:1] == ["rig"] and len(args) >= 2:
         nums = [a for a in args[2:] if a.isdigit()]
         cmd_rig(args[1], int(nums[0]) if nums else 32, blink="--blink" in args)

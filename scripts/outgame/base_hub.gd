@@ -276,20 +276,27 @@ func _world_mouse() -> Vector2:
 	return get_viewport().get_mouse_position()
 
 
+## 그 점의 대원: 몸 그림의 불투명 픽셀 위(몸 어디든)만 — 겹치면 앞에 그려진 대원
 func _npc_at(p: Vector2) -> String:
 	var best := ""
-	var best_d := INF
+	var best_z := -INF
 	for id in npc_views:
 		var v: NpcView = npc_views[id]
-		if not v.visible:
+		if not v.visible or not v.hits(p):
 			continue
-		var r := v.hit_rect()
-		if r.has_point(p):
-			var d := absf(r.get_center().x - p.x)
-			if d < best_d:
-				best = id
-				best_d = d
+		var z := float(v.z_index) + v.position.y * 0.001
+		if z > best_z:
+			best = id
+			best_z = z
 	return best
+
+
+## 그 점의 '!' 요청 마커 (대원 id, 없으면 "")
+func _marker_at(p: Vector2) -> String:
+	for id in npc_views:
+		if (npc_views[id] as NpcView).marker_hits(p):
+			return id
+	return ""
 
 
 func _bubble_at(p: Vector2) -> String:
@@ -402,6 +409,11 @@ func _left_click(p: Vector2, dbl: bool = false) -> void:
 	if key != "":
 		hud.open_overhear(key)
 		return
+	var mk := _marker_at(p)
+	if mk != "":   # 머리 위 '!' = 요청 받기 (요청 대화 → 수락)
+		select(mk)
+		hud.open_dialogue(mk)
+		return
 	var n := _npc_at(p)
 	if n == "" and jukebox_rect().has_point(p):   # 공용실 주크박스 = 음악 카세트 창 (다시 누르면 닫힘)
 		hud.toggle_music()
@@ -446,24 +458,23 @@ func room_x_at(fid: String, p: Vector2) -> float:
 
 
 ## 오른쪽 클릭: 대원 = 그 대원 선택 + 행동 메뉴 / 선택한 대원이 있는 방 = 그 방에서 할 행동 메뉴
+## 방 빈 곳 = 그 방 메뉴 ('정보 보기' = 그 방 도감 · 선택한 대원이 그 방에 있으면 그 방에서 할 행동도)
 func _right_click(p: Vector2, screen: Vector2) -> void:
-	var n := _npc_at(p)
+	var n := _npc_at(p) if _marker_at(p) == "" else ""
 	if n != "":
 		select(n)
 		hud.open_context(n, screen)   # 내장 팝업 위치 = 논리 화면 좌표
 		return
-	if selected == "":
-		return
 	var fid := under.facility_at_screen(p)
-	var sn: NpcAgent = sim.npcs[selected]
 	if fid == "":
 		select("")
-	elif sn.facility == fid and sn.state != NpcAgent.MOVING:
-		hud.open_context(selected, screen)
-	elif sn.state == NpcAgent.MOVING and sn.dest == fid:
-		hud.show_toast("%s 이(가) 아직 %s 로 가는 중입니다 — 도착하면 우클릭" % [sn.name, sim.data.facility_name(fid)], OutgameHud.BAD)
-	else:
-		hud.show_toast("%s 은(는) %s 에 없습니다 — 왼쪽 클릭으로 먼저 보내세요" % [sn.name, sim.data.facility_name(fid)], OutgameHud.BAD)
+		return
+	var here := ""
+	if selected != "":
+		var sn: NpcAgent = sim.npcs[selected]
+		if sn.facility == fid and sn.state != NpcAgent.MOVING:
+			here = selected
+	hud.open_room_menu(fid, screen, here)
 
 
 func select(npc_id: String) -> void:
@@ -569,6 +580,18 @@ func _cli_ui(spec: String) -> void:
 		"contracts": hud.open_contracts("")
 		"armory": hud.open_armory()
 		"log_closed": hud.set_log_open(false)
+		"hittest":   # 대원마다 몸 가운데 · 사각형 모서리(빈 곳) · '!' 마커 클릭 판정을 로그에 (확인용)
+			await get_tree().process_frame
+			for id in npc_views:
+				var v: NpcView = npc_views[id]
+				if not v.visible:
+					continue
+				var r: Rect2 = v.chr.drawn_rect() if v.chr != null else v.hit_rect()
+				var head := Vector2(r.get_center().x, r.position.y + r.size.y * 0.1)
+				var chest := Vector2(r.get_center().x, r.position.y + r.size.y * 0.3)
+				print("[hit] %s head=%s chest=%s corner=%s marker=%s" % [id, _npc_at(head), _npc_at(chest), _npc_at(r.position + Vector2(2, 2)), _marker_at(v.position + v.marker_at) if v.marker_at != Vector2.INF else "-"])
+		"room_menu":   # room_menu:시설 id — 방 빈 곳 우클릭 메뉴
+			hud.open_room_menu(p[1], Vector2(640, 360))
 		"jukebox":   # 주크박스를 누른 것처럼 (클릭 판정 확인용)
 			_left_click(jukebox_rect().get_center())
 		"music":   # music[:곡 번호(0부터)] — 음악 카세트 창 (그 곡으로)

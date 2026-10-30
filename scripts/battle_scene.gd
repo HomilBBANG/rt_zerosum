@@ -137,6 +137,15 @@ func _run_cli() -> void:
 			if auto == "move":
 				hud.begin_move()
 				break
+			if auto == "tired":
+				# --autoplay=tired — 아군 모두 AP 1 (지침 자세 유지 확인용)
+				for id in view.sprites:
+					var tu: UnitRuntime = view.sprites[id].unit
+					if tu.team == "ally":
+						tu.ap = 1
+				view.refresh_tired()
+				await get_tree().create_timer(1.2).timeout
+				break
 			if auto.begins_with("act"):
 				# --autoplay=act[:초[:스킬 id]] — 첫 아군 차례에 공격 하나, 초 뒤에 찍음 (행동 연출 확인용, 기본 0.5)
 				var aid2 := auto.get_slice(":", 2) if auto.get_slice_count(":") > 2 else "basic_attack"

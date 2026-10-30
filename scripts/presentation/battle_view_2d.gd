@@ -31,14 +31,16 @@ const UNIT_SCRIPT := preload("res://scripts/presentation/unit_sprite_2d.gd")
 		cam_screen_center = v
 		_camera_changed()
 @export_group("행동 연출")
-## 행동(스킬 · 공격): 카메라는 캐릭터가 아니라 **화면 가운데로 살짝 줌** + 행동한 캐릭터가 화면 가운데 쪽으로 나왔다가 → 행동 → 제자리로.
+## 행동(스킬 · 공격): 카메라는 캐릭터가 아니라 **화면 가운데로 살짝 줌**, 행동한 캐릭터는 제자리 (act_move 를 켜면 가운데 쪽으로 나왔다 돌아옴).
+## AP 0~1 = 지침: 지침 그림(tired)이 있는 캐릭터는 숨 쉬는 지침 자세를 계속 (AP 0 이 돼도 따로 연출 없음).
 ## 상황별 포즈 그림(shot · hit · miss · stun …)은 그동안 잠깐 바뀜 (그림이 있는 캐릭터만, tools/char_sprites.py poses)
 @export_range(1.0, 2.0, 0.01) var pose_zoom := 1.12           ## 카메라 줌 배율 (화면 가운데 기준)
 @export_range(0.02, 1.0, 0.01, "suffix:초") var pose_zoom_in := 0.22   ## 줌인 · 캐릭터가 가운데로 나오는 시간
 @export_range(0.2, 5.0, 0.05, "suffix:초") var pose_time := 1.5        ## 포즈를 보여 주는 시간
 @export_range(0.0, 1.0, 0.01, "suffix:초") var pose_back := 0.28       ## 원래 화면 · 제자리로 돌아오는 시간
 @export_range(0.0, 400.0, 1.0, "suffix:px") var act_center_gap := 90.0   ## 가운데로 나온 캐릭터와 화면 가운데 사이 가로 거리 (자기 편 쪽으로, 0 = 정가운데)
-@export var act_move := true   ## 행동한 캐릭터가 가운데로 나왔다가 돌아옴 (끄면 제자리에서)
+@export var act_move := false   ## 행동한 캐릭터가 가운데로 나왔다가 돌아옴 (기본 꺼짐 = 제자리)
+@export_range(0, 5, 1) var tired_ap := 1   ## AP 가 이 값 이하면 지침 자세 유지
 @export_range(0.0, 1.0, 0.01, "suffix:초") var shake_time := 0.32      ## 공격이 명중했을 때 카메라 흔들림 시간
 @export_range(0.0, 60.0, 0.5, "suffix:px") var shake_px := 16.0      ## 카메라 흔들림 세기 (처음 세기, 점점 약하게)
 @export_group("")
@@ -289,6 +291,9 @@ func setup(p_controller: BattleController, p_preset: Dictionary) -> void:
 	if not controller.slots.all_units().is_empty():
 		_spawn_units()
 	controller.action_resolved.connect(_on_action_resolved)
+	controller.actor_started.connect(func(_u, _r): refresh_tired())
+	controller.ap_changed.connect(func(_u): _refresh_tired_idle.call_deferred())   # 행동이면 그 연출이 끝난 뒤에 (바로 다음에 연출이 시작됨)
+	controller.round_started.connect(func(_n, _q): refresh_tired())
 	controller.status_ticked.connect(_on_status_ticked)
 	controller.unit_moved.connect(_on_unit_moved)
 	controller.units_swapped.connect(_on_units_swapped)
@@ -672,10 +677,20 @@ func _on_action_resolved(event: Dictionary) -> void:
 	if left > 0.0:
 		await get_tree().create_timer(left).timeout
 	await get_tree().create_timer(_stage_out(s)).timeout
-	# 탈진: AP 를 다 쓰면 그다음 tired
-	if actor.alive and actor.ap <= 0 and s.has_pose("tired"):
-		await get_tree().create_timer(_pose(s, "tired", true)).timeout
 	_end_busy()
+	refresh_tired()
+
+
+## 지침 자세: AP 가 tired_ap(1) 이하인 살아 있는 캐릭터는 숨 쉬는 지침 자세 유지, AP 가 차면 idle 로
+func refresh_tired() -> void:
+	for id in sprites:
+		var sp: UnitSprite2D = sprites[id]
+		sp.set_tired(sp.unit.alive and sp.unit.ap <= tired_ap)
+
+
+func _refresh_tired_idle() -> void:
+	if not busy:
+		refresh_tired()
 
 
 ## 차례 시작 상태 이상 피해 → 맞는 연출
