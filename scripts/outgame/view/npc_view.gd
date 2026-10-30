@@ -172,10 +172,14 @@ func _update_light(n: NpcAgent, delta: float) -> void:
 		if absf(float(key.dx)) > 0.15:   # 바로 머리 위를 지날 때 좌우가 떨리지 않게
 			_lit.right = key.from_right
 		_lit.behind = bool(key.behind)
-	_lit.rim = not rim.is_empty() and Game.rim_enabled
+	# 림(빛 반대쪽 가장자리 선): 항상 켬. 반대쪽에서 실제로 오는 두 번째 빛이 있으면 그 색 · 세기,
+	# 없으면 방 조명 프리셋의 림 색(accent · char_accent_mix) — 방이 하나의 조명이어도 윤곽이 보이게
+	_lit.rim = Game.rim_enabled
 	if _lit.rim:
-		_lit.rim_color = (_lit.rim_color as Color).lerp(rim.color, t)
-		_lit.rim_k = lerpf(float(_lit.rim_k), clampf(0.45 + float(rim.intensity) / 4.0, 0.45, 0.85), t)
+		var rc: Color = rim.color if not rim.is_empty() else p.accent
+		var rk: float = clampf(0.45 + float(rim.intensity) / 4.0, 0.45, 0.85) if not rim.is_empty() else float(p.get("char_accent_mix", 0.65))
+		_lit.rim_color = (_lit.rim_color as Color).lerp(rc, t)
+		_lit.rim_k = lerpf(float(_lit.rim_k), rk, t)
 	var k := float(_lit.k)
 	chr.set_param("key_color", _lit.color)
 	chr.set_param("key_mix", lerpf(0.25, lerpf(0.45, 0.70, k), k) if _lit.has else 0.25)
