@@ -107,6 +107,8 @@ static func read(path: String = PATH) -> Array:
 						if s.has(k):
 							d[k] = str(s[k])
 					out.append(d)
+			if path == PATH:
+				SkillTable.apply_statuses(out)   # data/skills.xlsx 표의 이름 · 글자 · 색 · 설명이 우선
 			return out
 	for eff in EFFECT_ORDER:
 		out.append(new_status(eff, eff))

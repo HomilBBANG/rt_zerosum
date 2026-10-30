@@ -9,10 +9,14 @@ extends Control
 ## 상태 정의: 상태 이상 이름·머리 위 글자·색 + 쓰는 효과(규칙) → data/statuses.json. 같은 효과를 이름만 다르게 여러 개 (예: 진통제·자가 치유 = 재생).
 ## 가운데: 격자 위 자유 모양 (캐릭터마다 다르게) — 빈 칸 클릭 = 새 노드(고른 노드에서 이어짐), 끌기 = 옮기기, Shift+클릭 = 선행 잇기/끊기, Delete = 삭제.
 ## 오른쪽: 고른 노드의 id · 이름 · 갈래 색 · 시작 노드 · 필요 레벨 · 선행(하나라도/모두) · 택일 그룹 · 효과 · 값 · 설명, 옮기기 · 삭제, 아래 검사.
+## 수치 · 이름 · 설명의 원본 = 엑셀 스킬 표 data/skills.xlsx (SkillTable). 표를 엑셀에서 고쳐 저장하면 이 탭이 1초 안에 읽어 반영,
+## 이 탭에서 저장하면 표도 같이 다시 씀 (엑셀에 열려 있으면 저장 안 됨 — 닫고 다시).
 ## 게임 규칙(BaseSim): 시작 노드는 처음부터 습득, 선행을 배워야 다음, 같은 택일 그룹은 트리마다 하나만, 스킬 포인트는 두 트리 공용.
 
 const CANVAS := preload("res://addons/rtz_skill_editor/skill_tree_canvas.gd")
 
+var _table_mtime := 0              # data/skills.xlsx 마지막으로 읽거나 쓴 때 (바뀌면 _apply_table)
+var _table_poll := 0.0
 var history: EditorHistory   # Ctrl+Z 뒤로 감기 · Ctrl+Y 앞으로 감기 (addons/rtz_common/editor_history.gd)
 var nodes: Array = []                # 전체 노드 (모든 캐릭터)
 var dirty := false
@@ -296,13 +300,20 @@ func _load() -> void:
 	if _god(god_sel).is_empty():
 		god_sel = faith.gods[0].id if not faith.gods.is_empty() else ""
 	dirty = false
-	status.text = "data/skill_tree.json 노드 %d개 · data/faith.json 신 %d · 신앙 스킬 %d" % [nodes.size(), faith.gods.size(), faith.skills.size()]
+	_table_mtime = SkillTable.mtime()
+	status.text = "data/skills.xlsx(표) + skill_tree.json 노드 %d개 · data/faith.json 신 %d · 신앙 스킬 %d" % [nodes.size(), faith.gods.size(), faith.skills.size()]
 	_rebuild()
 	history.reset()
 
 
 ## 스킬 트리 · 신앙 · 상태 이상 모두 저장
 func _save() -> void:
+	# 스킬 표(data/skills.xlsx)가 수치 · 이름 · 설명의 원본 → 먼저 표를 씀. 못 쓰면(엑셀에 열려 있음) 아무것도 저장 안 함
+	var et := SkillTable.write({"nodes": nodes, "faith": faith, "sstat": sstat, "sdefs": sdefs, "mdata": mdata, "spose": spose})
+	if et != OK:
+		status.text = "저장 못 함: data/skills.xlsx 를 쓸 수 없습니다 (엑셀에 열려 있으면 닫고 다시 저장) — 아무것도 저장 안 됨"
+		return
+	_table_mtime = SkillTable.mtime()
 	var err := SkillTreeData.write(nodes)
 	var err2 := FaithData.write(faith)
 	var err3 := SkillStatusData.write(sstat)
@@ -314,9 +325,9 @@ func _save() -> void:
 		var errs: int = SkillTreeData.check(nodes, allies, actions).errors.size() + FaithData.check(faith, char_faith, actions).errors.size() \
 			+ SkillStatusData.check(sstat, actions).errors.size() + MonsterSkillData.check(mdata, sheet_skill_ids, monsters).errors.size() \
 			+ StatusCatalog.check(sdefs).errors.size()
-		status.text = "저장됨: data/skill_tree.json · faith.json · skill_status.json · statuses.json · monster_skills.json · skill_poses.json" + ("" if errs == 0 else "  (검사 오류 %d개 — 아래 확인)" % errs)
+		status.text = "저장됨: data/skills.xlsx(표) · skill_tree.json · faith.json · skill_status.json · statuses.json · monster_skills.json · skill_poses.json" + ("" if errs == 0 else "  (검사 오류 %d개 — 아래 확인)" % errs)
 		if Engine.is_editor_hint():
-			for path in [SkillTreeData.PATH, FaithData.PATH, SkillStatusData.PATH, MonsterSkillData.PATH, StatusCatalog.PATH, SkillPoseData.PATH]:
+			for path in [SkillTable.PATH, SkillTreeData.PATH, FaithData.PATH, SkillStatusData.PATH, MonsterSkillData.PATH, StatusCatalog.PATH, SkillPoseData.PATH]:
 				EditorInterface.get_resource_filesystem().update_file(path)
 	else:
 		status.text = "저장 실패 (%d / %d / %d)" % [err, err2, err3]
@@ -2263,6 +2274,26 @@ func _head(t: String) -> Label:
 func _process(delta: float) -> void:
 	if history != null and is_visible_in_tree():
 		history.tick(delta)
+	_table_poll += delta
+	if _table_poll >= 1.0:
+		_table_poll = 0.0
+		var mt := SkillTable.mtime()
+		if mt != _table_mtime and mt != 0:
+			_table_mtime = mt
+			_apply_table()
+
+
+## 엑셀 스킬 표(data/skills.xlsx)가 바뀌면 그 값을 지금 편집 중인 데이터에 덮어씀 (저장 안 한 다른 편집은 그대로, 같은 칸은 표가 이김)
+func _apply_table() -> void:
+	SkillTable.clear_cache()
+	var n := SkillTable.apply_tree(nodes) + SkillTable.apply_faith(faith) + SkillTable.apply_skill_status(sstat) \
+		+ SkillTable.apply_statuses(sdefs) + SkillTable.apply_monster(mdata) + SkillTable.apply_poses(spose)
+	if n == 0:
+		return
+	char_faith = faith.believers
+	StatusCatalog.refresh(sdefs)
+	_rebuild()
+	status.text = "엑셀 표(data/skills.xlsx)에서 %d칸 바뀜 → 반영 (Ctrl+Z = 표 읽기 전으로)" % n
 
 
 func _input(event: InputEvent) -> void:

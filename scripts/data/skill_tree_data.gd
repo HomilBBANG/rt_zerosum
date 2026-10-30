@@ -142,6 +142,8 @@ static func read(path: String = PATH) -> Array:
 	var out := []
 	for r in raw:
 		out.append(_norm(r))
+	if path == PATH:
+		SkillTable.apply_tree(out)   # data/skills.xlsx 표의 이름 · 레벨 · 효과 · 값 · 설명이 우선
 	return out
 
 

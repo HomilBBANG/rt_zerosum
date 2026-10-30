@@ -59,6 +59,7 @@ func _init() -> void:
 	_test_hit_evasion()
 	_test_poses()
 	_test_portrait_cache()
+	_test_skill_table()
 	_test_story_graph()
 	_test_story_edit()
 	_test_codex()
@@ -707,6 +708,73 @@ func _test_portrait_cache() -> void:
 	_check(Time.get_ticks_usec() - t0 < 5000, "캐시된 초상화 100번 < 5ms")
 	CharacterSprite2D.clear_cache()
 	_check(CharacterSprite2D.portrait("dan") != a, "clear_cache 뒤에는 다시 읽음")
+
+
+func _test_skill_table() -> void:
+	print("[13i] 스킬 표 data/skills.xlsx (표 값이 우선 · 에디터 저장 = 표도 씀)")
+	SkillTable.clear_cache()
+	_check(FileAccess.file_exists(SkillTable.PATH), "data/skills.xlsx 있음")
+	# 지금 표 = 지금 데이터 (표를 덮어도 JSON 과 같음)
+	var tmpj := "user://_tree_only.json"
+	DirAccess.copy_absolute(ProjectSettings.globalize_path(SkillTreeData.PATH), ProjectSettings.globalize_path(tmpj))
+	_check(var_to_str(SkillTreeData.read()) == var_to_str(SkillTreeData.read(tmpj)), "저장소의 표와 skill_tree.json 이 같은 값")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmpj))
+	var t := XlsxReader.read(SkillTable.PATH)
+	for sh in ["읽어보기", "스킬 트리", "신", "신앙 스킬", "믿는 신", "신 해금", "기적", "스킬 상태 이상", "상태 정의", "몬스터 스킬", "스킬 포즈"]:
+		_check_quiet(t.has(sh))
+	_check(t.size() == 11, "시트 11개 (%s)" % ", ".join(t.keys()))
+	# 표를 고친 것처럼 (엑셀 저장 흉내)
+	var m := {}
+	for k in t:
+		var rows := []
+		for r in t[k]:
+			rows.append(Array(r))
+		m[k] = rows
+	var _set := func(sheet: String, key: String, head: String, v: String, key2: String = "") -> void:
+		var rows: Array = m[sheet]
+		var h: Array = rows[0]
+		for r in rows.slice(1):
+			if str(r[0]) == key and (key2 == "" or str(r[1]) == key2):
+				r[h.find(head)] = v
+	_set.call("스킬 트리", "dan_a_n3", "값", "7")
+	_set.call("스킬 트리", "dan_a_n3", "이름", "강타 개정")
+	_set.call("스킬 트리", "dan_a_n3", "필요 레벨", "")          # 빈 숫자 칸 = 그대로
+	_set.call("스킬 트리", "dan_a_n3", "(참고) 캐릭터", "무시")   # 참고 열 = 무시
+	_set.call("신앙 스킬", "solus_1", "필요 신앙도", "150")       # 0~100 으로
+	_set.call("기적", "hana_m1", "값", "12")
+	_set.call("믿는 신", "a_dan", "시작 신앙도", "44")
+	_set.call("신 해금", "a_hana", "시작 의지", "25")
+	_set.call("스킬 상태 이상", "brutal_strike", "확률 %", "77", "stun")
+	_set.call("상태 정의", "bleed", "이름", "대출혈")
+	_set.call("몬스터 스킬", "rend", "위력", "15")
+	_set.call("스킬 포즈", "heavy_attack", "포즈", "slash")
+	(m["스킬 트리"] as Array).append(["없는_노드", "", "", "", "", "", "유령", "1", "hp", "99"])   # 표에만 있는 id = 무시
+	var before_level: int = SkillTreeData.read().filter(func(x): return x.id == "dan_a_n3")[0].level
+	SkillTable.use_sheets(m)
+	var nd: Dictionary = SkillTreeData.read().filter(func(x): return x.id == "dan_a_n3")[0]
+	_check(int(nd.value) == 7 and str(nd.name) == "강타 개정" and int(nd.level) == before_level, "스킬 트리: 값 · 이름은 표, 빈 숫자 칸은 그대로")
+	_check(not SkillTreeData.read().any(func(x): return x.id == "없는_노드"), "표에만 있는 id 는 무시 (추가는 에디터)")
+	var f := FaithData.read()
+	_check(int(f.skills.filter(func(x): return x.id == "solus_1")[0].need) == 100 and int(f.miracles.filter(func(x): return x.id == "hana_m1")[0].value) == 12, "신앙 스킬 · 기적 (신앙도는 100 까지)")
+	_check(int(f.believers.a_dan.faith) == 44 and int(f.divine.a_hana.will) == 25, "믿는 신 시작 신앙도 · 신 해금 시작 의지")
+	_check(int(SkillStatusData.read().filter(func(x): return x.skill == "brutal_strike" and x.status == "stun")[0].chance) == 77, "스킬 상태 이상 확률")
+	_check(str(StatusCatalog.read().filter(func(x): return x.id == "bleed")[0].name) == "대출혈", "상태 정의 이름")
+	_check(int(MonsterSkillData.read().skills.filter(func(x): return x.id == "rend")[0].power) == 15, "몬스터 스킬 위력")
+	_check(str(SkillPoseData.read().get("heavy_attack", "")) == "slash", "스킬 포즈")
+	var gd := GameData.load_from()
+	_check(gd != null and int(gd.skill_tree.a_dan.filter(func(x): return x.id == "dan_a_n3")[0].value) == 7, "게임 데이터(GameData)도 표 값으로")
+	_check(SkillTreeData.read(SkillTreeData.PATH + ".none").is_empty(), "다른 경로로 읽으면 표 안 씀")
+	# 데이터 → 표 (에디터 저장): 쓴 표를 다시 읽으면 같은 값
+	var tmp := "user://_skill_table_test.xlsx"
+	_check(SkillTable.write({}, tmp) == OK, "표 쓰기")
+	var back := XlsxReader.read(tmp)
+	var trow: Array = (back["스킬 트리"] as Array).filter(func(r): return str(r[0]) == "dan_a_n3")[0]
+	_check(str(trow[(back["스킬 트리"][0] as Array).find("값")]) == "7", "쓴 표에 지금 값")
+	_check((back["스킬 트리"] as Array).size() == SkillTreeData.read().size() + 1, "표 줄 = 노드 수 + 머리 줄")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+	SkillTable.clear_cache()
+	StatusCatalog.refresh()
+	_check(int(SkillTreeData.read().filter(func(x): return x.id == "dan_a_n3")[0].value) != 7, "clear_cache 뒤 = 파일의 표")
 
 
 func _test_story_graph() -> void:

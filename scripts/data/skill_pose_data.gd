@@ -61,6 +61,8 @@ static func read(path: String = PATH) -> Dictionary:
 			var v := str(j.skills[k])
 			if v != "":
 				out[str(k)] = v
+	if path == PATH:
+		SkillTable.apply_poses(out)   # data/skills.xlsx 표의 포즈 칸이 우선 (빈 칸 · (자동) = 자동)
 	return out
 
 

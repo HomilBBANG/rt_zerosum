@@ -24,6 +24,10 @@ static func read(path: String = PATH) -> Array:
 		if e is Dictionary:
 			out.append({"skill": str(e.get("skill", "")), "status": StatusCatalog.find(str(e.get("status", ""))),
 				"turns": maxi(1, int(e.get("turns", 1))), "value": int(e.get("value", 0)), "chance": clampi(int(e.get("chance", 100)), 0, 100)})
+	if path == PATH and SkillTable.apply_skill_status(out) > 0:   # data/skills.xlsx 표가 우선
+		for e in out:
+			e.turns = maxi(1, int(e.turns))
+			e.chance = clampi(int(e.chance), 0, 100)
 	return out
 
 

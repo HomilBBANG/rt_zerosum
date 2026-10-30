@@ -103,6 +103,13 @@ static func read(path: String = PATH) -> Dictionary:
 			out.skills.append({"id": str(s.get("id", "")), "god": str(s.get("god", "")), "name": str(s.get("name", "")),
 				"need": clampi(int(s.get("need", 0)), 0, FAITH_MAX), "effect": str(s.get("effect", "")).strip_edges(),
 				"value": int(s.get("value", 0)), "desc": str(s.get("desc", ""))})
+	if path == PATH and SkillTable.apply_faith(out) > 0:   # data/skills.xlsx 표가 우선
+		for s in out.skills + out.miracles:
+			s.need = clampi(int(s.need), 0, FAITH_MAX)
+		for cid in out.believers:
+			out.believers[cid].faith = clampi(int(out.believers[cid].faith), 0, FAITH_MAX)
+		for cid in out.divine:
+			out.divine[cid].will = clampi(int(out.divine[cid].will), 0, FAITH_MAX)
 	return out
 
 

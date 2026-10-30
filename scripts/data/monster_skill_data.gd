@@ -35,6 +35,9 @@ static func read(path: String = PATH) -> Dictionary:
 	if k is Dictionary:
 		for mid in k:
 			out.kits[str(mid)] = (k[mid] as Array).map(func(x): return str(x)) if k[mid] is Array else []
+	if path == PATH and SkillTable.apply_monster(out) > 0:   # data/skills.xlsx 표가 우선
+		for s in out.skills:
+			s.ap = maxi(0, int(s.ap))
 	return out
 
 
