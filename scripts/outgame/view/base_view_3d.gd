@@ -31,6 +31,7 @@ var _lights: Dictionary = {}  # fid → [SpotLight3D] (방 스폿 · 출입문 �
 var _proxies: Dictionary = {} # npc id → MeshInstance3D (그림자만 드리우는 실루엣 판)
 var _sil_cache: Dictionary = {}
 var shadow_dirty := false     # 그림자 판이 움직임 → BaseHub 가 3D 를 다시 그림
+var jukebox: AABB = AABB()    # 공용실 주크박스 (3D 상자, 크기 0 = 없음) — 누르면 음악 카세트 창 (BaseHub)
 
 
 func build(p_sim: BaseSim) -> void:
@@ -383,8 +384,9 @@ func _furniture(n: Node3D, f: Dictionary, b: Dictionary, light: String) -> void:
 			else:
 				_box(n, Vector3(1.1, 0.08, 0.6), Vector3(x0 + w * 0.62, y + 0.45, BZ + 1.3), wood)
 				_box(n, Vector3(0.12, 0.42, 0.12), Vector3(x0 + w * 0.62, y + 0.21, BZ + 1.3), metal)
-				_box(n, Vector3(1.2, 0.8, 0.08), Vector3(x0 + w * 0.78, y + 1.95, BZ + 0.04), _mat(Color(0.1, 0.1, 0.13), light, 0.012))
-				_box(n, Vector3(1.05, 0.66, 0.02), Vector3(x0 + w * 0.78, y + 1.95, BZ + 0.09), _glow(acc), false)
+				_box(n, Vector3(1.2, 0.8, 0.08), Vector3(x0 + w * 0.68, y + 1.95, BZ + 0.04), _mat(Color(0.1, 0.1, 0.13), light, 0.012))   # TV (주크박스 자리만큼 왼쪽)
+				_box(n, Vector3(1.05, 0.66, 0.02), Vector3(x0 + w * 0.68, y + 1.95, BZ + 0.09), _glow(acc), false)
+				_jukebox(n, Vector3(x1_in(b) - 0.62, y, BZ + 0.55), light)
 		"생활":
 			pass   # 침대는 오브젝트 시트로
 		"작업", "무기고":
@@ -424,6 +426,44 @@ func _furniture(n: Node3D, f: Dictionary, b: Dictionary, light: String) -> void:
 			for i in 2:
 				var t := _box(n, Vector3(w - 0.8, 0.16, 0.04), Vector3(x0 + w * 0.5, y + 1.6 + i * 0.6, BZ + 0.06), _glow(Color(1, 0.85, 0.1)), false)
 				t.rotation_degrees.z = -6.0 + i * 12.0
+
+
+## 방 오른쪽 벽 안쪽 x
+func x1_in(b: Dictionary) -> float:
+	return float(b.x1) - WALL
+
+
+## 주크박스 (공용실 오른쪽 빈 곳): 몸통 · 둥근 윗부분 · 무지개 발광 띠 · 스피커 망 · 레코드 창. at = 바닥 가운데
+func _jukebox(n: Node3D, at: Vector3, light: String) -> void:
+	var W := 0.9
+	var H := 1.25
+	var D := 0.6
+	var body := _mat(Color(0.42, 0.16, 0.12), light, 0.018)
+	var chrome := _mat(Color(0.82, 0.82, 0.86), light, 0.01)
+	_box(n, Vector3(W, H, D), Vector3(at.x, at.y + H * 0.5, at.z), body)
+	var top := CylinderMesh.new()   # 둥근 윗부분 (앞에서 보면 반원)
+	top.top_radius = W * 0.5
+	top.bottom_radius = W * 0.5
+	top.height = D
+	var mi := MeshInstance3D.new()
+	mi.mesh = top
+	mi.material_override = body
+	mi.rotation_degrees.x = 90.0
+	mi.position = Vector3(at.x, at.y + H, at.z)
+	n.add_child(mi)
+	var fz := at.z + D * 0.5 + 0.01
+	var cols := [Color(1.0, 0.35, 0.35), Color(1.0, 0.8, 0.3), Color(0.4, 1.0, 0.6), Color(0.35, 0.8, 1.0), Color(0.85, 0.45, 1.0)]
+	for i in cols.size():   # 앞면 발광 띠 (위 반원을 따라 세운 막대들)
+		var a := PI * (0.15 + 0.7 * i / float(cols.size() - 1))
+		var r := _box(n, Vector3(0.06, 0.42, 0.02), Vector3(at.x + cos(a) * W * 0.3, at.y + H + sin(a) * W * 0.18 - 0.05, fz), _glow(cols[i]), false)
+		r.rotation.z = a - PI * 0.5
+	_box(n, Vector3(W * 0.62, 0.3, 0.02), Vector3(at.x, at.y + H - 0.25, fz), _glow(Color(1.0, 0.85, 0.55)), false)   # 레코드 창
+	_box(n, Vector3(W * 0.7, 0.55, 0.02), Vector3(at.x, at.y + 0.55, fz), _mat(Color(0.12, 0.1, 0.1), light, 0.01), false)   # 스피커 망
+	for i in 4:
+		_box(n, Vector3(W * 0.66, 0.025, 0.01), Vector3(at.x, at.y + 0.36 + i * 0.12, fz + 0.012), chrome, false)
+	for sx in [-1.0, 1.0]:
+		_box(n, Vector3(0.06, H, 0.04), Vector3(at.x + sx * (W * 0.5 - 0.03), at.y + H * 0.5, fz), _glow(Color(1.0, 0.6, 0.85)), false)
+	jukebox = AABB(Vector3(at.x - W * 0.5, at.y, at.z - D * 0.5), Vector3(W, H + W * 0.5, D))
 
 
 func _stairs(n: Node3D, fid: String, b: Dictionary, light: String) -> void:

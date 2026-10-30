@@ -1,0 +1,11 @@
+{
+	"_readme": "배경음악 목록 (기지 공용실 주크박스 · 음악 카세트 창 순서). file = assets/audio/bgm 의 파일, title = 카세트에 보이는 제목. 순서를 바꾸거나 줄을 더하면 바로 반영 (게임 다시 시작)",
+	"volume_db": -8.0,
+	"tracks": [
+		{"file": "kingmakers_joke.mp3", "title": "Kingmaker's Joke"},
+		{"file": "call_me_monster.mp3", "title": "Call Me Monster"},
+		{"file": "beautiful_catastrophe.mp3", "title": "Beautiful Catastrophe"},
+		{"file": "last_dawn.mp3", "title": "Last Dawn"},
+		{"file": "smoke_and_blood.mp3", "title": "Smoke & Blood"}
+	]
+}

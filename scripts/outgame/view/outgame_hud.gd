@@ -23,7 +23,7 @@ var manifest: Dictionary = {}
 var date_label: Label
 var cash_label: Label
 var info_label: Label
-var speed_buttons: Array[Button] = []
+var speed_buttons: Array[BaseButton] = []
 var toast: Label
 var banner: Label
 var log_panel: PanelContainer
@@ -166,11 +166,28 @@ func _build_top() -> void:
 	date_label = _label("", 22, Color(1, 1, 1))
 	row.add_child(date_label)
 	row.add_child(_spacer_w(6))
-	for sp in [[0, "정지"], [1, "1x"], [4, "4x"], [16, "16x"]]:
-		var b := _button(sp[1], Color(0.55, 0.65, 0.42), 14, 44)
+	# 속도 버튼 그림 (사용자 제공): 정지 = ■, 1배 = ▶, 4 · 16배 = 빈 버튼 + 글자
+	for sp in [[0, "speed_stop", "", "정지"], [1, "speed_play", "", "1배속"], [4, "speed_blank", "4x", "4배속"], [16, "speed_blank", "16x", "16배속"]]:
+		var b := TextureButton.new()
+		b.texture_normal = load(UI_DIR + "%s.png" % sp[1])
+		b.ignore_texture_size = true
+		b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+		b.custom_minimum_size = Vector2(34, 34)
 		b.size_flags_vertical = SIZE_SHRINK_CENTER
+		b.focus_mode = FOCUS_NONE
+		b.tooltip_text = sp[3]
+		if sp[2] != "":
+			var t := _label(sp[2], 13, Color(0.97, 0.97, 0.93), true)
+			t.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+			t.offset_bottom = -3   # 아래 그림자만큼 위로
+			t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			t.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			t.mouse_filter = MOUSE_FILTER_IGNORE
+			b.add_child(t)
 		var v: int = sp[0]
 		b.pressed.connect(func(): hub.set_speed(v))
+		b.mouse_entered.connect(func(): b.set_meta("hover", true))
+		b.mouse_exited.connect(func(): b.set_meta("hover", false))
 		row.add_child(b)
 		speed_buttons.append(b)
 	var r2 := _hbox(8)
@@ -315,6 +332,92 @@ func set_log_open(on: bool) -> void:
 	log_panel.visible = on
 	log_toggle.position = log_panel.position + Vector2(log_panel.get_combined_minimum_size().x - 30, -14)   # 접어도 같은 자리 (층 표시와 안 겹침)
 	log_toggle.tooltip_text = "기록 접기" if on else "기록 펴기"
+
+
+# ---------------------------------------------------------------- 음악 카세트 (공용실 주크박스를 누르면 화면 왼쪽에)
+## 카세트 그림(assets/ui/outgame/music_cassette.png, 원본 art_src/ui/music_cassette.webp)의 빈 칸에 지금 곡 제목, 위 ▲ = 이전 곡 · 아래 ▼ = 다음 곡
+var music_panel: Control
+var _music_title: Label
+var _music_no: Label
+const MUSIC_W := 360.0
+
+
+func toggle_music() -> void:
+	if music_panel == null:
+		_build_music()
+	music_panel.visible = not music_panel.visible
+	_refresh_music()
+
+
+func _build_music() -> void:
+	music_panel = VBoxContainer.new()
+	music_panel.add_theme_constant_override("separation", 4)
+	music_panel.position = Vector2(14, 236)
+	music_panel.visible = false
+	add_child(music_panel)
+	var tex: Texture2D = load(UI_DIR + "music_cassette.png")
+	var h := MUSIC_W * tex.get_height() / tex.get_width()
+	music_panel.add_child(_tri_button(true, "이전 곡", Bgm.prev))
+	var cas := TextureRect.new()
+	cas.texture = tex
+	cas.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cas.stretch_mode = TextureRect.STRETCH_SCALE
+	cas.custom_minimum_size = Vector2(MUSIC_W, h)
+	music_panel.add_child(cas)
+	# 그림의 빈 칸 (가로 5.5~94.5%, 세로 12.7~45.9%)
+	var area := Control.new()
+	area.position = Vector2(MUSIC_W * 0.075, h * 0.135)
+	area.size = Vector2(MUSIC_W * 0.85, h * 0.31)
+	area.clip_contents = true
+	area.mouse_filter = MOUSE_FILTER_IGNORE
+	cas.add_child(area)
+	_music_title = _label("", 20, Color(0.14, 0.14, 0.16))
+	_music_title.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_music_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_music_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_music_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	area.add_child(_music_title)
+	_music_no = _label("", 11, Color(0.35, 0.35, 0.38))
+	_music_no.set_anchors_and_offsets_preset(PRESET_BOTTOM_RIGHT)
+	_music_no.position = area.size - Vector2(34, 15)
+	area.add_child(_music_no)
+	music_panel.add_child(_tri_button(false, "다음 곡", Bgm.next))
+	Bgm.changed_hook.append(_refresh_music)
+
+
+## 위(▲) / 아래(▼) 삼각형 버튼 — 카세트 가운데 위·아래
+func _tri_button(up: bool, tip: String, cb: Callable) -> Control:
+	var b := Button.new()
+	b.flat = true
+	b.focus_mode = FOCUS_NONE
+	b.custom_minimum_size = Vector2(56, 26)
+	b.size_flags_horizontal = SIZE_SHRINK_CENTER
+	b.tooltip_text = tip
+	for st in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+		b.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	b.draw.connect(func():
+		var c := b.size * 0.5
+		var hw := 15.0
+		var hh := 9.0
+		var pts := PackedVector2Array([c + Vector2(-hw, hh), c + Vector2(hw, hh), c + Vector2(0, -hh)]) if up else PackedVector2Array([c + Vector2(-hw, -hh), c + Vector2(hw, -hh), c + Vector2(0, hh)])
+		var hov := b.is_hovered()
+		b.draw_colored_polygon(pts, Color(0.95, 0.94, 0.86) if hov else Color(0.78, 0.78, 0.74))
+		pts.append(pts[0])
+		b.draw_polyline(pts, Color(0.06, 0.06, 0.07), 2.0, true))
+	b.mouse_entered.connect(b.queue_redraw)
+	b.mouse_exited.connect(b.queue_redraw)
+	b.pressed.connect(func():
+		cb.call()
+		_refresh_music())
+	return b
+
+
+func _refresh_music() -> void:
+	if _music_title == null or not is_instance_valid(_music_title):
+		return
+	var t := Bgm.title()
+	_music_title.text = t if t != "" else "(곡 없음 — data/bgm.json)"
+	_music_no.text = "%d / %d" % [Bgm.index + 1, Bgm.tracks.size()] if not Bgm.tracks.is_empty() else ""
 
 
 ## 오른쪽 아래 확대/축소: − 배율 + (휠·핀치·Q/E·+/- 키도 됨, 0 = 기본)
@@ -467,7 +570,9 @@ func toggle_debug() -> void:
 func refresh(delta: float) -> void:
 	date_label.text = sim.clock.label()
 	for i in speed_buttons.size():
-		speed_buttons[i].modulate = Color(1, 1, 0.5) if [0, 1, 4, 16][i] == hub.speed else Color(1, 1, 1)
+		var on: bool = [0, 1, 4, 16][i] == hub.speed
+		var hov: bool = speed_buttons[i].get_meta("hover", false)
+		speed_buttons[i].modulate = Color(1.3, 1.15, 0.55) if on else (Color(1.15, 1.15, 1.12) if hov else Color(0.82, 0.82, 0.84))   # 지금 속도 = 금빛
 	cash_label.text = "%d" % sim.ledger.cash   # 지폐 그림이 $ 표시
 	_update_battle_bar()
 	zoom_label.text = "%d%%" % hub.zoom_percent()
@@ -2235,3 +2340,7 @@ func open_sortie() -> void:
 	var go := _button("전투 배치로", Color(1.0, 0.5, 0.3), 18, 180)
 	go.pressed.connect(func(): hub.sortie(Game.data.stage_order[maxi(0, ob.selected)]))
 	body.add_child(go)
+
+
+func _exit_tree() -> void:
+	Bgm.changed_hook.erase(_refresh_music)

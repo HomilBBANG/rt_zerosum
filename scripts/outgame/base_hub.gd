@@ -54,6 +54,7 @@ func _ready() -> void:
 		push_error("기지 데이터(data/outgame.xlsx)를 읽지 못했습니다")
 		return
 	RenderingServer.set_default_clear_color(Color(0.1, 0.06, 0.08))
+	Bgm.ensure_playing()   # 배경음악 (공용실 주크박스로 바꿈)
 	_make_3d()
 	var bb := v3d.base_bounds()
 	# 처음엔 지상 1층·지하 1층 가운데(대원들이 있는 곳)를 크게
@@ -150,6 +151,17 @@ func _make_3d() -> void:
 
 
 ## 3D 위치 → 논리 화면 좌표 (1280×720)
+## 공용실 주크박스의 화면 사각형 (없으면 크기 0)
+func jukebox_rect() -> Rect2:
+	var a := v3d.jukebox
+	if a.size == Vector3.ZERO:
+		return Rect2()
+	var r := Rect2(project(a.position), Vector2.ZERO)
+	for i in 8:
+		r = r.expand(project(a.get_endpoint(i)))
+	return r
+
+
 func project(p: Vector3) -> Vector2:
 	return v3d.camera.unproject_position(p) * (SCREEN.x / float(RENDER_SIZE.x))
 
@@ -391,6 +403,9 @@ func _left_click(p: Vector2, dbl: bool = false) -> void:
 		hud.open_overhear(key)
 		return
 	var n := _npc_at(p)
+	if n == "" and jukebox_rect().has_point(p):   # 공용실 주크박스 = 음악 카세트 창 (다시 누르면 닫힘)
+		hud.toggle_music()
+		return
 	if n != "" and sim.is_researcher(n) and not dbl:   # 연구원(로한) 클릭 = 무기 연구 창
 		hud.open_research()
 		return
@@ -554,6 +569,12 @@ func _cli_ui(spec: String) -> void:
 		"contracts": hud.open_contracts("")
 		"armory": hud.open_armory()
 		"log_closed": hud.set_log_open(false)
+		"jukebox":   # 주크박스를 누른 것처럼 (클릭 판정 확인용)
+			_left_click(jukebox_rect().get_center())
+		"music":   # music[:곡 번호(0부터)] — 음악 카세트 창 (그 곡으로)
+			if p.size() > 1:
+				Bgm.play_index(int(p[1]))
+			hud.toggle_music()
 		"statement":
 			if not sim.ledger.statements.is_empty():
 				hud.open_statement(sim.ledger.statements[-1])
