@@ -47,7 +47,10 @@ uniform bool light_from_right = true;   // 텍스처 기준 빛 방향 (스크�
 uniform float rim_px : hint_range(0.0, 60.0) = 14.0;
 uniform float neon_rim : hint_range(0.0, 1.0) = 0.92;   // 네온 칠일 때 림 세기 (accent_mix 보다 크면 이것)
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
-uniform int debug_view = 0;   // 1: 원화 그대로 출력 (디버그)
+uniform int debug_view = 0;
+// 불에 타 사라짐 (몬스터 사망): 0 = 그대로 → 얼룩지며 검게 탐 → 위에서부터 불꽃 테두리와 함께 재가 되어 사라짐 (1 = 다 사라짐)
+uniform float burn : hint_range(0.0, 1.0) = 0.0;
+uniform vec4 burn_glow : source_color = vec4(1.0, 0.42, 0.08, 1.0);   // 1: 원화 그대로 출력 (디버그)
 
 // ── 네온 칠 (character.json "style": "neon") ── 레퍼런스: 면은 조명색으로 쨍하게 덮고 선화만 원화 그대로.
 //   원화 밝기 → 조명색 명도로 옮김 (검정 옷도 바닥 밝기 neon_floor 로 들어 올려 깊은 조명색이 됨, 흰 옷은 밝은 조명색)
@@ -211,6 +214,21 @@ float edge_rim(sampler2D tex, vec2 uv, vec2 dir, vec2 px) {
 	return smoothstep(0.10, 0.30, out_a) * smoothstep(0.55, 0.95, open_a / 3.0);
 }
 
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+
+
+float vnoise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x), mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+
 void fragment() {
 	// 텍스처색 × COLOR(이미 텍스처색 × 모듈레이트) = 원화색을 두 번 곱한 진한 톤 (확정된 룩)
 	vec3 orig = COLOR.rgb;   // 원화 색 (텍스처 × 모듈레이트 한 번) — 선화는 이 색 그대로
@@ -249,5 +267,21 @@ void fragment() {
 	if (debug_view == 1) {
 		o = base.rgb;
 	}
-	COLOR = vec4(o, base.a);
+	float a = base.a;
+	if (burn > 0.0) {
+		float n = vnoise(UV * 9.0) * 0.65 + vnoise(UV * 27.0) * 0.35;
+		// 1) 얼룩지며 검게 (노이즈가 큰 곳부터 숯처럼)
+		float ch = smoothstep(0.0, 0.55, burn * 1.25 - (1.0 - n) * 0.35);
+		o = mix(o, vec3(0.045, 0.03, 0.028), ch);
+		o += burn_glow.rgb * 0.35 * ch * smoothstep(0.55, 0.85, n) * (1.0 - smoothstep(0.6, 1.0, burn));   // 숯 사이 잉걸불
+		// 2) 위에서부터 타서 사라짐 (경계는 주황 불꽃)
+		float h = n * 0.7 + UV.y * 0.3;
+		float t = smoothstep(0.3, 1.0, burn) * 1.12;
+		if (h < t) {
+			a = 0.0;
+		}
+		float edge = smoothstep(t + 0.07, t, h) * step(0.001, t);
+		o = mix(o, burn_glow.rgb * 1.6, edge);
+	}
+	COLOR = vec4(o, a);
 }

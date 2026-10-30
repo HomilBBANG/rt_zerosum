@@ -438,6 +438,50 @@ func set_tired(on: bool) -> void:
 	rest_pose = "tired" if on and unit.alive and has_pose("tired") else ""
 
 
+## 몬스터 사망 연출: 그 자리에서 멈춰 얼룩지며 검게 탐 → 위에서부터 불꽃 테두리와 함께 재가 되어 사라짐 + 위로 날리는 불티 (BURN_TIME 초)
+const BURN_TIME := 2.6
+var burning := false   # 타는 중 (그동안 3D 바닥 그림자도 남김)
+
+
+func play_burn() -> void:
+	_stop_pose()
+	rest_pose = ""
+	burning = true
+	set_highlight("none")
+	z_index = 5
+	chr.speed_scale = 0.0   # 지금 프레임에서 멈춤
+	var embers := CPUParticles2D.new()
+	embers.amount = 48
+	embers.lifetime = 1.1
+	embers.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	embers.emission_rect_extents = Vector2(chr_height * 0.22, chr_height * 0.4)
+	embers.position = Vector2(0.0, -chr_height * 0.45)
+	embers.direction = Vector2(0, -1)
+	embers.spread = 25.0
+	embers.gravity = Vector2(0, -60)
+	embers.initial_velocity_min = 30.0
+	embers.initial_velocity_max = 90.0
+	embers.scale_amount_min = 2.0
+	embers.scale_amount_max = 4.5
+	var grad := Gradient.new()
+	grad.set_color(0, Color(1.0, 0.75, 0.3, 1.0))
+	grad.set_color(1, Color(1.0, 0.25, 0.05, 0.0))
+	embers.color_ramp = grad
+	embers.z_index = 1
+	flip.add_child(embers)
+	var set_burn := func(v: float) -> void:
+		for m in _all_mats():
+			m.set_shader_parameter("burn", v)
+	var tw := create_tween()
+	tw.tween_method(set_burn, 0.0, 1.0, BURN_TIME)
+	tw.tween_callback(func():
+		embers.emitting = false
+		burning = false
+		flip.visible = false)
+	tw.tween_interval(embers.lifetime)
+	tw.tween_callback(embers.queue_free)
+
+
 func play_move_steps(delay: float = 0.0) -> void:
 	if chr == null:
 		return
@@ -447,6 +491,9 @@ func play_move_steps(delay: float = 0.0) -> void:
 
 func play_death() -> void:
 	Sfx.play_at(self, Sfx.common("dead"), Sfx.DEAD_DB)   # 쓰러지는 소리 (공용)
+	if unit.team != "ally" and chr != null:   # 몬스터: 불에 타듯 검게 타 들어가며 사라짐
+		play_burn()
+		return
 	if has_pose("dead"):   # 쓰러진 그림으로 바꿈 (회색 처리 · 쓰러지는 회전 없음)
 		_stop_pose()
 		chr.play("dead")

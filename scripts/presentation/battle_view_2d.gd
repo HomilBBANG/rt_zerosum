@@ -420,11 +420,12 @@ func _sync_shadow_poses() -> void:
 	for id in sprites:
 		var s: UnitSprite2D = sprites[id]
 		var sp := s.shadow_pose()
-		if str(_shadow_poses.get(id, "")) == sp:
+		var key := sp + ("#burn" if s.burning else "")   # 몬스터가 타는 동안은 그림자도 남고, 다 타면 사라짐
+		if str(_shadow_poses.get(id, "")) == key:
 			continue
-		_shadow_poses[id] = sp
+		_shadow_poses[id] = key
 		var u: UnitRuntime = s.unit
-		bg3d.set_shadow_proxy(id, unit_world(u), 1.75 * (u.data.height_cm / 175.0), u.alive or sp != "", u.data.sprite_id, s.is_mirrored(), sp)
+		bg3d.set_shadow_proxy(id, unit_world(u), 1.75 * (u.data.height_cm / 175.0), u.alive or sp != "" or s.burning, u.data.sprite_id, s.is_mirrored(), sp)
 		changed = true
 	if changed:
 		_rerender_bg()

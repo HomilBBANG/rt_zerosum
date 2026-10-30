@@ -137,6 +137,15 @@ func _run_cli() -> void:
 			if auto == "move":
 				hud.begin_move()
 				break
+			if auto.begins_with("burn"):
+				# --autoplay=burn[:초] — 적 모두 사망 연출(불에 타 사라짐), 초 뒤에 찍음 (기본 1.0)
+				for id in view.sprites:
+					var bs: UnitSprite2D = view.sprites[id]
+					if bs.unit.team != "ally":
+						bs.unit.alive = false
+						bs.play_death()
+				await get_tree().create_timer(float(auto.get_slice(":", 1)) if auto.get_slice_count(":") > 1 else 1.0).timeout
+				break
 			if auto == "tired":
 				# --autoplay=tired — 아군 모두 AP 1 (지침 자세 유지 확인용)
 				for id in view.sprites:

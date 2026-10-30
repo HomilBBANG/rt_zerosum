@@ -347,6 +347,10 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![몬스터 리깅 idle (프레임 1 · 7 · 13 · 19)](docs/screenshots/monster_idle_rig.jpg)
 
+- **몬스터 사망**: 불에 타듯 검게 타 들어가며 위에서부터 사라짐 (셰이더 `burn`, `UnitSprite2D.play_burn`). 확인 `--autoplay=burn:1.3`.
+
+![몬스터 사망 — 불에 타 사라짐 (0.6 · 1.3 · 2.0 · 2.9초)](docs/screenshots/monster_burn_death.jpg)
+
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
 
 ## 세계관 도감
