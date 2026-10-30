@@ -304,6 +304,9 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - 대원 우클릭 메뉴에도 아이콘: 대화(편지) · 무기 연구(돋보기) · 정보·장비(책) · 스킬 트리(번개) · 업무·의뢰 지시(문서).
 - 아이콘 20개 = 사용자 UI 패키지에서 잘라 `assets/ui/outgame/icons/<이름>.png` (96×96): skill · sword · faith · levelup · book · codex · search · bookmark · contract · quest · mail · scroll · schedule · calendar_check · ledger · calendar · gear · tools · sliders · gear_wrench. 원본 `art_src/ui/`.
 - UI 그림은 2560×1440 창에서 1:1 이 되게 2배 해상도로 만들고 반으로 줄여 그림 (게임 기준 1280×720).
+- **UI 공용 패널** = `assets/ui/panel.png` (원본 `art_src/ui/panel.webp`, 어두운 판 · 올리브 테두리 · 팔각 모서리): 기지의 모든 창(납품 · 대화 · 원장 · 의뢰 · 도감 등) · 대원 카드 · 기록 · 확대 버튼, 전투 하단 명령 패널 · 상태 이상 창 · 전투 기록. 모서리 · 테두리는 그대로, 가운데만 늘림. 코드 `scripts/ui/ui_panel.gd` (`UiPanel.apply(패널, 안쪽 여백)`) — 새 패널도 이걸로.
+
+![전투 하단 패널 — UI 공용 패널](docs/screenshots/battle_ui_panel.jpg)
 
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
 

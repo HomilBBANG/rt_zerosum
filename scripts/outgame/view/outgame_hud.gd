@@ -270,7 +270,7 @@ func _icon_button(text: String, icon: String, col: Color, cb: Callable) -> Contr
 
 func _build_log() -> void:
 	log_panel = PanelContainer.new()
-	log_panel.add_theme_stylebox_override("panel", _panel_style(Color(0.04, 0.05, 0.08, 0.78), Color(0.25, 0.32, 0.4)))
+	UiPanel.apply(log_panel, Vector4(14, 10, 14, 10), 0.9)   # UI 공용 패널
 	log_panel.position = Vector2(10, 628)
 	log_panel.custom_minimum_size = Vector2(470, 84)
 	log_panel.mouse_filter = MOUSE_FILTER_PASS
@@ -289,7 +289,7 @@ func _build_log() -> void:
 ## 오른쪽 아래 확대/축소: − 배율 + (휠·핀치·Q/E·+/- 키도 됨, 0 = 기본)
 func _build_zoom() -> void:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", _panel_style(Color(0.04, 0.05, 0.08, 0.8), Color(0.25, 0.32, 0.4)))
+	UiPanel.apply(p, Vector4(12, 8, 12, 8))
 	add_child(p)
 	var h := _hbox(6)
 	p.add_child(h)
@@ -311,7 +311,7 @@ func _build_zoom() -> void:
 ## 오른쪽: 선택한 대원 카드 (이름·지금 하는 일·체력·피로도·친밀도·조작 안내)
 func _build_selection() -> void:
 	sel_panel = PanelContainer.new()
-	sel_panel.add_theme_stylebox_override("panel", _panel_style(Color(0.04, 0.05, 0.08, 0.88), Color(1.0, 0.86, 0.25)))
+	UiPanel.apply(sel_panel, Vector4(18, 14, 18, 14))
 	sel_panel.position = Vector2(1280 - 10 - 330, 300)
 	sel_panel.custom_minimum_size = Vector2(330, 0)
 	sel_panel.visible = false
@@ -582,7 +582,7 @@ func _window(title: String, w: float, on_close: Callable = Callable()) -> Dictio
 	root.add_child(dim)
 	dim.gui_input.connect(func(e): if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_RIGHT: close_top())
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", _panel_style(Color(0.06, 0.08, 0.12, 0.98), PANEL_LINE, 10))
+	UiPanel.apply(panel, Vector4(22, 18, 22, 18))   # 모든 창 = UI 공용 패널
 	panel.custom_minimum_size = Vector2(w, 0)
 	root.add_child(panel)
 	var v := _vbox(8)

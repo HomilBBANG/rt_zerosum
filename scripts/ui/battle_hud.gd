@@ -56,6 +56,13 @@ func _ready() -> void:
 	if find_child("Bottom", true, false) == null:
 		_create_layout()
 	_bind_layout()
+	# UI 공용 패널 그림 (assets/ui/panel.png): 하단 명령 패널 · 상태 이상 창 · 전투 기록
+	UiPanel.apply(bottom, Vector4(8, 8, 8, 8))
+	var stw: Control = find_child("StatusWindow", true, false)
+	if stw != null:
+		UiPanel.apply(stw, Vector4(8, 7, 8, 7))
+	if log_panel != null:
+		UiPanel.apply(log_panel, Vector4(12, 10, 12, 10), 0.92)
 
 
 func setup(p_controller: BattleController, p_view: BattleViewBase, p_preset: Dictionary) -> void:
