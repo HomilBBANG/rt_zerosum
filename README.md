@@ -318,6 +318,10 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![요청 대화 수락 · 나중에](docs/screenshots/outgame_request_buttons.jpg)
 
+- **대화 선택지 버튼** (원본 `art_src/ui/buttons_choice.png` → `assets/ui/btn_choice.png` 회색 · `btn_choice_on.png` 올리브 금테): 컷씬 선택지에만. 마우스를 올리면 올리브 금테로 바뀜. `UiButton.apply(버튼, "choice", "choice_on")`.
+
+![대화 선택지 (위 = 마우스 올림)](docs/screenshots/cutscene_choice_buttons.jpg)
+
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
 
 ## 세계관 도감

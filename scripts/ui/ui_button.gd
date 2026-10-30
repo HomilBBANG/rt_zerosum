@@ -1,13 +1,20 @@
 class_name UiButton
 extends RefCounted
-## 의뢰 수락 / 거절 버튼 그림 (원본 art_src/ui/buttons_accept_decline.webp → assets/ui/btn_accept.png 초록 · btn_decline.png 회색).
-## 대원 요청(의뢰) 대화의 수락 · 나중에, 의뢰 게시판의 지시에만 씀 — 대화 선택지 등 다른 버튼에는 안 씀.
-## 그림은 2배 해상도(높이 72 = 버튼 36칸)라 반으로 줄여 그림. 양 끝 팔각 모서리는 그대로, 가운데만 늘림.
+## 버튼 그림 (사용자 제공, 2배 해상도라 반으로 줄여 그림. 모서리는 그대로, 가운데만 늘림):
+##   accept / decline = 의뢰 수락(초록) / 거절(회색) — 원본 art_src/ui/buttons_accept_decline.webp
+##       → 대원 요청(의뢰) 대화의 수락 · 나중에, 의뢰 게시판의 지시에만
+##   choice / choice_on = 대화 중 선택지 (회색 = 평소, 올리브 + 금테 = 마우스 올림 · 누름) — 원본 art_src/ui/buttons_choice.png
+##       → 컷씬 선택지에만
 
-const TEX := {"accept": "res://assets/ui/btn_accept.png", "decline": "res://assets/ui/btn_decline.png"}
-const SIDE := 26     # 좌우 모서리 칸 (그림 픽셀)
-const CAP_TOP := 24
-const CAP_BOTTOM := 28   # 아래 그림자 포함
+const TEX := {
+	"accept": "res://assets/ui/btn_accept.png", "decline": "res://assets/ui/btn_decline.png",
+	"choice": "res://assets/ui/btn_choice.png", "choice_on": "res://assets/ui/btn_choice_on.png",
+}
+## 9칸 늘리기 여백 (그림 픽셀): 좌우 · 위 · 아래(아래 그림자 포함)
+const MARGIN := {
+	"accept": Vector3(26, 24, 28), "decline": Vector3(26, 24, 28),
+	"choice": Vector3(22, 16, 26), "choice_on": Vector3(22, 16, 26),
+}
 
 static var _sb := {}
 
@@ -16,17 +23,18 @@ static func _style(kind: String) -> StyleBoxTexture:
 	if not _sb.has(kind):
 		var sb := StyleBoxTexture.new()
 		sb.texture = load(TEX.get(kind, TEX.accept))
-		sb.texture_margin_left = SIDE
-		sb.texture_margin_right = SIDE
-		sb.texture_margin_top = CAP_TOP
-		sb.texture_margin_bottom = CAP_BOTTOM
+		var m: Vector3 = MARGIN.get(kind, MARGIN.accept)
+		sb.texture_margin_left = m.x
+		sb.texture_margin_right = m.x
+		sb.texture_margin_top = m.y
+		sb.texture_margin_bottom = m.z
 		_sb[kind] = sb
 	return _sb[kind]
 
 
 ## b(Button)의 바탕을 그 그림으로. 글자는 그림 위 (그림은 버튼 뒤에 그리는 자식).
-## 마우스 올림 = 밝게, 누름 = 어둡게, 못 누름 = 흐리게
-static func apply(b: Button, kind: String) -> void:
+## hover_kind 가 있으면 마우스 올림 · 누름 때 그 그림으로 바꿈, 없으면 밝게 / 어둡게. 못 누름 = 흐리게
+static func apply(b: Button, kind: String, hover_kind: String = "") -> void:
 	var em := StyleBoxEmpty.new()
 	em.content_margin_left = 16
 	em.content_margin_right = 16
@@ -46,18 +54,24 @@ static func apply(b: Button, kind: String) -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	b.add_child(bg)
 	var sb := _style(kind)
+	var on: StyleBoxTexture = _style(hover_kind) if hover_kind != "" else null
 	bg.draw.connect(func():
 		var mod := Color.WHITE
+		var s: StyleBoxTexture = sb
 		match b.get_draw_mode():
 			BaseButton.DRAW_HOVER:
-				mod = Color(1.22, 1.22, 1.18)
+				if on != null:
+					s = on
+				else:
+					mod = Color(1.22, 1.22, 1.18)
 			BaseButton.DRAW_PRESSED, BaseButton.DRAW_HOVER_PRESSED:
-				mod = Color(0.78, 0.78, 0.78)
+				if on != null:
+					s = on
+				mod = Color(0.85, 0.85, 0.85)
 			BaseButton.DRAW_DISABLED:
 				mod = Color(0.6, 0.6, 0.6, 0.6)
-		var s: StyleBoxTexture = sb
 		if mod != Color.WHITE:
-			s = sb.duplicate()
+			s = s.duplicate()
 			s.modulate_color = mod
 		bg.draw_set_transform(Vector2.ZERO, 0.0, Vector2(0.5, 0.5))
 		bg.draw_style_box(s, Rect2(Vector2.ZERO, bg.size * 2.0))

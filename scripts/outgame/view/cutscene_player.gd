@@ -270,14 +270,9 @@ func _show_choice(st: Dictionary) -> void:
 		b.add_theme_font_size_override("font_size", 20)
 		b.custom_minimum_size = Vector2(600, 52)
 		b.focus_mode = FOCUS_NONE
-		for st_name in ["normal", "hover", "pressed"]:
-			var bs := StyleBoxFlat.new()
-			bs.bg_color = Color(0.06, 0.07, 0.1, 0.94) if st_name == "normal" else Color(0.22, 0.17, 0.08, 0.96)
-			bs.border_color = Color(0.95, 0.75, 0.4, 0.9 if st_name != "normal" else 0.55)
-			bs.set_border_width_all(2)
-			bs.set_corner_radius_all(8)
-			b.add_theme_stylebox_override(st_name, bs)
-		b.add_theme_color_override("font_hover_color", Color(1, 0.9, 0.6))
+		UiButton.apply(b, "choice", "choice_on")   # 선택지 버튼 그림 (평소 회색 · 마우스 올리면 올리브 금테)
+		b.add_theme_color_override("font_hover_color", Color(1, 0.93, 0.7))
+		b.add_theme_color_override("font_hover_pressed_color", Color(1, 0.93, 0.7))
 		var nx := str(op.next)
 		b.pressed.connect(func(): _choose(nx))
 		choice_box.add_child(b)
