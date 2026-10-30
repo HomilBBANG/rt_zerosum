@@ -51,6 +51,8 @@ assets/characters/<id>/
   python3 tools/char_sprites.py breathe-pose <캐릭터> [포즈=tired] [칸 수=16]   포즈 한 장(<포즈>/0001.png)을 리깅해 숨 쉬는 반복 프레임으로 (idle 처럼)
       발 · 다리 · 골반 아래 고정, 골반 위 상체가 숨 쉬듯 오르내리고 가슴이 살짝 넓어짐 + 머리 살짝 끄덕임. 조명 · 선화 · 눈 마스크도 같이.
       원본 한 장은 art_src/poses/<캐릭터>/<포즈>/ 에 보관 (다시 돌려도 원본에서 만듦). 전투에서 AP 0~1 일 때 계속 보이는 지침(tired) 자세에 씀
+  python3 tools/char_sprites.py rig-monster <몬스터> [칸 수=24] [--blob]   몬스터 리깅 idle: 기본 그림(base.png) 한 장 → <몬스터>/idle/ (반복)
+      두 발 몬스터 = 골반(hip_y) 아래 고정, 상체가 크게 숨 쉬며 좌우로 살짝 흔들림 + 머리 끄덕임. --blob(슬라임 등) = 바닥 고정, 몸 전체가 출렁(늘었다 퍼졌다)
   python3 tools/char_sprites.py posecheck <캐릭터> [출력.png]   idle · 걷기 · 모든 포즈를 게임과 같은 배율 · 같은 발 위치로 한 장에 (크기 비교 — 초록 선 = 기본 그림 키)
 (지금 base.png·마스크·character.json 은 예전 Skeleton2D 리그를 쉬는 자세로 합쳐 만든 것 — 리그는 제거됨)
 """
@@ -1397,6 +1399,68 @@ def cmd_breathe_pose(cid, pose="tired", frames=16, fps=8.0, breath=0.007):
     print(cid, pose, "숨쉬기", frames, "장 (골반 y%d · 어깨 y%d)" % (hip, shoulder))
 
 
+# ---------------------------------------------------------------- 몬스터 리깅 idle (base.png 한 장 → 숨쉬기 · 흔들림 · 출렁임)
+def cmd_rig_monster(cid, frames=24, fps=10.0, blob=False):
+    """몬스터 기본 그림 한 장을 휘어 반복 idle → <몬스터>/idle/0001~ (+ 조명 · 선화 마스크, anim.json loop)"""
+    import math
+    import numpy as np
+    from scipy.ndimage import map_coordinates
+    cdir = os.path.join(CHAR_DIR, cid)
+    info = json.load(open(os.path.join(cdir, "character.json"), encoding="utf-8"))
+    PT, PS = 40, 24                                      # 캔버스 여백 (위 · 좌우) — 늘어나거나 흔들려도 잘리지 않게, anim.json ground 로 발 위치 보정
+    base = np.array(Image.open(os.path.join(cdir, "base.png")).convert("RGBA")).astype(np.float32)
+    base = np.pad(base, ((PT, 0), (PS, PS), (0, 0)))
+    H, W = base.shape[:2]
+    ys, xs = np.nonzero(base[..., 3] > 40)
+    top = float(ys.min())
+    g0 = info.get("ground", [W / 2 - PS, ys.max() - PT])
+    gx, gy = float(g0[0]) + PS, float(g0[1]) + PT
+    fig = float(info.get("figure_px", gy - top))
+    hip = float(info.get("hip_y", gy - PT - fig * 0.5)) + PT
+    hr = info.get("head_rect") or [0, top - PT, W, fig * 0.3]
+    head_y = float(hr[1]) + float(hr[3]) + PT             # 머리 아래 (목 높이쯤)
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+
+    def sstep(e0, e1, v):
+        t = np.clip((v - e0) / (e1 - e0), 0.0, 1.0)
+        return t * t * (3 - 2 * t)
+    srcs = {}
+    for suf in ("_mask_r", "_mask_l", "_line", "_eye"):
+        mp = os.path.join(cdir, "base" + suf + ".png")
+        if os.path.exists(mp):
+            srcs[suf] = np.pad(np.array(Image.open(mp).convert("L")).astype(np.float32), ((PT, 0), (PS, PS)), constant_values=85.0 if "_mask_" in suf else 0.0)
+    w_up = sstep(hip, top + (hip - top) * 0.25, yy)       # 골반 0 → 위 1
+    w_head = sstep(head_y, head_y - fig * 0.08, yy)
+    w_h = np.clip((gy - yy) / max(1.0, gy - top), 0.0, 1.0)   # 바닥 0 → 꼭대기 1 (슬라임)
+    adir = os.path.join(cdir, "idle")
+    os.makedirs(adir, exist_ok=True)
+    for fn in os.listdir(adir):
+        os.remove(os.path.join(adir, fn))
+    for i in range(frames):
+        ph = 2 * math.pi * i / frames
+        b = 0.5 - 0.5 * math.cos(ph)                        # 0 → 들숨 1 → 0
+        if blob:
+            st = math.sin(ph)                               # 늘어남(+) ↔ 퍼짐(-)
+            DY = -(gy - yy) * 0.035 * st * (0.6 + 0.4 * w_h)
+            DX = (xx - gx) * (-0.03 * st) * w_h + fig * 0.008 * math.sin(ph * 2 + 0.7) * w_h * w_h   # 부피 유지 + 꼭대기 출렁
+        else:
+            DY = -fig * 0.012 * b * w_up - fig * 0.004 * math.sin(ph - 0.6) * w_head
+            DX = fig * 0.006 * math.sin(ph + 0.3) * w_up * w_up + (xx - gx) * 0.01 * b * w_up * (1 - w_head)
+        sy, sx = yy - DY, xx - DX
+        stem = os.path.join(adir, "%04d" % (i + 1))
+        out = np.zeros_like(base)
+        for ch in range(4):
+            out[..., ch] = map_coordinates(base[..., ch], [sy, sx], order=1, mode="constant", cval=0.0)
+        Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)).save(stem + ".png")
+        for suf, m in srcs.items():
+            w = map_coordinates(m, [sy, sx], order=1, mode="constant", cval=85.0 if "_mask_" in suf else 0.0)
+            Image.fromarray(np.clip(w, 0, 255).astype(np.uint8)).save(stem + suf + ".png")
+    json.dump({"fps": fps, "loop": True, "ground": [round(gx), round(gy)], "figure_px": fig, "hip_y": round(hip),
+               "source": "rig-monster: base.png %s idle (%d장, 여백 위 %d · 좌우 %d)" % ("출렁" if blob else "숨쉬기", frames, PT, PS)},
+              open(os.path.join(adir, "anim.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    print(cid, "몬스터 리깅 idle", frames, "장", "출렁" if blob else "(골반 y%d · 머리 아래 y%d)" % (hip, head_y))
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args[:1] == ["masks"]:
@@ -1447,6 +1511,9 @@ if __name__ == "__main__":
                  tuple(float(v) for v in opt.get("scale", "1,0.5").split(",")), opt.get("out"))
     elif args[:1] == ["steps"] and len(args) >= 2:
         cmd_steps(args[1], tuple(args[2:]) or ("walk", "run"))
+    elif args[:1] == ["rig-monster"] and len(args) >= 2:
+        nums = [a for a in args[2:] if a.isdigit()]
+        cmd_rig_monster(args[1], int(nums[0]) if nums else 24, blob="--blob" in args)
     elif args[:1] == ["breathe-pose"] and len(args) >= 2:
         nums = [a for a in args[2:] if a.isdigit()]
         names = [a for a in args[2:] if not a.isdigit()]

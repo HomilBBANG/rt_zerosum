@@ -343,6 +343,10 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![방 빈 곳 우클릭 메뉴](docs/screenshots/outgame_room_menu.jpg)
 ![전투 지침 자세 유지 (AP 1)](docs/screenshots/battle_tired_hold.jpg)
 
+- **몬스터 idle 리깅**: `python3 tools/char_sprites.py rig-monster <몬스터> [칸 수=24] [--blob]` — 기본 그림 한 장 → `<몬스터>/idle/` 반복 (구울 · 늑대 숨쉬기 · 흔들림, 슬라임 `--blob` 출렁). 몬스터 그림을 바꾸면 다시 실행.
+
+![몬스터 리깅 idle (프레임 1 · 7 · 13 · 19)](docs/screenshots/monster_idle_rig.jpg)
+
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
 
 ## 세계관 도감
