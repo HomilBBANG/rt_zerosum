@@ -326,6 +326,12 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![무기고 창 — 화면 안에 맞춤 + 스크롤](docs/screenshots/outgame_armory_fit.jpg)
 
+- **전투 행동 연출**: 화면 가운데로 살짝 줌 + 행동한 캐릭터가 가운데로 나왔다가 제자리로, 명중 시 카메라 흔들림. 값은 BattleView2D 인스펙터 '행동 연출'. 확인 `--autoplay=act:0.45`.
+- **기지 조작**: 선택한 대원을 한 번 더 클릭하면 선택 해제. 대원 정보는 우클릭 → '정보 보기' (화면 가운데 창). 로그창은 오른쪽 위 아이콘으로 접기 · 펴기.
+
+![전투 행동 연출 (가운데로 나온 니키타 · 화면 가운데 줌)](docs/screenshots/battle_action_stage.jpg)
+![대원 정보 창 (우클릭 → 정보 보기)](docs/screenshots/outgame_info_window.jpg)
+
 ![기지 상단 UI · 대원 메뉴 아이콘](docs/screenshots/outgame_top_ui.jpg)
 
 ## 세계관 도감

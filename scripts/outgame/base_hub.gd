@@ -383,7 +383,7 @@ func _update_zoom(delta: float) -> void:
 	cam_size = nz
 
 
-## 왼쪽 클릭: 대원 = 선택 (선택한 대원을 한 번 더 = 대화) / 선택한 대원이 있으면 방 = 그 위치로 걸어감, 더블클릭 = 뛰어감 /
+## 왼쪽 클릭: 대원 = 선택 (선택한 대원을 한 번 더 = 선택 해제 — 대화는 우클릭 메뉴) / 선택한 대원이 있으면 방 = 그 위치로 걸어감, 더블클릭 = 뛰어감 /
 ## 선택 없으면 방 = 시설 창(잠긴 방 = 해금). 빈 곳 = 선택 해제
 func _left_click(p: Vector2, dbl: bool = false) -> void:
 	var key := _bubble_at(p)
@@ -396,7 +396,7 @@ func _left_click(p: Vector2, dbl: bool = false) -> void:
 		return
 	if n != "" and not (dbl and selected != "" and n != selected):
 		if n == selected and not dbl:
-			hud.open_dialogue(n)
+			select("")
 		else:
 			select(n)
 		return
@@ -553,6 +553,7 @@ func _cli_ui(spec: String) -> void:
 			hud.open_codex(p[1] if p.size() > 1 else "characters", p[2] if p.size() > 2 else "")
 		"contracts": hud.open_contracts("")
 		"armory": hud.open_armory()
+		"log_closed": hud.set_log_open(false)
 		"statement":
 			if not sim.ledger.statements.is_empty():
 				hud.open_statement(sim.ledger.statements[-1])

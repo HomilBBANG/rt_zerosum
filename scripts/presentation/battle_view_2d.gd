@@ -30,25 +30,24 @@ const UNIT_SCRIPT := preload("res://scripts/presentation/unit_sprite_2d.gd")
 	set(v):
 		cam_screen_center = v
 		_camera_changed()
-@export_group("포즈 연출")
-## 상황별 포즈 그림(shot 공격 · hit 피격 · miss 회피 · stun 기절 …)으로 잠깐 바꿀 때 카메라 연출. 그림이 있는 캐릭터만 (tools/char_sprites.py poses)
-## 카메라가 그 캐릭터 가운데로 빠르게 줌 → 캐릭터가 화면 가운데보다 가로로 조금 어긋난 데서 천천히 가운데로 → 끝나면 원래 화면으로 (캐릭터 크기는 그대로)
-@export_range(1.0, 3.0, 0.01) var pose_zoom := 1.5           ## 카메라 줌 배율 (캐릭터 가운데 기준)
-@export_range(0.02, 1.0, 0.01, "suffix:초") var pose_zoom_in := 0.15   ## 줌 · 캐릭터로 다가가는 시간 (빠르게)
-@export_range(0.2, 5.0, 0.05, "suffix:초") var pose_time := 1.5        ## 포즈를 보여 주는 시간 (그동안 가로로 천천히 가운데로)
-@export_range(-60.0, 60.0, 0.5, "suffix:px") var pose_drift := -5.0  ## 처음 화면 가운데에서 캐릭터가 어긋난 가로 거리 (- = 뒤쪽, 적에게서 먼 쪽)
-@export_range(0.0, 1.0, 0.01, "suffix:초") var pose_back := 0.0        ## 원래 화면으로 돌아오는 시간 (0 = 바로, 카메라가 움직이지 않고 원래 화면)
-@export_range(100.0, 620.0, 1.0, "suffix:px") var pose_screen_y := 290.0   ## 줌할 때 캐릭터 가운데가 올 화면 높이 (1280×720 기준 — 아래 HUD 위 가운데쯤)
-@export var pose_keep_in_view := true   ## 줌해도 원래 화면 밖(방 바깥 빈 곳)은 안 보이게 — 가장자리 캐릭터는 가운데까지 못 옴
-@export_range(0.0, 1.0, 0.01, "suffix:초") var shake_time := 0.2       ## 공격(shot·slash) · 피격(hit) 때 카메라 흔들림 시간
-@export_range(0.0, 40.0, 0.5, "suffix:px") var shake_px := 7.0       ## 카메라 흔들림 세기
+@export_group("행동 연출")
+## 행동(스킬 · 공격): 카메라는 캐릭터가 아니라 **화면 가운데로 살짝 줌** + 행동한 캐릭터가 화면 가운데 쪽으로 나왔다가 → 행동 → 제자리로.
+## 상황별 포즈 그림(shot · hit · miss · stun …)은 그동안 잠깐 바뀜 (그림이 있는 캐릭터만, tools/char_sprites.py poses)
+@export_range(1.0, 2.0, 0.01) var pose_zoom := 1.12           ## 카메라 줌 배율 (화면 가운데 기준)
+@export_range(0.02, 1.0, 0.01, "suffix:초") var pose_zoom_in := 0.22   ## 줌인 · 캐릭터가 가운데로 나오는 시간
+@export_range(0.2, 5.0, 0.05, "suffix:초") var pose_time := 1.5        ## 포즈를 보여 주는 시간
+@export_range(0.0, 1.0, 0.01, "suffix:초") var pose_back := 0.28       ## 원래 화면 · 제자리로 돌아오는 시간
+@export_range(0.0, 400.0, 1.0, "suffix:px") var act_center_gap := 90.0   ## 가운데로 나온 캐릭터와 화면 가운데 사이 가로 거리 (자기 편 쪽으로, 0 = 정가운데)
+@export var act_move := true   ## 행동한 캐릭터가 가운데로 나왔다가 돌아옴 (끄면 제자리에서)
+@export_range(0.0, 1.0, 0.01, "suffix:초") var shake_time := 0.32      ## 공격이 명중했을 때 카메라 흔들림 시간
+@export_range(0.0, 60.0, 0.5, "suffix:px") var shake_px := 16.0      ## 카메라 흔들림 세기 (처음 세기, 점점 약하게)
 @export_group("")
 
 var _cam_live := false
 
 
 func pose_opts() -> Dictionary:
-	return {"zoom": pose_zoom, "zoom_in": pose_zoom_in, "time": pose_time, "drift": pose_drift, "back": pose_back}
+	return {"zoom": pose_zoom, "zoom_in": pose_zoom_in, "time": pose_time, "back": pose_back}
 
 
 # ---------------------------------------------------------------- 포즈 카메라 (줌 · 흔들림)
@@ -59,48 +58,65 @@ var _focus_tw: Tween
 var _shake_left := 0.0
 
 
-## 그 캐릭터 가운데로 카메라 줌: zoom_in 초에 pose_zoom 배 · 캐릭터가 화면 가운데에서 drift 만큼 어긋난 데서 time 초 동안 가운데로 → 원래 화면
-func focus_camera(s: UnitSprite2D, o: Dictionary = {}, at: Variant = null) -> void:
-	if bcam == null or s == null:
+## 화면 가운데로 카메라 줌: zoom_in 초에 zoom 배 → time 초 유지 → back 초에 원래 화면. 캐릭터를 따라가지 않음 (s · at 은 예전 호출 호환용)
+func focus_camera(_s: UnitSprite2D = null, o: Dictionary = {}, _at: Variant = null) -> void:
+	if bcam == null:
 		return
-	if _focus_tw != null and _focus_tw.is_valid():
-		_focus_tw.kill()
-	var home := CAM_SCREEN * 0.5
-	var c: Vector2 = s.center_world() if at == null else at
-	var k := float(o.get("zoom", pose_zoom))
 	var t_in := maxf(0.01, float(o.get("zoom_in", pose_zoom_in)))
 	var t_hold := maxf(t_in, float(o.get("time", pose_time)))
-	var t_back := float(o.get("back", pose_back))
-	var dx := float(o.get("drift", pose_drift)) * (1.0 if s.unit.team == "ally" else -1.0)   # 뒤쪽에서 가운데로
-	var start_pos := _cam_pos
-	var start_zoom := _cam_zoom
-	var run := func(t: float) -> void:
-		var zi := 1.0 - pow(1.0 - clampf(t / t_in, 0.0, 1.0), 3.0)   # 빠르게 다가감
-		var dr := sin(clampf(t / t_hold, 0.0, 1.0) * PI * 0.5)        # 천천히 가운데로
-		var aim := c - (Vector2(home.x + dx * (1.0 - dr), pose_screen_y) - home) / k   # 캐릭터가 화면 (가운데 + dx, pose_screen_y) 에 보이게
-		_cam_zoom = lerpf(start_zoom, k, zi)
-		_cam_pos = _keep_in_view(start_pos.lerp(aim, zi), _cam_zoom)
-	var from := _keep_in_view(c - (Vector2(home.x, pose_screen_y) - home) / k, k)
-	var back := func(t: float) -> void:
-		_cam_zoom = lerpf(k, 1.0, t)
-		_cam_pos = _keep_in_view(from.lerp(home, t), _cam_zoom)
-	var done := func() -> void:
-		_cam_zoom = 1.0
-		_cam_pos = home
+	_zoom_camera(float(o.get("zoom", pose_zoom)), t_in, t_hold - t_in, float(o.get("back", pose_back)))
+
+
+## 화면 가운데 줌: t_in 초에 k 배 → hold 초 유지 → t_back 초에 1배 (hold < 0 = 돌아가지 않고 그대로 — release_camera 로 돌아감)
+func _zoom_camera(k: float, t_in: float, hold: float, t_back: float) -> void:
+	if _focus_tw != null and _focus_tw.is_valid():
+		_focus_tw.kill()
+	_cam_pos = CAM_SCREEN * 0.5
 	_focus_tw = create_tween()
-	_focus_tw.tween_method(run, 0.0, t_hold, t_hold)
-	if t_back > 0.0:
-		_focus_tw.tween_method(back, 0.0, 1.0, t_back).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	_focus_tw.tween_callback(done)
+	_focus_tw.tween_property(self, "_cam_zoom", k, t_in).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	if hold < 0.0:
+		return
+	if hold > 0.0:
+		_focus_tw.tween_interval(hold)
+	release_camera(t_back, _focus_tw)
 
 
-## 줌 z 일 때 화면이 원래 화면(1280×720) 안에 머무는 카메라 자리
-func _keep_in_view(p: Vector2, z: float) -> Vector2:
-	if not pose_keep_in_view:
-		return p
-	var half := CAM_SCREEN * 0.5
-	var m := half * (1.0 - 1.0 / maxf(1.0, z))
-	return Vector2(clampf(p.x, half.x - m.x, half.x + m.x), clampf(p.y, half.y - m.y, half.y + m.y))
+## 원래 화면(1배)으로 t 초에 (tw = 이어 붙일 트윈, 없으면 새로)
+func release_camera(t: float = -1.0, tw: Tween = null) -> void:
+	if t < 0.0:
+		t = pose_back
+	if tw == null:
+		if _focus_tw != null and _focus_tw.is_valid():
+			_focus_tw.kill()
+		_focus_tw = create_tween()
+		tw = _focus_tw
+	if t > 0.0:
+		tw.tween_property(self, "_cam_zoom", 1.0, t).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	else:
+		tw.tween_property(self, "_cam_zoom", 1.0, 0.0)
+
+
+## 행동 시작: 화면 가운데로 살짝 줌 + 행동한 캐릭터가 화면 가운데 쪽(자기 편 쪽으로 act_center_gap)으로 나옴 → 나오는 초
+func _stage_in(s: UnitSprite2D) -> float:
+	_zoom_camera(pose_zoom, pose_zoom_in, -1.0, 0.0)
+	if not act_move:
+		return pose_zoom_in
+	var side := -1.0 if s.unit.team == "ally" else 1.0
+	var to := Vector2(CAM_SCREEN.x * 0.5 + side * act_center_gap, s.position.y)
+	if side * (to.x - s.position.x) > 0.0:   # 이미 가운데보다 안쪽이면 그대로
+		to.x = s.position.x
+	var tw := create_tween()
+	tw.tween_property(s, "position", to, pose_zoom_in).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	return pose_zoom_in
+
+
+## 행동 끝: 제자리(지금 슬롯 자리)로 돌아가고 카메라도 원래 화면 → 돌아오는 초
+func _stage_out(s: UnitSprite2D) -> float:
+	release_camera(pose_back)
+	if act_move and s.unit != null:
+		var tw := create_tween()
+		tw.tween_property(s, "position", unit_position(s.unit), pose_back).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	return pose_back
 
 
 ## 카메라 흔들림 (처음 shake_time 초, 점점 약하게) — 줌과 함께 써도 됨
@@ -122,7 +138,7 @@ func _apply_camera(delta: float) -> void:
 	bcam.position = _cam_pos + off
 
 
-## 포즈 + 카메라 줌 (focus = 이 캐릭터로 줌) → 포즈 초
+## 포즈 + 카메라 줌 (focus = 화면 가운데로 살짝 줌) → 포즈 초
 func _pose(s: UnitSprite2D, pose: String, focus: bool, at: Variant = null) -> float:
 	if s == null or pose == "" or not s.has_pose(pose):
 		return 0.0
@@ -601,6 +617,8 @@ func _on_action_resolved(event: Dictionary) -> void:
 	if s == null:
 		return
 	_begin_busy()
+	# 화면 가운데로 살짝 줌 + 행동한 캐릭터가 가운데 쪽으로 나옴 (끝나면 제자리로)
+	await get_tree().create_timer(_stage_in(s)).timeout
 	var ranged: bool = actor.is_ranged_now() or event.action.kind == "ultimate"
 	var start := Time.get_ticks_msec()
 	var until := 0.0   # 시작부터 포즈가 끝나는 초
@@ -609,13 +627,8 @@ func _on_action_resolved(event: Dictionary) -> void:
 	# 쓰는 쪽: 스킬 포즈 (자동 = 적에게 쓰는 피해·상태 스킬 shot — 근접 무기면 slash, 그 밖 point_up) — 그림이 없으면 공격 애니메이션
 	var tgt: Variant = (event.targets as Array)[0] if not (event.targets as Array).is_empty() else null
 	var cp := _pick_pose(s, SkillPoseData.caster_poses(event.action, actor, tgt, skill_poses, weapon_poses))
-	var focused := false   # 카메라 줌은 한 행동에 한 캐릭터 (쓰는 쪽 포즈가 먼저, 없으면 맞는 쪽)
 	if cp != "":
-		until = _pose(s, cp, true)
-		focused = true
-		if cp.begins_with("shot") or cp.begins_with("slash"):
-			shake_camera()
-			shook = true
+		until = _pose(s, cp, false)   # 카메라는 _stage_in 에서 이미 화면 가운데로 줌
 	else:
 		tw = s.play_attack(actor.team == "ally", ranged)
 	await get_tree().create_timer(0.12).timeout
@@ -632,13 +645,12 @@ func _on_action_resolved(event: Dictionary) -> void:
 		var pose := ""
 		if not posed.has(id) and r.target.alive and r.kind in ["damage", "miss"]:
 			pose = _pick_pose(ts, SkillPoseData.target_poses(r.kind, effs.get(id, [])))
+		if r.kind == "damage" and not shook:   # 명중 → 카메라 흔들림 (한 행동에 한 번)
+			shake_camera()
+			shook = true
 		if pose != "":
 			posed[id] = true
-			until = maxf(until, 0.12 + _pose(ts, pose, not focused))
-			focused = true
-			if pose == "hit" and not shook:
-				shake_camera()
-				shook = true
+			until = maxf(until, 0.12 + _pose(ts, pose, false))
 		elif r.kind == "damage":
 			ts.play_hit()
 		elif r.kind == "miss":
@@ -653,13 +665,13 @@ func _on_action_resolved(event: Dictionary) -> void:
 		var p2 := _pick_pose(ts2, SkillPoseData.target_poses("", effs[id]))
 		if p2 != "":
 			posed[id] = true
-			until = maxf(until, 0.12 + _pose(ts2, p2, not focused))
-			focused = true
+			until = maxf(until, 0.12 + _pose(ts2, p2, false))
 	if tw != null and tw.is_valid():
 		await tw.finished
 	var left := until - (Time.get_ticks_msec() - start) / 1000.0
 	if left > 0.0:
 		await get_tree().create_timer(left).timeout
+	await get_tree().create_timer(_stage_out(s)).timeout
 	# 탈진: AP 를 다 쓰면 그다음 tired
 	if actor.alive and actor.ap <= 0 and s.has_pose("tired"):
 		await get_tree().create_timer(_pose(s, "tired", true)).timeout

@@ -137,6 +137,14 @@ func _run_cli() -> void:
 			if auto == "move":
 				hud.begin_move()
 				break
+			if auto.begins_with("act"):
+				# --autoplay=act[:초[:스킬 id]] — 첫 아군 차례에 공격 하나, 초 뒤에 찍음 (행동 연출 확인용, 기본 0.5)
+				var aid2 := auto.get_slice(":", 2) if auto.get_slice_count(":") > 2 else "basic_attack"
+				var tg := controller.get_valid_targets(aid2)
+				if not tg.is_empty():
+					controller.player_execute(aid2, tg[0])
+				await get_tree().create_timer(float(auto.get_slice(":", 1)) if auto.get_slice_count(":") > 1 else 0.5).timeout
+				break
 			if auto.begins_with("pose"):
 				# --autoplay=pose:<shot|hit|miss|stun|dead…>[:초] — 포즈 그림이 있는 첫 아군(--pose_char=스프라이트 id 로 고르기)에게 그 연출, 초 뒤에 찍음 (기본 0.6)
 				var pz := auto.get_slice(":", 1)
@@ -149,7 +157,6 @@ func _run_cli() -> void:
 							var po: Dictionary = view.pose_opts()
 							if Game.cli.has("pose_zoom"):   # --pose_zoom=1 = 줌 없이 (크기 확인)
 								po.zoom = float(Game.cli.pose_zoom)
-								po.drift = 0.0
 							sp.play_pose(pz, po)
 							view.focus_camera(sp, po)
 							if pz in ["shot", "hit"]:

@@ -34,10 +34,7 @@ var zoom_label: Label
 var battle_bar: PanelContainer
 var battle_label: Label
 var battle_skip: Button
-var sel_panel: PanelContainer
-var sel_body: VBoxContainer
 var _sel_id := ""
-var _sel_t := 0.0
 var _modals: Array[Control] = []
 var _queue: Array[Callable] = []
 var _toast_t := 0.0
@@ -58,7 +55,6 @@ func setup(p_hub: Node, p_sim: BaseSim) -> void:
 	_build_zoom()
 	_build_debug()
 	_build_battle_bar()
-	_build_selection()
 	toast = _label("", 20, GOLD, true)
 	toast.set_anchors_and_offsets_preset(PRESET_CENTER_TOP)
 	toast.position = Vector2(340, 92)
@@ -288,9 +284,37 @@ func _build_log() -> void:
 	log_label.scroll_following = true
 	log_label.mouse_filter = MOUSE_FILTER_PASS
 	log_panel.add_child(log_label)
-	var hint := _label("대원 클릭: 선택 (한 번 더 = 대화) · 방 클릭: 이동 · 더블클릭: 뛰기 · 도착 후 우클릭: 행동 · Tab: 다음 대원 · Esc: 해제 · 말풍선: 엿듣기 · F1", 12, Color(0.8, 0.88, 0.95), true)
+	_build_log_toggle()
+	var hint := _label("대원 클릭: 선택 (한 번 더 = 해제) · 우클릭: 대화 · 정보 · 방 클릭: 이동 · 더블클릭: 뛰기 · 도착 후 우클릭: 행동 · Tab: 다음 대원 · Esc: 해제 · 말풍선: 엿듣기 · F1", 12, Color(0.8, 0.88, 0.95), true)
 	hint.position = Vector2(500, 696)
 	add_child(hint)
+
+
+## 로그창 접기 / 펴기 아이콘 (UI 패키지 schedule — 다른 버튼과 안 겹치는 것): 로그창 오른쪽 위 모서리, 접으면 아이콘만 그 자리에
+var log_toggle: TextureButton
+
+
+func _build_log_toggle() -> void:
+	var b := TextureButton.new()
+	b.texture_normal = load(UI_DIR + "icons/schedule.png")
+	b.ignore_texture_size = true
+	b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	b.custom_minimum_size = Vector2(34, 34)
+	b.size = Vector2(34, 34)
+	b.pivot_offset = Vector2(17, 17)
+	b.focus_mode = FOCUS_NONE
+	b.mouse_entered.connect(func(): b.modulate = Color(1.25, 1.25, 1.2))
+	b.mouse_exited.connect(func(): b.modulate = Color.WHITE)
+	b.pressed.connect(func(): set_log_open(not log_panel.visible))
+	add_child(b)
+	log_toggle = b
+	set_log_open(true)
+
+
+func set_log_open(on: bool) -> void:
+	log_panel.visible = on
+	log_toggle.position = log_panel.position + Vector2(log_panel.get_combined_minimum_size().x - 30, -14)   # 접어도 같은 자리 (층 표시와 안 겹침)
+	log_toggle.tooltip_text = "기록 접기" if on else "기록 펴기"
 
 
 ## 오른쪽 아래 확대/축소: − 배율 + (휠·핀치·Q/E·+/- 키도 됨, 0 = 기본)
@@ -316,59 +340,9 @@ func _build_zoom() -> void:
 
 
 ## 오른쪽: 선택한 대원 카드 (이름·지금 하는 일·체력·피로도·친밀도·조작 안내)
-func _build_selection() -> void:
-	sel_panel = PanelContainer.new()
-	UiPanel.apply(sel_panel, Vector4(18, 14, 18, 14))
-	sel_panel.position = Vector2(1280 - 10 - 330, 300)
-	sel_panel.custom_minimum_size = Vector2(330, 0)
-	sel_panel.visible = false
-	add_child(sel_panel)
-	sel_body = _vbox(4)
-	sel_panel.add_child(sel_body)
-
-
+## 대원 선택: 오른쪽 아래 카드는 없음 (정보는 우클릭 → '정보 보기' 창, 화면 가운데)
 func show_selection(npc_id: String) -> void:
 	_sel_id = npc_id
-	_sel_t = 0.0
-	sel_panel.visible = npc_id != ""
-	_fill_selection()
-
-
-func _fill_selection() -> void:
-	for c in sel_body.get_children():
-		sel_body.remove_child(c)
-		c.queue_free()
-	if _sel_id == "" or not sim.npcs.has(_sel_id):
-		return
-	var n: NpcAgent = sim.npcs[_sel_id]
-	var row := _hbox(10)
-	sel_body.add_child(row)
-	row.add_child(_portrait_rect(_sprite_of(_sel_id), 56))
-	var col := _vbox(2)
-	row.add_child(col)
-	col.add_child(_label(n.name, 18, GOLD))
-	var what: String = n.state_name() if n.state != NpcAgent.STAYING else OutgameData.ACTIVITIES.get(n.activity, n.activity)
-	if n.state == NpcAgent.MOVING:
-		what = "%s → %s" % ["뛰는 중" if n.running else "걷는 중", sim.data.facility_name(n.dest)]
-	col.add_child(_label("%s · %s" % [sim.data.facility_name(n.facility), what], 14, Color(0.85, 0.9, 1)))
-	if n.is_holding():
-		col.add_child(_label("지시 대기 중 (다음 일정까지)", 12, Color(0.6, 1.0, 0.7)))
-	var card := _status_card(_sel_id)
-	sel_body.add_child(card)
-	if sim.is_combatant(n):
-		var cid := n.character_id
-		var pts := sim.skill_points(cid)
-		sel_body.add_child(_label("Lv%d · 경험치 %d/%d%s" % [sim.char_level(cid), sim.char_xp(cid), sim.xp_need(cid), "  · 스킬 포인트 %d (우클릭 → 스킬 트리)" % pts if pts > 0 else ""],
-			13, Color(0.85, 0.6, 1.0) if pts > 0 else Color(0.8, 0.85, 0.92)))
-	var tip := "방 클릭: 걸어서 · 더블클릭: 뛰어서\n도착하면 우클릭: 그 방에서 할 행동 · 대원 다시 클릭: 대화"
-	if sim.is_researcher(_sel_id):
-		tip = "방 클릭: 걸어서 · 더블클릭: 뛰어서\n%s 클릭: 무기 연구 · 우클릭: 대화·행동" % n.name
-	if n.state == NpcAgent.MOVING:
-		tip = "가는 중 — 더블클릭하면 뛰어감\n도착하면 우클릭으로 행동 지시"
-	sel_body.add_child(_label(tip, 12, Color(0.75, 0.8, 0.9)))
-	sel_panel.reset_size()
-	var sz := sel_panel.get_combined_minimum_size()
-	sel_panel.position = Vector2(1280 - 10 - sz.x, 640 - 12 - sz.y)   # 오른쪽 아래 확대 버튼 위, 화면 안쪽
 
 
 ## 전투 발생 띠 (전투가 끝날 때까지 기지 시계 정지)
@@ -496,11 +470,6 @@ func refresh(delta: float) -> void:
 		speed_buttons[i].modulate = Color(1, 1, 0.5) if [0, 1, 4, 16][i] == hub.speed else Color(1, 1, 1)
 	cash_label.text = "%d" % sim.ledger.cash   # 지폐 그림이 $ 표시
 	_update_battle_bar()
-	if _sel_id != "":
-		_sel_t -= delta
-		if _sel_t <= 0.0:
-			_sel_t = 0.3
-			_fill_selection()
 	zoom_label.text = "%d%%" % hub.zoom_percent()
 	var left := sim.minutes_to_settlement()
 	var pend := sim.ledger.pending_total()
@@ -1385,8 +1354,8 @@ func open_context(npc_id: String, at: Vector2) -> void:
 	pm.add_item("대화", 0)
 	if sim.is_researcher(npc_id):
 		pm.add_item("무기 연구", 7)
+	pm.add_item("정보 보기", 4)
 	if sim.is_combatant(n):
-		pm.add_item("정보·장비", 4)
 		pm.add_item("스킬 트리 (Lv%d%s)" % [sim.char_level(n.character_id), " · 포인트 %d" % sim.skill_points(n.character_id) if sim.skill_points(n.character_id) > 0 else ""], 8)
 	pm.set_item_disabled(pm.get_item_index(0), n.state == NpcAgent.UNAVAILABLE)
 	var room_ids := {}
@@ -1446,7 +1415,6 @@ func _on_context(id: int, npc_id: String, room_act: String = "") -> void:
 			open_research()
 	if not r.is_empty():
 		show_toast(r.msg, GOOD if r.ok else BAD)
-		_sel_t = 0.0
 		return
 	if room_act != "":
 		return
@@ -1662,20 +1630,26 @@ func _quest_divine(qid: String) -> Array:
 # ---------------------------------------------------------------- 대원 정보·장비
 func open_character(npc_id: String) -> void:
 	var n: NpcAgent = sim.npcs[npc_id]
-	var win := _window("%s — 정보·장비" % n.name, 640)
+	var combat := sim.is_combatant(n)
+	var win := _window("%s — 정보%s" % [n.name, "·장비" if combat else ""], 640)
 	var body: VBoxContainer = win.body
 	var row := _hbox(14)
 	body.add_child(row)
 	row.add_child(_portrait_rect(n.sprite, 110))
 	var col := _vbox(4)
 	row.add_child(col)
-	var u: UnitData = GameData._find(sim.battle.allies, n.character_id) if sim.battle != null else null
-	col.add_child(_label("상태: %s · 위치: %s" % [n.state_name(), sim.data.facility_name(n.facility)], 15))
+	var u: UnitData = GameData._find(sim.battle.allies, n.character_id) if sim.battle != null and combat else null
+	var what: String = n.state_name() if n.state != NpcAgent.STAYING else OutgameData.ACTIVITIES.get(n.activity, n.activity)
+	if n.state == NpcAgent.MOVING:
+		what = "%s → %s" % ["뛰는 중" if n.running else "걷는 중", sim.data.facility_name(n.dest)]
+	col.add_child(_label("지금: %s · %s%s" % [sim.data.facility_name(n.facility), what, "  (지시 대기 중)" if n.is_holding() else ""], 15))
 	col.add_child(_label("지금 일정: %s @ %s (%s)" % [OutgameData.ACTIVITIES.get(n.activity, n.activity), sim.data.facility_name(n.dest), n.dest_reason], 14, Color(0.8, 0.88, 1)))
 	col.add_child(_status_card(npc_id))
 	var lv := sim.training_level(n.character_id)
 	if u != null:
 		col.add_child(_label("전투: %s Lv%d · HP %d (훈련 %d단계) · 속도 %d" % [u.role, sim.char_level(u.id), sim.char_max_hp(u.id), lv, u.speed], 15, GOLD))
+		col.add_child(_label("경험치 %d/%d%s" % [sim.char_xp(u.id), sim.xp_need(u.id), "  · 스킬 포인트 %d" % sim.skill_points(u.id) if sim.skill_points(u.id) > 0 else ""], 13,
+			Color(0.85, 0.6, 1.0) if sim.skill_points(u.id) > 0 else Color(0.8, 0.85, 0.92)))
 		var gi := sim.god_info(u.id)
 		if not gi.is_empty():
 			var grow := _hbox(8)
@@ -1692,8 +1666,9 @@ func open_character(npc_id: String) -> void:
 			close_top()
 			open_skills(u.id))
 		col.add_child(sk)
-	body.add_child(_label("장비 (전투에 반영 · 주무기 / 보조1 / 보조2)", 16, Color(1, 0.95, 0.75)))
-	for slot in 3:
+	if combat:
+		body.add_child(_label("장비 (전투에 반영 · 주무기 / 보조1 / 보조2)", 16, Color(1, 0.95, 0.75)))
+	for slot in (3 if combat else 0):
 		var r := _hbox(10)
 		body.add_child(r)
 		r.add_child(_label(["주무기", "보조 1", "보조 2"][slot], 15))
