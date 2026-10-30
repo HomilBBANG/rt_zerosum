@@ -291,7 +291,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![스토리 흐름 탭 — 선 고름 · 선 긋는 중](docs/screenshots/story_editor_edit.png)
 
 ## 기지 상단 UI
-- 왼쪽 위: **날짜 바**(`assets/ui/outgame/day_bar.png` — 양 끝 팔각 모서리는 그대로, 가운데만 날짜 길이만큼 늘림) + 속도 버튼 · 그 아래 **지폐 그림**(`money.png`) + 돈 · 정보 줄.
+- 왼쪽 위: **날짜 바**(`assets/ui/outgame/day_bar.png`) 한 장이 날짜 · 속도 버튼 · **지폐 그림**(`money.png`) + 돈 · 정보 줄을 모두 감쌈 (양 끝 팔각 모서리는 그대로, 가운데만 내용 크기만큼 늘림). 정보 줄이 길어져 오른쪽 아이콘 버튼에 닿으면 정보 줄 글자를 14 → 12 → 11 로 줄임.
 - 오른쪽 위: **아이콘 버튼** + 아래 이름 — 스킬(번개) · 도감(눈 달린 책) · 퀘스트(체크 클립보드) · 의뢰(봉인 문서) · 무기고(공구) · 원장(장부) · 저장(책갈피) · 전투 출전(검) · 타이틀(톱니). 마우스를 올리면 밝게 · 살짝 커짐, 툴팁 = 이름.
 - 대원 우클릭 메뉴에도 아이콘: 대화(편지) · 무기 연구(돋보기) · 정보·장비(책) · 스킬 트리(번개) · 업무·의뢰 지시(문서).
 - 아이콘 20개 = 사용자 UI 패키지에서 잘라 `assets/ui/outgame/icons/<이름>.png` (96×96): skill · sword · faith · levelup · book · codex · search · bookmark · contract · quest · mail · scroll · schedule · calendar_check · ledger · calendar · gear · tools · sliders · gear_wrench. 원본 `art_src/ui/`.

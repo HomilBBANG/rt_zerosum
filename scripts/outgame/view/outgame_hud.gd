@@ -145,49 +145,40 @@ func _vbox(sep: int = 6) -> VBoxContainer:
 
 # ================================================================ 위쪽 바
 const UI_DIR := "res://assets/ui/outgame/"
+var _top_left: Control
+var _top_right: Control
 
 
-## 상단: 왼쪽 = 날짜 바(day_bar 그림) + 속도 버튼 / 돈(지폐 그림) + 정보 줄, 오른쪽 = 아이콘 버튼 (UI 패키지에서 자른 assets/ui/outgame/icons)
+## 상단: 왼쪽 = 날짜 바(day_bar 그림) 한 장이 날짜 · 속도 버튼 · 돈(지폐 그림) · 정보 줄 전체를 감쌈, 오른쪽 = 아이콘 버튼 (UI 패키지에서 자른 assets/ui/outgame/icons)
 func _build_top() -> void:
-	var left := _vbox(6)
-	left.position = Vector2(10, 8)
-	add_child(left)
-	var row := _hbox(8)
-	left.add_child(row)
-	# 날짜 바: 그림 양 끝(팔각 모서리)은 그대로, 가운데만 늘림
-	var day := PanelContainer.new()
+	var left := PanelContainer.new()
 	var em := StyleBoxEmpty.new()
-	em.content_margin_left = 30
-	em.content_margin_right = 30
-	em.content_margin_top = 6
-	em.content_margin_bottom = 6
-	day.add_theme_stylebox_override("panel", em)
-	day.mouse_filter = MOUSE_FILTER_IGNORE
-	_nine_bg(day, load(UI_DIR + "day_bar.png"), 44, 16)
+	em.content_margin_left = 22
+	em.content_margin_right = 22
+	em.content_margin_top = 9
+	em.content_margin_bottom = 9
+	left.add_theme_stylebox_override("panel", em)
+	left.position = Vector2(10, 8)
+	left.mouse_filter = MOUSE_FILTER_IGNORE
+	_top_left = left
+	_nine_bg(left, load(UI_DIR + "day_bar.png"), 44, 20)   # 양 끝 팔각 모서리는 그대로, 가운데만 늘림
+	add_child(left)
+	var lv := _vbox(4)
+	left.add_child(lv)
+	var row := _hbox(8)
+	lv.add_child(row)
 	date_label = _label("", 22, Color(1, 1, 1))
-	date_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	day.add_child(date_label)
-	row.add_child(day)
-	var sp_box := _hbox(4)
-	sp_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(sp_box)
+	row.add_child(date_label)
+	row.add_child(_spacer_w(6))
 	for sp in [[0, "정지"], [1, "1x"], [4, "4x"], [16, "16x"]]:
 		var b := _button(sp[1], Color(0.55, 0.65, 0.42), 14, 44)
 		b.size_flags_vertical = SIZE_SHRINK_CENTER
 		var v: int = sp[0]
 		b.pressed.connect(func(): hub.set_speed(v))
-		sp_box.add_child(b)
+		row.add_child(b)
 		speed_buttons.append(b)
-	var row2 := PanelContainer.new()
-	var ps := _panel_style(Color(0.05, 0.06, 0.05, 0.82), Color(0.33, 0.38, 0.27), 6)
-	ps.content_margin_top = 4
-	ps.content_margin_bottom = 4
-	ps.content_margin_left = 8
-	row2.add_theme_stylebox_override("panel", ps)
-	row2.mouse_filter = MOUSE_FILTER_IGNORE
-	left.add_child(row2)
 	var r2 := _hbox(8)
-	row2.add_child(r2)
+	lv.add_child(r2)
 	var money := TextureRect.new()
 	money.texture = load(UI_DIR + "money.png")
 	money.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -202,6 +193,7 @@ func _build_top() -> void:
 	r2.add_child(info_label)
 
 	var right := _hbox(4)
+	_top_right = right
 	right.position = Vector2(0, 6)
 	add_child(right)
 	var specs := [["스킬", "skill", null, func(): open_skills("")], ["도감", "codex", null, func(): open_codex()], ["퀘스트", "quest", QUEST_COL, func(): open_quests()],
@@ -212,6 +204,18 @@ func _build_top() -> void:
 		right.add_child(_icon_button(s[0], s[1], s[2] if s[2] != null else Color(0.88, 0.86, 0.76), s[3]))
 	right.position.x = 1280 - 10 - right.get_combined_minimum_size().x
 	right.resized.connect(func(): right.position.x = 1280 - 10 - right.size.x)
+
+
+## 날짜 바가 오른쪽 아이콘 버튼에 닿으면 정보 줄 글자를 줄임 (14 → 12 → 11), 넉넉하면 다시 14
+func _fit_top() -> void:
+	if _top_left == null or _top_right == null:
+		return
+	var limit := _top_right.position.x - 8.0 - _top_left.position.x
+	for fs in [14, 12, 11]:
+		info_label.add_theme_font_size_override("font_size", fs)
+		if _top_left.get_combined_minimum_size().x <= limit:
+			break
+	_top_left.reset_size()
 
 
 ## 그림 배경(9칸 늘리기)을 그 컨트롤 전체에 그림: 양 끝 모서리는 그대로, 가운데만 늘림.
@@ -227,6 +231,13 @@ func _nine_bg(c: Control, tex: Texture2D, side: int, cap: int) -> void:
 		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2(0.5, 0.5))
 		c.draw_style_box(sb, Rect2(Vector2.ZERO, c.size * 2.0))
 		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE))
+
+
+func _spacer_w(w: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size.x = w
+	c.mouse_filter = MOUSE_FILTER_IGNORE
+	return c
 
 
 ## 아이콘 버튼 + 아래 이름 (마우스를 올리면 밝게 · 살짝 커짐)
@@ -486,8 +497,11 @@ func refresh(delta: float) -> void:
 	var ins_text := "이번 달 장군 점검: %s" % ("완료 (%s, %d점)" % [ins.grade, roundi(float(ins.score))] if ins.get("done", false) else "예정 (날짜 모름)")
 	var nb := sim.next_battle()
 	var nb_text := "다음 전투 %s" % sim.clock.label(int(nb.minute)).right(14) if not nb.is_empty() else "예정 전투 없음"
-	info_label.text = "미지급 $%d · 결산까지 %d일 %d시간 · 식재료 %d끼  |  위생 %d점 · %s  |  %s" % [sim.ledger.pending_total(),
+	var info := "미지급 $%d · 결산까지 %d일 %d시간 · 식재료 %d끼  |  위생 %d점 · %s  |  %s" % [sim.ledger.pending_total(),
 		floori(left / 1440.0), floori(fmod(left, 1440.0) / 60.0), sim.food, roundi(sim.hygiene_score()), ins_text.replace("이번 달 장군 점검", "점검"), nb_text]
+	if info != info_label.text:
+		info_label.text = info
+		_fit_top.call_deferred()
 	if _toast_t > 0.0:
 		_toast_t -= delta
 		toast.modulate.a = clampf(_toast_t / 0.6, 0.0, 1.0)
