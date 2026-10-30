@@ -266,9 +266,14 @@ func set_highlight(kind: String) -> void:
 
 
 func _draw() -> void:
-	# 하이라이트 링 (UI 요소: 조명과 무관한 색). 발밑 그림자는 3D 배경이 실루엣으로 드리움 (둥근 그림자는 2026-10-29 제거)
+	# 발밑 동그란 그림자 (모든 캐릭터 · 몬스터 — 3D 실루엣 그림자는 무거워서 2026-10-30 뺌). 몬스터가 타면 같이 옅어지다 사라짐
 	var r := Vector2(44, 13)
 	draw_set_transform(Vector2(0, 2), 0.0, Vector2.ONE)
+	if flip.visible:
+		var sr := Vector2(88, 20) if unit.is_large() else Vector2(46, 12)
+		draw_ellipse_poly(Vector2.ZERO, sr, Color(0, 0, 0, 0.42 * (1.0 - burn_value)), true)
+		draw_ellipse_poly(Vector2.ZERO, sr * 0.62, Color(0, 0, 0, 0.18 * (1.0 - burn_value)), true)
+	# 하이라이트 링 (UI 요소: 조명과 무관한 색)
 	match highlight_kind:
 		"current":
 			draw_ellipse_poly(Vector2.ZERO, r + Vector2(10, 4), ui_accent, false, 4.0)
@@ -440,7 +445,8 @@ func set_tired(on: bool) -> void:
 
 ## 몬스터 사망 연출: 그 자리에서 멈춰 얼룩지며 검게 탐 → 위에서부터 불꽃 테두리와 함께 재가 되어 사라짐 + 위로 날리는 불티 (BURN_TIME 초)
 const BURN_TIME := 2.6
-var burning := false   # 타는 중 (그동안 3D 바닥 그림자도 남김)
+var burning := false   # 타는 중
+var burn_value := 0.0
 
 
 func play_burn() -> void:
@@ -470,6 +476,8 @@ func play_burn() -> void:
 	embers.z_index = 1
 	flip.add_child(embers)
 	var set_burn := func(v: float) -> void:
+		burn_value = v
+		queue_redraw()
 		for m in _all_mats():
 			m.set_shader_parameter("burn", v)
 	var tw := create_tween()

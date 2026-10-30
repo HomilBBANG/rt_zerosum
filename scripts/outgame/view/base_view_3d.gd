@@ -5,7 +5,7 @@ extends Node3D
 ## 카메라는 직교(원근 없음) + 살짝 내려다봄: 방 단면은 모두 같은 크기의 반듯한 사각형(한 칸 ≈ 정사각형), 방 안은 위에서 바닥이 보인다.
 ## 건물 바깥은 검정 (배경 없음).
 ## 대원(2D 리그)·이름표·말풍선은 BaseHub 가 이 카메라로 화면 좌표를 투영해 그 위에 그린다.
-## 대원 조명: 방 스폿 조명을 탐침(light_probe)해 캐릭터 셰이더의 빛 방향·색·림을 실시간으로 (NpcView), 실루엣 판(set_shadow_proxy)이 바닥에 대원 그림자를 드리움.
+## 대원 조명: 방 스폿 조명을 탐침(light_probe)해 캐릭터 셰이더의 빛 방향·색·림을 실시간으로 (NpcView) (그림자는 NpcView 의 발밑 동그란 그림자).
 ## 좌표: 시뮬레이션의 2D px (x 오른쪽, y 아래) → 3D m (x 오른쪽, y 위, z 화면 쪽). 칸 240px = CELL_M, 층 220px = FLOOR_M.
 
 const CEL := preload("res://shaders/cel_3d.gdshader")
@@ -28,9 +28,6 @@ var fill: DirectionalLight3D
 var rooms: Dictionary = {}    # fid → Node3D
 var _mats: Dictionary = {}    # key → ShaderMaterial (색·조명 프리셋별 공유)
 var _lights: Dictionary = {}  # fid → [SpotLight3D] (방 스폿 · 출입문 노을빛) — 대원 조명 탐침(light_probe)용
-var _proxies: Dictionary = {} # npc id → MeshInstance3D (그림자만 드리우는 실루엣 판)
-var _sil_cache: Dictionary = {}
-var shadow_dirty := false     # 그림자 판이 움직임 → BaseHub 가 3D 를 다시 그림
 var jukebox: AABB = AABB()    # 공용실 주크박스 (3D 상자, 크기 0 = 없음) — 누르면 음악 카세트 창 (BaseHub)
 
 
@@ -545,74 +542,6 @@ func _spot_at(light: SpotLight3D, q: Vector3) -> float:
 	return light.light_energy * cone * sqrt(clampf(1.0 - dist / light.spot_range, 0.0, 1.0))
 
 
-## 대원 그림자 대리 판 (전투와 같음): 원화 실루엣을 세운 판, 보이지 않고 그림자만 드리움 → 방 스폿 조명이 바닥·벽에 대원 모양 그림자를
-## pos = 발 위치 (m), height = 그 자세의 키 (m), mirror = 왼쪽을 봄. 판이 움직이면 shadow_dirty (BaseHub 가 다시 그림)
-func set_shadow_proxy(id: String, pos: Vector3, height: float, shown: bool, sprite_id: String, mirror: bool) -> void:
-	var mi: MeshInstance3D = _proxies.get(id, null)
-	var sil := _silhouette(sprite_id)
-	if mi == null:
-		mi = MeshInstance3D.new()
-		if sil.is_empty():
-			var cap := CapsuleMesh.new()
-			cap.radius = 0.22
-			mi.mesh = cap
-		else:
-			var q := QuadMesh.new()
-			var m := StandardMaterial3D.new()
-			m.albedo_texture = sil.tex
-			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-			m.alpha_scissor_threshold = 0.5
-			m.cull_mode = BaseMaterial3D.CULL_DISABLED
-			m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			q.material = m
-			mi.mesh = q
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
-		add_child(mi)
-		_proxies[id] = mi
-		shadow_dirty = true
-	var want_pos := pos
-	var want_scale := Vector3.ONE
-	if mi.mesh is QuadMesh:
-		var mpp: float = height / float(sil.figure_px)
-		var size: Vector2 = sil.image_size * mpp
-		if (mi.mesh as QuadMesh).size != size:
-			(mi.mesh as QuadMesh).size = size
-			shadow_dirty = true
-		var off := Vector2(size.x * 0.5 - sil.ground.x * mpp, sil.image_size.y * mpp - sil.ground.y * mpp - size.y * 0.5)
-		var sx := -1.0 if mirror else 1.0
-		want_pos = pos + Vector3(off.x * sx, -off.y, 0.0)
-		want_scale = Vector3(sx, 1.0, 1.0)
-	else:
-		if (mi.mesh as CapsuleMesh).height != height:
-			(mi.mesh as CapsuleMesh).height = height
-			shadow_dirty = true
-		want_pos = pos + Vector3(0, height * 0.5, 0)
-	if mi.visible != shown or mi.scale != want_scale or mi.position.distance_to(want_pos) > 0.004:
-		mi.visible = shown
-		mi.scale = want_scale
-		mi.position = want_pos
-		shadow_dirty = true
-
-
-func _silhouette(sprite_id: String) -> Dictionary:
-	if sprite_id == "":
-		return {}
-	if _sil_cache.has(sprite_id):
-		return _sil_cache[sprite_id]
-	var info := {}
-	var ch := CharacterSprite2D.info_of(sprite_id)
-	if ch.has("silhouette") and ch.has("figure_px"):
-		info = {
-			"tex": CharacterSprite2D._tex(CharacterSprite2D.dir_of(sprite_id).path_join(str(ch.silhouette))),
-			"image_size": Vector2(float(ch.image_size[0]), float(ch.image_size[1])),
-			"ground": Vector2(float(ch.ground[0]), float(ch.ground[1])),
-			"figure_px": float(ch.figure_px),
-		}
-	_sil_cache[sprite_id] = info
-	return info
-
-
-# ================================================================ 카메라
 ## target = 화면 가운데 점 (m), 직교 카메라가 위에서 pitch 만큼 내려다봄. size = 화면 세로에 들어가는 높이 (m, 작을수록 확대)
 func set_camera(target: Vector3, size: float, pitch_deg: float) -> void:
 	var p := deg_to_rad(pitch_deg)

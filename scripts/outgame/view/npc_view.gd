@@ -2,7 +2,7 @@ class_name NpcView
 extends Node2D
 ## 기지 대원 화면 노드: 전투와 같은 캐릭터 프레임 애니메이션(CharacterSprite2D)을, 3D 기지 위 그 대원의 발 위치(투영)에 원근 크기로.
 ## 조명은 방 프리셋 색이 아니라 **지금 자리에 실제로 닿는 스폿 조명**(BaseView3D.light_probe)으로 매 프레임: 빛 쪽·그림자 면·림이 걸어가는 동안 따라 바뀜 (부드럽게 섞음).
-## 발밑 그림자 = 3D 쪽 실루엣 판(BaseView3D.set_shadow_proxy)이 방 조명으로 드리움 (둥근 그림자 없음).
+## 발밑 그림자 = 동그란 그림자 (3D 실루엣 그림자는 무거워서 2026-10-30 뺌). 누우면 없음.
 ## 머리 위: '!' 요청 마커, 수면 Zz, 마우스를 올리면 이름·상태. 화면 좌표 노드 (BaseHub 의 화면 층).
 
 var npc_id: String = ""
@@ -127,7 +127,6 @@ func _process(delta: float) -> void:
 			chr.scale = Vector2(_s * n.facing, _s)
 		_update_anim(n)
 		_update_light(n, delta)
-	_update_shadow(n)
 	queue_redraw()
 
 
@@ -211,25 +210,17 @@ func _update_light(n: NpcAgent, delta: float) -> void:
 	chr.set_light_direction(bool(_lit.right) if n.facing >= 0 else not bool(_lit.right))
 
 
-## 3D 쪽 그림자 판: 서 있으면 발 위치, 앉으면 의자 높이에서 앉은 키로, 누우면 안 보임
-func _update_shadow(n: NpcAgent) -> void:
-	var v3d: BaseView3D = hub.v3d
-	var h_m := n.height_cm / 100.0
-	var post: Dictionary = sim.posture(n)
-	var shown := visible and _pose != "lie"
-	var pos := _foot3
-	var h := h_m
-	if _pose == "sit":
-		var hip := (chr.hip_ratio("sit") if chr != null else 0.5) * h_m
-		pos = _foot3 + Vector3(0.0, float(post.height) + 0.05 - hip, 0.0)
-		h = float(post.height) + h_m - hip
-	v3d.set_shadow_proxy(npc_id, pos, h, shown, n.sprite, n.facing < 0)
-
-
 func _draw() -> void:
 	var n: NpcAgent = sim.npcs.get(npc_id)
 	if n == null:
 		return
+	if _pose != "lie":   # 발밑 동그란 그림자 (앉으면 바닥의 발 자리)
+		var foot: Vector2 = hub.project(_foot3) - position
+		var rx := maxf(8.0, screen_h * 0.17)
+		draw_set_transform(foot, 0.0, Vector2(1.0, 0.28))
+		draw_circle(Vector2.ZERO, rx, Color(0, 0, 0, 0.4))
+		draw_circle(Vector2.ZERO, rx * 0.62, Color(0, 0, 0, 0.16))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var top := Vector2(0, -screen_h - 14)
 	if _pose == "lie":
 		top = Vector2(-hit_rect().size.x * 0.8, -screen_h * 1.2)

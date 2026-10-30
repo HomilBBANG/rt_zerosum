@@ -233,15 +233,6 @@ func _process(delta: float) -> void:
 	if selected != "" and not sim.npcs.has(selected):
 		select("")
 	hud.refresh(delta)
-	# 대원 그림자 판이 움직였으면 3D 배경을 다시 그림 (걷는 동안 그림자가 따라감 — 1초에 최대 20번)
-	_shadow_cool = maxf(0.0, _shadow_cool - delta)
-	if v3d != null and v3d.shadow_dirty and _shadow_cool <= 0.0:
-		v3d.shadow_dirty = false
-		_shadow_cool = 0.05
-		_rerender()
-
-
-var _shadow_cool := 0.0
 
 
 func _move_camera(delta: float) -> void:
