@@ -325,6 +325,8 @@ func _spacer_w(w: float) -> Control:
 
 
 ## 아이콘 버튼 + 아래 이름 (마우스를 올리면 밝게 · 살짝 커짐)
+const ICON_PX := 48.0     # 오른쪽 위 아이콘 크기 (예전 44)
+const ICON_CELL := 60.0   # 아이콘 한 칸 너비 (가장 긴 이름 "전투 출전"이 들어가는 폭)
 func _icon_button(text: String, icon: String, col: Color, cb: Callable) -> Control:
 	var box := _vbox(0)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -332,11 +334,11 @@ func _icon_button(text: String, icon: String, col: Color, cb: Callable) -> Contr
 	b.texture_normal = load(V2 + "icon_%s.png" % icon)
 	b.ignore_texture_size = true
 	b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	b.custom_minimum_size = Vector2(44, 44)
+	b.custom_minimum_size = Vector2(ICON_PX, ICON_PX)
 	b.size_flags_horizontal = SIZE_SHRINK_CENTER
 	b.tooltip_text = text
 	b.focus_mode = FOCUS_NONE
-	b.pivot_offset = Vector2(22, 22)
+	b.pivot_offset = Vector2(ICON_PX, ICON_PX) * 0.5
 	b.mouse_entered.connect(func():
 		b.modulate = Color(1.25, 1.25, 1.2)
 		b.scale = Vector2(1.06, 1.06))
@@ -347,7 +349,7 @@ func _icon_button(text: String, icon: String, col: Color, cb: Callable) -> Contr
 	box.add_child(b)
 	var l := _label(text, 13, col, true)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.custom_minimum_size.x = 50
+	box.custom_minimum_size.x = ICON_CELL   # 칸 너비 고정 → 글자 길이와 상관없이 아이콘 사이 간격이 모두 같음
 	box.add_child(l)
 	return box
 
