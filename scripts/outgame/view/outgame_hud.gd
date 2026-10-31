@@ -326,7 +326,7 @@ func _spacer_w(w: float) -> Control:
 
 ## 아이콘 버튼 + 아래 이름 (마우스를 올리면 밝게 · 살짝 커짐)
 const ICON_PX := 48.0     # 오른쪽 위 아이콘 크기 (예전 44)
-const ICON_CELL := 60.0   # 아이콘 한 칸 너비 (가장 긴 이름 "전투 출전"이 들어가는 폭)
+const ICON_CELL := 50.0   # 아이콘 한 칸 너비 — 패널 크기는 예전 그대로 (칸 50 × 11 + 간격 4 × 10 = 590)
 func _icon_button(text: String, icon: String, col: Color, cb: Callable) -> Control:
 	var box := _vbox(0)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -347,10 +347,17 @@ func _icon_button(text: String, icon: String, col: Color, cb: Callable) -> Contr
 		b.scale = Vector2.ONE)
 	b.pressed.connect(cb)
 	box.add_child(b)
+	# 이름은 칸 가운데에 그리되 칸 너비에 영향 없음 (긴 이름은 양옆으로 살짝 넘침) → 칸 너비 고정 = 아이콘 사이 간격 모두 같음
 	var l := _label(text, 13, col, true)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.custom_minimum_size.x = ICON_CELL   # 칸 너비 고정 → 글자 길이와 상관없이 아이콘 사이 간격이 모두 같음
-	box.add_child(l)
+	var lh := Control.new()
+	lh.mouse_filter = MOUSE_FILTER_IGNORE
+	lh.custom_minimum_size = Vector2(ICON_CELL, l.get_combined_minimum_size().y)
+	l.set_anchors_preset(PRESET_CENTER_TOP)
+	l.grow_horizontal = GROW_DIRECTION_BOTH
+	lh.add_child(l)
+	box.custom_minimum_size.x = ICON_CELL
+	box.add_child(lh)
 	return box
 
 
