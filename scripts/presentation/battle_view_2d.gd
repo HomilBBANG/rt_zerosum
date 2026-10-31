@@ -177,7 +177,7 @@ func _camera_changed() -> void:
 	_rerender_bg()
 
 
-var back_bars: Node2D   # 발밑 체력 칸 층: 캐릭터·하이라이트 링보다 위 (월드 안 제일 위)
+var bar_nodes: Dictionary = {}   # 유닛 id → 그 유닛의 체력 · AP 칸 · 상태 배지 (그 유닛 바로 위 z — 앞줄 캐릭터에는 가려짐)
 @onready var markers_root: Node2D = $World/Markers
 @onready var clear_rect: ColorRect = $Clear
 
@@ -275,11 +275,6 @@ func _ready() -> void:
 	set_camera(_camera_dict())
 	_make_3d_background()
 	_make_camera()
-	back_bars = Node2D.new()
-	back_bars.name = "BackBars"
-	back_bars.z_index = 100   # 캐릭터·하이라이트 링보다 위 (제일 위)
-	world.add_child(back_bars)
-	back_bars.draw.connect(_draw_back_bars)
 	_cam_live = true
 
 
@@ -410,8 +405,8 @@ var _last_view := Vector3(-1, -1, -1)
 
 
 func _process(delta: float) -> void:
-	if back_bars != null:
-		back_bars.queue_redraw()   # 이동 트윈·피해 반영
+	for bid in bar_nodes:
+		(bar_nodes[bid] as Node2D).queue_redraw()   # 이동 트윈·피해 반영
 	_apply_camera(delta)
 	# 2D 카메라가 움직이거나 줌이 바뀌면 3D 배경 카메라를 맞추고 다시 렌더
 	if bg3d == null or bcam == null:
@@ -445,10 +440,22 @@ func relight() -> void:
 	_rerender_bg()
 
 
+## 앞뒤 순서: 줄(index)이 앞일수록 위. 쓰러진 캐릭터는 살아 있는 캐릭터보다 뒤. 체력 칸은 그 유닛 바로 위 (다른 캐릭터 위로 올라오지 않음)
 func _sort_units() -> void:
 	for id in sprites:
 		var s: UnitSprite2D = sprites[id]
-		s.z_index = 10 + s.unit.index * 2
+		s.z_index = (10 if s.unit.alive else 4) + s.unit.index * 2
+		_bar_node(id).z_index = s.z_index + 1
+
+
+func _bar_node(id: int) -> Node2D:
+	if not bar_nodes.has(id):
+		var n := Node2D.new()
+		n.name = "Bars%d" % id
+		world.add_child(n)
+		n.draw.connect(func(): _draw_unit_bars(id, n))
+		bar_nodes[id] = n
+	return bar_nodes[id]
 
 
 func sprite_of(unit: UnitRuntime) -> UnitSprite2D:
@@ -462,7 +469,7 @@ func get_unit_screen_pos(unit: UnitRuntime) -> Vector2:
 	return world.get_global_transform_with_canvas() * (s.position + s.head_screen_offset() * s.scale.y)
 
 
-## 발밑 체력 칸: 월드 안에서 제일 위 층에 그려 하이라이트 링·캐릭터에 가리지 않는다.
+## 발밑 체력 칸: 유닛마다 그 유닛 바로 위 층 (자기 하이라이트 링 · 몸 위, 앞줄 캐릭터 아래)
 func draws_back_bars() -> bool:
 	return true
 
@@ -478,9 +485,9 @@ const AP_COLOR := Color(0.25, 0.6, 1.0)
 const AP_EMPTY := Color(0.04, 0.1, 0.25, 0.7)
 
 
-func _draw_back_bars() -> void:
-	for id in sprites:
-		var s: UnitSprite2D = sprites[id]
+func _draw_unit_bars(id: int, c: CanvasItem) -> void:
+	var s: UnitSprite2D = sprites.get(id, null)
+	if s != null:
 		var u: UnitRuntime = s.unit
 		var k := s.scale.y
 		var a := 1.0 if u.alive else 0.35
@@ -488,17 +495,17 @@ func _draw_back_bars() -> void:
 		var y := s.position.y + 17.0 * k
 		var n := HP_SEGMENTS_ALLY if u.team == "ally" else HP_SEGMENTS_ENEMY
 		var hp_frac := clampf(float(u.hp) / float(maxi(u.data.max_hp, 1)), 0.0, 1.0)
-		_draw_segments(s.position.x, y, n, (15.0 if n <= 3 else 8.0) * k, h, 3.0 * k, hp_frac * n, HP_COLOR, HP_EMPTY, a)
+		_draw_segments(c, s.position.x, y, n, (15.0 if n <= 3 else 8.0) * k, h, 3.0 * k, hp_frac * n, HP_COLOR, HP_EMPTY, a)
 		if u.alive:
 			var ah := maxf(4.0, 5.0 * k)
-			_draw_segments(s.position.x, y + h + 3.0 * k, u.data.max_ap, 7.0 * k, ah, 2.5 * k, float(u.ap), AP_COLOR, AP_EMPTY, a)
+			_draw_segments(c, s.position.x, y + h + 3.0 * k, u.data.max_ap, 7.0 * k, ah, 2.5 * k, float(u.ap), AP_COLOR, AP_EMPTY, a)
 			var head := s.position + s.head_screen_offset() * s.scale.y
-			_draw_status_badges(u, head.x, head.y - 30.0 * k, k)
+			_draw_status_badges(c, u, head.x, head.y - 30.0 * k, k)
 
 
 ## 머리 위 전투 상태 이상 배지: 한 글자 + 남은 턴 (출혈 = 혈2, 동상은 터지기까지 남은 차례)
 var _badge_font: Font
-func _draw_status_badges(u: UnitRuntime, cx: float, y: float, k: float) -> void:
+func _draw_status_badges(c: CanvasItem, u: UnitRuntime, cx: float, y: float, k: float) -> void:
 	var list := u.statuses.filter(func(sid): return StatusCatalog.get_def(sid).get("battle", false))
 	if list.is_empty():
 		return
@@ -518,22 +525,22 @@ func _draw_status_badges(u: UnitRuntime, cx: float, y: float, k: float) -> void:
 		sb.border_color = col
 		sb.set_border_width_all(maxi(1, roundi(1.5 * k)))
 		sb.set_corner_radius_all(roundi(4 * k))
-		back_bars.draw_style_box(sb, r)
+		c.draw_style_box(sb, r)
 		var t := "%s%d" % [StatusCatalog.get_def(sid).get("short", "?"), u.status_turns(sid)]
-		back_bars.draw_string(_badge_font, Vector2(r.position.x, r.position.y + hgt * 0.5 + fs * 0.36), t, HORIZONTAL_ALIGNMENT_CENTER, w, fs, Color.WHITE)
+		c.draw_string(_badge_font, Vector2(r.position.x, r.position.y + hgt * 0.5 + fs * 0.36), t, HORIZONTAL_ALIGNMENT_CENTER, w, fs, Color.WHITE)
 
 
 ## 가운데 cx 에 n 칸, filled 칸만큼 채움 (소수면 마지막 칸 일부)
-func _draw_segments(cx: float, y: float, n: int, seg_w: float, h: float, gap: float, filled: float, col: Color, empty: Color, a: float) -> void:
+func _draw_segments(c: CanvasItem, cx: float, y: float, n: int, seg_w: float, h: float, gap: float, filled: float, col: Color, empty: Color, a: float) -> void:
 	var skew := h * 0.6   # 윗변을 오른쪽으로 밀어 기울임
 	var total := n * seg_w + (n - 1) * gap + skew
 	var x0 := cx - total * 0.5
 	for i in n:
 		var x := x0 + i * (seg_w + gap)
-		back_bars.draw_colored_polygon(_para(x, y, seg_w, h, skew), Color(empty, empty.a * a))
+		c.draw_colored_polygon(_para(x, y, seg_w, h, skew), Color(empty, empty.a * a))
 		var f := clampf(filled - i, 0.0, 1.0)
 		if f > 0.0:
-			back_bars.draw_colored_polygon(_para(x, y, seg_w * f, h, skew), Color(col, a))
+			c.draw_colored_polygon(_para(x, y, seg_w * f, h, skew), Color(col, a))
 
 
 ## 아래변 왼쪽이 (x, y+h) 인 평행사변형
@@ -723,3 +730,4 @@ func _on_unit_died(unit: UnitRuntime) -> void:
 	var s := sprite_of(unit)
 	if s:
 		s.play_death()
+		_sort_units()   # 쓰러진 캐릭터는 살아 있는 캐릭터 뒤로

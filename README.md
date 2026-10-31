@@ -364,6 +364,11 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![AU군 병사 — 배치 · 권총 사격 · 쓰러짐(늑대는 탐)](docs/screenshots/army_m_battle.jpg)
 ![AU군 거한 배치 · 베기 · 모두 쓰러짐(그림자 위)](docs/screenshots/bigman_battle.jpg)
+
+- **체력 · AP 칸 · 상태 배지**: 유닛마다 그 유닛 바로 위 층에 그림 → 앞줄 캐릭터에 가려지고 다른 캐릭터 위로 올라오지 않음 (예전엔 모든 칸을 맨 위 한 층에).
+- **쓰러진 몸 자리**: 쓰러지면 살아 있는 캐릭터 뒤 층으로, 조금 뒤(화면 위 · 자기 편 뒤쪽)로 물러나 눕고 가운데 열은 한 번 더 뒤로 → 같은 줄 앞 · 가운데 · 뒤가 모두 쓰러져도 겹치지 않음 (`UnitSprite2D` DEAD_BACK · DEAD_STAGGER · DEAD_SIDE).
+
+![체력 칸 층 · 쓰러진 몸 자리](docs/screenshots/battle_bars_dead_layout.jpg)
 ![AU군 병사 포즈 크기 비교](docs/screenshots/army_m_poses.png)
 ![몬스터 사망 — 불에 타 사라짐 (0.6 · 1.3 · 2.0 · 2.9초)](docs/screenshots/monster_burn_death.jpg)
 

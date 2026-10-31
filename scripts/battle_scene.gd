@@ -145,6 +145,7 @@ func _run_cli() -> void:
 					if bs.unit.team != "ally" or all_die:
 						bs.unit.alive = false
 						bs.play_death()
+				view._sort_units()
 				await get_tree().create_timer(float(auto.get_slice(":", 1)) if auto.get_slice_count(":") > 1 else 1.0).timeout
 				break
 			if auto == "tired":

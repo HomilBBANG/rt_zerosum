@@ -443,6 +443,21 @@ func set_tired(on: bool) -> void:
 	rest_pose = "tired" if on and unit.alive and has_pose("tired") else ""
 
 
+## 쓰러진 몸 자리: 누운 몸은 옆 칸까지 길어 겹치므로 조금 뒤(화면 위 · 자기 편 뒤쪽)로 물러나 눕고,
+## 가운데 열(row 1)은 몸 두께만큼 더 뒤로 → 앞 · 가운데 · 뒤 열이 모두 쓰러져도 서로 겹치지 않음
+const DEAD_BACK := 0.07      # 키 대비 뒤(화면 위)로
+const DEAD_STAGGER := 0.22   # 가운데 열이 더 물러나는 양 (누운 몸 두께보다 조금 더)
+const DEAD_SIDE := 0.10      # 자기 편 뒤쪽(아군 = 왼쪽)으로
+
+
+func _lie_back() -> void:
+	var k := scale.y
+	var up := chr_height * (DEAD_BACK + (DEAD_STAGGER if unit.row == 1 else 0.0)) * k
+	var side := chr_height * DEAD_SIDE * k * (-1.0 if unit.team == "ally" else 1.0)
+	var tw := create_tween()
+	tw.tween_property(self, "position", position + Vector2(side, -up), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
 ## 몬스터 = 적 중 분류(몬스터 시트 '분류')가 '인간'이 아닌 것 — 인간 적군은 아군처럼 쓰러진 그림(dead)으로 죽음
 func is_monster() -> bool:
 	return unit.team != "ally" and str(unit.data.role) != "인간"
@@ -509,9 +524,10 @@ func play_death() -> void:
 		return
 	if has_pose("dead"):   # 쓰러진 그림으로 바꿈 (회색 처리 · 쓰러지는 회전 없음)
 		_stop_pose()
+		rest_pose = ""
 		chr.play("dead")
-		z_index = 5
 		set_highlight("none")
+		_lie_back()
 		return
 	if chr != null and chr.has_anim("death"):
 		chr.play("death")
