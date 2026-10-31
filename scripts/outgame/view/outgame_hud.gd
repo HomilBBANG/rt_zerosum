@@ -141,6 +141,20 @@ func _hbox(sep: int = 8) -> HBoxContainer:
 	return h
 
 
+## 세로 가운데 정렬된 줄 안에서 글자를 dy 만큼 아래로 (위 여백 2·dy → 가운데 맞춤이 그 절반만큼 내림)
+func _nudge_label(l: Label, dy: float) -> void:
+	var sb := StyleBoxEmpty.new()
+	sb.content_margin_top = dy * 2.0
+	l.add_theme_stylebox_override("normal", sb)
+
+
+func _nudge_spacer(h: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size.y = h
+	c.mouse_filter = MOUSE_FILTER_IGNORE
+	return c
+
+
 func _vbox(sep: int = 6) -> VBoxContainer:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", sep)
@@ -168,20 +182,23 @@ func _build_top() -> void:
 	# 왼쪽 위: UI 패키지 v2 두 줄 패널 (윗줄 = 달력 · 날짜 · 속도 버튼, 아랫줄 = 지폐 · 잔액 | 미지급 | 결산 D-day)
 	var left := PanelContainer.new()
 	var em := StyleBoxEmpty.new()
+	# 위아래 = 패널 그림의 두 안쪽 칸에 맞춤 (그림 189px 중 윗칸 24~97 · 아랫칸 105~164, TOP_K 배율) → 줄마다 칸 가운데, 위아래 대칭
 	em.content_margin_left = 28
 	em.content_margin_right = 30
-	em.content_margin_top = 16
-	em.content_margin_bottom = 17
+	em.content_margin_top = 24.0 * TOP_K
+	em.content_margin_bottom = (189.0 - 24.0 - (97.0 - 24.0) - (164.0 - 105.0)) * TOP_K - 4.0   # 패널 높이 = 그림 높이 (189 × TOP_K)
 	left.add_theme_stylebox_override("panel", em)
 	left.position = Vector2(6, 6)
 	left.mouse_filter = MOUSE_FILTER_IGNORE
 	_top_left = left
 	_nine_bg_lrtb(left, load(V2 + "panel_date.png"), 60, 60, 95, 94, TOP_K)   # 양 끝 볼트는 그대로, 가로로만 늘림 (레퍼런스처럼 조금 크게 — 글자가 안쪽 칸에 들어가게)
 	add_child(left)
-	var lv := _vbox(13)
+	var lv := _vbox(4)   # 두 칸 사이 (그림 97~105 ≈ 4.5px)
 	left.add_child(lv)
 	var row := _hbox(8)
+	row.custom_minimum_size.y = (97.0 - 24.0) * TOP_K   # 윗칸 높이 — 안의 것은 모두 세로 가운데
 	lv.add_child(row)
+	row.add_child(_spacer_w(13))   # 달력 = 아랫줄 지폐 그림(48px)과 가운데 맞춤 (13 = (48 - 22) / 2)
 	var cal := TextureRect.new()
 	cal.texture = load(V2 + "glyph_calendar.png")
 	cal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -189,8 +206,11 @@ func _build_top() -> void:
 	cal.custom_minimum_size = Vector2(22, 24)
 	cal.size_flags_vertical = SIZE_SHRINK_CENTER
 	cal.mouse_filter = MOUSE_FILTER_IGNORE
-	row.add_child(cal)
-	row.add_child(_spacer_w(6))   # 날짜를 달력 그림에서 조금 오른쪽으로
+	var cal_box := _vbox(0)   # 달력 그림을 1px 아래로 (칸 가운데에 눈으로 맞춤)
+	cal_box.add_child(_nudge_spacer(2.0))
+	cal_box.add_child(cal)
+	row.add_child(cal_box)
+	row.add_child(_spacer_w(7))   # 날짜 글자 왼쪽 = 아랫줄 잔액 글자 왼쪽 (13 + 22 + 8 + 7 + 8 = 48 + 10)
 	date_label = _label("", 22, Color(1, 1, 1))
 	date_label.add_theme_font_override("font", _tnum(bold))   # 시간이 흘러도 폭이 같음 (예전: 숫자마다 폭이 달라 패널이 점점 늘어남)
 	row.add_child(date_label)
@@ -229,6 +249,7 @@ func _build_top() -> void:
 		row.add_child(b)
 		speed_buttons.append(b)
 	var r2 := _hbox(10)
+	r2.custom_minimum_size.y = (164.0 - 105.0) * TOP_K   # 아랫칸 높이
 	lv.add_child(r2)
 	var money := TextureRect.new()
 	money.texture = load(V2 + "money.png")
@@ -244,6 +265,12 @@ func _build_top() -> void:
 	info_label = _label("", 15, Color(0.88, 0.9, 0.86))
 	info_label.add_theme_font_override("font", _tnum(font))
 	r2.add_child(info_label)
+	for rr in [row, r2]:
+		for ch in rr.get_children():
+			(ch as Control).size_flags_vertical = SIZE_SHRINK_CENTER
+	# 숫자 글자는 줄 상자 위쪽에 붙어 보여서 칸 가운데로 살짝 내림 (스크린샷에서 잰 값)
+	_nudge_label(date_label, 1.0)
+	_nudge_label(cash_label, 1.5)
 
 	var right := _hbox(4)
 	# 아이콘 줄 뒤 패널 (사용자 제공 팔각 띠, 원본 art_src/ui/icon_bar_panel.webp) — 왼쪽 날짜 패널과 같은 높이
