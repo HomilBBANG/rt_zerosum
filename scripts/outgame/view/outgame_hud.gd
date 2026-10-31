@@ -2033,7 +2033,7 @@ func open_character(npc_id: String, tab: String = "info") -> void:
 	var combat := sim.is_combatant(n)
 	if not combat:
 		tab = "info"
-	var win := _window("%s — %s" % [n.name, "장비" if tab == "equip" else "정보"], 640)
+	var win := _window("%s — %s" % [n.name, "장비" if tab == "equip" else "정보"], 780 if tab == "equip" else 640)
 	var body: VBoxContainer = win.body
 	if combat:
 		var tabs := _hbox(6)
@@ -2098,7 +2098,8 @@ func open_character(npc_id: String, tab: String = "info") -> void:
 
 
 
-## '장비' 탭: 주무기 / 보조 1 / 보조 2 장착 (전투에 반영) + 이 대원이 쓸 수 있는 무기 목록
+## '장비' 탭: 주무기 / 보조 1 / 보조 2 장착 (전투에 반영) — 고를 무기마다 지금 그 칸 무기와 비교(위력 ▲▼ · 사거리 바뀜)
+## + 무기고 보관 무기 목록 (위력 · 사거리)
 func _equip_tab(body: VBoxContainer, n: NpcAgent, npc_id: String) -> void:
 	var row := _hbox(14)
 	body.add_child(row)
@@ -2107,6 +2108,10 @@ func _equip_tab(body: VBoxContainer, n: NpcAgent, npc_id: String) -> void:
 	row.add_child(col)
 	col.add_child(_label("장비 (전투에 반영 · 주무기 / 보조 1 / 보조 2)", 16, Color(1, 0.95, 0.75)))
 	for slot in 3:
+		var cur := {}
+		for it in sim.inventory:
+			if it.owner == n.character_id and int(it.slot) == slot:
+				cur = it
 		var r := _hbox(10)
 		col.add_child(r)
 		var sl := _label(["주무기", "보조 1", "보조 2"][slot], 15)
@@ -2114,16 +2119,18 @@ func _equip_tab(body: VBoxContainer, n: NpcAgent, npc_id: String) -> void:
 		r.add_child(sl)
 		var ob := OptionButton.new()
 		ob.add_theme_font_override("font", font)
-		ob.custom_minimum_size.x = 360
+		ob.custom_minimum_size.x = 330
 		var uids: Array[String] = []
 		if slot > 0:
-			ob.add_item("(비움)")
+			ob.add_item("(비움)%s" % ("" if cur.is_empty() else "   " + _weapon_delta({}, cur)))
 			uids.append("")
 		for it in sim.inventory:
 			if it.owner == "" or it.owner == n.character_id:
-				ob.add_item("%s +%d%s" % [sim.item_name(it.item), it.plus, "" if it.owner == "" else " (장착 중 %d)" % (int(it.slot) + 1)])
+				var mine: bool = it.owner == n.character_id and int(it.slot) == slot
+				var tail := "  (장착 중)" if mine else ("" if it.owner == "" else "  (다른 칸 %d)" % (int(it.slot) + 1))
+				ob.add_item("%s +%d · %s%s%s" % [sim.item_name(it.item), it.plus, _weapon_stat_text(it), "" if mine else "   " + _weapon_delta(it, cur), tail])
 				uids.append(it.uid)
-				if it.owner == n.character_id and int(it.slot) == slot:
+				if mine:
 					ob.select(ob.item_count - 1)
 		ob.item_selected.connect(func(i):
 			var res := sim.equip(n.character_id, slot, uids[i])
@@ -2131,11 +2138,45 @@ func _equip_tab(body: VBoxContainer, n: NpcAgent, npc_id: String) -> void:
 			close_top()
 			open_character(npc_id, "equip"))
 		r.add_child(ob)
-	body.add_child(_label("무기고 보관 무기 — 다른 대원이 장착 중인 무기는 그 대원의 장비 탭에서 빼야 고를 수 있음", 13, Color(0.8, 0.85, 0.92)))
-	var list := _scroll(body, 150)
+		r.add_child(_label("지금: " + (_weapon_stat_text(cur) if not cur.is_empty() else "없음"), 13, Color(0.8, 0.85, 0.92)))
+	var hint := _label("고르는 목록의 ▲▼ = 지금 그 칸 무기보다 위력이 얼마나 오르내리는지 (→ 원거리 · 근접 = 사거리가 바뀜) · 다른 대원이 장착 중인 무기는 그 대원의 장비 탭에서 빼야 고를 수 있음", 13, Color(0.8, 0.85, 0.92))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size.x = 720
+	body.add_child(hint)
+	var list := _scroll(body, 140)
 	for it in sim.inventory:
 		var who := "보관 중" if it.owner == "" else "%s 장착 (%d)" % [_char_name(it.owner), int(it.slot) + 1]
-		list.add_child(_label("%s +%d — %s" % [sim.item_name(it.item), it.plus, who], 14, Color(0.9, 0.92, 0.95) if it.owner == "" or it.owner == n.character_id else Color(0.6, 0.63, 0.7)))
+		list.add_child(_label("%s +%d · %s — %s" % [sim.item_name(it.item), it.plus, _weapon_stat_text(it), who], 14, Color(0.9, 0.92, 0.95) if it.owner == "" or it.owner == n.character_id else Color(0.6, 0.63, 0.7)))
+
+
+## 인벤토리 무기의 전투 수치 {power(강화 포함), ranged}
+func _weapon_stats(it: Dictionary) -> Dictionary:
+	if it.is_empty() or sim.battle == null:
+		return {}
+	var item: Dictionary = sim.battle.items.get(str(it.item), {})
+	if item.is_empty():
+		return {}
+	return {"power": int(item.get("power_bonus", 0)) + int(it.plus) * sim.data.inum("enhance_power_bonus", 1), "ranged": str(item.get("range_type", "")) == "ranged"}
+
+
+func _weapon_stat_text(it: Dictionary) -> String:
+	var st := _weapon_stats(it)
+	if st.is_empty():
+		return "-"
+	return "%s 위력 %+d" % ["원거리" if st.ranged else "근접", int(st.power)]
+
+
+## 고를 무기(it) 와 지금 칸 무기(cur) 비교: 위력 ▲ · ▼ · =, 사거리가 바뀌면 "→ 원거리" 같은 표시
+func _weapon_delta(it: Dictionary, cur: Dictionary) -> String:
+	var a := _weapon_stats(it)
+	var b := _weapon_stats(cur)
+	var pa: int = a.get("power", 0)
+	var pb: int = b.get("power", 0)
+	var d := pa - pb
+	var out := "▲%d" % d if d > 0 else ("▼%d" % -d if d < 0 else "＝")
+	if not a.is_empty() and not b.is_empty() and a.ranged != b.ranged:
+		out += " · → %s" % ("원거리" if a.ranged else "근접")
+	return out
 
 # ---------------------------------------------------------------- 세계관 도감 (data/codex.json · 탭: 등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경)
 const CODEX_COL := {"characters": Color(0.55, 0.8, 1.0), "monsters": Color(1.0, 0.5, 0.4), "statuses": Color(0.85, 0.6, 1.0), "gods": Color(1.0, 0.85, 0.45), "cities": Color(0.5, 0.95, 0.7), "facilities": Color(0.95, 0.75, 0.5)}
