@@ -830,7 +830,6 @@ const SLOT_GAP := 18.0
 const WEAPON_W := 46.0      # 무기 칸: 세로로 긴 판 (전투 UI v2)
 const WEAPON_H := 96.0      # 무기 칸 높이 — 이름은 아래 틀 띠 위 (레퍼런스처럼)
 const WEAPON_SEP := 3       # 무기 사이 간격
-const CAP_H := 16.0
 
 
 func _refresh_panel() -> void:
@@ -993,7 +992,7 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
 	box.custom_minimum_size.x = bsize.x + (1.0 if is_weapon else 4.0)   # 무기 칸 가로 간격 좁게
-	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN   # 판 윗변을 모두 같은 높이에 (무기 판이 길어 이름이 아래 틀 띠 위로 — 레퍼런스처럼)
+	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER   # 무기 판 · 정사각형 판 모두 아래 틀 안쪽 세로 가운데 (위아래 대칭)
 	var btn := Button.new()
 	btn.custom_minimum_size = bsize
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -1051,13 +1050,8 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	if tip != "":
 		btn.mouse_entered.connect(_show_slot_tip.bind(btn, tip))
 		btn.mouse_exited.connect(func(): slot_tip.visible = false)
-	var cap := _label(d.get("caption", ""), 11 if is_weapon else 12, Color(0.9, 0.9, 0.92) if usable else Color(0.55, 0.55, 0.58))
-	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cap.clip_text = true
-	cap.custom_minimum_size = Vector2(0, CAP_H)
-	# 버튼 + 이름을 한 덩어리로 패널 세로 가운데 (위/아래 대칭)
+	# 이름 글자는 빼고(이름 · 설명은 마우스를 올리면 말풍선), 판만 아래 틀 안쪽 세로 가운데
 	box.add_child(btn)
-	box.add_child(cap)
 	parent.add_child(box)
 
 

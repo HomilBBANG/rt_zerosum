@@ -306,7 +306,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - UI 그림은 2560×1440 창에서 1:1 이 되게 2배 해상도로 만들고 반으로 줄여 그림 (게임 기준 1280×720).
 - **UI 공용 패널** = `assets/ui/panel.png` (원본 `art_src/ui/panel.webp`, 어두운 판 · 올리브 테두리 · 팔각 모서리): 기지의 모든 창(납품 · 대화 · 원장 · 의뢰 · 도감 등) · 대원 카드 · 기록 · 확대 버튼, 전투 기록. (전투 하단 명령 패널 · 상태 이상 창은 아래 전투 UI v2) 모서리 · 테두리는 그대로, 가운데만 늘림. 코드 `scripts/ui/ui_panel.gd` (`UiPanel.apply(패널, 안쪽 여백)`) — 새 패널도 이걸로.
 
-- **전투 UI v2** (사용자 제공 `art_src/ui/battle_ui_package.webp` + 레퍼런스 `art_src/ui/ref_battle_v2.webp` → 조각 `assets/ui/battle/v2/`): 위 = 어두운 띠(`top_bar`, 왼쪽 라운드 · 가운데 행동 순서 · 오른쪽 기록 버튼 = 작은 판), 아래 = 틀(`bottom_shell` — 원본 하단 바에서 안쪽 칸을 지운 것, 칸막이 두 개를 이름 칸 오른쪽 · 상태 이상 창 왼쪽에 맞춰 7조각으로 늘림). 초상화 = 큰 사각 테두리, 무기 = 세로 판(장착 중 = 금색 판), 자리 이동 · 스킬 · 필살기 = 정사각형 판(선택 중 = 금색 테두리), 상태 이상 = 넓은 판, 턴 종료 = 붉은 판. 슬롯 줄 · 행동 순서는 틀 · 띠 안쪽 세로 가운데. 9칸 늘리기 공용 `scripts/ui/ui_nine.gd` (`UiNine.draw` · `UiNine.behind`). 위치는 `scenes/battle_hud.tscn`(에디터 편집), 그림은 `battle_hud.gd` `_apply_v2_art`.
+- **전투 UI v2** (사용자 제공 `art_src/ui/battle_ui_package.webp` + 레퍼런스 `art_src/ui/ref_battle_v2.webp` → 조각 `assets/ui/battle/v2/`): 위 = 어두운 띠(`top_bar`, 왼쪽 라운드 · 가운데 행동 순서 · 오른쪽 기록 버튼 = 작은 판), 아래 = 틀(`bottom_shell` — 원본 하단 바에서 안쪽 칸을 지운 것, 칸막이 두 개를 이름 칸 오른쪽 · 상태 이상 창 왼쪽에 맞춰 7조각으로 늘림). 초상화 = 큰 사각 테두리, 무기 = 세로 판(장착 중 = 금색 판), 자리 이동 · 스킬 · 필살기 = 정사각형 판(선택 중 = 금색 테두리), 상태 이상 = 넓은 판, 턴 종료 = 붉은 판. 슬롯 아래 이름 글자 없음(마우스 올리면 말풍선), 슬롯 줄 · 행동 순서는 틀 · 띠 안쪽 세로 가운데. 9칸 늘리기 공용 `scripts/ui/ui_nine.gd` (`UiNine.draw` · `UiNine.behind`). 위치는 `scenes/battle_hud.tscn`(에디터 편집), 그림은 `battle_hud.gd` `_apply_v2_art`.
 
 ![전투 UI v2](docs/screenshots/battle_ui_v2.jpg)
 
