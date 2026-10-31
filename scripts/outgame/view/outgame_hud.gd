@@ -227,9 +227,20 @@ func _build_top() -> void:
 	r2.add_child(info_label)
 
 	var right := _hbox(4)
-	_top_right = right
-	right.position = Vector2(0, 6)
-	add_child(right)
+	# 아이콘 줄 뒤 패널 (사용자 제공 팔각 띠, 원본 art_src/ui/icon_bar_panel.webp) — 왼쪽 날짜 패널과 같은 높이
+	var rp := PanelContainer.new()
+	var rem := StyleBoxEmpty.new()
+	rem.content_margin_left = 12
+	rem.content_margin_right = 12
+	rem.content_margin_top = 9
+	rem.content_margin_bottom = 9
+	rp.add_theme_stylebox_override("panel", rem)
+	rp.mouse_filter = MOUSE_FILTER_IGNORE
+	_nine_bg_lrtb(rp, load(V2 + "panel_iconbar.png"), 34, 34, 34, 34)
+	rp.add_child(right)
+	_top_right = rp
+	rp.position = Vector2(0, 6)
+	add_child(rp)
 	# 오른쪽 위 아이콘 (UI 패키지 v2 타일 — 전투 출전만 주황 타일)
 	var specs := [["스킬", "skill", null, func(): open_skills("")], ["도감", "codex", null, func(): open_codex()], ["퀘스트", "quest", null, func(): open_quests()],
 		["의뢰", "contract", null, func(): open_contracts("")], ["무기고", "armory", null, func(): open_armory()], ["인벤토리", "inventory", null, func(): open_inventory()], ["납품", "supply", GOLD, func(): open_supply()], ["원장", "ledger", null, func(): open_ledger()],
@@ -237,8 +248,10 @@ func _build_top() -> void:
 		["타이틀", "title", null, func(): hub.to_title()]]
 	for s in specs:
 		right.add_child(_icon_button(s[0], s[1], s[2] if s[2] != null else Color(0.92, 0.91, 0.86), s[3]))
-	right.position.x = 1280 - 10 - right.get_combined_minimum_size().x
-	right.resized.connect(func(): right.position.x = 1280 - 10 - right.size.x)
+	rp.position.x = 1280 - 6 - rp.get_combined_minimum_size().x
+	rp.custom_minimum_size.y = 92   # 날짜 패널과 같은 높이
+	rp.resized.connect(func(): rp.position.x = 1280 - 6 - rp.size.x)
+	right.alignment = BoxContainer.ALIGNMENT_CENTER
 
 
 ## 날짜 바가 오른쪽 아이콘 버튼에 닿으면 정보 줄 글자를 줄임 (14 → 12 → 11), 넉넉하면 다시 14
