@@ -77,6 +77,14 @@ func setup(p_hub: Node, p_sim: BaseSim) -> void:
 
 
 # ================================================================ 공통 위젯
+## 숫자 폭이 모두 같은 글꼴 (Pretendard tnum) — 시계 · 돈처럼 매번 바뀌는 숫자가 패널 폭을 흔들지 않게
+func _tnum(base: Font) -> FontVariation:
+	var v := FontVariation.new()
+	v.base_font = base
+	v.opentype_features = {TextServerManager.get_primary_interface().name_to_tag("tnum"): 1}
+	return v
+
+
 func _label(text: String, size: int, col: Color = Color(1, 1, 1), outline: bool = false) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -182,7 +190,9 @@ func _build_top() -> void:
 	cal.size_flags_vertical = SIZE_SHRINK_CENTER
 	cal.mouse_filter = MOUSE_FILTER_IGNORE
 	row.add_child(cal)
+	row.add_child(_spacer_w(6))   # 날짜를 달력 그림에서 조금 오른쪽으로
 	date_label = _label("", 22, Color(1, 1, 1))
+	date_label.add_theme_font_override("font", _tnum(bold))   # 시간이 흘러도 폭이 같음 (예전: 숫자마다 폭이 달라 패널이 점점 늘어남)
 	row.add_child(date_label)
 	row.add_child(_spacer_w(10))
 	# 속도 버튼 (UI 패키지 v2): 어두운 정사각형, 지금 속도 = 초록. 정지 ■ · 1배 ▶ · 4x · 16x
@@ -228,9 +238,11 @@ func _build_top() -> void:
 	money.mouse_filter = MOUSE_FILTER_IGNORE
 	r2.add_child(money)
 	cash_label = _label("", 22, GOLD)
+	cash_label.add_theme_font_override("font", _tnum(bold))
 	r2.add_child(cash_label)
 	r2.add_child(_label("|", 16, Color(0.45, 0.47, 0.4)))
 	info_label = _label("", 15, Color(0.88, 0.9, 0.86))
+	info_label.add_theme_font_override("font", _tnum(font))
 	r2.add_child(info_label)
 
 	var right := _hbox(4)
@@ -765,7 +777,10 @@ func refresh(delta: float) -> void:
 		if sb.texture_normal != want:
 			sb.texture_normal = want   # 지금 속도 = 초록 버튼
 		sb.modulate = Color(1.18, 1.18, 1.14) if hov and not on else Color.WHITE
-	cash_label.text = "%d" % sim.ledger.cash   # 지폐 그림이 $ 표시
+	var cash := "%d" % sim.ledger.cash   # 지폐 그림이 $ 표시
+	if cash != cash_label.text:
+		cash_label.text = cash
+		_fit_top.call_deferred()   # 자릿수가 줄면 패널도 다시 줄임
 	_update_battle_bar()
 	_place_music()
 	_place_top_band()
