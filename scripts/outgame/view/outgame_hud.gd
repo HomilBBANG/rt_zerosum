@@ -337,6 +337,8 @@ func _build_log() -> void:
 	log_label.position = Vector2(26, LOG_TOP)
 	log_label.size = Vector2(LOG_W - 80, text_h)
 	log_label.scroll_following = true
+	log_label.autowrap_mode = TextServer.AUTOWRAP_OFF   # 긴 줄은 패널 안에서 잘림 (다음 줄로 넘어가 칸을 밀지 않게)
+	log_label.clip_contents = true
 	log_label.mouse_filter = MOUSE_FILTER_PASS
 	log_panel.add_child(log_label)
 	var dot := Button.new()   # 오른쪽 위 주황 점 = 접기
@@ -428,8 +430,20 @@ func _build_hint() -> void:
 	var items := ["대원 클릭: 선택 (한 번 더 = 해제)", "우클릭: 대화 · 정보", "방 클릭: 이동", "더블클릭: 뛰기", "도착 후 우클릭: 행동", "Tab: 다음 대원", "Esc: 해제", "F1: 도움말"]
 	var t := _label("   |   ".join(items), 11, Color(0.82, 0.84, 0.8))
 	bar.add_child(t)
+	bar.clip_contents = true
 	add_child(bar)
 	bar.position = Vector2(LOG_W + 18, 720 - 6 - 24)
+	var avail := 1280.0 - bar.position.x - 24.0
+	var sep := "   |   "
+	for fs in [11, 10, 9]:   # 띠 안에 다 들어가게 (구분 간격 → 글자 크기 순으로 줄임)
+		for sp in ["   |   ", "  |  ", " | "]:
+			sep = sp
+			t.text = sep.join(items)
+			t.add_theme_font_size_override("font_size", fs)
+			if t.get_combined_minimum_size().x <= avail:
+				break
+		if t.get_combined_minimum_size().x <= avail:
+			break
 	bar.size = Vector2(1280 - bar.position.x, 24)
 
 

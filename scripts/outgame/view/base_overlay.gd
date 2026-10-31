@@ -77,15 +77,21 @@ func _draw_room(fid: String) -> void:
 			draw_polyline(_closed(q), Color(1, 0.85, 0.3), 3.0)
 			_text(c + Vector2(0, 54 * k), "클릭: 해금", int(15 * k), Color(1, 0.85, 0.3), _font)
 		return
-	# 이름표 (단면 앞 왼쪽 위 — 위층 슬래브에 가리지 않게)
-	var plate_at := q[3] + Vector2(6, 5)
+	_room_frame(q)
+	# 이름표 (테두리 안쪽 왼쪽 위 — 방이 좁으면 글자를 줄이고 잘라 방 밖으로 안 나가게)
+	var plate_at := q[3] + Vector2(7, 11)
 	var label: String = f.name
 	var size := 14
+	var room_w: float = _quad_rect(q).size.x - 14.0
 	var tw := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	_tag(Rect2(plate_at, Vector2(tw + 30, 29)), false)   # 방 이름표 = 어두운 태그
-	draw_string(_font, plate_at + Vector2(15, 20), label, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(0.95, 0.94, 0.9))
+	while tw + 30 > room_w and size > 10:
+		size -= 1
+		tw = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var pw := minf(tw + 30, room_w)
+	_tag(Rect2(plate_at, Vector2(pw, 29)), false)   # 방 이름표 = 어두운 태그
+	draw_string(_font, plate_at + Vector2(15, 20), label, HORIZONTAL_ALIGNMENT_LEFT, pw - 26, size, Color(0.95, 0.94, 0.9))
 	if fid == hover_fid:
-		draw_polyline(_closed(q), Color(1, 1, 1, 0.8), 2.0)
+		draw_polyline(_closed(q), Color(0.45, 1.0, 0.75, 0.95), 3.0)   # 마우스를 올린 방 = 민트 테두리 (레퍼런스)
 	if f.tag == "작업" and not sim.workshop.is_empty():
 		var sp := proj(Vector3(b.x0 + (b.x1 - b.x0) * 0.78, b.y0 + 1.5, BaseView3D.BACK_Z + 0.5))
 		draw_circle(sp, 5 + 4 * (0.5 + 0.5 * sin(_t * 12.0)), Color(1, 0.85, 0.3, 0.9))
@@ -120,6 +126,33 @@ func _draw_floor_labels() -> void:
 
 ## 잠긴 방 앞면을 덮는 패널: 그 방 단면 사각형(조금 안쪽)에 9칸 늘리기 — 둥근 모서리 · 볼트는 그대로, 2배 해상도 그림을 반으로
 static var _lock_sb: StyleBoxTexture
+const LOCK_K := 0.15    # 잠긴 방 패널 그림 배율 (볼트 지름 ≈ 5px)
+const FRAME_K := 0.11   # 방 테두리(ui-room) 그림 배율 (위 띠 ≈ 8px)
+static var _frame_sb: StyleBoxTexture
+
+
+## 열린 방 테두리 (사용자 제공 ui-room, 원본 art_src/ui/room_frame.png): 단면 사각형에 9칸 늘리기, 가운데는 비어 있음
+func _room_frame(q: PackedVector2Array) -> void:
+	if _frame_sb == null:
+		_frame_sb = StyleBoxTexture.new()
+		_frame_sb.texture = load("res://assets/ui/outgame/v2/room_frame.png")
+		_frame_sb.draw_center = false
+		_frame_sb.set_texture_margin(SIDE_LEFT, 110)
+		_frame_sb.set_texture_margin(SIDE_RIGHT, 110)
+		_frame_sb.set_texture_margin(SIDE_TOP, 100)
+		_frame_sb.set_texture_margin(SIDE_BOTTOM, 100)
+	var r := _quad_rect(q)
+	var k := clampf(minf(r.size.x, r.size.y) / 900.0, 0.05, FRAME_K)
+	draw_set_transform(r.position, 0.0, Vector2(k, k))
+	draw_style_box(_frame_sb, Rect2(Vector2.ZERO, r.size / k))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _quad_rect(q: PackedVector2Array) -> Rect2:
+	var r := Rect2(q[0], Vector2.ZERO)
+	for pt in q:
+		r = r.expand(pt)
+	return r
 
 
 func _locked_panel(q: PackedVector2Array) -> void:
@@ -128,11 +161,8 @@ func _locked_panel(q: PackedVector2Array) -> void:
 		_lock_sb.texture = load("res://assets/ui/outgame/v2/panel_locked.png")
 		for side in [SIDE_LEFT, SIDE_RIGHT, SIDE_TOP, SIDE_BOTTOM]:
 			_lock_sb.set_texture_margin(side, 90)
-	var r := Rect2(q[0], Vector2.ZERO)
-	for pt in q:
-		r = r.expand(pt)
-	r = r.grow(-3.0)
-	var k := clampf(minf(r.size.x, r.size.y) / 180.0, 0.25, 0.5)   # 아주 작게 축소했을 때 모서리가 넘치지 않게
+	var r := _quad_rect(q).grow(-3.0)
+	var k := clampf(minf(r.size.x, r.size.y) / 400.0, 0.08, LOCK_K)   # 레퍼런스처럼 볼트 = 작은 점 (아주 작게 축소하면 더 작게)
 	draw_set_transform(r.position, 0.0, Vector2(k, k))
 	draw_style_box(_lock_sb, Rect2(Vector2.ZERO, r.size / k))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
