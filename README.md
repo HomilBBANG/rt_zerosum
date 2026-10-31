@@ -343,7 +343,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![방 빈 곳 우클릭 메뉴](docs/screenshots/outgame_room_menu.jpg)
 ![전투 지침 자세 유지 (AP 1)](docs/screenshots/battle_tired_hold.jpg)
 
-- **기지 UI v2** (사용자 제공 UI 패키지 `art_src/ui/ui_package_v2.webp` + 레퍼런스 `art_src/ui/ref_outgame_v2.webp` → 조각 `assets/ui/outgame/v2/`): 두 줄 날짜 패널 · 상단 뒤 띠(`band_top.png`, 밝기 0.64배) · 새 아이콘 타일(48px, 같은 간격, 뒤에 팔각 띠 패널 = 사용자 제공 타이틀 바 `art_src/ui/icon_bar_panel.webp`, 밝기 0.72배 · 채도 0.55배) · 금색/어두운 층 태그 · 방 이름 패널(`plate_room.png` — 위쪽 밝은 선 · 오른쪽 아래 비스듬히 잘린 판, 원본 `art_src/ui/room_name_panel.webp`) · 운영 기록 패널(머리 탭 · 주황 점 = 접기) · − 100% + · 조작 안내 띠 · ! 동그라미.
+- **기지 UI v2** (사용자 제공 UI 패키지 `art_src/ui/ui_package_v2.webp` + 레퍼런스 `art_src/ui/ref_outgame_v2.webp` → 조각 `assets/ui/outgame/v2/`): 두 줄 날짜 패널 · 상단 뒤 띠(`band_top.png`, 밝기 0.64배) · 새 아이콘 타일(48px, 같은 간격, 뒤에 팔각 띠 패널 = 사용자 제공 타이틀 바 `art_src/ui/icon_bar_panel.webp`, 밝기 0.72배 · 채도 0.55배) · 금색/어두운 층 태그 · 방 이름 패널(`plate_room.png` — 위쪽 밝은 선 · 오른쪽 아래 비스듬히 잘린 판, 원본 `art_src/ui/room_name_panel.webp`) · 운영 기록 패널(머리 탭 · 주황 점 = 접기) · − 100% + · 조작 안내 띠 · ! 동그라미 · 방 사이 칸막이 = 검은 벽(연출만).
 
 ![기지 UI v2](docs/screenshots/outgame_ui_v2.jpg)
 - **잠긴 방** = 볼트 달린 검은 패널(사용자 제공, `assets/ui/outgame/v2/panel_locked.png`, 볼트 작은 점) + 자물쇠 · 해금 비용, 층마다 ui-room 테두리(`room_frame.png`, 위 · 아래 볼트 띠). 최종 시안 = `art_src/ui/ref_outgame_v2.webp`. 확인 `--base_ui=zoom_out`.

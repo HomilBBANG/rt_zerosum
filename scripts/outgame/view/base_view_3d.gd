@@ -249,8 +249,10 @@ func rebuild_room(fid: String) -> void:
 	var floor_m := _mat(Color(0.55, 0.52, 0.50), light)
 	# 뒷벽 · 칸막이 · 바닥 · 천장
 	_box(n, Vector3(w, h, 0.3), Vector3(cx, y0 + h * 0.5, BACK_Z - 0.15), wall)
-	_box(n, Vector3(WALL, h, FRONT_Z - BACK_Z), Vector3(b.x0 + WALL * 0.5, y0 + h * 0.5, (FRONT_Z + BACK_Z) * 0.5), _mat(wall_col.darkened(0.15), light))
-	_box(n, Vector3(WALL, h, FRONT_Z - BACK_Z), Vector3(b.x1 - WALL * 0.5, y0 + h * 0.5, (FRONT_Z + BACK_Z) * 0.5), _mat(wall_col.darkened(0.15), light))
+	# 방과 방 사이 칸막이 = 검은 벽 (연출만 — 이동 경로는 그대로 지나감). 빛을 안 받는 단색이라 어느 조명에서도 검정
+	var part := _glow(Color(0.02, 0.02, 0.03))
+	_box(n, Vector3(WALL, h, FRONT_Z - BACK_Z), Vector3(b.x0 + WALL * 0.5, y0 + h * 0.5, (FRONT_Z + BACK_Z) * 0.5), part)
+	_box(n, Vector3(WALL, h, FRONT_Z - BACK_Z), Vector3(b.x1 - WALL * 0.5, y0 + h * 0.5, (FRONT_Z + BACK_Z) * 0.5), part)
 	_floor_box(n, b, y0 + 0.03, 0.06, floor_m, arrival_hole(fid))
 	if not has_flight(fid):   # 계단이 위층으로 뚫고 올라가는 방은 천장 없음
 		_box(n, Vector3(w, 0.1, FRONT_Z - BACK_Z), Vector3(cx, b.y1 - 0.05, (FRONT_Z + BACK_Z) * 0.5), _mat(Color(0.30, 0.30, 0.36), light), false)
