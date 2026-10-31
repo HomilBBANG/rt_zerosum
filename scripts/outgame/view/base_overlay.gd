@@ -81,8 +81,8 @@ func _draw_room(fid: String) -> void:
 	var label: String = f.name
 	var size := 14
 	var tw := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	draw_rect(Rect2(plate_at, Vector2(tw + 14, 22)), Color(0.05, 0.06, 0.09, 0.85))
-	draw_string(_font, plate_at + Vector2(7, 16), label, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(1, 1, 1))
+	_tag(Rect2(plate_at, Vector2(tw + 30, 29)), false)   # 방 이름표 = 어두운 태그
+	draw_string(_font, plate_at + Vector2(15, 20), label, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(0.95, 0.94, 0.9))
 	if fid == hover_fid:
 		draw_polyline(_closed(q), Color(1, 1, 1, 0.8), 2.0)
 	if f.tag == "작업" and not sim.workshop.is_empty():
@@ -96,17 +96,44 @@ func _closed(q: PackedVector2Array) -> PackedVector2Array:
 	return c
 
 
+## 층 표시 (UI 패키지 v2 태그): 지금 보는 층(마우스를 올린 방 · 선택한 대원의 층, 없으면 맨 위 층) = 금색 태그, 나머지 = 어두운 태그
 func _draw_floor_labels() -> void:
 	var bb := v3d.base_bounds()
+	var active := ""
+	if hover_fid != "":
+		active = str(sim.data.facilities[hover_fid].floor)
+	elif hub.selected != "" and sim.npcs.has(hub.selected):
+		active = str(sim.data.facilities.get(sim.npcs[hub.selected].facility, {}).get("floor", ""))
+	elif not sim.data.floors.is_empty():
+		active = str(sim.data.floors[0].id)
 	for f in sim.data.floors:
 		var y0: float = -float(f.order) * BaseView3D.FLOOR_M
 		var at := proj(Vector3(bb.position.x - 0.6, y0 + 0.2, BaseView3D.FRONT_Z + 0.3))
-		var w := _bold.get_string_size(f.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-		var r := Rect2(at - Vector2(w + 18, 24), Vector2(w + 14, 24))
+		var on: bool = str(f.id) == active
+		var w := _bold.get_string_size(f.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+		var r := Rect2(at - Vector2(w + 38, 34), Vector2(w + 38, 34))
 		r.position.x = maxf(r.position.x, 8.0)   # 축소해도 화면 밖으로 안 나가게
-		draw_rect(r, Color(0.95, 0.85, 0.2))
-		draw_rect(r, OUTLINE, false, 2.0)
-		draw_string(_bold, r.position + Vector2(7, 18), f.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, OUTLINE)
+		_tag(r, on)
+		draw_string(_bold, r.position + Vector2(19, 24), f.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, OUTLINE if on else Color(0.95, 0.94, 0.9))
+
+
+## UI 패키지 v2 태그 (금색 / 어두운 팔각 띠) — 2배 해상도 그림을 반으로, 9칸 늘리기
+static var _tag_sb := {}
+
+
+func _tag(r: Rect2, gold: bool) -> void:
+	var key := "gold" if gold else "dark"
+	if not _tag_sb.has(key):
+		var sb := StyleBoxTexture.new()
+		sb.texture = load("res://assets/ui/outgame/v2/tag_%s.png" % key)
+		for side in [SIDE_LEFT, SIDE_RIGHT]:
+			sb.set_texture_margin(side, 24)
+		for side in [SIDE_TOP, SIDE_BOTTOM]:
+			sb.set_texture_margin(side, 22)
+		_tag_sb[key] = sb
+	draw_set_transform(r.position, 0.0, Vector2(0.5, 0.5))
+	draw_style_box(_tag_sb[key], Rect2(Vector2.ZERO, r.size * 2.0))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_lock(c: Vector2, k: float) -> void:

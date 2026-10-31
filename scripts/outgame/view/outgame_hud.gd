@@ -26,7 +26,7 @@ var info_label: Label
 var speed_buttons: Array[BaseButton] = []
 var toast: Label
 var banner: Label
-var log_panel: PanelContainer
+var log_panel: Control
 var log_label: RichTextLabel
 var debug_panel: PanelContainer
 var debug_label: Label
@@ -141,45 +141,66 @@ func _vbox(sep: int = 6) -> VBoxContainer:
 
 # ================================================================ 위쪽 바
 const UI_DIR := "res://assets/ui/outgame/"
+const V2 := "res://assets/ui/outgame/v2/"   # UI 패키지 v2 (원본 art_src/ui/ui_package_v2.webp, 레퍼런스 art_src/ui/ref_outgame_v2.webp)
+var _speed_tex: Texture2D = preload("res://assets/ui/outgame/v2/btn_blank.png")
+var _speed_tex_on: Texture2D = preload("res://assets/ui/outgame/v2/btn_blank_on.png")
 var _top_left: Control
 var _top_right: Control
 
 
 ## 상단: 왼쪽 = 날짜 바(day_bar 그림) 한 장이 날짜 · 속도 버튼 · 돈(지폐 그림) · 정보 줄 전체를 감쌈, 오른쪽 = 아이콘 버튼 (UI 패키지에서 자른 assets/ui/outgame/icons)
 func _build_top() -> void:
+	# 왼쪽 위: UI 패키지 v2 두 줄 패널 (윗줄 = 달력 · 날짜 · 속도 버튼, 아랫줄 = 지폐 · 잔액 | 미지급 | 결산 D-day)
 	var left := PanelContainer.new()
 	var em := StyleBoxEmpty.new()
 	em.content_margin_left = 22
-	em.content_margin_right = 22
-	em.content_margin_top = 9
-	em.content_margin_bottom = 9
+	em.content_margin_right = 20
+	em.content_margin_top = 12
+	em.content_margin_bottom = 10
 	left.add_theme_stylebox_override("panel", em)
-	left.position = Vector2(10, 8)
+	left.position = Vector2(6, 6)
 	left.mouse_filter = MOUSE_FILTER_IGNORE
 	_top_left = left
-	_nine_bg(left, load(UI_DIR + "day_bar.png"), 44, 20)   # 양 끝 팔각 모서리는 그대로, 가운데만 늘림
+	_nine_bg_lrtb(left, load(V2 + "panel_date.png"), 60, 60, 95, 94)   # 양 끝 볼트는 그대로, 가로로만 늘림
 	add_child(left)
-	var lv := _vbox(4)
+	var lv := _vbox(10)
 	left.add_child(lv)
 	var row := _hbox(8)
 	lv.add_child(row)
+	var cal := TextureRect.new()
+	cal.texture = load(V2 + "glyph_calendar.png")
+	cal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cal.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cal.custom_minimum_size = Vector2(22, 24)
+	cal.size_flags_vertical = SIZE_SHRINK_CENTER
+	cal.mouse_filter = MOUSE_FILTER_IGNORE
+	row.add_child(cal)
 	date_label = _label("", 22, Color(1, 1, 1))
 	row.add_child(date_label)
-	row.add_child(_spacer_w(6))
-	# 속도 버튼 그림 (사용자 제공): 정지 = ■, 1배 = ▶, 4 · 16배 = 빈 버튼 + 글자
-	for sp in [[0, "speed_stop", "", "정지"], [1, "speed_play", "", "1배속"], [4, "speed_blank", "4x", "4배속"], [16, "speed_blank", "16x", "16배속"]]:
+	row.add_child(_spacer_w(10))
+	# 속도 버튼 (UI 패키지 v2): 어두운 정사각형, 지금 속도 = 초록. 정지 ■ · 1배 ▶ · 4x · 16x
+	for sp in [[0, "stop", "정지"], [1, "play", "1배속"], [4, "4x", "4배속"], [16, "16x", "16배속"]]:
 		var b := TextureButton.new()
-		b.texture_normal = load(UI_DIR + "%s.png" % sp[1])
+		b.texture_normal = load(V2 + "btn_blank.png")
 		b.ignore_texture_size = true
-		b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-		b.custom_minimum_size = Vector2(34, 34)
+		b.stretch_mode = TextureButton.STRETCH_SCALE
+		b.custom_minimum_size = Vector2(36, 34)
 		b.size_flags_vertical = SIZE_SHRINK_CENTER
 		b.focus_mode = FOCUS_NONE
-		b.tooltip_text = sp[3]
-		if sp[2] != "":
-			var t := _label(sp[2], 13, Color(0.97, 0.97, 0.93), true)
+		b.tooltip_text = sp[2]
+		var mark: String = sp[1]
+		if mark == "stop" or mark == "play":
+			b.draw.connect(func():
+				var c := b.size * 0.5 + Vector2(0, -1)
+				var col := Color(0.93, 0.9, 0.8)
+				if mark == "stop":
+					b.draw_rect(Rect2(c - Vector2(7, 7), Vector2(14, 14)), col)
+				else:
+					b.draw_colored_polygon(PackedVector2Array([c + Vector2(-6, -9), c + Vector2(9, 0), c + Vector2(-6, 9)]), col))
+		else:
+			var t := _label(mark, 14, Color(0.93, 0.9, 0.8))
 			t.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-			t.offset_bottom = -3   # 아래 그림자만큼 위로
+			t.offset_bottom = -2
 			t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			t.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			t.mouse_filter = MOUSE_FILTER_IGNORE
@@ -190,31 +211,32 @@ func _build_top() -> void:
 		b.mouse_exited.connect(func(): b.set_meta("hover", false))
 		row.add_child(b)
 		speed_buttons.append(b)
-	var r2 := _hbox(8)
+	var r2 := _hbox(10)
 	lv.add_child(r2)
 	var money := TextureRect.new()
-	money.texture = load(UI_DIR + "money.png")
+	money.texture = load(V2 + "money.png")
 	money.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	money.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	money.custom_minimum_size = Vector2(52, 24)
+	money.custom_minimum_size = Vector2(48, 26)
 	money.mouse_filter = MOUSE_FILTER_IGNORE
 	r2.add_child(money)
-	cash_label = _label("", 20, GOLD)
+	cash_label = _label("", 22, GOLD)
 	r2.add_child(cash_label)
-	r2.add_child(_label("|", 14, Color(0.4, 0.45, 0.35)))
-	info_label = _label("", 14, Color(0.85, 0.92, 1.0))
+	r2.add_child(_label("|", 16, Color(0.45, 0.47, 0.4)))
+	info_label = _label("", 15, Color(0.88, 0.9, 0.86))
 	r2.add_child(info_label)
 
 	var right := _hbox(4)
 	_top_right = right
 	right.position = Vector2(0, 6)
 	add_child(right)
-	var specs := [["스킬", "skill", null, func(): open_skills("")], ["도감", "codex", null, func(): open_codex()], ["퀘스트", "quest", QUEST_COL, func(): open_quests()],
-		["의뢰", "contract", null, func(): open_contracts("")], ["무기고", "tools", null, func(): open_armory()], ["인벤토리", "scroll", null, func(): open_inventory()], ["납품", "calendar_check", GOLD, func(): open_supply()], ["원장", "ledger", null, func(): open_ledger()],
-		["저장", "bookmark", Color(0.6, 0.95, 0.65), func(): hub.save_now()], ["전투 출전", "sword", Color(1.0, 0.55, 0.35), func(): open_sortie()],
-		["타이틀", "gear", Color(0.7, 0.7, 0.72), func(): hub.to_title()]]
+	# 오른쪽 위 아이콘 (UI 패키지 v2 타일 — 전투 출전만 주황 타일)
+	var specs := [["스킬", "skill", null, func(): open_skills("")], ["도감", "codex", null, func(): open_codex()], ["퀘스트", "quest", null, func(): open_quests()],
+		["의뢰", "contract", null, func(): open_contracts("")], ["무기고", "armory", null, func(): open_armory()], ["인벤토리", "inventory", null, func(): open_inventory()], ["납품", "supply", GOLD, func(): open_supply()], ["원장", "ledger", null, func(): open_ledger()],
+		["저장", "save", null, func(): hub.save_now()], ["전투 출전", "sortie", Color(1.0, 0.5, 0.32), func(): open_sortie()],
+		["타이틀", "title", null, func(): hub.to_title()]]
 	for s in specs:
-		right.add_child(_icon_button(s[0], s[1], s[2] if s[2] != null else Color(0.88, 0.86, 0.76), s[3]))
+		right.add_child(_icon_button(s[0], s[1], s[2] if s[2] != null else Color(0.92, 0.91, 0.86), s[3]))
 	right.position.x = 1280 - 10 - right.get_combined_minimum_size().x
 	right.resized.connect(func(): right.position.x = 1280 - 10 - right.size.x)
 
@@ -246,6 +268,21 @@ func _nine_bg(c: Control, tex: Texture2D, side: int, cap: int) -> void:
 		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE))
 
 
+## _nine_bg 의 좌 · 우 · 위 · 아래 여백을 따로 (그림 픽셀, 2배 해상도 그림을 반으로)
+func _nine_bg_lrtb(c: Control, tex: Texture2D, l: int, r: int, t: int, b: int) -> void:
+	var sb := StyleBoxTexture.new()
+	sb.texture = tex
+	sb.texture_margin_left = l
+	sb.texture_margin_right = r
+	sb.texture_margin_top = t
+	sb.texture_margin_bottom = b
+	c.draw.connect(func():
+		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2(0.5, 0.5))
+		c.draw_style_box(sb, Rect2(Vector2.ZERO, c.size * 2.0))
+		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE))
+	c.queue_redraw()
+
+
 func _spacer_w(w: float) -> Control:
 	var c := Control.new()
 	c.custom_minimum_size.x = w
@@ -258,14 +295,14 @@ func _icon_button(text: String, icon: String, col: Color, cb: Callable) -> Contr
 	var box := _vbox(0)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	var b := TextureButton.new()
-	b.texture_normal = load(UI_DIR + "icons/%s.png" % icon)
+	b.texture_normal = load(V2 + "icon_%s.png" % icon)
 	b.ignore_texture_size = true
 	b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	b.custom_minimum_size = Vector2(42, 42)
+	b.custom_minimum_size = Vector2(44, 44)
 	b.size_flags_horizontal = SIZE_SHRINK_CENTER
 	b.tooltip_text = text
 	b.focus_mode = FOCUS_NONE
-	b.pivot_offset = Vector2(21, 21)
+	b.pivot_offset = Vector2(22, 22)
 	b.mouse_entered.connect(func():
 		b.modulate = Color(1.25, 1.25, 1.2)
 		b.scale = Vector2(1.06, 1.06))
@@ -274,64 +311,126 @@ func _icon_button(text: String, icon: String, col: Color, cb: Callable) -> Contr
 		b.scale = Vector2.ONE)
 	b.pressed.connect(cb)
 	box.add_child(b)
-	var l := _label(text, 12, col, true)
+	var l := _label(text, 13, col, true)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.custom_minimum_size.x = 48
+	l.custom_minimum_size.x = 50
 	box.add_child(l)
 	return box
 
 
-const LOG_LINES := 4
 
 
 func _build_log() -> void:
-	log_panel = PanelContainer.new()
-	UiPanel.apply(log_panel, Vector4(14, 10, 14, 10), 0.9)   # UI 공용 패널
-	# 높이 = 정확히 LOG_LINES 줄 (줄이 반쯤 잘려 보이지 않게) + 화면 아래에 여백
+	# 운영 기록 (UI 패키지 v2 큰 패널: 왼쪽 위 머리 탭 · 오른쪽 스크롤 막대 · 주황 점). 머리 탭 · 주황 점 = 접기
+	log_panel = Control.new()
 	var text_h := ceilf(font.get_height(12)) * LOG_LINES
-	log_panel.custom_minimum_size = Vector2(470, 0)
-	log_panel.position = Vector2(10, 720 - 14 - (text_h + 20))
+	log_panel.size = Vector2(LOG_W, LOG_TOP + text_h + 12)
+	log_panel.position = Vector2(6, 720 - 6 - log_panel.size.y)
 	log_panel.mouse_filter = MOUSE_FILTER_PASS
+	_nine_bg_lrtb(log_panel, load(V2 + "panel_log.png"), 270, 90, 100, 40)
 	add_child(log_panel)
+	log_panel.add_child(_log_head(Vector2(23, 13)))
 	log_label = RichTextLabel.new()
 	log_label.add_theme_font_override("normal_font", font)
 	log_label.add_theme_font_size_override("normal_font_size", 12)
 	log_label.add_theme_constant_override("line_separation", 0)
-	log_label.custom_minimum_size.y = text_h
+	log_label.position = Vector2(26, LOG_TOP)
+	log_label.size = Vector2(LOG_W - 80, text_h)
 	log_label.scroll_following = true
 	log_label.mouse_filter = MOUSE_FILTER_PASS
 	log_panel.add_child(log_label)
-	_build_log_toggle()
-	var hint := _label("대원 클릭: 선택 (한 번 더 = 해제) · 우클릭: 대화 · 정보 · 방 클릭: 이동 · 더블클릭: 뛰기 · 도착 후 우클릭: 행동 · Tab: 다음 대원 · Esc: 해제 · 말풍선: 엿듣기 · F1", 12, Color(0.8, 0.88, 0.95), true)
-	hint.position = Vector2(500, 696)
-	add_child(hint)
-
-
-## 로그창 접기 / 펴기 아이콘 (UI 패키지 schedule — 다른 버튼과 안 겹치는 것): 로그창 오른쪽 위 모서리, 접으면 아이콘만 그 자리에
-var log_toggle: TextureButton
-
-
-func _build_log_toggle() -> void:
-	var b := TextureButton.new()
-	b.texture_normal = load(UI_DIR + "icons/schedule.png")
-	b.ignore_texture_size = true
-	b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	b.custom_minimum_size = Vector2(34, 34)
-	b.size = Vector2(34, 34)
-	b.pivot_offset = Vector2(17, 17)
-	b.focus_mode = FOCUS_NONE
-	b.mouse_entered.connect(func(): b.modulate = Color(1.25, 1.25, 1.2))
-	b.mouse_exited.connect(func(): b.modulate = Color.WHITE)
-	b.pressed.connect(func(): set_log_open(not log_panel.visible))
-	add_child(b)
-	log_toggle = b
+	var dot := Button.new()   # 오른쪽 위 주황 점 = 접기
+	dot.flat = true
+	dot.focus_mode = FOCUS_NONE
+	dot.tooltip_text = "기록 접기"
+	dot.position = Vector2(LOG_W - 40, 18)
+	dot.size = Vector2(26, 26)
+	dot.mouse_default_cursor_shape = CURSOR_POINTING_HAND
+	dot.pressed.connect(func(): set_log_open(false))
+	log_panel.add_child(dot)
+	# 접었을 때: 머리 탭만 (누르면 펴기)
+	log_tab = PanelContainer.new()
+	var em := StyleBoxEmpty.new()
+	em.content_margin_left = 12
+	em.content_margin_right = 14
+	em.content_margin_top = 5
+	em.content_margin_bottom = 6
+	log_tab.add_theme_stylebox_override("panel", em)
+	_nine_bg_lrtb(log_tab, load(V2 + "tag_dark.png"), 24, 24, 22, 22)
+	var th := _hbox(6)
+	log_tab.add_child(th)
+	var g := TextureRect.new()
+	g.texture = load(V2 + "glyph_doc.png")
+	g.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	g.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	g.custom_minimum_size = Vector2(14, 18)
+	g.mouse_filter = MOUSE_FILTER_IGNORE
+	th.add_child(g)
+	th.add_child(_label("운영 기록  ▸", 14, Color(0.92, 0.91, 0.86)))
+	log_tab.mouse_filter = MOUSE_FILTER_STOP
+	log_tab.mouse_default_cursor_shape = CURSOR_POINTING_HAND
+	log_tab.tooltip_text = "기록 펴기"
+	log_tab.gui_input.connect(func(e): if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT: set_log_open(true))
+	add_child(log_tab)
+	_build_hint()
 	set_log_open(true)
+
+
+const LOG_LINES := 2
+const LOG_W := 515.0
+const LOG_TOP := 44.0   # 머리 탭 아래 첫 줄
+var log_tab: PanelContainer
+
+
+## 기록 머리: 문서 아이콘 + "운영 기록" (패널 그림의 머리 탭 위). 누르면 접기
+func _log_head(at: Vector2) -> Control:
+	var h := _hbox(6)
+	h.position = at
+	h.size = Vector2(88, 26)
+	var g := TextureRect.new()
+	g.texture = load(V2 + "glyph_doc.png")
+	g.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	g.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	g.custom_minimum_size = Vector2(15, 20)
+	g.size_flags_vertical = SIZE_SHRINK_CENTER
+	g.mouse_filter = MOUSE_FILTER_IGNORE
+	h.add_child(g)
+	var l := _label("운영 기록", 14, Color(0.92, 0.91, 0.86))
+	l.size_flags_vertical = SIZE_SHRINK_CENTER
+	h.add_child(l)
+	h.mouse_filter = MOUSE_FILTER_STOP
+	h.mouse_default_cursor_shape = CURSOR_POINTING_HAND
+	h.tooltip_text = "기록 접기"
+	h.gui_input.connect(func(e): if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT: set_log_open(false))
+	return h
 
 
 func set_log_open(on: bool) -> void:
 	log_panel.visible = on
-	log_toggle.position = log_panel.position + Vector2(log_panel.get_combined_minimum_size().x - 30, -14)   # 접어도 같은 자리 (층 표시와 안 겹침)
-	log_toggle.tooltip_text = "기록 접기" if on else "기록 펴기"
+	log_tab.visible = not on
+	log_tab.reset_size()
+	log_tab.position = Vector2(6, 720 - 6 - 8 - log_tab.get_combined_minimum_size().y)
+
+
+## 아래 조작 안내 줄 (어두운 띠 · 항목 사이 |)
+func _build_hint() -> void:
+	var bar := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.075, 0.08, 0.075, 0.94)
+	sb.border_color = Color(0.25, 0.27, 0.22)
+	sb.border_width_top = 1
+	sb.content_margin_left = 14
+	sb.content_margin_right = 10
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	bar.add_theme_stylebox_override("panel", sb)
+	bar.mouse_filter = MOUSE_FILTER_IGNORE
+	var items := ["대원 클릭: 선택 (한 번 더 = 해제)", "우클릭: 대화 · 정보", "방 클릭: 이동", "더블클릭: 뛰기", "도착 후 우클릭: 행동", "Tab: 다음 대원", "Esc: 해제", "F1: 도움말"]
+	var t := _label("   |   ".join(items), 11, Color(0.82, 0.84, 0.8))
+	bar.add_child(t)
+	add_child(bar)
+	bar.position = Vector2(LOG_W + 18, 720 - 6 - 24)
+	bar.size = Vector2(1280 - bar.position.x, 24)
 
 
 # ---------------------------------------------------------------- 음악 카세트 (공용실 주크박스를 누르면 화면 왼쪽에)
@@ -339,7 +438,7 @@ func set_log_open(on: bool) -> void:
 var music_panel: Control
 var _music_title: Label
 var _music_no: Label
-const MUSIC_W := 360.0
+const MUSIC_W := 250.0   # 레퍼런스 크기
 
 
 func music_open() -> bool:
@@ -376,15 +475,15 @@ func _build_music() -> void:
 	area.clip_contents = true
 	area.mouse_filter = MOUSE_FILTER_IGNORE
 	cas.add_child(area)
-	_music_title = _label("", 20, Color(0.14, 0.14, 0.16))
+	_music_title = _label("", 15, Color(0.14, 0.14, 0.16))
 	_music_title.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	_music_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_music_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_music_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	area.add_child(_music_title)
-	_music_no = _label("", 11, Color(0.35, 0.35, 0.38))
+	_music_no = _label("", 9, Color(0.35, 0.35, 0.38))
 	_music_no.set_anchors_and_offsets_preset(PRESET_BOTTOM_RIGHT)
-	_music_no.position = area.size - Vector2(34, 15)
+	_music_no.position = area.size - Vector2(26, 12)
 	area.add_child(_music_no)
 	music_panel.add_child(_tri_button(false, "다음 곡", Bgm.next))
 	Bgm.changed_hook.append(_refresh_music)
@@ -400,15 +499,10 @@ func _tri_button(up: bool, tip: String, cb: Callable) -> Control:
 	b.tooltip_text = tip
 	for st in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
 		b.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	var tex: Texture2D = load(V2 + ("tri_up.png" if up else "tri_down.png"))   # UI 패키지 v2 삼각형
 	b.draw.connect(func():
-		var c := b.size * 0.5
-		var hw := 15.0
-		var hh := 9.0
-		var pts := PackedVector2Array([c + Vector2(-hw, hh), c + Vector2(hw, hh), c + Vector2(0, -hh)]) if up else PackedVector2Array([c + Vector2(-hw, -hh), c + Vector2(hw, -hh), c + Vector2(0, hh)])
-		var hov := b.is_hovered()
-		b.draw_colored_polygon(pts, Color(0.95, 0.94, 0.86) if hov else Color(0.78, 0.78, 0.74))
-		pts.append(pts[0])
-		b.draw_polyline(pts, Color(0.06, 0.06, 0.07), 2.0, true))
+		var sz := Vector2(36, 27)
+		b.draw_texture_rect(tex, Rect2((b.size - sz) * 0.5, sz), false, Color(1.15, 1.15, 1.1) if b.is_hovered() else Color.WHITE))
 	b.mouse_entered.connect(b.queue_redraw)
 	b.mouse_exited.connect(b.queue_redraw)
 	b.pressed.connect(func():
@@ -439,24 +533,44 @@ func _refresh_music() -> void:
 
 ## 오른쪽 아래 확대/축소: − 배율 + (휠·핀치·Q/E·+/- 키도 됨, 0 = 기본)
 func _build_zoom() -> void:
+	# UI 패키지 v2: 가운데 패널 + − / + 정사각형 버튼
 	var p := PanelContainer.new()
-	UiPanel.apply(p, Vector4(12, 8, 12, 8))
+	var em := StyleBoxEmpty.new()
+	em.content_margin_left = 9
+	em.content_margin_right = 9
+	em.content_margin_top = 6
+	em.content_margin_bottom = 6
+	p.add_theme_stylebox_override("panel", em)
+	_nine_bg_lrtb(p, load(V2 + "panel_mid.png"), 34, 34, 30, 30)
 	add_child(p)
-	var h := _hbox(6)
+	var h := _hbox(4)
 	p.add_child(h)
-	var minus := _button("－", Color(0.45, 0.7, 0.9), 18, 40)
-	minus.tooltip_text = "축소 (휠 아래 · Q · -)"
+	var minus := _tex_button(V2 + "btn_minus.png", Vector2(36, 34), "축소 (휠 아래 · Q · -)")
 	minus.pressed.connect(func(): hub.zoom_step(-1))
 	h.add_child(minus)
-	zoom_label = _label("100%", 15, Color(0.9, 0.95, 1.0))
-	zoom_label.custom_minimum_size.x = 56
+	zoom_label = _label("100%", 17, Color(0.95, 0.95, 0.92))
+	zoom_label.custom_minimum_size.x = 62
 	zoom_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	zoom_label.size_flags_vertical = SIZE_SHRINK_CENTER
 	h.add_child(zoom_label)
-	var plus := _button("＋", Color(0.45, 0.7, 0.9), 18, 40)
-	plus.tooltip_text = "확대 (휠 위 · E · +)"
+	var plus := _tex_button(V2 + "btn_plus.png", Vector2(36, 34), "확대 (휠 위 · E · +)")
 	plus.pressed.connect(func(): hub.zoom_step(1))
 	h.add_child(plus)
-	p.position = Vector2(1280 - 10 - p.get_combined_minimum_size().x, 640)
+	p.position = Vector2(1280 - 8 - p.get_combined_minimum_size().x, 720 - 6 - 24 - 8 - p.get_combined_minimum_size().y)
+
+
+## 그림 버튼 (마우스를 올리면 밝게)
+func _tex_button(path: String, sz: Vector2, tip: String) -> TextureButton:
+	var b := TextureButton.new()
+	b.texture_normal = load(path)
+	b.ignore_texture_size = true
+	b.stretch_mode = TextureButton.STRETCH_SCALE
+	b.custom_minimum_size = sz
+	b.focus_mode = FOCUS_NONE
+	b.tooltip_text = tip
+	b.mouse_entered.connect(func(): b.modulate = Color(1.25, 1.25, 1.2))
+	b.mouse_exited.connect(func(): b.modulate = Color.WHITE)
+	return b
 
 
 ## 오른쪽: 선택한 대원 카드 (이름·지금 하는 일·체력·피로도·친밀도·조작 안내)
@@ -589,14 +703,18 @@ func refresh(delta: float) -> void:
 	for i in speed_buttons.size():
 		var on: bool = [0, 1, 4, 16][i] == hub.speed
 		var hov: bool = speed_buttons[i].get_meta("hover", false)
-		speed_buttons[i].modulate = Color(1.3, 1.15, 0.55) if on else (Color(1.15, 1.15, 1.12) if hov else Color(0.82, 0.82, 0.84))   # 지금 속도 = 금빛
+		var sb: TextureButton = speed_buttons[i]
+		var want: Texture2D = _speed_tex_on if on else _speed_tex
+		if sb.texture_normal != want:
+			sb.texture_normal = want   # 지금 속도 = 초록 버튼
+		sb.modulate = Color(1.18, 1.18, 1.14) if hov and not on else Color.WHITE
 	cash_label.text = "%d" % sim.ledger.cash   # 지폐 그림이 $ 표시
 	_update_battle_bar()
 	_place_music()
 	zoom_label.text = "%d%%" % hub.zoom_percent()
 	var left := sim.minutes_to_settlement()
 	var pend := sim.ledger.pending_total()
-	var info := "미지급 %s$%d  ·  결산 D-%d (%d일 %d시간)" % ["-" if pend < 0 else "", absi(pend), ceili(left / 1440.0),
+	var info := "미지급 %s$%d    |    결산 D-%d (%d일 %d시간)" % ["-" if pend < 0 else "", absi(pend), ceili(left / 1440.0),
 		floori(left / 1440.0), floori(fmod(left, 1440.0) / 60.0)]
 	if info != info_label.text:
 		info_label.text = info

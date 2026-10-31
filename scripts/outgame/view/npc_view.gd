@@ -19,6 +19,7 @@ var _foot3 := Vector3.ZERO          # 이번 프레임 3D 발 위치 (조명 탐
 var _lit := {"has": false, "color": Color.WHITE, "k": 0.0, "right": true, "behind": false, "rim": false, "rim_color": Color.WHITE, "rim_k": 0.0}
 var _font: Font
 var _bold: Font
+const ALERT := preload("res://assets/ui/outgame/v2/alert.png")
 var marker_at := Vector2.INF   # 머리 위 '!' 요청 마커 가운데 (이 노드 기준, 없으면 INF) — 누르면 요청 대화
 
 
@@ -231,9 +232,7 @@ func _draw() -> void:
 		var b := sin(Time.get_ticks_msec() / 180.0) * 3.0
 		var c := top + Vector2(0, -12 + b)
 		marker_at = top + Vector2(0, -12)
-		draw_circle(c, 15, Color(1, 0.85, 0.15))
-		draw_circle(c, 15, Color(0.06, 0.05, 0.08), false, 3.0)
-		_text(c + Vector2(0, 8), "!", 22, Color(0.06, 0.05, 0.08), _bold, false)
+		draw_texture_rect(ALERT, Rect2(c - Vector2(17, 17), Vector2(34, 34)), false)   # UI 패키지 v2 '!' 동그라미
 		top.y -= 30
 	elif not sim.pending_affinity_talk(npc_id).is_empty():   # 친밀도로 새 대화 해금 → 파스텔 노랑 하트
 		var b2 := sin(Time.get_ticks_msec() / 220.0) * 3.0
