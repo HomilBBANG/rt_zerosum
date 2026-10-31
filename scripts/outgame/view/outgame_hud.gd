@@ -1788,15 +1788,27 @@ func open_context(npc_id: String, at: Vector2, room_fid: String = "") -> void:
 	pm.popup()
 
 
+## 대원 지시 실행: 정지 중이면 기지가 '다음 행동 1개'로 맡아 두고(재생하면 실행), 아니면 바로 + 결과 알림
+func _order(npc_id: String, label: String, call: Callable) -> void:
+	if hub.speed == 0:
+		hub.queue_action(npc_id, label, call)
+		return
+	var r: Dictionary = call.call()
+	show_toast(r.msg, GOOD if r.ok else BAD)
+
+
 func _on_context(id: int, npc_id: String, room_act: String = "") -> void:
 	var r := {}
 	match room_act:
 		"sleep", "rest", "eat":
-			r = sim.issue_activity(npc_id, room_act)
+			_order(npc_id, {"sleep": "잠자기", "rest": "쉬기", "eat": "식사"}[room_act], sim.issue_activity.bind(npc_id, room_act))
+			return
 		"train":
-			r = sim.issue_train(npc_id)
+			_order(npc_id, "훈련", sim.issue_train.bind(npc_id))
+			return
 		"medical":
-			r = sim.issue_medical(npc_id)
+			_order(npc_id, "치료", sim.issue_medical.bind(npc_id))
+			return
 		"jobs":
 			open_contracts(npc_id)
 		"facility":
@@ -1814,16 +1826,13 @@ func _on_context(id: int, npc_id: String, room_act: String = "") -> void:
 		2:
 			open_contracts(npc_id)
 		3:
-			var r3 := sim.issue_train(npc_id)
-			show_toast(r3.msg, GOOD if r3.ok else BAD)
+			_order(npc_id, "훈련실로", sim.issue_train.bind(npc_id))
 		4:
 			open_character(npc_id)
 		5:
-			var r5 := sim.issue_medical(npc_id)
-			show_toast(r5.msg, GOOD if r5.ok else BAD)
+			_order(npc_id, "의무실로", sim.issue_medical.bind(npc_id))
 		6:
-			var r6 := sim.cancel_command(npc_id)
-			show_toast(r6.msg, GOOD if r6.ok else BAD)
+			_order(npc_id, "지시 그만두기", sim.cancel_command.bind(npc_id))
 		7:
 			open_research()
 		8:

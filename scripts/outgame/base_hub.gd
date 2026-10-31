@@ -226,8 +226,14 @@ func _on_notice(text: String) -> void:
 
 
 # ================================================================ 진행
-## 정지 중에 맡아 둔 다음 이동 지시 {npc, fid, x(규칙 좌표), run} (없으면 빈 사전) — 하나만, 재생하면 실행
+## 정지 중에 맡아 둔 다음 행동 (하나만 — 새로 지시하면 바꿈, 재생하면 실행. 없으면 빈 사전)
+##   이동 = {npc, fid, x(규칙 좌표), run} · 행동(우클릭 메뉴: 자기 · 훈련 · 치료 등) = {npc, label, call(→ {ok, msg})}
 var queued: Dictionary = {}
+
+
+func queue_action(npc_id: String, label: String, call: Callable) -> void:
+	queued = {"npc": npc_id, "label": label, "call": call}
+	under.queue_redraw()
 
 
 func set_speed(v: int) -> void:
@@ -235,7 +241,10 @@ func set_speed(v: int) -> void:
 	if v > 0 and not queued.is_empty():
 		var q := queued
 		queued = {}
-		if sim.npcs.has(str(q.npc)):
+		if q.has("call") and sim.npcs.has(str(q.npc)):
+			var ra: Dictionary = (q.call as Callable).call()
+			hud.show_toast(ra.msg, OutgameHud.GOOD if ra.ok else OutgameHud.BAD)
+		elif sim.npcs.has(str(q.npc)):
 			var r := sim.issue_move(str(q.npc), str(q.fid), float(q.x), bool(q.run))
 			if r.ok:
 				move_mark = {"pos": queued_screen_pos(q), "t": 0.0, "run": q.run, "fid": q.fid}
@@ -246,6 +255,9 @@ func set_speed(v: int) -> void:
 
 ## 맡아 둔 지시의 화면 위치 (그 방 바닥, 규칙 x) — 카메라가 움직여도 따라감
 func queued_screen_pos(q: Dictionary = queued) -> Vector2:
+	if q.has("call"):   # 행동 = 그 대원 머리 위
+		var v: NpcView = npc_views.get(str(q.npc))
+		return v.position + Vector2(0, -v.screen_h - 30) if v != null and v.visible else Vector2.INF
 	if q.is_empty() or not sim.data.facilities.has(str(q.fid)):
 		return Vector2.INF
 	var r := sim.data.facility_rect(str(q.fid))
@@ -679,9 +691,8 @@ func _cli_ui(spec: String) -> void:
 		"place":   # place:npc_dan:960 — 대원을 그 규칙 x 에 세우고 시계 정지 (벽 뒤로 가리는지 확인용)
 			(sim.npcs[p[1]] as NpcAgent).pos.x = float(p[2])
 			speed = 0
-		"act":   # act:npc_dan:sleep — 지금 방에서 행동
-			var r2 := sim.issue_activity(p[1], p[2])
-			hud.show_toast(r2.msg, OutgameHud.GOOD if r2.ok else OutgameHud.BAD)
+		"act":   # act:npc_dan:sleep|rest|eat|train|medical — 우클릭 메뉴 행동과 같게 (정지 중이면 다음 행동으로 맡아 둠)
+			hud._on_context(-1, p[1], p[2])
 		"context":
 			var v: NpcView = npc_views[p[1]]
 			v._place(sim.npcs[p[1]])   # 시간 건너뛴 직후라 화면 위치 갱신

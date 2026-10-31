@@ -325,13 +325,16 @@ func _draw_queued_mark() -> void:
 		return
 	var col := Color(1.0, 0.62, 0.2) if q.get("run", false) else Color(0.45, 1.0, 0.6)
 	var a := 0.55 + 0.45 * sin(_t * 5.0)
+	var who: String = sim.npcs[q.npc].name if sim.npcs.has(str(q.npc)) else ""
+	if q.has("call"):   # 행동 예약 = 머리 위 글자만
+		_text(p, "다음: %s · 재생하면 시작" % q.label, 13, Color(1, 0.85, 0.4, 0.6 + 0.4 * a), _bold)
+		return
 	draw_set_transform(p, 0.0, Vector2(1.0, 0.45))
 	for i in 12:
 		var a0 := TAU * i / 12.0 + _t * 0.8
 		draw_arc(Vector2.ZERO, 18.0, a0, a0 + TAU / 24.0, 4, Color(col, a), 3.0)
 	draw_circle(Vector2.ZERO, 4.0, Color(col, a))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	var who: String = sim.npcs[q.npc].name if sim.npcs.has(str(q.npc)) else ""
 	_text(p + Vector2(0, -16), "%s %s · 재생하면 시작" % [who, "뛰어감" if q.get("run", false) else "이동"], 13, col, _bold)
 
 
