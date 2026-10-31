@@ -1,1 +1,1 @@
-{"pose": true, "loop": true, "fps": 1.0, "ground": [432, 262], "figure_px": 837.4, "hip_y": 332, "source": "dead.webp (배율 0.497, 기준 hit)", "lying_sink": 0.3, "lying_fit": 1.103}
+{"pose": true, "loop": true, "fps": 1.0, "ground": [432, 262], "figure_px": 759.0, "hip_y": 332, "source": "dead.webp (배율 0.497, 기준 hit)", "lying_sink": 0.3, "lying_keep": true}

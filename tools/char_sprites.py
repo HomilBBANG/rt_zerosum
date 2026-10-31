@@ -1290,6 +1290,8 @@ def cmd_poses(cid, pairs, ref=None, band=None):
             gy -= round(im2.height * LYING_SINK)
         adir = os.path.join(cdir, name)
         os.makedirs(adir, exist_ok=True)
+        old_meta = os.path.join(adir, "anim.json")
+        keep_size = os.path.exists(old_meta) and bool(json.load(open(old_meta, encoding="utf-8")).get("lying_keep", False))   # 사용자가 원래 크기 유지로 정한 누운 그림
         for f in os.listdir(adir):
             if f.endswith(".png") or f == "anim.json":
                 os.remove(os.path.join(adir, f))
@@ -1307,9 +1309,9 @@ def cmd_poses(cid, pairs, ref=None, band=None):
         fig_draw = fig
         if lying and im2.width > im2.height * 1.6:   # 누운 몸이 선 키보다 길면 그만큼 작게 그림 (몸통 길이 비교, 팔 같은 가는 부분 제외)
             fit = _trunk_len(can, 0) / max(1, _trunk_len(Image.open(os.path.join(cdir, "base.png")), 1))
-            if fit > 1.03:
+            if fit > 1.03 and not keep_size:
                 fig_draw = round(fig * fit, 1)
-        meta = {"pose": True, "loop": True, "fps": 1.0, "ground": [round(gx), gy], "figure_px": fig_draw, **({"lying_sink": LYING_SINK} if lying else {}),
+        meta = {"pose": True, "loop": True, "fps": 1.0, "ground": [round(gx), gy], "figure_px": fig_draw, **({"lying_sink": LYING_SINK} if lying else {}), **({"lying_keep": True} if keep_size else {}),
                 "hip_y": round(gy - fig * 0.52) if not lying else gy - 40, "source": "%s (배율 %.3f, 기준 %s)" % (os.path.basename(path), km, ref)}
         json.dump(meta, open(os.path.join(adir, "anim.json"), "w", encoding="utf-8"), ensure_ascii=False)
         print(cid, name, "포즈", can.size, "발", meta["ground"], "누움" if lying else "")

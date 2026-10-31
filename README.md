@@ -370,7 +370,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 
 ![체력 칸 층 · 쓰러진 몸 자리](docs/screenshots/battle_bars_dead_layout.jpg)
 
-- **쓰러진 몸 길이 = 선 키**: 누운 그림(dead)의 몸통 길이(팔 같은 가는 부분 제외)를 기본 그림 키와 비교해 길면 그만큼 작게 그림 (`anim.json` figure_px · "lying_fit"). 아군: 단 1.10 · 키라 1.09 · 이선 1.29 · 하나 1.16 · 니키타 1.11 배 길던 것을 1.0 으로 (앨마는 0.99 라 그대로). poses 도구도 새 누운 그림에 자동으로.
+- **쓰러진 몸 길이 = 선 키**: 누운 그림(dead)의 몸통 길이(팔 같은 가는 부분 제외)를 기본 그림 키와 비교해 길면 그만큼 작게 그림 (`anim.json` figure_px · "lying_fit"). 아군: 키라 1.09 · 이선 1.29 · 니키타 1.11 배 길던 것을 1.0 으로 (앨마 0.99 그대로). **단 · 하나는 사용자 요청으로 원래 크기 유지** (`"lying_keep": true` — poses 도구로 다시 만들어도 유지). poses 도구도 새 누운 그림에 자동으로.
 
 ![아군 쓰러짐 — 위 = 전, 아래 = 키 맞춤](docs/screenshots/ally_dead_fit.jpg)
 ![AU군 병사 포즈 크기 비교](docs/screenshots/army_m_poses.png)
