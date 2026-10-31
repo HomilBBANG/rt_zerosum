@@ -84,11 +84,11 @@ func _draw_room(fid: String) -> void:
 	var size := 14
 	var room_w: float = _quad_rect(q).size.x - 14.0
 	var tw := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	while tw + 30 > room_w and size > 10:
+	while tw + 36 > room_w and size > 10:
 		size -= 1
 		tw = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	var pw := minf(tw + 30, room_w)
-	_tag(Rect2(plate_at, Vector2(pw, 29)), false)   # 방 이름표 = 어두운 태그
+	var pw := minf(tw + 36, room_w)
+	_plate(Rect2(plate_at, Vector2(pw, 29)))   # 방 이름표 = 사용자 제공 패널 (오른쪽 아래만 비스듬히 잘림)
 	draw_string(_font, plate_at + Vector2(15, 20), label, HORIZONTAL_ALIGNMENT_LEFT, pw - 26, size, Color(0.95, 0.94, 0.9))
 	if fid == hover_fid:
 		draw_polyline(_closed(q), Color(1.0, 0.95, 0.8, 0.95), 3.0)   # 마우스를 올린 방 = 크림색 테두리 (최종 시안)
@@ -195,6 +195,24 @@ func _locked_panel(q: PackedVector2Array) -> void:
 	var k := clampf(minf(r.size.x, r.size.y) / 400.0, 0.08, LOCK_K)   # 레퍼런스처럼 볼트 = 작은 점 (아주 작게 축소하면 더 작게)
 	draw_set_transform(r.position, 0.0, Vector2(k, k))
 	draw_style_box(_lock_sb, Rect2(Vector2.ZERO, r.size / k))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## 방 이름 패널 (사용자 제공, 원본 art_src/ui/room_name_panel.webp): 오른쪽 아래 비스듬한 모서리 · 위 밝은 줄은 그대로, 9칸 늘리기
+static var _plate_sb: StyleBoxTexture
+const PLATE_K := 0.09
+
+
+func _plate(r: Rect2) -> void:
+	if _plate_sb == null:
+		_plate_sb = StyleBoxTexture.new()
+		_plate_sb.texture = load("res://assets/ui/outgame/v2/plate_room.png")
+		_plate_sb.set_texture_margin(SIDE_LEFT, 40)
+		_plate_sb.set_texture_margin(SIDE_TOP, 52)
+		_plate_sb.set_texture_margin(SIDE_RIGHT, 145)
+		_plate_sb.set_texture_margin(SIDE_BOTTOM, 150)
+	draw_set_transform(r.position, 0.0, Vector2(PLATE_K, PLATE_K))
+	draw_style_box(_plate_sb, Rect2(Vector2.ZERO, r.size / PLATE_K))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
