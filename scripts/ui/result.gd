@@ -9,6 +9,7 @@ const GOLD := Color(1.0, 0.82, 0.25)
 const CREAM := Color(0.95, 0.93, 0.86)
 const DIM := Color(0.7, 0.72, 0.68)
 const RED := Color(0.95, 0.3, 0.28)
+const PANEL_K := 0.9   # 큰 판 그림 배율 — 머리 탭 안쪽(그림 53px)이 제목 글자(40)보다 크게
 
 var _font: Font
 var _bold: Font
@@ -48,10 +49,10 @@ func _ready() -> void:
 	# 가운데 판
 	var panel := Control.new()
 	panel.position = Vector2(287, 6)
-	panel.size = Vector2(708, 628)
+	panel.size = Vector2(708, 634)
 	panel.mouse_filter = MOUSE_FILTER_IGNORE
 	panel.draw.connect(func():
-		UiNine.draw(panel, R + "panel_main.png", Vector4(140, 96, 140, 44), Rect2(Vector2.ZERO, panel.size), 0.62)
+		UiNine.draw(panel, R + "panel_main.png", Vector4(140, 96, 140, 44), Rect2(Vector2.ZERO, panel.size), PANEL_K)
 		_title(panel, "전투 승리" if win else "전투 패배", win))
 	add_child(panel)
 	_rows(panel, allies)
@@ -74,16 +75,16 @@ func _ready() -> void:
 ## 머리 탭 제목 + 양옆 줄무늬
 func _title(c: Control, text: String, win: bool) -> void:
 	var col := GOLD if win else Color(0.95, 0.45, 0.4)
-	var fs := 42
+	var fs := 40
 	var w := _bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var cx := c.size.x * 0.5
-	var y := 40.0
-	c.draw_string_outline(_bold, Vector2(cx - w * 0.5, y + 15), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color(0.05, 0.05, 0.03))
-	c.draw_string(_bold, Vector2(cx - w * 0.5, y + 15), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
+	var y := (16.0 + 69.0) * 0.5 * PANEL_K   # 머리 탭 안쪽 가운데 (그림 16~69px)
+	c.draw_string_outline(_bold, Vector2(cx - w * 0.5, y + fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color(0.05, 0.05, 0.03))
+	c.draw_string(_bold, Vector2(cx - w * 0.5, y + fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
 	for side in [-1, 1]:
 		for i in 3:
 			var x0: float = cx + side * (w * 0.5 + 18 + i * 9.0)
-			var yy := y - 6 + i * 7.0
+			var yy := y - 9 + i * 7.0
 			var p := PackedVector2Array([Vector2(x0, yy), Vector2(x0 + side * 30, yy), Vector2(x0 + side * 26, yy + 4), Vector2(x0 - side * 4, yy + 4)])
 			c.draw_colored_polygon(p, col)
 
@@ -91,8 +92,8 @@ func _title(c: Control, text: String, win: bool) -> void:
 ## 대원 줄: 초상화 · 이름 · Lv | +EXP · 막대 · 경험치 | 전투 끝에 남은 부정적 상태 이상 꼬리표 · 체력
 func _rows(panel: Control, allies: Array) -> void:
 	var n := maxi(1, allies.size())
-	var top := 78.0
-	var area := 384.0
+	var top := 92.0
+	var area := 374.0
 	var gap := 6.0
 	var h := minf(92.0, (area - gap * (n - 1)) / n)
 	for i in allies.size():
@@ -210,20 +211,20 @@ func _chip(c: Control, r: Rect2, text: String, border: Color, col: Color, fs: in
 func _loot(panel: Control) -> void:
 	var items: Array = Game.base.last_loot if Game.campaign and Game.base != null else []
 	var box := Control.new()
-	box.position = Vector2(30, 472)
-	box.size = Vector2(648, 132)
+	box.position = Vector2(30, 474)
+	box.size = Vector2(648, 120)
 	box.mouse_filter = MOUSE_FILTER_IGNORE
 	panel.add_child(box)
 	box.draw.connect(func():
 		UiNine.draw(box, R + "plate_row.png", Vector4(30, 30, 30, 30), Rect2(Vector2.ZERO, box.size), 0.5)
-		box.draw_string(_bold, Vector2(22, 74), "획득 전리품", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, GOLD)
+		box.draw_string(_bold, Vector2(22, 68), "획득 전리품", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, GOLD)
 		if items.is_empty():
-			box.draw_string(_font, Vector2(170, 74), "없음", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, DIM)
+			box.draw_string(_font, Vector2(170, 68), "없음", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, DIM)
 			return
 		var sw := 106.0
 		for i in mini(items.size(), 4):
 			var e: Dictionary = items[i]
-			var r := Rect2(160 + i * (sw + 8), 12, sw, 108)
+			var r := Rect2(160 + i * (sw + 8), 10, sw, 100)
 			UiNine.draw(box, R + "plate_slot.png", Vector4(40, 40, 40, 40), r, 0.36)
 			var nm := str(e.name)
 			var nw := _bold.get_string_size(nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
