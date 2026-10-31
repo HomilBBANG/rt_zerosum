@@ -42,8 +42,9 @@ var _sched_mtime: int = 0
 var _ally_copies: Array = []        # [{copy, base}] 기지 성장(훈련·장비)을 반영한 전투용 아군 복제본
 
 
-## 렌더 해상도: 창(=렌더 버퍼)을 QHD(2560×1440 픽셀)로 고정. 게임 좌표는 1280×720 그대로이고
-## stretch=canvas_items 라 화면은 창의 실제 픽셀 해상도로 그려진다. 모니터가 QHD 보다 작으면 16:9 로 맞춰 줄임. F11 전체 화면.
+## 창 크기: 창 모드 1920×1080 (게임 좌표는 1280×720 그대로, stretch=canvas_items 라 창의 실제 픽셀 해상도로 그려짐).
+## 화면(작업 표시줄 · 제목줄 제외)보다 크면 16:9 로 맞춰 줄임. F11 = 전체 화면. 스크린샷(--shot)은 QHD 2560×1440 고정.
+const WINDOW_SIZE := Vector2i(1920, 1080)
 const RENDER_SIZE := Vector2i(2560, 1440)
 
 
@@ -57,6 +58,10 @@ func _fit_window() -> void:
 			var wh := str(cli.win).split("x")
 			win.size = Vector2i(int(wh[0]), int(wh[1]))
 		return
+	if Engine.is_embedded_in_editor():
+		return   # 에디터 '게임' 탭 안에 넣어 실행하면 크기는 에디터가 정함
+	if win.mode != Window.MODE_WINDOWED:
+		win.mode = Window.MODE_WINDOWED   # 최대화 · 전체 화면으로 시작해도 창 모드로 (F11 로 전체 화면)
 	# 창 제목줄 · 테두리까지 화면(작업 표시줄 제외)에 들어가게: 실제 장식 크기를 재서 그만큼 빼고, 장식 포함 사각형을 가운데로.
 	# (예전엔 제목줄을 60px 로 어림하고 안쪽만 가운데 맞춤 → 화면 배율이 큰 모니터에서 아래가 작업 표시줄 뒤로 잘림)
 	var usable := DisplayServer.screen_get_usable_rect(win.current_screen)
@@ -68,8 +73,8 @@ func _fit_window() -> void:
 		deco = Vector2i(16, 80)
 		off = Vector2i(8, 72)
 	var room := usable.size - deco - Vector2i(8, 8)
-	var s := minf(1.0, minf(float(room.x) / RENDER_SIZE.x, float(room.y) / RENDER_SIZE.y))
-	var size := Vector2i(int(RENDER_SIZE.x * s), int(RENDER_SIZE.y * s))
+	var s := minf(1.0, minf(float(room.x) / WINDOW_SIZE.x, float(room.y) / WINDOW_SIZE.y))
+	var size := Vector2i(int(WINDOW_SIZE.x * s), int(WINDOW_SIZE.y * s))
 	win.size = size
 	win.position = usable.position + (usable.size - (size + deco)) / 2 + off
 
