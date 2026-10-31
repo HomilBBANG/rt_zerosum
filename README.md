@@ -168,7 +168,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ## 실행
 1. 위 설치 스크립트를 썼다면 `play.bat` / `play.sh`. 직접 설치한 Godot 4.7 (stable) 로 이 폴더를 열어 F5 해도 됩니다. 메인 씬 `scenes/title.tscn` (타이틀).
 2. 타이틀 `새 게임` → 기지 (위 '게임 루프' 참고). 전투만 따로 보려면 타이틀 `설정` → `전투 테스트 메뉴 (개발용)`: 조명 프리셋(G1~G4), 선공(동전/아군 기습/적 매복), 시드를 고른 뒤 편성 → 전투 (기지 성장 반영 없음).
-   - **타이틀 화면** (사용자 제공 `art_src/ui/title/` → `assets/ui/title/`, 레퍼런스 `art_src/ui/title/ref_title.webp`): 배경 · 로고 ROTTEN WAR · 아래 띠 위 그림 버튼 4개 (이어하기 · 새 게임 · 설정 · 종료). 마우스 올림 = 금빛으로 밝게 + 살짝 커짐, 저장 없으면 이어하기 흐리게. 설정 = 전체 화면 켜고 끄기 · 전투 테스트 메뉴(개발용). 확인용 `--scene=title --title_ui=settings`.
+   - **타이틀 화면** (사용자 제공 `art_src/ui/title/` → `assets/ui/title/`, 레퍼런스 `art_src/ui/title/ref_title.webp`): 배경 · 로고 ZEROSUM · 아래 띠 위 그림 버튼 4개 (이어하기 · 새 게임 · 설정 · 종료). 마우스 올림 = 금빛으로 밝게 + 살짝 커짐, 저장 없으면 이어하기 흐리게. 설정 = 전체 화면 켜고 끄기 · 전투 테스트 메뉴(개발용). 확인용 `--scene=title --title_ui=settings`.
 
 ![타이틀](docs/screenshots/title_v2.jpg)
 

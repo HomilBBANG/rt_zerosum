@@ -27,13 +27,13 @@ func _ready() -> void:
 	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	bg.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(bg)
-	# 로고 "ROTTEN WAR": 위 가운데 (레퍼런스처럼 살짝 오른쪽)
+	# 로고 "ZEROSUM" (사용자 제공, 원본 art_src/ui/title/logo_zerosum.webp): 위 가운데 (레퍼런스처럼 살짝 오른쪽)
 	var logo := TextureRect.new()
 	logo.texture = load(T + "logo.png")
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	logo.size = Vector2(546, 167)
-	logo.position = Vector2(654 - 273, 40)
+	logo.size = Vector2(620, 144)
+	logo.position = Vector2(654 - 310, 52)
 	logo.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(logo)
 	# 아래 띠
