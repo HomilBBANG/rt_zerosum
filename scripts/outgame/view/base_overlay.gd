@@ -53,6 +53,7 @@ func _draw() -> void:
 	if mode == "over":
 		_draw_bubbles()
 		return
+	_draw_floor_frames()
 	for fid in sim.data.facility_order:
 		_draw_room(fid)
 	_draw_floor_labels()
@@ -77,7 +78,6 @@ func _draw_room(fid: String) -> void:
 			draw_polyline(_closed(q), Color(1, 0.85, 0.3), 3.0)
 			_text(c + Vector2(0, 54 * k), "클릭: 해금", int(15 * k), Color(1, 0.85, 0.3), _font)
 		return
-	_room_frame(q)
 	# 이름표 (테두리 안쪽 왼쪽 위 — 방이 좁으면 글자를 줄이고 잘라 방 밖으로 안 나가게)
 	var plate_at := q[3] + Vector2(7, 11)
 	var label: String = f.name
@@ -91,7 +91,7 @@ func _draw_room(fid: String) -> void:
 	_tag(Rect2(plate_at, Vector2(pw, 29)), false)   # 방 이름표 = 어두운 태그
 	draw_string(_font, plate_at + Vector2(15, 20), label, HORIZONTAL_ALIGNMENT_LEFT, pw - 26, size, Color(0.95, 0.94, 0.9))
 	if fid == hover_fid:
-		draw_polyline(_closed(q), Color(0.45, 1.0, 0.75, 0.95), 3.0)   # 마우스를 올린 방 = 민트 테두리 (레퍼런스)
+		draw_polyline(_closed(q), Color(1.0, 0.95, 0.8, 0.95), 3.0)   # 마우스를 올린 방 = 크림색 테두리 (최종 시안)
 	if f.tag == "작업" and not sim.workshop.is_empty():
 		var sp := proj(Vector3(b.x0 + (b.x1 - b.x0) * 0.78, b.y0 + 1.5, BaseView3D.BACK_Z + 0.5))
 		draw_circle(sp, 5 + 4 * (0.5 + 0.5 * sin(_t * 12.0)), Color(1, 0.85, 0.3, 0.9))
@@ -127,12 +127,28 @@ func _draw_floor_labels() -> void:
 ## 잠긴 방 앞면을 덮는 패널: 그 방 단면 사각형(조금 안쪽)에 9칸 늘리기 — 둥근 모서리 · 볼트는 그대로, 2배 해상도 그림을 반으로
 static var _lock_sb: StyleBoxTexture
 const LOCK_K := 0.15    # 잠긴 방 패널 그림 배율 (볼트 지름 ≈ 5px)
-const FRAME_K := 0.11   # 방 테두리(ui-room) 그림 배율 (위 띠 ≈ 8px)
+const FRAME_K := 0.28   # 층 테두리(ui-room) 그림 배율 (위 · 아래 띠 ≈ 20px, 볼트 ≈ 7px)
 static var _frame_sb: StyleBoxTexture
 
 
-## 열린 방 테두리 (사용자 제공 ui-room, 원본 art_src/ui/room_frame.png): 단면 사각형에 9칸 늘리기, 가운데는 비어 있음
-func _room_frame(q: PackedVector2Array) -> void:
+## 층 테두리 (최종 시안): 층마다 그 층 방 전체를 ui-room 으로 감쌈 — 위 · 아래 띠는 층 사이 슬래브 쪽으로, 네 귀 볼트
+func _draw_floor_frames() -> void:
+	for f in sim.data.floors:
+		var r := Rect2()
+		var first := true
+		for fid in sim.data.facility_order:
+			if str(sim.data.facilities[fid].floor) != str(f.id):
+				continue
+			var qr := _quad_rect(front_quad(fid))
+			r = qr if first else r.merge(qr)
+			first = false
+		if not first:
+			_room_frame(r)
+
+
+## 사용자 제공 ui-room (원본 art_src/ui/room_frame.png): 사각형 r 을 감싸는 9칸 늘리기 테두리, 가운데는 비어 있음.
+## 띠가 방 안을 덜 가리게 바깥쪽으로 조금 키워 그림 (위 · 아래 띠는 층 사이 슬래브 위)
+func _room_frame(r: Rect2) -> void:
 	if _frame_sb == null:
 		_frame_sb = StyleBoxTexture.new()
 		_frame_sb.texture = load("res://assets/ui/outgame/v2/room_frame.png")
@@ -141,8 +157,8 @@ func _room_frame(q: PackedVector2Array) -> void:
 		_frame_sb.set_texture_margin(SIDE_RIGHT, 110)
 		_frame_sb.set_texture_margin(SIDE_TOP, 100)
 		_frame_sb.set_texture_margin(SIDE_BOTTOM, 100)
-	var r := _quad_rect(q)
-	var k := clampf(minf(r.size.x, r.size.y) / 900.0, 0.05, FRAME_K)
+	var k := clampf(minf(r.size.x, r.size.y) / 700.0, 0.08, FRAME_K)
+	r = r.grow_individual(34.0 * k * 0.6, 76.0 * k * 0.75, 34.0 * k * 0.6, 73.0 * k * 0.75)
 	draw_set_transform(r.position, 0.0, Vector2(k, k))
 	draw_style_box(_frame_sb, Rect2(Vector2.ZERO, r.size / k))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

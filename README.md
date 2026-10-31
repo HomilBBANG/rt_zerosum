@@ -346,7 +346,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - **기지 UI v2** (사용자 제공 UI 패키지 `art_src/ui/ui_package_v2.webp` + 레퍼런스 `art_src/ui/ref_outgame_v2.webp` → 조각 `assets/ui/outgame/v2/`): 두 줄 날짜 패널 · 새 아이콘 타일(뒤에 팔각 띠 패널) · 금색/어두운 층 · 방 태그 · 운영 기록 패널(머리 탭 · 주황 점 = 접기) · − 100% + · 조작 안내 띠 · ! 동그라미.
 
 ![기지 UI v2](docs/screenshots/outgame_ui_v2.jpg)
-- **잠긴 방** = 볼트 달린 검은 패널(사용자 제공, `assets/ui/outgame/v2/panel_locked.png`, 볼트 작은 점) + 자물쇠 · 해금 비용, **열린 방** = ui-room 테두리(`room_frame.png`). 확인 `--base_ui=zoom_out`.
+- **잠긴 방** = 볼트 달린 검은 패널(사용자 제공, `assets/ui/outgame/v2/panel_locked.png`, 볼트 작은 점) + 자물쇠 · 해금 비용, 층마다 ui-room 테두리(`room_frame.png`, 위 · 아래 볼트 띠). 최종 시안 = `art_src/ui/ref_outgame_v2.webp`. 확인 `--base_ui=zoom_out`.
 
 ![잠긴 방 패널](docs/screenshots/outgame_locked_rooms.jpg)
 
