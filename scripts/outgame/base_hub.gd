@@ -221,8 +221,30 @@ func _on_notice(text: String) -> void:
 
 
 # ================================================================ 진행
+## 정지 중에 맡아 둔 다음 이동 지시 {npc, fid, x(규칙 좌표), run} (없으면 빈 사전) — 하나만, 재생하면 실행
+var queued: Dictionary = {}
+
+
 func set_speed(v: int) -> void:
 	speed = v
+	if v > 0 and not queued.is_empty():
+		var q := queued
+		queued = {}
+		if sim.npcs.has(str(q.npc)):
+			var r := sim.issue_move(str(q.npc), str(q.fid), float(q.x), bool(q.run))
+			if r.ok:
+				move_mark = {"pos": queued_screen_pos(q), "t": 0.0, "run": q.run, "fid": q.fid}
+			else:
+				hud.show_toast(r.msg, OutgameHud.BAD)
+		under.queue_redraw()
+
+
+## 맡아 둔 지시의 화면 위치 (그 방 바닥, 규칙 x) — 카메라가 움직여도 따라감
+func queued_screen_pos(q: Dictionary = queued) -> Vector2:
+	if q.is_empty() or not sim.data.facilities.has(str(q.fid)):
+		return Vector2.INF
+	var r := sim.data.facility_rect(str(q.fid))
+	return project(v3d.to3d(Vector2(float(q.x), r.end.y), -0.6))
 
 
 func _process(delta: float) -> void:
@@ -322,7 +344,7 @@ func _update_hover() -> void:
 	if under.juke_hover != juke:
 		under.juke_hover = juke
 		under.queue_redraw()
-	var go := selected != "" and under.hover_fid != "" and speed > 0
+	var go := selected != "" and under.hover_fid != ""
 	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if (n != "" or _bubble_at(p) != "" or go or juke) else Input.CURSOR_ARROW)
 
 
@@ -448,7 +470,10 @@ func _left_click(p: Vector2, dbl: bool = false) -> void:
 		hud.open_unlock(fid)
 		return
 	if speed == 0:
-		return   # 정지 중 = 이동 지시 안 받음 (예전: 지시는 들어가고 시간이 안 흘러 제자리에서 걸음)
+		# 정지 중 = 다음 행동 1개만 맡아 둠 (새로 누르면 바꿈) → 재생하면 그 지시대로 움직임 (set_speed)
+		queued = {"npc": selected, "fid": fid, "x": room_x_at(fid, p), "run": dbl}
+		under.queue_redraw()
+		return
 	var r2 := sim.issue_move(selected, fid, room_x_at(fid, p), dbl)
 	if not r2.ok:
 		hud.show_toast(r2.msg, OutgameHud.BAD)
@@ -563,7 +588,7 @@ func _cli_ui(spec: String) -> void:
 				if p.size() > 2:
 					sim.skip(int(p[2]))
 			hud.open_research()
-		"character": hud.open_character(p[1])
+		"character": hud.open_character(p[1], p[2] if p.size() > 2 else "info")   # character:npc_id[:equip]
 		"divine":   # divine:캐릭터 id[:더할 의지] — 정체(신) 바로 해금 (확인·에디터 테스트 플레이용)
 			var r3 := sim.unlock_divine(p[1], "테스트")
 			if p.size() > 2:

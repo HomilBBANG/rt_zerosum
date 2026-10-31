@@ -1605,42 +1605,21 @@ func _research_section(body: VBoxContainer, win: Dictionary, with_talk: bool = f
 		row.add_child(b)
 
 
-## 무기고: 대원별 장착 (주무기/보조1/보조2)
+## 무기고: 장착은 대원 정보 창의 '장비' 탭으로 옮김 — 여기선 대원별 바로 가기 버튼만
 func _armory_section(body: VBoxContainer) -> void:
-	body.add_child(_label("장착 (전투에 반영)", 16, Color(1, 0.95, 0.75)))
+	body.add_child(_label("장착 — 대원 정보의 '장비' 탭 (대원 우클릭 → 정보 보기)", 16, Color(1, 0.95, 0.75)))
+	var row := _hbox(6)
+	body.add_child(row)
 	for id in sim.data.npc_order:
 		var n: NpcAgent = sim.npcs[id]
 		if not sim.is_combatant(n):
 			continue   # 연구원 등 전투에 나가지 않는 대원
-		var row := _hbox(6)
-		body.add_child(row)
-		var nl := _label(n.name, 14)
-		nl.custom_minimum_size.x = 50
-		row.add_child(nl)
-		for slot in 3:
-			var ob := OptionButton.new()
-			ob.add_theme_font_override("font", font)
-			ob.add_theme_font_size_override("font_size", 12)
-			ob.custom_minimum_size.x = 150
-			ob.fit_to_longest_item = false
-			var uids: Array[String] = []
-			if slot > 0:
-				ob.add_item("(비움)")
-				uids.append("")
-			for it in sim.inventory:
-				if it.owner == "" or it.owner == n.character_id:
-					ob.add_item("%s+%d" % [sim.item_name(it.item), it.plus])
-					uids.append(it.uid)
-					if it.owner == n.character_id and int(it.slot) == slot:
-						ob.select(ob.item_count - 1)
-			var cid := n.character_id
-			var wf := sim.workshop_facility()
-			ob.item_selected.connect(func(i):
-				var res := sim.equip(cid, slot, uids[i])
-				show_toast(res.msg, GOOD if res.ok else BAD)
-				close_top()
-				open_facility(wf))
-			row.add_child(ob)
+		var b := _button(n.name, Color(0.55, 0.7, 0.9), 13, 70)
+		var nid: String = id
+		b.pressed.connect(func():
+			close_top()
+			open_character(nid, "equip"))
+		row.add_child(b)
 
 
 func _px_section(body: VBoxContainer, fid: String) -> void:
@@ -2039,11 +2018,28 @@ func _quest_divine(qid: String) -> Array:
 
 
 # ---------------------------------------------------------------- 대원 정보·장비
-func open_character(npc_id: String) -> void:
+## 대원 정보 창: 탭 = 정보 · 장비 (장비 = 전투에 나가는 대원만 — 무기고에 있던 장착 화면을 옮김)
+func open_character(npc_id: String, tab: String = "info") -> void:
 	var n: NpcAgent = sim.npcs[npc_id]
 	var combat := sim.is_combatant(n)
-	var win := _window("%s — 정보%s" % [n.name, "·장비" if combat else ""], 640)
+	if not combat:
+		tab = "info"
+	var win := _window("%s — %s" % [n.name, "장비" if tab == "equip" else "정보"], 640)
 	var body: VBoxContainer = win.body
+	if combat:
+		var tabs := _hbox(6)
+		body.add_child(tabs)
+		for t in [["info", "정보"], ["equip", "장비"]]:
+			var tb := _button(t[1], GOLD if t[0] == tab else Color(0.45, 0.55, 0.7), 15, 110)
+			var tt: String = t[0]
+			tb.pressed.connect(func():
+				if tt != tab:
+					close_top()
+					open_character(npc_id, tt))
+			tabs.add_child(tb)
+	if tab == "equip":
+		_equip_tab(body, n, npc_id)
+		return
 	var row := _hbox(14)
 	body.add_child(row)
 	row.add_child(_portrait_rect(n.sprite, 110))
@@ -2077,12 +2073,36 @@ func open_character(npc_id: String) -> void:
 			close_top()
 			open_skills(u.id))
 		col.add_child(sk)
-	if combat:
-		body.add_child(_label("장비 (전투에 반영 · 주무기 / 보조1 / 보조2)", 16, Color(1, 0.95, 0.75)))
-	for slot in (3 if combat else 0):
+	# 오늘 일정 요약
+	var wd := sim.clock.weekday()
+	var today := PackedStringArray()
+	for b in sim.data.schedules.get(npc_id, {}).get("weekly_schedule", []):
+		if int(b.weekday) == wd:
+			var req: Array = b.get("required_unlocks", [])
+			var fb := str(b.get("fallback_facility_id", ""))
+			today.append("%s~%s %s @ %s%s%s" % [OutgameData.hm(int(b.start_minute)), OutgameData.hm(int(b.end_minute)), OutgameData.ACTIVITIES.get(b.activity_id, b.activity_id),
+				sim.data.facility_name(b.target_facility_id), " (해금 시: %s)" % ", ".join(req.map(func(x): return sim.data.facility_name(x))) if not req.is_empty() else "",
+				" (잠기면: %s)" % sim.data.facility_name(fb) if fb != "" else ""])
+	body.add_child(_label("오늘(%s) 일정 — 편집은 Godot 에디터 '일정' 탭" % OutgameData.WEEKDAYS[wd], 15, Color(1, 0.95, 0.75)))
+	var t := _label("\n".join(today), 13, Color(0.82, 0.88, 0.96))
+	body.add_child(t)
+
+
+
+## '장비' 탭: 주무기 / 보조 1 / 보조 2 장착 (전투에 반영) + 이 대원이 쓸 수 있는 무기 목록
+func _equip_tab(body: VBoxContainer, n: NpcAgent, npc_id: String) -> void:
+	var row := _hbox(14)
+	body.add_child(row)
+	row.add_child(_portrait_rect(n.sprite, 90))
+	var col := _vbox(6)
+	row.add_child(col)
+	col.add_child(_label("장비 (전투에 반영 · 주무기 / 보조 1 / 보조 2)", 16, Color(1, 0.95, 0.75)))
+	for slot in 3:
 		var r := _hbox(10)
-		body.add_child(r)
-		r.add_child(_label(["주무기", "보조 1", "보조 2"][slot], 15))
+		col.add_child(r)
+		var sl := _label(["주무기", "보조 1", "보조 2"][slot], 15)
+		sl.custom_minimum_size.x = 56
+		r.add_child(sl)
 		var ob := OptionButton.new()
 		ob.add_theme_font_override("font", font)
 		ob.custom_minimum_size.x = 360
@@ -2100,22 +2120,13 @@ func open_character(npc_id: String) -> void:
 			var res := sim.equip(n.character_id, slot, uids[i])
 			show_toast(res.msg, GOOD if res.ok else BAD)
 			close_top()
-			open_character(npc_id))
+			open_character(npc_id, "equip"))
 		r.add_child(ob)
-	# 오늘 일정 요약
-	var wd := sim.clock.weekday()
-	var today := PackedStringArray()
-	for b in sim.data.schedules.get(npc_id, {}).get("weekly_schedule", []):
-		if int(b.weekday) == wd:
-			var req: Array = b.get("required_unlocks", [])
-			var fb := str(b.get("fallback_facility_id", ""))
-			today.append("%s~%s %s @ %s%s%s" % [OutgameData.hm(int(b.start_minute)), OutgameData.hm(int(b.end_minute)), OutgameData.ACTIVITIES.get(b.activity_id, b.activity_id),
-				sim.data.facility_name(b.target_facility_id), " (해금 시: %s)" % ", ".join(req.map(func(x): return sim.data.facility_name(x))) if not req.is_empty() else "",
-				" (잠기면: %s)" % sim.data.facility_name(fb) if fb != "" else ""])
-	body.add_child(_label("오늘(%s) 일정 — 편집은 Godot 에디터 '일정' 탭" % OutgameData.WEEKDAYS[wd], 15, Color(1, 0.95, 0.75)))
-	var t := _label("\n".join(today), 13, Color(0.82, 0.88, 0.96))
-	body.add_child(t)
-
+	body.add_child(_label("무기고 보관 무기 — 다른 대원이 장착 중인 무기는 그 대원의 장비 탭에서 빼야 고를 수 있음", 13, Color(0.8, 0.85, 0.92)))
+	var list := _scroll(body, 150)
+	for it in sim.inventory:
+		var who := "보관 중" if it.owner == "" else "%s 장착 (%d)" % [_char_name(it.owner), int(it.slot) + 1]
+		list.add_child(_label("%s +%d — %s" % [sim.item_name(it.item), it.plus, who], 14, Color(0.9, 0.92, 0.95) if it.owner == "" or it.owner == n.character_id else Color(0.6, 0.63, 0.7)))
 
 # ---------------------------------------------------------------- 세계관 도감 (data/codex.json · 탭: 등장인물 · 몬스터 · 상태이상 · 종교(신) · 도시 배경)
 const CODEX_COL := {"characters": Color(0.55, 0.8, 1.0), "monsters": Color(1.0, 0.5, 0.4), "statuses": Color(0.85, 0.6, 1.0), "gods": Color(1.0, 0.85, 0.45), "cities": Color(0.5, 0.95, 0.7), "facilities": Color(0.95, 0.75, 0.5)}

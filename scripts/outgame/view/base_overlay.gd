@@ -315,7 +315,28 @@ func _text(pos: Vector2, s: String, size: int, col: Color, font: Font) -> void:
 
 
 ## 방 클릭 = 이동 목표 표시: 걷기 = 초록 고리 하나, 뛰기(더블클릭) = 주황 고리 둘 + 빠르게 퍼짐
+## 정지 중에 맡아 둔 다음 이동: 그 자리에 깜빡이는 점선 고리 + "재생하면 이동" (뛰기 = 주황, 걷기 = 초록)
+func _draw_queued_mark() -> void:
+	var q: Dictionary = hub.queued
+	if q.is_empty():
+		return
+	var p: Vector2 = hub.queued_screen_pos()
+	if p == Vector2.INF:
+		return
+	var col := Color(1.0, 0.62, 0.2) if q.get("run", false) else Color(0.45, 1.0, 0.6)
+	var a := 0.55 + 0.45 * sin(_t * 5.0)
+	draw_set_transform(p, 0.0, Vector2(1.0, 0.45))
+	for i in 12:
+		var a0 := TAU * i / 12.0 + _t * 0.8
+		draw_arc(Vector2.ZERO, 18.0, a0, a0 + TAU / 24.0, 4, Color(col, a), 3.0)
+	draw_circle(Vector2.ZERO, 4.0, Color(col, a))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var who: String = sim.npcs[q.npc].name if sim.npcs.has(str(q.npc)) else ""
+	_text(p + Vector2(0, -16), "%s %s · 재생하면 시작" % [who, "뛰어감" if q.get("run", false) else "이동"], 13, col, _bold)
+
+
 func _draw_move_mark() -> void:
+	_draw_queued_mark()
 	if move_mark.is_empty():
 		return
 	var t := float(move_mark.t) / 0.9
