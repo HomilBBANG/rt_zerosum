@@ -1,5 +1,5 @@
 extends Control
-## 타이틀: 게임 시작(새 기지) / 이어하기(저장) / 전투 테스트 메뉴(개발용) / 종료.
+## 타이틀: 이어하기(저장) / 새 게임(새 기지) / 설정(전체 화면 · 전투 테스트 메뉴 — 개발용) / 종료.
 ## 게임 루프 [임시]: 타이틀 → 기지 → 전투 출전 → 전투 배치 → 전투 → 결과 → 기지.
 
 var _font: Font
@@ -7,70 +7,145 @@ var _bold: Font
 var _confirm: Control
 
 
+## 타이틀 v2 (사용자 제공 그림 art_src/ui/title/ → assets/ui/title/, 레퍼런스 art_src/ui/title/ref_title.webp):
+## 배경 한 장 + 위 로고 + 아래 띠(9칸 늘리기) 위에 버튼 4개(이어하기 · 새 게임 · 설정 · 종료 — 글자 · 아이콘이 그려진 그림).
+const T := "res://assets/ui/title/"
+const BAR_RECT := Rect2(0, 595, 1280, 108)          # 아래 띠 (레퍼런스 화면 위치)
+const BTN_Y := 619.0
+const BTN_H := 62.0
+const BTN_SLOTS := [Vector2(84, 358), Vector2(371, 635), Vector2(647, 911), Vector2(922, 1198)]   # 버튼 칸 가로 범위
+var _settings: Control
+
+
 func _ready() -> void:
 	_font = load("res://assets/fonts/Pretendard-Medium.ttf")
 	_bold = load("res://assets/fonts/Pretendard-Bold.ttf")
-	var bg := ColorRect.new()
-	bg.color = Color(0.04, 0.05, 0.08)
+	var bg := TextureRect.new()
+	bg.texture = load(T + "bg_title.png")
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	bg.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(bg)
-	# 원색 조명 색면 두 개 + 경계 띠 (전투 메뉴와 같은 스타일 선언)
-	var a := Polygon2D.new()
-	a.polygon = PackedVector2Array([Vector2(0, 0), Vector2(700, 0), Vector2(420, 720), Vector2(0, 720)])
-	a.color = Color(0.03, 0.18, 0.40)
-	add_child(a)
-	var b := Polygon2D.new()
-	b.polygon = PackedVector2Array([Vector2(700, 0), Vector2(1280, 0), Vector2(1280, 720), Vector2(420, 720)])
-	b.color = Color(1.0, 0.52, 0.06)
-	add_child(b)
-	var s := Polygon2D.new()
-	s.polygon = PackedVector2Array([Vector2(700, 0), Vector2(744, 0), Vector2(464, 720), Vector2(420, 720)])
-	s.color = Color(0.40, 0.82, 1.0)
-	add_child(s)
-	# 기지 단면 실루엣
-	var sil := Polygon2D.new()
-	sil.polygon = PackedVector2Array([Vector2(760, 470), Vector2(1220, 470), Vector2(1220, 720), Vector2(760, 720)])
-	sil.color = Color(0.10, 0.06, 0.06)
-	add_child(sil)
-	for i in 3:
-		for j in 4:
-			var w := ColorRect.new()
-			w.color = [Color(1, 0.12, 0.47), Color(0.22, 1, 0.73), Color(0.18, 0.95, 1), Color(0, 0, 0)][(i * 4 + j) % 4] if (i + j) % 3 != 2 else Color(0, 0, 0)
-			w.position = Vector2(780 + j * 108, 486 + i * 76)
-			w.size = Vector2(96, 62)
-			add_child(w)
-
-	var box := VBoxContainer.new()
-	box.position = Vector2(90, 110)
-	box.add_theme_constant_override("separation", 14)
-	add_child(box)
-	box.add_child(_label("RT ZEROSUM", 64, Color(1, 1, 1)))
-	box.add_child(_label("2048-04-07 — 기지 총괄 책임자", 20, Color(0.9, 0.95, 1)))
-	var sp := Control.new()
-	sp.custom_minimum_size.y = 24
-	box.add_child(sp)
-	var start := _button("게임 시작", Color(1.0, 0.55, 0.25))
-	start.pressed.connect(_on_new)
-	box.add_child(start)
-	var cont := _button("이어하기", Color(0.35, 0.85, 0.7))
-	cont.disabled = not Game.has_save()
+	# 로고 "ROTTEN WAR": 위 가운데 (레퍼런스처럼 살짝 오른쪽)
+	var logo := TextureRect.new()
+	logo.texture = load(T + "logo.png")
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.size = Vector2(546, 167)
+	logo.position = Vector2(654 - 273, 40)
+	logo.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(logo)
+	# 아래 띠
+	var bar := Control.new()
+	bar.position = BAR_RECT.position
+	bar.size = BAR_RECT.size
+	bar.mouse_filter = MOUSE_FILTER_IGNORE
+	bar.draw.connect(func():
+		var k := BAR_RECT.size.y / 212.0
+		UiNine.draw(bar, T + "title_bar.png", Vector4(300, 100, 300, 100), Rect2(Vector2.ZERO, bar.size), k))
+	add_child(bar)
+	var has_data := Game.outgame_data != null
+	var cont := _art_button("btn_continue.png", 0, "이어하기")
+	cont.disabled = not (has_data and Game.has_save())
 	cont.pressed.connect(func():
 		if Game.load_campaign():
 			Game.go_base())
-	box.add_child(cont)
-	var test := _button("전투 테스트 메뉴 (개발용)", Color(0.6, 0.6, 0.7))
-	test.pressed.connect(func(): Game.go_menu_test())
-	box.add_child(test)
-	var quit := _button("종료", Color(0.5, 0.5, 0.55))
+	var start := _art_button("btn_new.png", 1, "새 게임")
+	start.disabled = not has_data
+	start.pressed.connect(_on_new)
+	var settings := _art_button("btn_settings.png", 2, "설정")
+	settings.pressed.connect(_open_settings)
+	var quit := _art_button("btn_quit.png", 3, "종료")
 	quit.pressed.connect(func(): Game.quit_game())
-	box.add_child(quit)
-	if Game.outgame_data == null:
-		start.disabled = true
-		cont.disabled = true
-		box.add_child(_label("data/outgame.xlsx 를 읽지 못해 기지를 열 수 없습니다", 15, Color(1, 0.5, 0.4)))
-	box.add_child(_label("기지 데이터: data/outgame.xlsx · 대원 일정: Godot 에디터 '일정' 탭 · F11 전체 화면", 13, Color(0.85, 0.9, 0.95)))
+	if not has_data:
+		var err := _label("data/outgame.xlsx 를 읽지 못해 기지를 열 수 없습니다", 15, Color(1, 0.5, 0.4))
+		err.position = Vector2(84, BAR_RECT.position.y - 30)
+		add_child(err)
 	if Game.cli.get("scene", "title") == "title":
+		if str(Game.cli.get("title_ui", "")) == "settings":
+			_open_settings()
 		Game.maybe_cli_capture()
+
+
+## 그림 버튼 (글자 · 아이콘이 그려진 그림): 칸 i 가운데에 높이 맞춤. 마우스 올림 = 밝게 + 살짝 커짐, 누름 = 어둡게, 못 누름 = 흐리게
+func _art_button(file: String, i: int, tip: String) -> TextureButton:
+	var tex: Texture2D = load(T + file)
+	var b := TextureButton.new()
+	b.texture_normal = tex
+	b.ignore_texture_size = true
+	b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	var slot: Vector2 = BTN_SLOTS[i]
+	var w := minf(slot.y - slot.x, BTN_H * tex.get_width() / float(tex.get_height()))
+	b.size = Vector2(w, BTN_H)
+	b.position = Vector2((slot.x + slot.y) * 0.5 - w * 0.5, BTN_Y)
+	b.pivot_offset = b.size * 0.5
+	b.tooltip_text = tip
+	b.focus_mode = FOCUS_NONE
+	b.mouse_default_cursor_shape = CURSOR_POINTING_HAND
+	var look := func():
+		if b.disabled:
+			b.modulate = Color(0.5, 0.5, 0.5, 0.85)
+			b.scale = Vector2.ONE
+		elif b.is_pressed():
+			b.modulate = Color(0.85, 0.85, 0.8)
+		elif b.is_hovered():
+			b.modulate = Color(1.25, 1.18, 0.95)   # 레퍼런스의 선택된 버튼처럼 금빛으로 밝게
+			b.scale = Vector2(1.03, 1.03)
+		else:
+			b.modulate = Color.WHITE
+			b.scale = Vector2.ONE
+	for sig in ["mouse_entered", "mouse_exited", "button_down", "button_up"]:
+		b.connect(sig, look)
+	add_child(b)
+	look.call_deferred()
+	return b
+
+
+## 설정: 전체 화면 켜고 끄기 · 전투 테스트 메뉴(개발용) · 닫기
+func _open_settings() -> void:
+	if _settings != null and is_instance_valid(_settings):
+		_settings.queue_free()
+		_settings = null
+		return
+	var p := PanelContainer.new()
+	UiPanel.apply(p, Vector4(26, 20, 26, 22))
+	add_child(p)
+	_settings = p
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	p.add_child(v)
+	var t := _label("설정", 22, Color(1, 0.92, 0.75))
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(t)
+	var win := get_window()
+	var fs := _choice("전체 화면 끄기  (F11)" if win.mode == Window.MODE_FULLSCREEN else "전체 화면 켜기  (F11)")
+	fs.pressed.connect(func():
+		win.mode = Window.MODE_WINDOWED if win.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+		_settings.queue_free()
+		_settings = null)
+	v.add_child(fs)
+	var test := _choice("전투 테스트 메뉴 (개발용)")
+	test.pressed.connect(func(): Game.go_menu_test())
+	v.add_child(test)
+	var close := _choice("닫기")
+	close.pressed.connect(func():
+		_settings.queue_free()
+		_settings = null)
+	v.add_child(close)
+	p.reset_size()
+	p.position = Vector2(640, 330) - p.get_combined_minimum_size() * 0.5
+
+
+func _choice(text: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.add_theme_font_override("font", _font)
+	b.add_theme_font_size_override("font_size", 18)
+	b.custom_minimum_size = Vector2(320, 44)
+	b.focus_mode = FOCUS_NONE
+	UiButton.apply(b, "choice", "choice_on")
+	return b
 
 
 func _on_new() -> void:
@@ -78,14 +153,8 @@ func _on_new() -> void:
 		_start_new()
 		return
 	_confirm = PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.06, 0.08, 0.12, 0.97)
-	sb.border_color = Color(1, 0.6, 0.3)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(10)
-	sb.set_content_margin_all(18)
-	_confirm.add_theme_stylebox_override("panel", sb)
-	_confirm.position = Vector2(380, 280)
+	UiPanel.apply(_confirm, Vector4(26, 20, 26, 22))
+	_confirm.position = Vector2(370, 290)
 	add_child(_confirm)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
@@ -94,12 +163,16 @@ func _on_new() -> void:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 10)
 	v.add_child(h)
-	var yes := _button("새로 시작", Color(1.0, 0.55, 0.25))
-	yes.custom_minimum_size = Vector2(200, 48)
+	var yes := Button.new()
+	yes.text = "새로 시작"
+	yes.custom_minimum_size = Vector2(200, 44)
+	UiButton.apply(yes, "accept")
 	yes.pressed.connect(_start_new)
 	h.add_child(yes)
-	var no := _button("취소", Color(0.5, 0.5, 0.55))
-	no.custom_minimum_size = Vector2(200, 48)
+	var no := Button.new()
+	no.text = "취소"
+	no.custom_minimum_size = Vector2(200, 44)
+	UiButton.apply(no, "decline")
 	no.pressed.connect(func(): _confirm.queue_free())
 	h.add_child(no)
 
@@ -118,27 +191,3 @@ func _label(text: String, size: int, color: Color = Color(1, 1, 1)) -> Label:
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	l.add_theme_constant_override("outline_size", 6)
 	return l
-
-
-func _button(text: String, color: Color) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_override("font", _font)
-	b.add_theme_font_size_override("font_size", 22)
-	b.custom_minimum_size = Vector2(360, 56)
-	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = color.darkened(0.55)
-	sb.border_color = color
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(8)
-	sb.content_margin_left = 20
-	b.add_theme_stylebox_override("normal", sb)
-	var h := sb.duplicate()
-	h.bg_color = color.darkened(0.2)
-	b.add_theme_stylebox_override("hover", h)
-	var d := sb.duplicate()
-	d.bg_color = Color(0.1, 0.1, 0.12)
-	d.border_color = Color(0.3, 0.3, 0.32)
-	b.add_theme_stylebox_override("disabled", d)
-	return b

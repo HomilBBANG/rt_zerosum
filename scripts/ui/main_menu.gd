@@ -34,7 +34,7 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 14)
 	add_child(box)
 	box.add_child(_label("RT ZEROSUM", 54, Color(1, 1, 1)))
-	box.add_child(_label("전투 테스트 메뉴 (개발용) — 기지 성장 반영 없음. 실제 게임은 타이틀 → 게임 시작", 17, Color(0.85, 0.95, 0.95)))
+	box.add_child(_label("전투 테스트 메뉴 (개발용) — 기지 성장 반영 없음. 실제 게임은 타이틀 → 새 게임", 17, Color(0.85, 0.95, 0.95)))
 	var sp := Control.new()
 	sp.custom_minimum_size.y = 10
 	box.add_child(sp)
