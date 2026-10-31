@@ -2,7 +2,7 @@ class_name BaseOverlay
 extends Node2D
 ## 3D 기지 위에 화면 좌표로 그리는 2D 덮개 (3D 카메라로 투영).
 ## mode "under": 방 이름표, 잠긴 방 자물쇠·가격, 마우스 강조, 층 이름표 — 대원보다 아래.
-## mode "walls": 방과 방 사이 검은 벽(3D 칸막이 앞면과 같은 자리) + 방 이름표 · 마우스 강조 · 주크박스 표시 — 대원보다 위 (대원이 벽 뒤로 지나감).
+## mode "walls": 방과 방 사이 검은 벽(3D 칸막이 앞면과 같은 자리) + 방 이름표 · 마우스 강조 · 주크박스 표시 · 층 이름표 — 대원보다 위 (대원이 벽 뒤로 지나감).
 ## mode "over": 대원끼리 대화 말풍선 — 대원보다 위. 말풍선 화면 사각형은 클릭 판정용으로 bubble_rects 에 남긴다.
 
 const OUTLINE := Color(0.06, 0.05, 0.08)
@@ -61,6 +61,7 @@ func _draw() -> void:
 		for fid in sim.data.facility_order:
 			if sim.is_unlocked(fid):
 				_draw_room_top(fid)
+		_draw_floor_labels()   # 층 이름표 = 벽 · 대원보다 앞
 		if hub.under.juke_hover:
 			var jr: Rect2 = hub.jukebox_rect()
 			draw_rect(jr, Color(1, 0.85, 0.3, 0.9), false, 2.0)
@@ -69,7 +70,6 @@ func _draw() -> void:
 	_draw_floor_frames()
 	for fid in sim.data.facility_order:
 		_draw_room(fid)
-	_draw_floor_labels()
 	_draw_move_mark()
 
 
@@ -135,6 +135,7 @@ func _closed(q: PackedVector2Array) -> PackedVector2Array:
 func _draw_floor_labels() -> void:
 	var bb := v3d.base_bounds()
 	var active := ""
+	var hover_fid: String = hub.under.hover_fid   # 마우스 강조는 아래 덮개(under)가 들고 있음
 	if hover_fid != "":
 		active = str(sim.data.facilities[hover_fid].floor)
 	elif hub.selected != "" and sim.npcs.has(hub.selected):
