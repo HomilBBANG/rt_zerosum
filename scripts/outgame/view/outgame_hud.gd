@@ -292,7 +292,7 @@ func _build_top() -> void:
 	var specs := [["스킬", "skill", null, func(): open_skills("")], ["도감", "codex", null, func(): open_codex()], ["퀘스트", "quest", null, func(): open_quests()],
 		["의뢰", "contract", null, func(): open_contracts("")], ["무기고", "armory", null, func(): open_armory()], ["인벤토리", "inventory", null, func(): open_inventory()], ["납품", "supply", GOLD, func(): open_supply()], ["원장", "ledger", null, func(): open_ledger()],
 		["저장", "save", null, func(): hub.save_now()], ["전투 출전", "sortie", Color(1.0, 0.5, 0.32), func(): open_sortie()],
-		["타이틀", "title", null, func(): hub.to_title()]]
+		["타이틀", "title", null, func(): confirm_title()]]
 	for s in specs:
 		right.add_child(_icon_button(s[0], s[1], s[2] if s[2] != null else Color(0.92, 0.91, 0.86), s[3]))
 	rp.position.x = 1280 - 6 - rp.get_combined_minimum_size().x
@@ -924,6 +924,35 @@ func close_all() -> void:
 
 ## {root, body}. 화면을 어둡게 덮고 가운데 창
 const WIN_EDGE := 4.0   # 창과 화면 가장자리 사이 최소 여백 (화면을 거의 채우는 스킬 · 도감 창도 스크롤 없이 들어가게 작게)
+
+
+## '타이틀' 버튼: "타이틀 화면으로 돌아가시겠습니까?" 확인 (예 = 저장하고 타이틀로, 아니요 = 닫기)
+func confirm_title() -> void:
+	var win := _window("타이틀로", 440)
+	var body: VBoxContainer = win.body
+	var q := _label("타이틀 화면으로 돌아가시겠습니까?", 18, Color(0.95, 0.94, 0.9))
+	q.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_child(q)
+	var note := _label("지금 상태는 저장됩니다 (칸 %d)" % Game.save_slot, 13, Color(0.75, 0.8, 0.85))
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_child(note)
+	var row := _hbox(12)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	body.add_child(row)
+	var yes := Button.new()
+	yes.text = "예"
+	yes.custom_minimum_size = Vector2(170, 42)
+	UiButton.apply(yes, "accept")
+	yes.pressed.connect(func():
+		close_top()
+		hub.to_title())
+	row.add_child(yes)
+	var no := Button.new()
+	no.text = "아니요"
+	no.custom_minimum_size = Vector2(170, 42)
+	UiButton.apply(no, "decline")
+	no.pressed.connect(close_top)
+	row.add_child(no)
 
 
 func _window(title: String, w: float, on_close: Callable = Callable()) -> Dictionary:
