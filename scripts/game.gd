@@ -321,7 +321,7 @@ func _cli_jump() -> void:
 				var u: UnitData = picks[i]
 				var d: Array = demo[i % demo.size()]
 				al.append({"id": u.id, "hp": int(u.max_hp * float(d[2])), "max_hp": u.max_hp, "alive": d[3], "statuses": d[4], "dmg": d[0], "kills": d[1]})
-			last_result = {"winner": cli.get("winner", "ally"), "rounds": 4, "mode": mode, "stage": stage_id,
+			last_result = {"winner": cli.get("winner", "ally"), "rounds": 5, "mode": mode, "stage": stage_id, "enemies_total": 4, "enemies_down": 2,
 				"log": PackedStringArray(["(CLI 미리보기) 전투 로그 예시", "라운드 4 시작", "전투 종료: 아군 승리"]), "allies": al}
 			if start_base_session(true):
 				base.apply_battle_result(last_result)

@@ -103,12 +103,18 @@ func _on_battle_ended(winner: String) -> void:
 	if Game.cli.has("shot"):
 		return
 	var allies := []
+	var foes := 0
+	var foes_down := 0
 	for u in controller.slots.all_units():
+		if u.team != "ally":
+			foes += 1
+			if not u.alive:
+				foes_down += 1
 		if u.team == "ally":
 			allies.append({"id": u.data.id, "hp": u.hp, "max_hp": u.data.max_hp, "alive": u.alive, "statuses": u.statuses.duplicate(),
 				"dmg": int(stats.get(u.data.id, {}).get("dmg", 0)), "kills": int(stats.get(u.data.id, {}).get("kills", 0))})
 	Game.show_result({"winner": winner, "rounds": controller.round_no, "log": controller.log_lines.duplicate(), "mode": Game.mode,
-		"allies": allies, "stage": Game.stage_id})
+		"allies": allies, "stage": Game.stage_id, "enemies_total": foes, "enemies_down": foes_down})
 
 
 func set_preset(id: String) -> void:

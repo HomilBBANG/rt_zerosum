@@ -3,6 +3,7 @@ extends Control
 ## 배경 · 가운데 큰 판(머리 탭 "전투 승리 / 패배") · 대원 줄(초상화 · 이름 · Lv · +EXP 막대 · 전투 끝에 남은 부정적 상태 이상 꼬리표 · 체력)
 ## · 획득 전리품 칸 · [상세 기록] [계속] · 왼쪽 MVP(준 피해가 가장 큰 대원 — 전신 그림 + 배지), 오른쪽 최저 성과(가장 적은 대원).
 ## 상세 기록 = 전투 로그 + 다시 전투 · 전투 배치 (예전 결과 화면 버튼).
+## 패배 = 다른 화면 (레퍼런스 art_src/ui/result/ref_defeat.webp, 조각 assets/ui/result/lose/ — _build_defeat).
 
 const R := "res://assets/ui/result/"
 const GOLD := Color(1.0, 0.82, 0.25)
@@ -26,6 +27,9 @@ func _ready() -> void:
 	var r := Game.last_result
 	var win: bool = r.get("winner", "enemy") == "ally"
 	var allies: Array = r.get("allies", [])
+	if not win:
+		_build_defeat(r, allies)
+		return
 	# 배경
 	var bg := TextureRect.new()
 	bg.texture = load(R + "bg_result.png")
@@ -359,3 +363,213 @@ func _label(text: String, size: int, color: Color, f: Font = null) -> Label:
 	l.add_theme_constant_override("outline_size", 4)
 	l.mouse_filter = MOUSE_FILTER_IGNORE
 	return l
+
+
+# ================================================================ 패배 화면
+## 위 띠(붉은 "전투 패배") · 왼쪽 지친 대원들(지침 포즈, 키 비례) · 오른쪽 전투 요약(라운드 · 격파한 적 · 행동 가능) ·
+## 부대 상태(대원 카드: 초상화 · 이름 · 남은 부정적 상태 이상) · 보상 정산(전리품 · 경험치) · 아래 띠 위 [상세 기록] [재도전] [기지로]
+const L := "res://assets/ui/result/lose/"
+
+
+func _build_defeat(r: Dictionary, allies: Array) -> void:
+	var bg := TextureRect.new()
+	bg.texture = load(L + "bg_defeat.png")
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	bg.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(bg)
+	_defeat_crew(allies)
+	# 위 · 아래 띠
+	var top := _art(L + "top_bar.png", Rect2(0, 0, 1280, 1280.0 * 166.0 / 1995.0))
+	top.draw.connect(func():
+		var fs := 50
+		var t := "전투 패배"
+		var w := _bold.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var cy := (21.0 + 141.0) * 0.5 * (1280.0 / 1995.0)   # 붉은 칸 안쪽 가운데 (그림 21~141px)
+		top.draw_string_outline(_bold, Vector2(640 - w * 0.5, cy + fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color(0.12, 0.03, 0.02))
+		top.draw_string(_bold, Vector2(640 - w * 0.5, cy + fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.96, 0.9, 0.78)))
+	var bh := 1280.0 * 158.0 / 1988.0
+	_art(L + "bottom_bar.png", Rect2(0, 720 - bh, 1280, bh))
+	var logo := TextureRect.new()
+	logo.texture = load("res://assets/ui/title/logo.png")
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.position = Vector2(1158, 36)
+	logo.size = Vector2(100, 24)
+	logo.modulate = Color(1, 1, 1, 0.55)
+	logo.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(logo)
+	# 오른쪽 기둥
+	var x0 := 872.0
+	var w := 394.0
+	var alive := allies.filter(func(a): return a.get("alive", true)).size()
+	_info_panel(L + "summary_panel.png", Rect2(x0, 78, w, 132), "전투 요약", [
+		["진행 라운드", str(int(r.get("rounds", 0)))],
+		["격파한 적", "%d / %d" % [int(r.get("enemies_down", 0)), int(r.get("enemies_total", 0))]],
+		["행동 가능", "%d / %d" % [alive, allies.size()]]])
+	_squad_panel(Rect2(x0, 214, w, 276), allies)
+	var loot: Array = Game.base.last_loot if Game.campaign and Game.base != null else []
+	var xp := 0
+	if Game.campaign and Game.base != null and not Game.base.growth.is_empty():
+		xp = int(Game.base.growth[0].xp)
+	_info_panel(L + "settlement_panel.png", Rect2(x0, 494, w, 118), "보상 정산", [
+		["획득 전리품", "없음" if loot.is_empty() else ", ".join(loot.map(func(e): return "%s ×%d" % [e.name, int(e.count)]))],
+		["획득 경험치", "+%d" % xp if xp > 0 else "-"]])
+	# 버튼 (아래 띠 위)
+	var by := 720 - bh + bh * 0.5 - 26
+	var detail := _plate_button("상세 기록", L + "button_normal.png", Vector4(40, 40, 40, 40), 0.5, Rect2(176, by, 280, 52), CREAM)
+	detail.pressed.connect(_open_detail)
+	var retry := _plate_button("재도전", L + "button_normal.png", Vector4(40, 40, 40, 40), 0.5, Rect2(500, by, 280, 52), CREAM)
+	retry.pressed.connect(func():
+		Game.restart_count += 1
+		Game.start_battle())
+	var home := _plate_button("기지로" if Game.campaign else "메뉴로", L + "button_red.png", Vector4(36, 36, 36, 36), 0.5, Rect2(824, by, 280, 52), CREAM)
+	home.pressed.connect(func(): Game.go_menu())
+	if str(Game.cli.get("result_ui", "")) == "detail":
+		_open_detail()
+	Game.maybe_cli_capture()
+
+
+func _art(path: String, rect: Rect2) -> Control:
+	var c := Control.new()
+	c.position = rect.position
+	c.size = rect.size
+	c.mouse_filter = MOUSE_FILTER_IGNORE
+	var tex: Texture2D = load(path)
+	c.draw.connect(func(): c.draw_texture_rect(tex, Rect2(Vector2.ZERO, c.size), false))
+	add_child(c)
+	return c
+
+
+## 지친 대원들: 지침(tired) 포즈 — 없으면 언짢음 · 기본 그림, 키 비례 (175cm = 520px), 왼쪽 칸에 나란히 (조금씩 겹침)
+func _defeat_crew(allies: Array) -> void:
+	var arts := []
+	for a in allies:
+		var u := Game.find_ally(str(a.get("id", "")))
+		if u == null:
+			continue
+		var path := ""
+		for pose in ["tired", "annoying"]:
+			path = CharacterSprite2D.pose_path(u.sprite_id, pose)
+			if path != "":
+				break
+		if path == "":
+			path = CharacterSprite2D.dir_of(u.sprite_id).path_join("base.png")
+		var tex := CharacterSprite2D._tex(path)
+		if tex == null:
+			continue
+		var canvas_h := float((CharacterSprite2D.info_of(u.sprite_id).get("image_size", [512, 768]) as Array)[1])
+		var k := (520.0 * u.height_cm / 175.0) / canvas_h
+		arts.append({"tex": tex, "k": k, "alive": a.get("alive", true)})
+	if arts.is_empty():
+		return
+	var left := 20.0
+	var right := 860.0
+	var step := (right - left) / arts.size()
+	for i in arts.size():
+		var e: Dictionary = arts[i]
+		var tex: Texture2D = e.tex
+		var t := TextureRect.new()
+		t.texture = tex
+		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		t.stretch_mode = TextureRect.STRETCH_SCALE
+		t.size = Vector2(tex.get_width(), tex.get_height()) * float(e.k)
+		var cx := left + step * (i + 0.5)
+		t.position = Vector2(cx - t.size.x * 0.5, 640.0 - t.size.y)
+		t.mouse_filter = MOUSE_FILTER_IGNORE
+		if not e.alive:
+			t.modulate = Color(0.78, 0.76, 0.8)
+		add_child(t)
+
+
+## 제목 + 이름 · 값 줄들이 있는 판 (전투 요약 · 보상 정산)
+func _info_panel(path: String, rect: Rect2, title: String, rows: Array) -> void:
+	var c := Control.new()
+	c.position = rect.position
+	c.size = rect.size
+	c.mouse_filter = MOUSE_FILTER_IGNORE
+	c.draw.connect(func():
+		UiNine.draw(c, L + "status_card.png", Vector4(60, 60, 60, 60), Rect2(Vector2.ZERO, c.size), 0.5)
+		_section_title(c, title)
+		var ry := 46.0
+		var rh := (c.size.y - ry - 12.0) / maxf(1.0, rows.size())
+		for i in rows.size():
+			var y := ry + i * rh
+			if i > 0:
+				c.draw_line(Vector2(22, y), Vector2(c.size.x - 22, y), Color(0.4, 0.42, 0.34, 0.6), 1.0)
+			c.draw_string(_font, Vector2(30, y + rh * 0.5 + 6), str(rows[i][0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.85, 0.86, 0.8))
+			var v := str(rows[i][1])
+			var vw := minf(_bold.get_string_size(v, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x, c.size.x - 170)
+			c.draw_string(_bold, Vector2(c.size.x - 30 - vw, y + rh * 0.5 + 6), v, HORIZONTAL_ALIGNMENT_LEFT, c.size.x - 170, 17, CREAM))
+	add_child(c)
+
+
+func _section_title(c: Control, title: String) -> void:
+	c.draw_rect(Rect2(20, 20, 4, 16), Color(0.75, 0.72, 0.55))
+	c.draw_string(_bold, Vector2(32, 35), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, CREAM)
+
+
+## 부대 상태: 대원 카드 2열 (초상화 · 이름 · 남은 부정적 상태 이상 — 쓰러짐 = "행동 불능")
+func _squad_panel(rect: Rect2, allies: Array) -> void:
+	var c := Control.new()
+	c.position = rect.position
+	c.size = rect.size
+	c.mouse_filter = MOUSE_FILTER_IGNORE
+	c.draw.connect(func():
+		UiNine.draw(c, L + "status_card.png", Vector4(60, 60, 60, 60), Rect2(Vector2.ZERO, c.size), 0.5)
+		_section_title(c, "부대 상태"))
+	add_child(c)
+	var n := allies.size()
+	var rows := maxi(1, ceili(n / 2.0))
+	var gx := 14.0
+	var gy := 46.0
+	var cw := (rect.size.x - gx * 3) / 2.0
+	var ch := minf(104.0, (rect.size.y - gy - 12.0 - 8.0 * (rows - 1)) / rows)
+	for i in n:
+		var a: Dictionary = allies[i]
+		var card := Control.new()
+		card.position = Vector2(gx + (i % 2) * (cw + gx), gy + (i / 2) * (ch + 8.0))
+		card.size = Vector2(cw, ch)
+		card.mouse_filter = MOUSE_FILTER_IGNORE
+		c.add_child(card)
+		var info := _ally_info(a)
+		card.draw.connect(_draw_member.bind(card, info, a.get("alive", true)))
+
+
+func _draw_member(card: Control, d: Dictionary, alive: bool) -> void:
+	UiNine.draw(card, L + "report_panel.png", Vector4(50, 50, 50, 50), Rect2(Vector2.ZERO, card.size), 0.4)
+	var ps := minf(card.size.y - 22.0, 72.0)
+	var pr := Rect2(11, (card.size.y - ps) * 0.5, ps, ps)
+	if d.portrait != null:
+		card.draw_texture_rect(d.portrait, pr.grow(-3), false)
+	UiNine.draw(card, L + "portrait_frame.png", Vector4(40, 40, 40, 40), pr, 0.3)
+	var tx := ps + 20
+	card.draw_string(_bold, Vector2(tx, 30), str(d.name), HORIZONTAL_ALIGNMENT_LEFT, card.size.x - tx - 12, 16, CREAM)
+	card.draw_string(_font, Vector2(tx, 49), str(d.hp_line), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, DIM)
+	# 상태 이상 (쓰러짐 = 행동 불능)
+	var bad: Array = (d.bad as Array).map(func(x): return "행동 불능" if x == "쓰러짐" else x)
+	var txt := "이상 없음" if bad.is_empty() else " · ".join(bad)
+	var tw := card.size.x - tx - 14
+	var parts := [txt]
+	if not bad.is_empty():   # 칸 폭에 맞춰 줄 바꿈 — 두 줄까지, 넘치면 끝에 "외 N"
+		parts = [""]
+		var shown := 0
+		for b in bad:
+			var cand: String = str(b) if parts[-1] == "" else parts[-1] + " · " + str(b)
+			if parts[-1] != "" and _bold.get_string_size(cand, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x > tw:
+				if parts.size() >= 2:
+					break
+				parts.append(str(b))
+			else:
+				parts[-1] = cand
+			shown += 1
+		if shown < bad.size():   # 끝 줄에 "외 N" 이 들어갈 자리가 없으면 그 줄 마지막 것도 "외" 로
+			var items: PackedStringArray = str(parts[-1]).split(" · ")
+			var more := bad.size() - shown
+			while items.size() > 1 and _bold.get_string_size(" · ".join(items) + " 외 %d" % more, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x > tw:
+				items.remove_at(items.size() - 1)
+				more += 1
+			parts[-1] = " · ".join(items) + " 외 %d" % more
+	for i in parts.size():
+		card.draw_string(_bold, Vector2(tx, 70 + i * 16), str(parts[i]), HORIZONTAL_ALIGNMENT_LEFT, tw, 13, CREAM if bad.is_empty() else RED)
