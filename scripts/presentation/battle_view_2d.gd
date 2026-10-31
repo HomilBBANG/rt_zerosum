@@ -487,20 +487,19 @@ const AP_EMPTY := Color(0.04, 0.1, 0.25, 0.7)
 
 func _draw_unit_bars(id: int, c: CanvasItem) -> void:
 	var s: UnitSprite2D = sprites.get(id, null)
-	if s != null:
+	if s != null and s.unit.alive:   # 쓰러진 캐릭터는 체력 · AP 칸 · 상태 배지 없음
 		var u: UnitRuntime = s.unit
 		var k := s.scale.y
-		var a := 1.0 if u.alive else 0.35
+		var a := 1.0
 		var h := maxf(6.0, 8.0 * k)
 		var y := s.position.y + 17.0 * k
 		var n := HP_SEGMENTS_ALLY if u.team == "ally" else HP_SEGMENTS_ENEMY
 		var hp_frac := clampf(float(u.hp) / float(maxi(u.data.max_hp, 1)), 0.0, 1.0)
 		_draw_segments(c, s.position.x, y, n, (15.0 if n <= 3 else 8.0) * k, h, 3.0 * k, hp_frac * n, HP_COLOR, HP_EMPTY, a)
-		if u.alive:
-			var ah := maxf(4.0, 5.0 * k)
-			_draw_segments(c, s.position.x, y + h + 3.0 * k, u.data.max_ap, 7.0 * k, ah, 2.5 * k, float(u.ap), AP_COLOR, AP_EMPTY, a)
-			var head := s.position + s.head_screen_offset() * s.scale.y
-			_draw_status_badges(c, u, head.x, head.y - 30.0 * k, k)
+		var ah := maxf(4.0, 5.0 * k)
+		_draw_segments(c, s.position.x, y + h + 3.0 * k, u.data.max_ap, 7.0 * k, ah, 2.5 * k, float(u.ap), AP_COLOR, AP_EMPTY, a)
+		var head := s.position + s.head_screen_offset() * s.scale.y
+		_draw_status_badges(c, u, head.x, head.y - 30.0 * k, k)
 
 
 ## 머리 위 전투 상태 이상 배지: 한 글자 + 남은 턴 (출혈 = 혈2, 동상은 터지기까지 남은 차례)
