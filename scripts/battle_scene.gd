@@ -20,6 +20,7 @@ func _ready() -> void:
 	view.setup(controller, preset)
 	hud.setup(controller, view, preset)
 	controller.battle_ended.connect(_on_battle_ended)
+	controller.action_resolved.connect(_tally)
 	Game.data_reloaded.connect(_on_data_reloaded)
 	if Game.cli.get("hud", "1") == "0":
 		hud.visible = false
@@ -77,6 +78,26 @@ func _on_data_reloaded(warnings: PackedStringArray) -> void:
 	hud.show_toast("밸런스 데이터 적용 (balance.xlsx)" + ("" if warnings.is_empty() else "  ⚠ " + warnings[0]))
 
 
+## 결과 화면 MVP · 최저 성과용: 아군마다 적에게 준 피해 · 처치 수 {id: {dmg, kills}}
+var stats := {}
+
+
+func _tally(event: Dictionary) -> void:
+	var a: UnitRuntime = event.get("actor")
+	if a == null or a.team != "ally":
+		return
+	var st: Dictionary = stats.get(a.data.id, {"dmg": 0, "kills": 0})
+	for r in event.get("results", []):
+		var t: UnitRuntime = r.get("target")
+		if t == null or t.team == a.team:
+			continue
+		if str(r.get("kind", "")) == "damage":
+			st.dmg = int(st.dmg) + int(r.get("amount", 0))
+		if r.get("killed", false):
+			st.kills = int(st.kills) + 1
+	stats[a.data.id] = st
+
+
 func _on_battle_ended(winner: String) -> void:
 	await get_tree().create_timer(1.4).timeout
 	if Game.cli.has("shot"):
@@ -84,7 +105,8 @@ func _on_battle_ended(winner: String) -> void:
 	var allies := []
 	for u in controller.slots.all_units():
 		if u.team == "ally":
-			allies.append({"id": u.data.id, "hp": u.hp, "alive": u.alive, "statuses": u.statuses.duplicate()})
+			allies.append({"id": u.data.id, "hp": u.hp, "max_hp": u.data.max_hp, "alive": u.alive, "statuses": u.statuses.duplicate(),
+				"dmg": int(stats.get(u.data.id, {}).get("dmg", 0)), "kills": int(stats.get(u.data.id, {}).get("kills", 0))})
 	Game.show_result({"winner": winner, "rounds": controller.round_no, "log": controller.log_lines.duplicate(), "mode": Game.mode,
 		"allies": allies, "stage": Game.stage_id})
 

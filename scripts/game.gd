@@ -312,10 +312,19 @@ func _cli_jump() -> void:
 		"base":
 			start_base_session(cli.get("new", "1") == "1")
 			go_base()
-		"result":
-			last_result = {"winner": cli.get("winner", "ally"), "rounds": 4, "mode": mode,
-				"log": PackedStringArray(["(CLI 미리보기) 전투 로그 예시", "라운드 4 시작: 라온 → 저격수 → ...", "라온 → 지휘관: 필살기 21 피해 (전투 불능)", "전투 종료: 아군 승리"]),
-				"allies": allies.map(func(u): return {"id": u.id, "hp": 0, "alive": false, "statuses": []})}
+		"result":   # 결과 화면 미리보기 (--winner=ally|enemy). 새 기지에 전투 결과를 반영해 경험치 · 전리품까지 보이게
+			var demo := [[18, 2, 1.0, true], [42, 3, 0.55, true], [25, 1, 0.8, true], [8, 0, 0.0, false], [12, 1, 1.0, true], [5, 0, 0.3, true]]
+			var al := []
+			var fm: Array = formation.map(func(e): return str(e.unit_id))
+			var picks: Array = allies.filter(func(u): return fm.is_empty() or fm.has(u.id)).slice(0, 4)
+			for i in picks.size():
+				var u: UnitData = picks[i]
+				var d: Array = demo[i % demo.size()]
+				al.append({"id": u.id, "hp": int(u.max_hp * float(d[2])), "max_hp": u.max_hp, "alive": d[3], "statuses": [], "dmg": d[0], "kills": d[1]})
+			last_result = {"winner": cli.get("winner", "ally"), "rounds": 4, "mode": mode, "stage": stage_id,
+				"log": PackedStringArray(["(CLI 미리보기) 전투 로그 예시", "라운드 4 시작", "전투 종료: 아군 승리"]), "allies": al}
+			if start_base_session(true):
+				base.apply_battle_result(last_result)
 			get_tree().change_scene_to_file(SCENE_RESULT)
 		_:
 			pass
