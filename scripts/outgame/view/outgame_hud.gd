@@ -453,8 +453,8 @@ func _build_log() -> void:
 	th.add_child(_label("운영 기록  ▸", 14, Color(0.92, 0.91, 0.86)))
 	log_tab.mouse_filter = MOUSE_FILTER_STOP
 	log_tab.mouse_default_cursor_shape = CURSOR_POINTING_HAND
-	log_tab.tooltip_text = "기록 펴기"
-	log_tab.gui_input.connect(func(e): if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT: set_log_open(true))
+	log_tab.tooltip_text = "클릭: 기록 펴기 · 끌기: 옮기기"
+	log_tab.gui_input.connect(_on_log_tab_input)
 	add_child(log_tab)
 	_build_hint()
 	set_log_open(true)
@@ -495,7 +495,39 @@ func set_log_open(on: bool) -> void:
 	log_panel.visible = on
 	log_tab.visible = not on
 	log_tab.reset_size()
-	log_tab.position = Vector2(6, 720 - 6 - 8 - log_tab.get_combined_minimum_size().y)   # 접은 탭은 예전 자리 (층 이름표와 덜 겹치게)
+	# 접은 탭: 끌어서 옮긴 자리가 있으면 거기 (기지를 다시 열어도 유지), 없으면 왼쪽 아래. 층 이름표는 이 탭을 비켜 그림 (BaseOverlay)
+	log_tab.position = _tab_saved if _tab_saved != Vector2.INF else Vector2(6, 720 - 6 - 8 - log_tab.get_combined_minimum_size().y)
+
+
+## 접은 운영 기록 탭: 누르고 끌면 옮기기 (화면 안으로 제한), 거의 안 움직이고 놓으면 펴기
+static var _tab_saved := Vector2.INF
+var _tab_drag := false
+var _tab_moved := false
+var _tab_grab := Vector2.ZERO
+
+
+func _on_log_tab_input(e: InputEvent) -> void:
+	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
+		if e.pressed:
+			_tab_drag = true
+			_tab_moved = false
+			_tab_grab = e.global_position - log_tab.position
+		elif _tab_drag:
+			_tab_drag = false
+			log_tab.mouse_default_cursor_shape = CURSOR_POINTING_HAND
+			if not _tab_moved:
+				set_log_open(true)
+		log_tab.accept_event()
+	elif e is InputEventMouseMotion and _tab_drag:
+		var to: Vector2 = e.global_position - _tab_grab
+		if not _tab_moved and to.distance_to(log_tab.position) < 4.0:
+			return
+		_tab_moved = true
+		log_tab.mouse_default_cursor_shape = CURSOR_DRAG
+		var sz := log_tab.size
+		log_tab.position = Vector2(clampf(to.x, 0.0, 1280.0 - sz.x), clampf(to.y, 0.0, 720.0 - sz.y))
+		_tab_saved = log_tab.position
+		log_tab.accept_event()
 
 
 ## 아래 조작 안내 줄 (어두운 띠 · 항목 사이 |)

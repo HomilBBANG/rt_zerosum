@@ -585,6 +585,20 @@ func _cli_ui(spec: String) -> void:
 		"contracts": hud.open_contracts("")
 		"armory": hud.open_armory()
 		"log_closed": hud.set_log_open(false)
+		"log_tab_drag":   # log_tab_drag:x:y — 접은 운영 기록 탭을 그 자리로 끌어다 놓은 것처럼 (끌기 · 층 이름표 비키기 확인용)
+			hud.set_log_open(false)
+			var from: Vector2 = hud.log_tab.position + Vector2(20, 10)
+			var to := Vector2(float(p[1]), float(p[2]))
+			for ev in [[true, from], [null, from + (to - from) * 0.5], [null, to], [false, to]]:
+				var e: InputEvent
+				if ev[0] == null:
+					e = InputEventMouseMotion.new()
+				else:
+					e = InputEventMouseButton.new()
+					e.button_index = MOUSE_BUTTON_LEFT
+					e.pressed = ev[0]
+				e.global_position = ev[1]
+				hud._on_log_tab_input(e)
 		"hittest":   # 대원마다 몸 가운데 · 사각형 모서리(빈 곳) · '!' 마커 클릭 판정을 로그에 (확인용)
 			await get_tree().process_frame
 			for id in npc_views:

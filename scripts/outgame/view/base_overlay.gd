@@ -149,8 +149,23 @@ func _draw_floor_labels() -> void:
 		var w := _bold.get_string_size(f.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 		var r := Rect2(at - Vector2(w + 38, 34), Vector2(w + 38, 34))
 		r.position.x = maxf(r.position.x, 8.0)   # 축소해도 화면 밖으로 안 나가게
+		r = _avoid_hud(r)
 		_tag(r, on)
 		draw_string(_bold, r.position + Vector2(19, 24), f.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, OUTLINE if on else Color(0.95, 0.94, 0.9))
+
+
+## 층 이름표가 접은 운영 기록 탭(HUD)과 겹치면 탭 위로 비켜 감 (위가 화면 밖이면 아래로)
+func _avoid_hud(r: Rect2) -> Rect2:
+	var hud = hub.get("hud")
+	if hud == null or hud.log_tab == null or not hud.log_tab.visible:
+		return r
+	var t: Rect2 = Rect2(hud.log_tab.position, hud.log_tab.size).grow(4.0)
+	if not r.intersects(t):
+		return r
+	r.position.y = t.position.y - r.size.y
+	if r.position.y < 0.0:
+		r.position.y = t.end.y
+	return r
 
 
 ## 잠긴 방 앞면을 덮는 패널: 그 방 단면 사각형(조금 안쪽)에 9칸 늘리기 — 둥근 모서리 · 볼트는 그대로, 2배 해상도 그림을 반으로
