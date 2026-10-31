@@ -278,8 +278,8 @@ func _build_top() -> void:
 	var rem := StyleBoxEmpty.new()
 	rem.content_margin_left = 16
 	rem.content_margin_right = 16
-	rem.content_margin_top = 12
-	rem.content_margin_bottom = 12
+	rem.content_margin_top = 15      # 위아래 대칭: 이름 글자 상자 아래 빈 곳만큼 아이콘 · 이름을 3px 내림 (스크린샷에서 패널 가운데와 맞춤)
+	rem.content_margin_bottom = 9
 	rp.add_theme_stylebox_override("panel", rem)
 	rp.mouse_filter = MOUSE_FILTER_IGNORE
 	_nine_bg_lrtb(rp, load(V2 + "panel_iconbar.png"), 34, 34, 34, 34, TOP_K)
@@ -406,8 +406,8 @@ func _build_log() -> void:
 	# 운영 기록 (UI 패키지 v2 큰 패널: 왼쪽 위 머리 탭 · 오른쪽 스크롤 막대 · 주황 점). 머리 탭 · 주황 점 = 접기
 	log_panel = Control.new()
 	var text_h := ceilf(font.get_height(12)) * LOG_LINES
-	log_panel.size = Vector2(LOG_W, LOG_TOP + text_h + 12)
-	log_panel.position = Vector2(6, 720 - 6 - log_panel.size.y)
+	log_panel.size = Vector2(LOG_W, LOG_TOP + text_h + LOG_PAD_BOTTOM)
+	log_panel.position = Vector2(6, 720 - LOG_BOTTOM - log_panel.size.y)
 	log_panel.mouse_filter = MOUSE_FILTER_PASS
 	_nine_bg_lrtb(log_panel, load(V2 + "panel_log.png"), 270, 90, 100, 40)
 	add_child(log_panel)
@@ -463,6 +463,8 @@ func _build_log() -> void:
 const LOG_LINES := 2
 const LOG_W := 515.0
 const LOG_TOP := 44.0   # 머리 탭 아래 첫 줄
+const LOG_PAD_BOTTOM := 24.0   # 마지막 줄 아래 ~ 패널 끝 (아래 테두리 20px 안쪽에 글자가 다 들어오게)
+const LOG_BOTTOM := 22.0       # 패널 아래 ~ 화면 아래 (예전 6 — 위로 올림)
 var log_tab: PanelContainer
 
 
@@ -493,7 +495,7 @@ func set_log_open(on: bool) -> void:
 	log_panel.visible = on
 	log_tab.visible = not on
 	log_tab.reset_size()
-	log_tab.position = Vector2(6, 720 - 6 - 8 - log_tab.get_combined_minimum_size().y)
+	log_tab.position = Vector2(6, 720 - 6 - 8 - log_tab.get_combined_minimum_size().y)   # 접은 탭은 예전 자리 (층 이름표와 덜 겹치게)
 
 
 ## 아래 조작 안내 줄 (어두운 띠 · 항목 사이 |)
