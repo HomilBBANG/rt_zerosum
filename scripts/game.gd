@@ -91,6 +91,7 @@ func _fit_window() -> void:
 	var size := Vector2i(int(want.x * s), int(want.y * s))
 	win.size = size
 	win.position = usable.position + (usable.size - (size + deco)) / 2 + off
+	_restore_window_rect(win, deco, off)
 	if Settings.fullscreen:
 		win.mode = Window.MODE_FULLSCREEN
 
@@ -98,6 +99,32 @@ func _fit_window() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
 		set_fullscreen(get_window().mode != Window.MODE_FULLSCREEN)
+
+
+## 마지막으로 끈 창 위치 · 크기로 (그 사각형이 어떤 화면 안에 다 들어갈 때만 — 모니터를 바꿨으면 가운데 그대로)
+func _restore_window_rect(win: Window, deco: Vector2i, off: Vector2i) -> void:
+	var sz := Settings.win_last
+	var pos := Settings.win_pos
+	if sz.x < 640 or sz.y < 360 or pos.x < -90000:
+		return
+	var outer := Rect2i(pos - off, sz + deco)   # 제목줄 · 테두리 포함
+	for i in DisplayServer.get_screen_count():
+		if DisplayServer.screen_get_usable_rect(i).encloses(outer):
+			win.size = sz
+			win.position = pos
+			return
+
+
+## 지금 창 위치 · 크기를 설정에 적어 둠 (창 모드일 때만 — 게임을 끌 때)
+func remember_window() -> void:
+	if DisplayServer.get_name() == "headless" or cli.has("shot") or Engine.is_embedded_in_editor():
+		return
+	var win := get_window()
+	if win.mode != Window.MODE_WINDOWED:
+		return
+	Settings.win_last = win.size
+	Settings.win_pos = win.position
+	Settings.save_all()
 
 
 ## 전체 화면 켜고 끄기 (설정에 저장)
@@ -127,6 +154,8 @@ func set_window_size(want: Vector2i) -> void:
 	win.size = size
 	win.position = usable.position + (usable.size - (size + deco)) / 2 + off
 	Settings.win_size = want
+	Settings.win_last = size
+	Settings.win_pos = win.position
 	Settings.save_all()
 
 
@@ -146,6 +175,7 @@ func quit_game() -> void:
 	if _quitting:
 		return
 	_quitting = true
+	remember_window()   # 다음 실행 때 같은 자리 · 크기로
 	Sfx.shutdown(get_tree())
 	CharacterSprite2D.clear_cache()
 	for i in 3:
