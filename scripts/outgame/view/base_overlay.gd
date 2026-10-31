@@ -198,7 +198,7 @@ func _room_frame(r: Rect2, up: float = 1e9, dn: float = 1e9) -> void:
 		_frame_sb.set_texture_margin(SIDE_TOP, 100)
 		_frame_sb.set_texture_margin(SIDE_BOTTOM, 100)
 	var k := clampf(minf(r.size.x, r.size.y) / 700.0, 0.08, FRAME_K)
-	k = minf(k, minf(up, dn) / (76.0 * 0.75))   # 층 사이 틈이 좁으면 띠도 가늘게
+	k = minf(k, minf(up, dn) / (76.0 * 0.6))   # 층 사이 틈이 좁으면 띠도 가늘게 (0.75 → 0.6: 약 25% 굵게 — 바깥은 틈 절반까지, 나머지는 방 안쪽 가장자리로)
 	k = maxf(k, 0.04)
 	r = r.grow_individual(34.0 * k * 0.6, minf(76.0 * k * 0.75, up), 34.0 * k * 0.6, minf(73.0 * k * 0.75, dn))
 	draw_set_transform(r.position, 0.0, Vector2(k, k))
