@@ -346,6 +346,9 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - **기지 UI v2** (사용자 제공 UI 패키지 `art_src/ui/ui_package_v2.webp` + 레퍼런스 `art_src/ui/ref_outgame_v2.webp` → 조각 `assets/ui/outgame/v2/`): 두 줄 날짜 패널 · 새 아이콘 타일 · 금색/어두운 층 · 방 태그 · 운영 기록 패널(머리 탭 · 주황 점 = 접기) · − 100% + · 조작 안내 띠 · ! 동그라미.
 
 ![기지 UI v2](docs/screenshots/outgame_ui_v2.jpg)
+- **잠긴 방** = 볼트 달린 검은 패널(사용자 제공, `assets/ui/outgame/v2/panel_locked.png`) + 자물쇠 · 해금 비용. 확인 `--base_ui=zoom_out`.
+
+![잠긴 방 패널](docs/screenshots/outgame_locked_rooms.jpg)
 
 - **몬스터 idle 리깅**: `python3 tools/char_sprites.py rig-monster <몬스터> [칸 수=24] [--blob]` — 기본 그림 한 장 → `<몬스터>/idle/` 반복 (구울 · 늑대 숨쉬기 · 흔들림, 슬라임 `--blob` 출렁). 몬스터 그림을 바꾸면 다시 실행.
 

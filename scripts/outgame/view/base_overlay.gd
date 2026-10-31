@@ -68,6 +68,7 @@ func _draw_room(fid: String) -> void:
 	var b := v3d.room_box(fid)
 	var q := front_quad(fid)
 	if not sim.is_unlocked(fid):
+		_locked_panel(q)   # 잠긴 방 = 볼트 달린 검은 패널 (UI 패키지, 원본 art_src/ui/locked_room_panel.webp)
 		var c := (q[0] + q[2]) * 0.5
 		var k := clampf((q[1].x - q[0].x) / float(maxi(1, int(f.width))) / 160.0, 0.45, 1.4)
 		_draw_lock(c + Vector2(0, -12 * k), k)
@@ -115,6 +116,26 @@ func _draw_floor_labels() -> void:
 		r.position.x = maxf(r.position.x, 8.0)   # 축소해도 화면 밖으로 안 나가게
 		_tag(r, on)
 		draw_string(_bold, r.position + Vector2(19, 24), f.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, OUTLINE if on else Color(0.95, 0.94, 0.9))
+
+
+## 잠긴 방 앞면을 덮는 패널: 그 방 단면 사각형(조금 안쪽)에 9칸 늘리기 — 둥근 모서리 · 볼트는 그대로, 2배 해상도 그림을 반으로
+static var _lock_sb: StyleBoxTexture
+
+
+func _locked_panel(q: PackedVector2Array) -> void:
+	if _lock_sb == null:
+		_lock_sb = StyleBoxTexture.new()
+		_lock_sb.texture = load("res://assets/ui/outgame/v2/panel_locked.png")
+		for side in [SIDE_LEFT, SIDE_RIGHT, SIDE_TOP, SIDE_BOTTOM]:
+			_lock_sb.set_texture_margin(side, 90)
+	var r := Rect2(q[0], Vector2.ZERO)
+	for pt in q:
+		r = r.expand(pt)
+	r = r.grow(-3.0)
+	var k := clampf(minf(r.size.x, r.size.y) / 180.0, 0.25, 0.5)   # 아주 작게 축소했을 때 모서리가 넘치지 않게
+	draw_set_transform(r.position, 0.0, Vector2(k, k))
+	draw_style_box(_lock_sb, Rect2(Vector2.ZERO, r.size / k))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## UI 패키지 v2 태그 (금색 / 어두운 팔각 띠) — 2배 해상도 그림을 반으로, 9칸 늘리기

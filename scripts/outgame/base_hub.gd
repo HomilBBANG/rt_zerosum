@@ -589,6 +589,9 @@ func _cli_ui(spec: String) -> void:
 				print("[hit] %s head=%s chest=%s corner=%s marker=%s" % [id, _npc_at(head), _npc_at(chest), _npc_at(r.position + Vector2(2, 2)), _marker_at(v.position + v.marker_at) if v.marker_at != Vector2.INF else "-"])
 		"room_menu":   # room_menu:시설 id — 방 빈 곳 우클릭 메뉴
 			hud.open_room_menu(p[1], Vector2(640, 360))
+		"zoom_out":   # 가장 멀리 (건물 전체 — 잠긴 방 확인용)
+			_zoom_goal = ZOOM_MAX
+			cam_size = ZOOM_MAX
 		"juke_hover":   # 주크박스에 마우스를 올린 표시 (확인용)
 			await get_tree().process_frame
 			get_viewport().warp_mouse(jukebox_rect().get_center())
