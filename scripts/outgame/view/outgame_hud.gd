@@ -928,8 +928,8 @@ const WIN_EDGE := 4.0   # 창과 화면 가장자리 사이 최소 여백 (화�
 
 ## '타이틀' 버튼: "타이틀 화면으로 돌아가시겠습니까?" 확인 (예 = 저장하고 타이틀로, 아니요 = 닫기)
 func confirm_title() -> void:
-	var win := _window("타이틀로", 440)
-	(win.close as Control).visible = false   # 닫기 버튼 없음 — '아니요' · Esc 로 닫음
+	var win := _window("", 440)
+	(win.head as Control).visible = false   # 제목 · 닫기 버튼 없음 — 질문 문구만, '아니요' · Esc 로 닫음
 	var body: VBoxContainer = win.body
 	var q := _label("타이틀 화면으로 돌아가시겠습니까?", 18, Color(0.95, 0.94, 0.9))
 	q.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1004,7 +1004,7 @@ func _window(title: String, w: float, on_close: Callable = Callable()) -> Dictio
 			p.x = maxf(p.x, WIN_EDGE)
 		p.y = maxf(p.y, WIN_EDGE)
 		panel.position = p)
-	return {"root": root, "body": body, "panel": panel, "close": x}
+	return {"root": root, "body": body, "panel": panel, "close": x, "title": t, "head": head}
 
 
 func _scroll(body: Control, h: float) -> VBoxContainer:
