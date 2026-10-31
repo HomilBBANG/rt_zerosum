@@ -372,6 +372,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 			KEY_F1:
 				hud.toggle_debug()
+			KEY_F10:   # 설정 (음량 · 창 크기 · 전체 화면)
+				SettingsPanel.open(hud)
+				get_viewport().set_input_as_handled()
 			KEY_SPACE:
 				speed = 1 if speed == 0 else 0
 			KEY_EQUAL, KEY_KP_ADD:
@@ -668,6 +671,7 @@ func _cli_ui(spec: String) -> void:
 			hud.show_toast(r.msg, OutgameHud.GOOD if r.ok else OutgameHud.BAD)
 			if p.size() > 4:
 				sim.skip(int(p[4]))
+		"settings": SettingsPanel.open(hud)
 		"speed":   # speed:0|1|4|16 — 기지 시계 속도 (0 = 정지)
 			set_speed(int(p[1]))
 		"click":   # click:x:y — 그 화면 점을 왼쪽 클릭한 것처럼 (정지 중 이동 지시 무시 확인용)

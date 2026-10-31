@@ -86,16 +86,48 @@ func _fit_window() -> void:
 		deco = Vector2i(16, 80)
 		off = Vector2i(8, 72)
 	var room := usable.size - deco - Vector2i(8, 8)
-	var s := minf(1.0, minf(float(room.x) / WINDOW_SIZE.x, float(room.y) / WINDOW_SIZE.y))
-	var size := Vector2i(int(WINDOW_SIZE.x * s), int(WINDOW_SIZE.y * s))
+	var want: Vector2i = Settings.win_size if Settings.win_size.x >= 640 else WINDOW_SIZE   # 설정 '창 크기' (없으면 1920×1080)
+	var s := minf(1.0, minf(float(room.x) / want.x, float(room.y) / want.y))
+	var size := Vector2i(int(want.x * s), int(want.y * s))
 	win.size = size
 	win.position = usable.position + (usable.size - (size + deco)) / 2 + off
+	if Settings.fullscreen:
+		win.mode = Window.MODE_FULLSCREEN
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
-		var win := get_window()
-		win.mode = Window.MODE_WINDOWED if win.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+		set_fullscreen(get_window().mode != Window.MODE_FULLSCREEN)
+
+
+## 전체 화면 켜고 끄기 (설정에 저장)
+func set_fullscreen(on: bool) -> void:
+	var win := get_window()
+	win.mode = Window.MODE_FULLSCREEN if on else Window.MODE_WINDOWED
+	Settings.fullscreen = on
+	Settings.save_all()
+
+
+## 창 모드 크기 바꾸기 (설정 '창 크기'): 화면(작업 표시줄 · 제목줄 제외)에 안 들어가면 비율 유지하며 줄이고 가운데로
+func set_window_size(want: Vector2i) -> void:
+	var win := get_window()
+	if Engine.is_embedded_in_editor():
+		return
+	win.mode = Window.MODE_WINDOWED
+	Settings.fullscreen = false
+	var usable := DisplayServer.screen_get_usable_rect(win.current_screen)
+	var deco := win.get_size_with_decorations() - win.size
+	var off := win.position - win.get_position_with_decorations()
+	if deco.y <= 0:
+		deco = Vector2i(16, 80)
+		off = Vector2i(8, 72)
+	var room := usable.size - deco - Vector2i(8, 8)
+	var s := minf(1.0, minf(float(room.x) / want.x, float(room.y) / want.y))
+	var size := Vector2i(int(want.x * s), int(want.y * s))
+	win.size = size
+	win.position = usable.position + (usable.size - (size + deco)) / 2 + off
+	Settings.win_size = want
+	Settings.save_all()
 
 
 ## 끝날 때 static 캐시(캐릭터 그림 · 발자국 소리)를 비움 — 안 비우면 종료 때 "ObjectDB instances were leaked" · "resources still in use" 경고
@@ -123,6 +155,7 @@ func quit_game() -> void:
 
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
+	Settings.load_all()   # 음량 · 창 크기 · 전체 화면 (user://settings.cfg)
 	call_deferred("_fit_window")
 	_parse_cli()
 	# 게임 기본: 밸런스 엑셀의 캐릭터·스킬·몬스터·스테이지 (읽지 못하면 코드 내장 테스트 데이터)

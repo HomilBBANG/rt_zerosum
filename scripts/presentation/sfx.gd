@@ -63,6 +63,7 @@ static func play_at(node: Node2D, stream: AudioStream, volume_db: float = 0.0) -
 	p.stream = stream
 	p.volume_db = volume_db
 	p.max_distance = MAX_DISTANCE
+	p.bus = "SFX"   # 설정 '효과음' 음량 (Settings)
 	p.attenuation = 1.0
 	p.add_to_group(GROUP)
 	node.add_child(p)

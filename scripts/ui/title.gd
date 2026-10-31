@@ -14,7 +14,6 @@ const BAR_RECT := Rect2(0, 595, 1280, 108)          # 아래 띠 (레퍼런스 �
 const BTN_Y := 619.0
 const BTN_H := 62.0
 const BTN_SLOTS := [Vector2(84, 358), Vector2(371, 635), Vector2(647, 911), Vector2(922, 1198)]   # 버튼 칸 가로 범위
-var _settings: Control
 
 
 func _ready() -> void:
@@ -102,50 +101,9 @@ func _art_button(file: String, i: int, tip: String) -> TextureButton:
 	return b
 
 
-## 설정: 전체 화면 켜고 끄기 · 전투 테스트 메뉴(개발용) · 닫기
+## 설정 = 공용 설정 창 (음량 · 창 크기 · 전체 화면) + 전투 테스트 메뉴(개발용)
 func _open_settings() -> void:
-	if _settings != null and is_instance_valid(_settings):
-		_settings.queue_free()
-		_settings = null
-		return
-	var p := PanelContainer.new()
-	UiPanel.apply(p, Vector4(26, 20, 26, 22))
-	add_child(p)
-	_settings = p
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
-	p.add_child(v)
-	var t := _label("설정", 22, Color(1, 0.92, 0.75))
-	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(t)
-	var win := get_window()
-	var fs := _choice("전체 화면 끄기  (F11)" if win.mode == Window.MODE_FULLSCREEN else "전체 화면 켜기  (F11)")
-	fs.pressed.connect(func():
-		win.mode = Window.MODE_WINDOWED if win.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
-		_settings.queue_free()
-		_settings = null)
-	v.add_child(fs)
-	var test := _choice("전투 테스트 메뉴 (개발용)")
-	test.pressed.connect(func(): Game.go_menu_test())
-	v.add_child(test)
-	var close := _choice("닫기")
-	close.pressed.connect(func():
-		_settings.queue_free()
-		_settings = null)
-	v.add_child(close)
-	p.reset_size()
-	p.position = Vector2(640, 330) - p.get_combined_minimum_size() * 0.5
-
-
-func _choice(text: String) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_override("font", _font)
-	b.add_theme_font_size_override("font_size", 18)
-	b.custom_minimum_size = Vector2(320, 44)
-	b.focus_mode = FOCUS_NONE
-	UiButton.apply(b, "choice", "choice_on")
-	return b
+	SettingsPanel.open(self, true)
 
 
 func _on_new() -> void:

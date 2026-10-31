@@ -40,7 +40,7 @@ static func _ensure_player() -> AudioStreamPlayer:
 		return null
 	_player = AudioStreamPlayer.new()
 	_player.name = "Bgm"
-	_player.bus = "Master"
+	_player.bus = "BGM"   # 설정 '배경음악' 음량 (Settings)
 	_player.finished.connect(func(): play_index(index + 1))   # 다 들으면 다음 곡
 	Game.add_child(_player)
 	return _player
