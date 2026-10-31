@@ -830,6 +830,7 @@ const SLOT_GAP := 18.0
 const WEAPON_W := 46.0      # 무기 칸: 세로로 긴 판 (전투 UI v2)
 const WEAPON_H := 96.0      # 무기 칸 높이 — 이름은 아래 틀 띠 위 (레퍼런스처럼)
 const WEAPON_SEP := 3       # 무기 사이 간격
+const WEAPON_LIFT := 4.0    # 무기 판만 스킬 판보다 이만큼 위로 (아래 틀 띠와 위아래 여백)
 
 
 func _refresh_panel() -> void:
@@ -850,6 +851,7 @@ func _refresh_panel() -> void:
 	# 무기 3칸: 주무기 · 보조무기1 · 보조무기2 (세로로 긴 칸, 간격 좁게)
 	var wbox := HBoxContainer.new()
 	wbox.add_theme_constant_override("separation", WEAPON_SEP)
+	wbox.custom_minimum_size.y = WEAPON_H + WEAPON_LIFT * 2.0   # 무기 판만 WEAPON_LIFT 만큼 위로 (판은 이 묶음 위쪽에 붙음)
 	slots_row.add_child(wbox)
 	var wcost := int(opts.get("weapon", {}).get("cost", 1))
 	for i in 3:
@@ -992,7 +994,7 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
 	box.custom_minimum_size.x = bsize.x + (1.0 if is_weapon else 4.0)   # 무기 칸 가로 간격 좁게
-	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER   # 무기 판 · 정사각형 판 모두 아래 틀 안쪽 세로 가운데 (위아래 대칭)
+	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if is_weapon else Control.SIZE_SHRINK_CENTER   # 정사각형 판 = 줄 세로 가운데, 무기 판 = 묶음 위쪽 (WEAPON_LIFT)
 	var btn := Button.new()
 	btn.custom_minimum_size = bsize
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
