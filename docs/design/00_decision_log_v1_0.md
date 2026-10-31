@@ -698,6 +698,12 @@
 - 사용자 제공 "ZEROSUM" 로고로 교체 (원본 art_src/ui/title/logo_zerosum.webp — 흰 바탕 · 글자 구멍을 투명하게 → assets/ui/title/logo.png). 620×144 칸, 가운데 x 654, 위 52.
 - 앞 항목의 "ROTTEN WAR" 로고 · 이름 확인 질문은 이것으로 정리(게임 이름 ZEROSUM, project.godot 의 "RT Zerosum Battle Prototype" 과 같은 이름).
 
+### 2026-10-31 — 로딩 화면 · 로딩 멘트 표
+- 사용자 레퍼런스대로 로딩 화면(scenes/loading.tscn · scripts/ui/loading_screen.gd). 바 틀은 레퍼런스에서 잘라 안쪽을 비움(assets/ui/loading/bar_frame.png), 채움 · 고리 · 멘트 칸은 코드로.
+- Game.change_scene_loading(경로, 장면): go_base · go_formation · start_battle · go_title 이 로딩 화면을 거침 (결과 화면 · 전투 테스트 메뉴는 바로). 스크린샷(--shot) · --no_loading 은 바로 바꿈.
+- 진행률: ResourceLoader 백그라운드 읽기의 실제 진행률과 시간(최소 1.2초) 중 느린 쪽. 장면의 _ready 작업(기지 3D 만들기 등)은 바뀐 뒤라 진행 바에 안 잡힘.
+- 로딩 멘트 표: 새 파일 data/loading_tips.xlsx (기존 엑셀은 안 건드림), 기본 멘트 16개(조작 · 시스템 안내 + 분위기 예시 1). 확인용 --scene=loading --loading_kind=기지|전투 (60% 정지).
+
 ## 검증 중 (확정 아님)
 - **배경 3D + 캐릭터 2D 하이브리드** (2026-10-25 적용): 배경은 3D 방을 2D 카메라와 같은 투영으로 렌더, 캐릭터 라이팅은 실제 광원 위치 기준
   (빛 쪽 얼굴·몸을 광원색으로 밝힘 + 빛이 뒤에서 오면 같은 쪽 가장자리 림 + 바닥 그림자). 캐릭터 2D(리그)는 확정 사항 유지. (이전 2D 배경 판은 2026-10-27 제거.)

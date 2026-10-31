@@ -9,6 +9,19 @@ const SCENE_MENU := "res://scenes/main_menu.tscn"
 const SCENE_FORMATION := "res://scenes/formation.tscn"
 const SCENE_BATTLE_2D := "res://scenes/battle_2d.tscn"
 const SCENE_RESULT := "res://scenes/result.tscn"
+const SCENE_LOADING := "res://scenes/loading.tscn"
+var loading_target := ""   # 로딩 화면이 읽을 다음 장면 (빈 칸 = 확인용 60% 정지)
+var loading_kind := ""     # 로딩 멘트 장면 (기지 · 전투, 빈 칸 = 전체 멘트만)
+
+
+## 로딩 화면을 거쳐 장면 바꾸기 (멘트 · 진행 바). 스크린샷(--shot) 실행은 바로 바꿈
+func change_scene_loading(path: String, kind: String = "") -> void:
+	if cli.has("shot") or cli.has("no_loading"):
+		get_tree().change_scene_to_file(path)
+		return
+	loading_target = path
+	loading_kind = kind
+	get_tree().change_scene_to_file(SCENE_LOADING)
 
 var _quitting := false
 var mode: String = "2d"            # 캐릭터 2D + 3D 배경 하나뿐 (3D 전투 씬 2026-10-27 제거). 결과 기록용 이름만 남김
@@ -229,6 +242,10 @@ func _cli_jump() -> void:
 			go_menu_test()
 		"title":
 			pass
+		"loading":   # 로딩 화면 확인용 (60% 에 멈춤, --loading_kind=기지|전투)
+			loading_target = ""
+			loading_kind = str(cli.get("loading_kind", ""))
+			get_tree().change_scene_to_file(SCENE_LOADING)
 		"base":
 			start_base_session(cli.get("new", "1") == "1")
 			go_base()
@@ -453,12 +470,12 @@ func delete_save() -> void:
 
 func go_title() -> void:
 	campaign = false
-	get_tree().change_scene_to_file(SCENE_TITLE)
+	change_scene_loading(SCENE_TITLE)
 
 
 func go_base() -> void:
 	campaign = true
-	get_tree().change_scene_to_file(SCENE_BASE)
+	change_scene_loading(SCENE_BASE, "기지")
 
 
 ## 기지 → 전투 출전 → 전투 배치(편성)
@@ -480,7 +497,7 @@ func battle_scene_path() -> String:
 
 
 func start_battle() -> void:
-	get_tree().change_scene_to_file(battle_scene_path())
+	change_scene_loading(battle_scene_path(), "전투")
 
 
 ## 전투·편성·결과의 "메뉴/돌아가기": 기지에서 출전했으면 기지로, 아니면 전투 테스트 메뉴로
@@ -492,7 +509,7 @@ func go_menu() -> void:
 
 
 func go_formation() -> void:
-	get_tree().change_scene_to_file(SCENE_FORMATION)
+	change_scene_loading(SCENE_FORMATION, "전투")
 
 
 func show_result(result: Dictionary) -> void:
