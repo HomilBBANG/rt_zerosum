@@ -81,15 +81,15 @@ func _draw_room(fid: String) -> void:
 	# 이름표 = 방 왼쪽 위 모서리에 딱 맞춤 (방이 좁으면 글자를 줄이고 잘라 방 밖으로 안 나가게)
 	var plate_at := _quad_rect(q).position
 	var label: String = f.name
-	var size := 14
+	var size := 10   # 이름표 0.7배 (예전 14)
 	var room_w: float = _quad_rect(q).size.x
 	var tw := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	while tw + 36 > room_w and size > 10:
+	while tw + 25 > room_w and size > 7:
 		size -= 1
 		tw = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	var pw := minf(tw + 36, room_w)
-	_plate(Rect2(plate_at, Vector2(pw, 29)))   # 방 이름표 = 사용자 제공 패널 (오른쪽 아래만 비스듬히 잘림)
-	draw_string(_font, plate_at + Vector2(15, 20), label, HORIZONTAL_ALIGNMENT_LEFT, pw - 26, size, Color(0.95, 0.94, 0.9))
+	var pw := minf(tw + 25, room_w)
+	_plate(Rect2(plate_at, Vector2(pw, 20)))   # 방 이름표 = 사용자 제공 패널 (오른쪽 아래만 비스듬히 잘림)
+	draw_string(_font, plate_at + Vector2(10, 14), label, HORIZONTAL_ALIGNMENT_LEFT, pw - 18, size, Color(0.95, 0.94, 0.9))
 	if fid == hover_fid:
 		draw_polyline(_closed(q), Color(1.0, 0.95, 0.8, 0.95), 3.0)   # 마우스를 올린 방 = 크림색 테두리 (최종 시안)
 	if f.tag == "작업" and not sim.workshop.is_empty():
@@ -200,7 +200,7 @@ func _locked_panel(q: PackedVector2Array) -> void:
 
 ## 방 이름 패널 (사용자 제공, 원본 art_src/ui/room_name_panel.webp): 오른쪽 아래 비스듬한 모서리 · 위 밝은 줄은 그대로, 9칸 늘리기
 static var _plate_sb: StyleBoxTexture
-const PLATE_K := 0.09
+const PLATE_K := 0.063   # 0.7배 (높이 20)
 
 
 func _plate(r: Rect2) -> void:
