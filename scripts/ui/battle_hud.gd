@@ -1180,8 +1180,9 @@ func _refresh_timeline() -> void:
 		sb.set_corner_radius_all(6)
 		frame.add_theme_stylebox_override("panel", sb)
 		frame.size = Vector2(TL_SIZE, TL_SIZE)
-		frame.position = Vector2((side - TL_SIZE) * 0.5, 0.0)
-		frame.pivot_offset = Vector2(TL_SIZE * 0.5, 0.0)
+		# 칸 세로 가운데 + 가운데 기준으로 키움 → 지금 차례 초상화도 다른 초상화와 같은 가운데 줄 (위 띠 가운데)
+		frame.position = Vector2((side - TL_SIZE) * 0.5, (TL_SIZE * TL_CUR_SCALE - TL_SIZE) * 0.5)
+		frame.pivot_offset = Vector2(TL_SIZE * 0.5, TL_SIZE * 0.5)
 		frame.scale = Vector2.ONE * (TL_CUR_SCALE if is_cur else 1.0)
 		frame.clip_contents = true
 		frame.mouse_filter = Control.MOUSE_FILTER_STOP
