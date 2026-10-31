@@ -133,6 +133,7 @@ static var _frame_sb: StyleBoxTexture
 
 ## 층 테두리 (최종 시안): 층마다 그 층 방 전체를 ui-room 으로 감쌈 — 위 · 아래 띠는 층 사이 슬래브 쪽으로, 네 귀 볼트
 func _draw_floor_frames() -> void:
+	var rects: Array = []   # 위층부터 [Rect2]
 	for f in sim.data.floors:
 		var r := Rect2()
 		var first := true
@@ -143,12 +144,23 @@ func _draw_floor_frames() -> void:
 			r = qr if first else r.merge(qr)
 			first = false
 		if not first:
-			_room_frame(r)
+			rects.append(r)
+	rects.sort_custom(func(a, b): return a.position.y < b.position.y)
+	for i in rects.size():
+		var r: Rect2 = rects[i]
+		# 위 · 아래 띠는 옆 층과의 틈 절반까지만 → 층 테두리끼리 안 겹침 (맨 위 · 맨 아래는 틈 대신 같은 폭)
+		var up: float = (r.position.y - (rects[i - 1] as Rect2).end.y) * 0.5 if i > 0 else -1.0
+		var dn: float = ((rects[i + 1] as Rect2).position.y - r.end.y) * 0.5 if i < rects.size() - 1 else -1.0
+		if up < 0.0:
+			up = dn
+		if dn < 0.0:
+			dn = up
+		_room_frame(r, maxf(0.0, up), maxf(0.0, dn))
 
 
 ## 사용자 제공 ui-room (원본 art_src/ui/room_frame.png): 사각형 r 을 감싸는 9칸 늘리기 테두리, 가운데는 비어 있음.
 ## 띠가 방 안을 덜 가리게 바깥쪽으로 조금 키워 그림 (위 · 아래 띠는 층 사이 슬래브 위)
-func _room_frame(r: Rect2) -> void:
+func _room_frame(r: Rect2, up: float = 1e9, dn: float = 1e9) -> void:
 	if _frame_sb == null:
 		_frame_sb = StyleBoxTexture.new()
 		_frame_sb.texture = load("res://assets/ui/outgame/v2/room_frame.png")
@@ -158,7 +170,9 @@ func _room_frame(r: Rect2) -> void:
 		_frame_sb.set_texture_margin(SIDE_TOP, 100)
 		_frame_sb.set_texture_margin(SIDE_BOTTOM, 100)
 	var k := clampf(minf(r.size.x, r.size.y) / 700.0, 0.08, FRAME_K)
-	r = r.grow_individual(34.0 * k * 0.6, 76.0 * k * 0.75, 34.0 * k * 0.6, 73.0 * k * 0.75)
+	k = minf(k, minf(up, dn) / (76.0 * 0.75))   # 층 사이 틈이 좁으면 띠도 가늘게
+	k = maxf(k, 0.04)
+	r = r.grow_individual(34.0 * k * 0.6, minf(76.0 * k * 0.75, up), 34.0 * k * 0.6, minf(73.0 * k * 0.75, dn))
 	draw_set_transform(r.position, 0.0, Vector2(k, k))
 	draw_style_box(_frame_sb, Rect2(Vector2.ZERO, r.size / k))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

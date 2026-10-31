@@ -141,7 +141,8 @@ func _vbox(sep: int = 6) -> VBoxContainer:
 
 # ================================================================ 위쪽 바
 const UI_DIR := "res://assets/ui/outgame/"
-const V2 := "res://assets/ui/outgame/v2/"   # UI 패키지 v2 (원본 art_src/ui/ui_package_v2.webp, 레퍼런스 art_src/ui/ref_outgame_v2.webp)
+const V2 := "res://assets/ui/outgame/v2/"
+const TOP_K := 0.56   # 상단 두 패널 그림 배율 (0.5 보다 조금 크게 — 안쪽 칸에 글자 · 버튼이 여유 있게)   # UI 패키지 v2 (원본 art_src/ui/ui_package_v2.webp, 레퍼런스 art_src/ui/ref_outgame_v2.webp)
 var _speed_tex: Texture2D = preload("res://assets/ui/outgame/v2/btn_blank.png")
 var _speed_tex_on: Texture2D = preload("res://assets/ui/outgame/v2/btn_blank_on.png")
 var _top_left: Control
@@ -153,17 +154,17 @@ func _build_top() -> void:
 	# 왼쪽 위: UI 패키지 v2 두 줄 패널 (윗줄 = 달력 · 날짜 · 속도 버튼, 아랫줄 = 지폐 · 잔액 | 미지급 | 결산 D-day)
 	var left := PanelContainer.new()
 	var em := StyleBoxEmpty.new()
-	em.content_margin_left = 22
-	em.content_margin_right = 20
-	em.content_margin_top = 12
-	em.content_margin_bottom = 10
+	em.content_margin_left = 28
+	em.content_margin_right = 30
+	em.content_margin_top = 16
+	em.content_margin_bottom = 17
 	left.add_theme_stylebox_override("panel", em)
 	left.position = Vector2(6, 6)
 	left.mouse_filter = MOUSE_FILTER_IGNORE
 	_top_left = left
-	_nine_bg_lrtb(left, load(V2 + "panel_date.png"), 60, 60, 95, 94)   # 양 끝 볼트는 그대로, 가로로만 늘림
+	_nine_bg_lrtb(left, load(V2 + "panel_date.png"), 60, 60, 95, 94, TOP_K)   # 양 끝 볼트는 그대로, 가로로만 늘림 (레퍼런스처럼 조금 크게 — 글자가 안쪽 칸에 들어가게)
 	add_child(left)
-	var lv := _vbox(10)
+	var lv := _vbox(13)
 	left.add_child(lv)
 	var row := _hbox(8)
 	lv.add_child(row)
@@ -230,13 +231,13 @@ func _build_top() -> void:
 	# 아이콘 줄 뒤 패널 (사용자 제공 팔각 띠, 원본 art_src/ui/icon_bar_panel.webp) — 왼쪽 날짜 패널과 같은 높이
 	var rp := PanelContainer.new()
 	var rem := StyleBoxEmpty.new()
-	rem.content_margin_left = 12
-	rem.content_margin_right = 12
-	rem.content_margin_top = 9
-	rem.content_margin_bottom = 9
+	rem.content_margin_left = 16
+	rem.content_margin_right = 16
+	rem.content_margin_top = 12
+	rem.content_margin_bottom = 12
 	rp.add_theme_stylebox_override("panel", rem)
 	rp.mouse_filter = MOUSE_FILTER_IGNORE
-	_nine_bg_lrtb(rp, load(V2 + "panel_iconbar.png"), 34, 34, 34, 34)
+	_nine_bg_lrtb(rp, load(V2 + "panel_iconbar.png"), 34, 34, 34, 34, TOP_K)
 	rp.add_child(right)
 	_top_right = rp
 	rp.position = Vector2(0, 6)
@@ -249,7 +250,7 @@ func _build_top() -> void:
 	for s in specs:
 		right.add_child(_icon_button(s[0], s[1], s[2] if s[2] != null else Color(0.92, 0.91, 0.86), s[3]))
 	rp.position.x = 1280 - 6 - rp.get_combined_minimum_size().x
-	rp.custom_minimum_size.y = 92   # 날짜 패널과 같은 높이
+	rp.custom_minimum_size.y = 189.0 * TOP_K   # 날짜 패널과 같은 높이
 	rp.resized.connect(func(): rp.position.x = 1280 - 6 - rp.size.x)
 	right.alignment = BoxContainer.ALIGNMENT_CENTER
 
@@ -282,7 +283,7 @@ func _nine_bg(c: Control, tex: Texture2D, side: int, cap: int) -> void:
 
 
 ## _nine_bg 의 좌 · 우 · 위 · 아래 여백을 따로 (그림 픽셀, 2배 해상도 그림을 반으로)
-func _nine_bg_lrtb(c: Control, tex: Texture2D, l: int, r: int, t: int, b: int) -> void:
+func _nine_bg_lrtb(c: Control, tex: Texture2D, l: int, r: int, t: int, b: int, scale: float = 0.5) -> void:
 	var sb := StyleBoxTexture.new()
 	sb.texture = tex
 	sb.texture_margin_left = l
@@ -290,8 +291,8 @@ func _nine_bg_lrtb(c: Control, tex: Texture2D, l: int, r: int, t: int, b: int) -
 	sb.texture_margin_top = t
 	sb.texture_margin_bottom = b
 	c.draw.connect(func():
-		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2(0.5, 0.5))
-		c.draw_style_box(sb, Rect2(Vector2.ZERO, c.size * 2.0))
+		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2(scale, scale))
+		c.draw_style_box(sb, Rect2(Vector2.ZERO, c.size / scale))
 		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE))
 	c.queue_redraw()
 
