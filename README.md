@@ -369,6 +369,10 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - **쓰러진 몸 자리**: 쓰러지면 살아 있는 캐릭터 뒤 층으로, 조금 뒤(화면 위 · 자기 편 뒤쪽)로 물러나 눕고 가운데 열은 한 번 더 뒤로 → 같은 줄 앞 · 가운데 · 뒤가 모두 쓰러져도 겹치지 않음 (`UnitSprite2D` DEAD_BACK · DEAD_STAGGER · DEAD_SIDE).
 
 ![체력 칸 층 · 쓰러진 몸 자리](docs/screenshots/battle_bars_dead_layout.jpg)
+
+- **쓰러진 몸 길이 = 선 키**: 누운 그림(dead)의 몸통 길이(팔 같은 가는 부분 제외)를 기본 그림 키와 비교해 길면 그만큼 작게 그림 (`anim.json` figure_px · "lying_fit"). 아군: 단 1.10 · 키라 1.09 · 이선 1.29 · 하나 1.16 · 니키타 1.11 배 길던 것을 1.0 으로 (앨마는 0.99 라 그대로). poses 도구도 새 누운 그림에 자동으로.
+
+![아군 쓰러짐 — 위 = 전, 아래 = 키 맞춤](docs/screenshots/ally_dead_fit.jpg)
 ![AU군 병사 포즈 크기 비교](docs/screenshots/army_m_poses.png)
 ![몬스터 사망 — 불에 타 사라짐 (0.6 · 1.3 · 2.0 · 2.9초)](docs/screenshots/monster_burn_death.jpg)
 

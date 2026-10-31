@@ -1240,6 +1240,14 @@ def cmd_rows(cid, rows=("idle", "walk", "walk:l", "run", "run:l"), name="rows", 
     bg.convert("RGB").save(os.path.join(out, "%s_preview.jpg" % name), quality=85)
 
 
+def _trunk_len(im, axis):
+    """몸통 길이 (px): axis 0 = 가로로 누운 그림(열마다 두께), 1 = 선 그림(행마다 두께). 두께가 최대의 25% 넘는 구간 — 팔 · 손 같은 가는 부분은 빠짐"""
+    import numpy as np
+    th = (np.array(im.convert("RGBA"))[..., 3] > 40).sum(axis=axis)
+    idx = np.nonzero(th > th.max() * 0.25)[0]
+    return int(idx.max() - idx.min()) if len(idx) else 0
+
+
 def cmd_poses(cid, pairs, ref=None, band=None):
     """상황별 한 장 그림 → 한 장짜리 동작 폴더 (<이름>/0001.png + 마스크 + anim.json {"pose": true, "loop": true, ground, figure_px})."""
     cdir = os.path.join(CHAR_DIR, cid)
@@ -1296,7 +1304,12 @@ def cmd_poses(cid, pairs, ref=None, band=None):
             top = can.crop((0, 0, can.width, round(pad + fig * 0.10))).split()[3].point(lambda v: 255 if v > 40 else 0).getbbox()
             head = (top[0], pad, top[2] - top[0], fig * 0.2) if top else None
             eye_mask(can, head=head).save(stem + "_eye.png")
-        meta = {"pose": True, "loop": True, "fps": 1.0, "ground": [round(gx), gy], "figure_px": fig, **({"lying_sink": LYING_SINK} if lying else {}),
+        fig_draw = fig
+        if lying and im2.width > im2.height * 1.6:   # 누운 몸이 선 키보다 길면 그만큼 작게 그림 (몸통 길이 비교, 팔 같은 가는 부분 제외)
+            fit = _trunk_len(can, 0) / max(1, _trunk_len(Image.open(os.path.join(cdir, "base.png")), 1))
+            if fit > 1.03:
+                fig_draw = round(fig * fit, 1)
+        meta = {"pose": True, "loop": True, "fps": 1.0, "ground": [round(gx), gy], "figure_px": fig_draw, **({"lying_sink": LYING_SINK} if lying else {}),
                 "hip_y": round(gy - fig * 0.52) if not lying else gy - 40, "source": "%s (배율 %.3f, 기준 %s)" % (os.path.basename(path), km, ref)}
         json.dump(meta, open(os.path.join(adir, "anim.json"), "w", encoding="utf-8"), ensure_ascii=False)
         print(cid, name, "포즈", can.size, "발", meta["ground"], "누움" if lying else "")
