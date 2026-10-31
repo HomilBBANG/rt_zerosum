@@ -342,7 +342,7 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 ![전투 행동 연출 (가운데로 나온 니키타 · 화면 가운데 줌)](docs/screenshots/battle_action_stage.jpg)
 ![대원 정보 창 (우클릭 → 정보 보기)](docs/screenshots/outgame_info_window.jpg)
 
-- **배경음악 · 주크박스**: 5곡 (`assets/audio/bgm/`, 목록 · 제목 · 음량은 `data/bgm.json`). 기지 공용실 오른쪽 **주크박스**(대원 선택 안 한 상태, 주크박스 어디든 — 마우스를 올리면 금색 테두리)를 누르면 주크박스 바로 왼쪽에 카세트 창 — 지금 곡 제목, ▲ 이전 곡 · ▼ 다음 곡. 코드 `scripts/presentation/bgm.gd` (`Bgm`).
+- **배경음악 · 주크박스**: 5곡 (`assets/audio/bgm/`, 목록 · 제목 · 음량은 `data/bgm.json`). 기지 공용실 오른쪽 **주크박스**(대원 선택 안 한 상태, 주크박스 어디든 — 마우스를 올리면 금색 테두리)를 누르면 주크박스 바로 왼쪽에 카세트 창 — 지금 곡 제목, ▲ 이전 곡 · ▼ 다음 곡. 기지에서만 재생 — 기지를 떠나면(타이틀 · 편성 · 전투) 짧게 줄이며 멈춤. 코드 `scripts/presentation/bgm.gd` (`Bgm`).
 - **날짜 속도 버튼**: ■ 정지 · ▶ 1배 · 4x · 16x (사용자 제공 그림, `assets/ui/outgame/speed_*.png`).
 
 ![공용실 주크박스 · 음악 카세트 창 · 속도 버튼](docs/screenshots/outgame_jukebox_music.jpg)
