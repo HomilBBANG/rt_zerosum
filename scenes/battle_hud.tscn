@@ -418,7 +418,7 @@ size_flags_horizontal = 3
 [node name="EndTurnWrap" type="MarginContainer" parent="Bottom/BottomRow" unique_id=629253322]
 layout_mode = 2
 size_flags_vertical = 4
-theme_override_constants/margin_right = 6
+theme_override_constants/margin_right = 9
 
 [node name="EndTurn" type="Button" parent="Bottom/BottomRow/EndTurnWrap" unique_id=1871022430]
 custom_minimum_size = Vector2(82, 82)
@@ -441,9 +441,9 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -304.0
+offset_left = -310.0
 offset_top = -124.0
-offset_right = -124.0
+offset_right = -130.0
 offset_bottom = -26.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_u3ffw")
