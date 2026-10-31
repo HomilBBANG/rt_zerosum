@@ -1,6 +1,7 @@
 class_name Bgm
 extends RefCounted
-## 배경음악 (data/bgm.json 목록, 파일 assets/audio/bgm/). 장면이 바뀌어도 끊기지 않게 Game(자동 로드)에 붙은 플레이어 하나로 재생.
+## 배경음악 (data/bgm.json 목록, 파일 assets/audio/bgm/). Game(자동 로드)에 붙은 플레이어 하나로 재생.
+## 기지(아웃게임) 전용: 기지에 들어오면 재생, 기지를 떠나면(타이틀 · 편성 · 전투 등) 짧게 줄이며 멈춤 — 다시 오면 그 곡 처음부터.
 ## 한 곡이 끝나면 다음 곡 (목록 끝이면 처음으로). 기지 공용실 주크박스 → 음악 카세트 창에서 ▲ 이전 · ▼ 다음.
 
 const DATA := "res://data/bgm.json"
@@ -11,7 +12,8 @@ static var index := 0
 static var volume_db := -8.0
 static var _player: AudioStreamPlayer
 static var _loaded := false
-static var changed_hook: Array[Callable] = []   # 곡이 바뀔 때 부를 것 (카세트 창 제목 갱신)
+static var changed_hook: Array[Callable] = []
+static var _fade: Tween   # 곡이 바뀔 때 부를 것 (카세트 창 제목 갱신)
 
 
 static func _load_list() -> void:
@@ -57,6 +59,11 @@ static func _stream(file: String) -> AudioStream:
 static func ensure_playing() -> void:
 	_load_list()
 	var p := _ensure_player()
+	if _fade != null and _fade.is_valid():   # 줄이는 중에 기지로 돌아오면 줄이기 취소
+		_fade.kill()
+		_fade = null
+		if p != null:
+			p.volume_db = volume_db
 	if p == null or p.playing or tracks.is_empty():
 		return
 	play_index(index)
@@ -95,3 +102,15 @@ static func title() -> String:
 static func stop() -> void:
 	if _player != null and is_instance_valid(_player):
 		_player.stop()
+
+
+## 짧게 소리를 줄이며 멈춤 (기지를 떠날 때). 플레이어는 Game 에 붙어 있어 장면이 바뀌어도 끝까지 줄어듦
+static func fade_out(sec: float = 0.4) -> void:
+	if _player == null or not is_instance_valid(_player) or not _player.playing:
+		return
+	var p := _player
+	_fade = p.create_tween()
+	_fade.tween_property(p, "volume_db", -60.0, sec)
+	_fade.tween_callback(func():
+		p.stop()
+		p.volume_db = volume_db)

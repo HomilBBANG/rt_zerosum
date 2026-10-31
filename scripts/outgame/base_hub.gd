@@ -205,6 +205,11 @@ func _add_npc_view(id: String) -> void:
 	npc_views[id] = v
 
 
+## 기지를 떠나면 배경음악 멈춤 (타이틀 · 편성 · 전투로 이어지지 않게)
+func _exit_tree() -> void:
+	Bgm.fade_out()
+
+
 func _on_reloaded(_w: PackedStringArray) -> void:
 	sim = Game.base
 	for id in sim.data.npc_order:
