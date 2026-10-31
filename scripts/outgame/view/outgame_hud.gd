@@ -151,14 +151,12 @@ var _top_right: Control
 
 ## 상단: 왼쪽 = 날짜 바(day_bar 그림) 한 장이 날짜 · 속도 버튼 · 돈(지폐 그림) · 정보 줄 전체를 감쌈, 오른쪽 = 아이콘 버튼 (UI 패키지에서 자른 assets/ui/outgame/icons)
 func _build_top() -> void:
-	# 상단 HUD 맨 뒤 띠 (사용자 제공 어두운 띠, 원본 art_src/ui/top_band.webp) — 화면 폭 전체, 두 패널 뒤
-	var band := Control.new()
-	band.position = Vector2.ZERO
-	band.size = Vector2(1280, 6 + 189.0 * TOP_K + 8)
-	band.mouse_filter = MOUSE_FILTER_IGNORE
-	_nine_bg_lrtb(band, load(V2 + "band_top.png"), 8, 8, 8, 8)
-	add_child(band)
-	move_child(band, 0)   # HUD 의 제일 뒤
+	# 상단 HUD 맨 뒤 띠 (사용자 제공 어두운 띠, 원본 art_src/ui/top_band.webp) — 두 패널 사이 틈에만 보이게 (_place_top_band)
+	_top_band = Control.new()
+	_top_band.mouse_filter = MOUSE_FILTER_IGNORE
+	_nine_bg_lrtb(_top_band, load(V2 + "band_top.png"), 8, 8, 8, 8)
+	add_child(_top_band)
+	move_child(_top_band, 0)   # HUD 의 제일 뒤
 	# 왼쪽 위: UI 패키지 v2 두 줄 패널 (윗줄 = 달력 · 날짜 · 속도 버튼, 아랫줄 = 지폐 · 잔액 | 미지급 | 결산 D-day)
 	var left := PanelContainer.new()
 	var em := StyleBoxEmpty.new()
@@ -261,6 +259,20 @@ func _build_top() -> void:
 	rp.custom_minimum_size.y = 189.0 * TOP_K   # 날짜 패널과 같은 높이
 	rp.resized.connect(func(): rp.position.x = 1280 - 6 - rp.size.x)
 	right.alignment = BoxContainer.ALIGNMENT_CENTER
+
+
+var _top_band: Control
+
+
+## 상단 띠 = 왼쪽 날짜 패널과 오른쪽 아이콘 패널 사이 (양쪽 패널 뒤로 조금씩 들어가게), 세로는 패널 안쪽 높이만큼
+func _place_top_band() -> void:
+	if _top_band == null or _top_left == null or _top_right == null:
+		return
+	var h := 189.0 * TOP_K
+	var x0 := _top_left.position.x + _top_left.size.x - 12.0
+	var x1 := _top_right.position.x + 12.0
+	_top_band.position = Vector2(x0, 6.0 + h * 0.16)
+	_top_band.size = Vector2(maxf(0.0, x1 - x0), h * 0.68)
 
 
 ## 날짜 바가 오른쪽 아이콘 버튼에 닿으면 정보 줄 글자를 줄임 (14 → 12 → 11), 넉넉하면 다시 14
@@ -747,6 +759,7 @@ func refresh(delta: float) -> void:
 	cash_label.text = "%d" % sim.ledger.cash   # 지폐 그림이 $ 표시
 	_update_battle_bar()
 	_place_music()
+	_place_top_band()
 	zoom_label.text = "%d%%" % hub.zoom_percent()
 	var left := sim.minutes_to_settlement()
 	var pend := sim.ledger.pending_total()
