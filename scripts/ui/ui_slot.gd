@@ -2,8 +2,7 @@ class_name UiSlot
 extends RefCounted
 ## 정사각형 슬롯 패널 3종 (원본 art_src/ui/square_panels.webp → assets/ui/slot_*.png, 150×150 = 75칸의 2배 해상도):
 ##   item  = 1번 (팔각 모서리) — 기지 인벤토리 칸에만
-##   skill = 2번 (둥근 모서리) — 전투 하단 일반 스킬 칸에만
-##   ult   = 3번 (꺾쇠 모서리) — 전투 하단 필살기 칸에만
+##   skill = 2번 (둥근 모서리) / ult = 3번 (꺾쇠 모서리) — 예전 전투 하단 칸용 (2026-10-31 전투 UI v2 판으로 바뀌어 지금은 안 씀)
 ## 자리 이동 · 무기 칸 등 다른 곳에는 쓰지 않음.
 
 const TEX := {

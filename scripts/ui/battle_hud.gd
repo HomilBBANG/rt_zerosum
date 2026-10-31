@@ -56,13 +56,130 @@ func _ready() -> void:
 	if find_child("Bottom", true, false) == null:
 		_create_layout()
 	_bind_layout()
-	# UI 공용 패널 그림 (assets/ui/panel.png): 하단 명령 패널 · 상태 이상 창 · 전투 기록
-	UiPanel.apply(bottom, Vector4(8, 8, 8, 8))
-	var stw: Control = find_child("StatusWindow", true, false)
-	if stw != null:
-		UiPanel.apply(stw, Vector4(8, 7, 8, 7))
+	_apply_v2_art()
 	if log_panel != null:
 		UiPanel.apply(log_panel, Vector4(12, 10, 12, 10), 0.92)
+
+
+# ---------------------------------------------------------------- 전투 UI v2 (사용자 제공 UI 패키지, 레퍼런스 art_src/ui/ref_battle_v2.webp)
+## 조각: assets/ui/battle/v2/ (원본 art_src/ui/battle_ui_package.webp). 위 = 띠(top_bar), 아래 = 틀(bottom_shell — 원본 하단 바에서 안쪽 칸을 지운 것)
+## + 칸마다 판(plate_sq 정사각형 · plate_tall 무기 · plate_tall_gold 장착 무기 · frame_gold 선택 중 · plate_wide 상태 이상 · plate_red 턴 종료 · frame_portrait 초상화)
+const V2B := "res://assets/ui/battle/v2/"
+const TOP_BAR_K := 0.55        # 위 띠 그림 배율 (그림 높이 132 → 73)
+const SHELL_K := 150.0 / 204.0  # 아래 틀 그림 배율 (그림 높이 204 → 하단 패널 높이 150)
+const PLATE_K := 0.5           # 칸 판 그림 배율 (2배 해상도)
+const M_SQ := Vector4(30, 30, 30, 30)
+const M_TALL := Vector4(30, 34, 30, 34)
+const M_FRAME := Vector4(36, 36, 36, 36)
+var _top_band: Control
+
+
+func _apply_v2_art() -> void:
+	# 위 띠: HUD 맨 뒤, 화면 위 가장자리 (라운드 · 행동 순서 · 기록 버튼이 그 위)
+	_top_band = Control.new()
+	_top_band.name = "TopBandArt"
+	_top_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_top_band.position = Vector2(0, -4)
+	_top_band.size = Vector2(1280, 132.0 * TOP_BAR_K)
+	_top_band.draw.connect(func():
+		UiNine.draw(_top_band, V2B + "top_bar.png", Vector4(530, 60, 530, 60), Rect2(Vector2.ZERO, _top_band.size), TOP_BAR_K))
+	add_child(_top_band)
+	move_child(_top_band, 0)
+	# 아래 틀: 왼쪽(초상화 · 이름) | 가운데(슬롯) | 오른쪽(상태 이상 · 턴 종료) — 칸막이 두 개를 실제 칸 사이에 맞춰 늘림
+	var em := StyleBoxEmpty.new()
+	em.content_margin_left = 22
+	em.content_margin_right = 20
+	em.content_margin_top = 24
+	em.content_margin_bottom = 18
+	bottom.add_theme_stylebox_override("panel", em)
+	bottom.draw.connect(_draw_shell)
+	for n in ["Info", "StatusWindow", "SlotsRow"]:
+		var c: Control = find_child(n, true, false)
+		if c != null:
+			c.resized.connect(bottom.queue_redraw)
+	# 초상화: 어두운 판 + 사용자 제공 큰 사각 테두리
+	var pf: PanelContainer = find_child("PortraitFrame", true, false)
+	if pf != null:
+		var pe := StyleBoxEmpty.new()
+		pe.set_content_margin_all(9)
+		pf.add_theme_stylebox_override("panel", pe)
+		pf.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pf.draw.connect(func(): UiNine.draw(pf, V2B + "plate_sq.png", M_SQ, Rect2(Vector2.ZERO, pf.size).grow(-4), PLATE_K))
+		var fr := Control.new()
+		fr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		fr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		fr.draw.connect(func(): UiNine.draw(fr, V2B + "frame_portrait.png", Vector4(70, 70, 70, 70), Rect2(Vector2.ZERO, fr.size), 0.3))
+		pf.add_child(fr)
+	var info: Control = find_child("Info", true, false)
+	if info != null:
+		info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# 상태 이상 창 = 넓은 판
+	var stw: PanelContainer = find_child("StatusWindow", true, false)
+	if stw != null:
+		var se := StyleBoxEmpty.new()
+		se.content_margin_left = 14
+		se.content_margin_right = 12
+		se.content_margin_top = 12
+		se.content_margin_bottom = 10
+		stw.add_theme_stylebox_override("panel", se)
+		stw.draw.connect(func(): UiNine.draw(stw, V2B + "plate_wide.png", Vector4(40, 40, 40, 40), Rect2(Vector2.ZERO, stw.size), PLATE_K))
+	# 턴 종료 = 붉은 판 (마우스 올림 = 밝게, 누름 = 어둡게, 못 누름 = 흐리게)
+	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
+		end_btn.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	end_btn.add_theme_color_override("font_disabled_color", Color(0.85, 0.8, 0.78, 0.6))
+	end_btn.add_theme_color_override("font_outline_color", Color(0.15, 0.04, 0.02))
+	end_btn.add_theme_constant_override("outline_size", 4)
+	UiNine.behind(end_btn, V2B + "plate_red.png", Vector4(40, 40, 40, 40), PLATE_K, func() -> Color:
+		match end_btn.get_draw_mode():
+			BaseButton.DRAW_HOVER: return Color(1.2, 1.15, 1.1)
+			BaseButton.DRAW_PRESSED, BaseButton.DRAW_HOVER_PRESSED: return Color(0.8, 0.8, 0.8)
+			BaseButton.DRAW_DISABLED: return Color(0.6, 0.6, 0.6, 0.75)
+		return Color.WHITE)
+	# 기록 버튼 = 작은 사각 판 (켜짐 = 금색 테두리)
+	if log_btn == null:
+		log_btn = find_child("LogButton", true, false)
+	if log_btn != null:
+		var lm := StyleBoxEmpty.new()
+		lm.set_content_margin_all(9)
+		for st in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+			log_btn.add_theme_stylebox_override(st, lm)
+		UiNine.behind(log_btn, V2B + "plate_sq.png", M_SQ, PLATE_K, func() -> Color:
+			return Color(1.25, 1.25, 1.2) if log_btn.is_hovered() or log_btn.button_pressed else Color.WHITE)
+
+
+## 아래 틀 그리기: 그림을 7조각(왼 끝 · 왼 늘림 · 칸막이1 · 가운데 늘림 · 칸막이2 · 오른 늘림 · 오른 끝)으로 나눠
+## 칸막이 두 개가 이름 칸 오른쪽 · 상태 이상 창 왼쪽에 오게 늘림 (그림 칸막이 x = 458 · 1200)
+func _draw_shell() -> void:
+	var tex: Texture2D = load(V2B + "bottom_shell.png")
+	var k := SHELL_K
+	var w := bottom.size.x
+	var h := bottom.size.y
+	var info: Control = find_child("Info", true, false)
+	var stw: Control = find_child("StatusWindow", true, false)
+	var d1 := (info.get_global_rect().end.x - bottom.global_position.x + 14.0) if info != null else w * 0.27
+	var d2 := (stw.get_global_rect().position.x - bottom.global_position.x - 12.0) if stw != null else w * 0.75
+	# 그림 x 구간 → 화면 폭 (고정 구간은 k 배, 늘림 구간은 남는 폭)
+	var wb := maxf(0.0, d1 - 458.0 * k + 150.0 * k)            # 230~380 늘림: 칸막이1 이 d1 에
+	var wd := maxf(0.0, d2 - d1 - (1200.0 - 458.0 - 710.0) * k)   # 476~1186 늘림: 칸막이2 가 d2 에
+	var wf := maxf(0.0, w - d2 - (1632.0 - 1200.0 - 150.0) * k)   # 1250~1400 늘림: 오른 끝이 w 에
+	var segs := [[0.0, 230.0, 230.0 * k], [230.0, 380.0, wb], [380.0, 476.0, 96.0 * k], [476.0, 1186.0, wd],
+		[1186.0, 1250.0, 64.0 * k], [1250.0, 1400.0, wf], [1400.0, 1632.0, 232.0 * k]]
+	var x := 0.0
+	for sg in segs:
+		var dw: float = sg[2]
+		if dw > 0.0:
+			bottom.draw_style_box(_shell_seg(tex, sg[0], sg[1]), Rect2(x, 0, dw + 0.6, h))
+		x += dw
+
+
+var _shell_sb := {}
+func _shell_seg(tex: Texture2D, x0: float, x1: float) -> StyleBoxTexture:
+	if not _shell_sb.has(x0):
+		var sb := StyleBoxTexture.new()
+		sb.texture = tex
+		sb.region_rect = Rect2(x0, 0, x1 - x0, 204)
+		_shell_sb[x0] = sb
+	return _shell_sb[x0]
 
 
 func setup(p_controller: BattleController, p_view: BattleViewBase, p_preset: Dictionary) -> void:
@@ -708,11 +825,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 # ---------------------------------------------------------------- 갱신
-const SLOT := 75.0          # 스킬·이동·필살기 칸 (58 → 30% 키움)
+const SLOT := 76.0          # 스킬·이동·필살기 칸 (전투 UI v2 정사각형 판)
 const SLOT_GAP := 18.0
-const WEAPON_W := 44.0      # 무기 칸: 세로로 긴 칸 (패널 천장까지)
-const WEAPON_H := 110.0     # 무기 칸: 이름 포함 높이가 패널 안쪽을 거의 채움
-const WEAPON_SEP := 2       # 무기 사이 간격
+const WEAPON_W := 46.0      # 무기 칸: 세로로 긴 판 (전투 UI v2)
+const WEAPON_H := 96.0      # 무기 칸 높이 — 이름은 아래 틀 띠 위 (레퍼런스처럼)
+const WEAPON_SEP := 3       # 무기 사이 간격
 const CAP_H := 16.0
 
 
@@ -854,7 +971,7 @@ func _add_skill_slot(o: Dictionary, is_player: bool) -> void:
 
 func _add_gap() -> void:
 	var g := Control.new()
-	g.custom_minimum_size.x = SLOT_GAP - 8.0
+	g.custom_minimum_size.x = SLOT_GAP - 12.0   # 묶음 사이 (무기 | 자리 이동 | 스킬 | 필살기) — 아래 틀 칸막이 사이에 다 들어가게
 	slots_row.add_child(g)
 
 
@@ -870,59 +987,41 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 	var tip: String = d.get("tip", "")
 	var on_press: Callable = d.get("press", Callable())
 	var is_weapon: bool = d.get("weapon", false)
-	var is_ult: bool = d.get("ult", false)
 	var active: bool = d.get("enabled", false) and on_press.is_valid()
 	var usable := active or mark == "equipped"
 	var bsize := Vector2(WEAPON_W, WEAPON_H) if is_weapon else Vector2(SLOT, SLOT)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
 	box.custom_minimum_size.x = bsize.x + (1.0 if is_weapon else 4.0)   # 무기 칸 가로 간격 좁게
-	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER   # 아이콘+이름 덩어리를 패널 세로 가운데
+	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN   # 판 윗변을 모두 같은 높이에 (무기 판이 길어 이름이 아래 틀 띠 위로 — 레퍼런스처럼)
 	var btn := Button.new()
 	btn.custom_minimum_size = bsize
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	btn.focus_mode = Control.FOCUS_NONE
-	var sb := StyleBoxFlat.new()
-	if is_ult:
-		sb.bg_color = Color(0.2, 0.08, 0.28, 0.95)
-	else:
-		sb.bg_color = Color(0.1, 0.11, 0.14, 0.95)
-	sb.border_color = Color(1, 1, 1, 0.22)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(6)
-	if mark == "equipped":
-		sb.border_color = Color(1.0, 0.82, 0.25)
-		sb.set_border_width_all(3)
-	elif mark == "selected":
-		sb.border_color = Color(0.45, 0.85, 1.0)
-		sb.set_border_width_all(3)
-	elif mark == "move_on":
-		sb.bg_color = Color(0.18, 0.45, 0.95)
-		sb.border_color = Color(0.6, 0.85, 1.0)
-		sb.set_border_width_all(3)
-	if not usable:
-		sb.bg_color = Color(0.24, 0.24, 0.26, 0.9)   # 회색 처리
-		sb.border_color = Color(1, 1, 1, 0.1)
-	var art: String = d.get("art", "")
-	if art != "":
-		# 일반 스킬 = 2번 패널, 필살기 = 3번 패널 (선택 중 = 파란 테두리, 쓸 수 없음 = 어둡게)
-		UiSlot.apply(btn, art, not usable, sb.border_color if mark != "" else Color(0, 0, 0, 0))
-	else:
-		btn.add_theme_stylebox_override("normal", sb)
-		var hov: StyleBoxFlat = sb.duplicate()
-		hov.bg_color = sb.bg_color.lightened(0.12)
-		if mark == "":
-			hov.border_color = Color(1, 1, 1, 0.6)
-		btn.add_theme_stylebox_override("hover", hov)
-		btn.add_theme_stylebox_override("pressed", hov)
-		btn.add_theme_stylebox_override("disabled", sb)
+	# 바탕 = 전투 UI v2 판: 무기 = 세로 판(장착 중 = 금색 판), 그 밖 = 정사각형 판. 선택 중 · 자리 이동 선택 = 금색 테두리.
+	# 마우스 올림 = 밝게, 못 씀 = 어둡게 (빈 칸은 아래에서 흐리게)
+	for st in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		btn.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	var plate := "plate_tall_gold.png" if (is_weapon and mark == "equipped") else ("plate_tall.png" if is_weapon else "plate_sq.png")
+	var pm: Vector4 = M_TALL if is_weapon else M_SQ
+	var gold := mark == "selected" or mark == "move_on"
+	btn.draw.connect(func():
+		var mod := Color.WHITE if usable else Color(0.55, 0.55, 0.58)
+		if btn.is_hovered() and not btn.disabled:
+			mod = Color(1.3, 1.3, 1.25)
+		var r := Rect2(Vector2.ZERO, btn.size)
+		UiNine.draw(btn, V2B + plate, pm, r, PLATE_K, mod)
+		if gold:
+			UiNine.draw(btn, V2B + "frame_gold.png", M_FRAME, r.grow(1.0), PLATE_K))
+	for sig in ["mouse_entered", "mouse_exited"]:
+		btn.connect(sig, btn.queue_redraw)
 	if icon != null:
 		var tr := TextureRect.new()
 		tr.texture = icon
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		tr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		var m := 4.0 if is_weapon else 7.0
+		var m := 7.0 if is_weapon else 12.0   # 판 테두리 안쪽
 		tr.offset_left = m
 		tr.offset_top = m
 		tr.offset_right = -m
@@ -943,7 +1042,7 @@ func _add_slot(parent: Container, d: Dictionary) -> void:
 		var cl := _label("-%d" % cost, 12, Color(0.6, 0.85, 1.0) if usable else Color(1.0, 0.3, 0.28))
 		cl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		btn.add_child(cl)
-		cl.position = Vector2(bsize.x - 18.0, -1.0)
+		cl.position = Vector2(bsize.x - 22.0, 3.0)   # 판 오른쪽 위 테두리 안
 	btn.disabled = not active
 	if mark == "equipped":
 		btn.disabled = not on_press.is_valid()

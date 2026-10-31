@@ -304,11 +304,13 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
 - 대원 우클릭 메뉴에도 아이콘: 대화(편지) · 무기 연구(돋보기) · 정보·장비(책) · 스킬 트리(번개) · 업무·의뢰 지시(문서).
 - 아이콘 20개 = 사용자 UI 패키지에서 잘라 `assets/ui/outgame/icons/<이름>.png` (96×96): skill · sword · faith · levelup · book · codex · search · bookmark · contract · quest · mail · scroll · schedule · calendar_check · ledger · calendar · gear · tools · sliders · gear_wrench. 원본 `art_src/ui/`.
 - UI 그림은 2560×1440 창에서 1:1 이 되게 2배 해상도로 만들고 반으로 줄여 그림 (게임 기준 1280×720).
-- **UI 공용 패널** = `assets/ui/panel.png` (원본 `art_src/ui/panel.webp`, 어두운 판 · 올리브 테두리 · 팔각 모서리): 기지의 모든 창(납품 · 대화 · 원장 · 의뢰 · 도감 등) · 대원 카드 · 기록 · 확대 버튼, 전투 하단 명령 패널 · 상태 이상 창 · 전투 기록. 모서리 · 테두리는 그대로, 가운데만 늘림. 코드 `scripts/ui/ui_panel.gd` (`UiPanel.apply(패널, 안쪽 여백)`) — 새 패널도 이걸로.
+- **UI 공용 패널** = `assets/ui/panel.png` (원본 `art_src/ui/panel.webp`, 어두운 판 · 올리브 테두리 · 팔각 모서리): 기지의 모든 창(납품 · 대화 · 원장 · 의뢰 · 도감 등) · 대원 카드 · 기록 · 확대 버튼, 전투 기록. (전투 하단 명령 패널 · 상태 이상 창은 아래 전투 UI v2) 모서리 · 테두리는 그대로, 가운데만 늘림. 코드 `scripts/ui/ui_panel.gd` (`UiPanel.apply(패널, 안쪽 여백)`) — 새 패널도 이걸로.
 
-![전투 하단 패널 — UI 공용 패널](docs/screenshots/battle_ui_panel.jpg)
+- **전투 UI v2** (사용자 제공 `art_src/ui/battle_ui_package.webp` + 레퍼런스 `art_src/ui/ref_battle_v2.webp` → 조각 `assets/ui/battle/v2/`): 위 = 어두운 띠(`top_bar`, 왼쪽 라운드 · 가운데 행동 순서 · 오른쪽 기록 버튼 = 작은 판), 아래 = 틀(`bottom_shell` — 원본 하단 바에서 안쪽 칸을 지운 것, 칸막이 두 개를 이름 칸 오른쪽 · 상태 이상 창 왼쪽에 맞춰 7조각으로 늘림). 초상화 = 큰 사각 테두리, 무기 = 세로 판(장착 중 = 금색 판), 자리 이동 · 스킬 · 필살기 = 정사각형 판(선택 중 = 금색 테두리), 상태 이상 = 넓은 판, 턴 종료 = 붉은 판. 9칸 늘리기 공용 `scripts/ui/ui_nine.gd` (`UiNine.draw` · `UiNine.behind`). 위치는 `scenes/battle_hud.tscn`(에디터 편집), 그림은 `battle_hud.gd` `_apply_v2_art`.
 
-- **정사각형 슬롯 패널** (원본 `art_src/ui/square_panels.webp` → `assets/ui/slot_item.png` · `slot_skill.png` · `slot_ult.png`, 150×150 = 75칸의 2배): 1번 = 기지 인벤토리 칸, 2번 = 전투 일반 스킬 칸, 3번 = 필살기 칸 — 이 셋에만. 코드 `scripts/ui/ui_slot.gd` (`UiSlot.apply(버튼, "item"|"skill"|"ult", 회색, 테두리색)`).
+![전투 UI v2](docs/screenshots/battle_ui_v2.jpg)
+
+- **정사각형 슬롯 패널** (원본 `art_src/ui/square_panels.webp` → `assets/ui/slot_item.png` · `slot_skill.png` · `slot_ult.png`, 150×150 = 75칸의 2배): 1번 = 기지 인벤토리 칸 (2번 · 3번 = 예전 전투 스킬 · 필살기 칸, 지금은 전투 UI v2 판). 코드 `scripts/ui/ui_slot.gd` (`UiSlot.apply(버튼, "item"|"skill"|"ult", 회색, 테두리색)`).
 - **인벤토리** (기지 상단 '인벤토리' 버튼): 식량 · 물 · 전투 보상(전리품) · PX 선물을 칸으로. 칸을 누르면 설명. 확인용 `--base_ui=inventory:scrap=4,gift_coffee=2` (PX 물건 id 면 선물로 넣음).
 
 ![기지 인벤토리](docs/screenshots/outgame_inventory.jpg)
