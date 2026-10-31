@@ -72,6 +72,46 @@ const M_SQ := Vector4(30, 30, 30, 30)
 const M_TALL := Vector4(30, 34, 30, 34)
 const M_FRAME := Vector4(36, 36, 36, 36)
 var _top_band: Control
+var _vitals: Control
+const HP_COL := Color(0.92, 0.22, 0.2)
+const AP_COL := Color(0.3, 0.6, 1.0)
+
+
+## 하단 정보 칸 HP · AP: 아이콘 + 숫자 + 칸 막대 (HP = 5칸 — 칸마다 20%, 끝 칸은 남은 만큼, AP = 최대 AP 만큼 칸)
+func _draw_vitals() -> void:
+	var u: UnitRuntime = controller.current if controller != null else null
+	if u == null:
+		return
+	var f: Font = _font_bold
+	for row in 2:
+		var y := 4.0 + row * 20.0
+		var cy := y + 7.0
+		if row == 0:   # 하트
+			var h := PackedVector2Array()
+			for i in 24:
+				var t := TAU * i / 24.0
+				h.append(Vector2(6 + 6.2 * pow(sin(t), 3), cy - 0.5 - (5.0 * cos(t) - 2.0 * cos(2 * t) - cos(3 * t) - 0.5 * cos(4 * t)) * 0.75))
+			_vitals.draw_colored_polygon(h, HP_COL)
+		else:   # 번개
+			_vitals.draw_colored_polygon(PackedVector2Array([Vector2(8, cy - 8), Vector2(2, cy + 1), Vector2(6, cy + 1), Vector2(4, cy + 8), Vector2(11, cy - 2), Vector2(7, cy - 2), Vector2(10, cy - 8)]), AP_COL)
+		var txt := "HP %d/%d" % [u.hp, u.data.max_hp] if row == 0 else "AP %d/%d" % [u.ap, u.data.max_ap]
+		_vitals.draw_string(f, Vector2(18, y + 12), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.93, 0.92, 0.88))
+		var x0 := 82.0
+		var w := 66.0
+		var n := 5 if row == 0 else maxi(1, u.data.max_ap)
+		var gap := 2.0
+		var sw := (w - gap * (n - 1)) / n
+		var fill := float(u.hp) / maxf(1.0, u.data.max_hp) * n if row == 0 else float(u.ap)
+		var col := HP_COL if row == 0 else AP_COL
+		for i in n:
+			var x := x0 + i * (sw + gap)
+			var k := clampf(fill - i, 0.0, 1.0)
+			var sk := 3.0   # 평행사변형 (머리 위 AP 칸과 같은 모양)
+			var bg := PackedVector2Array([Vector2(x + sk, y + 2), Vector2(x + sw + sk, y + 2), Vector2(x + sw, y + 12), Vector2(x, y + 12)])
+			_vitals.draw_colored_polygon(bg, Color(0.1, 0.11, 0.1))
+			if k > 0.0:
+				var fw := sw * k
+				_vitals.draw_colored_polygon(PackedVector2Array([Vector2(x + sk, y + 2), Vector2(x + fw + sk, y + 2), Vector2(x + fw, y + 12), Vector2(x, y + 12)]), col)
 
 
 func _apply_v2_art() -> void:
@@ -113,6 +153,14 @@ func _apply_v2_art() -> void:
 	var info: Control = find_child("Info", true, false)
 	if info != null:
 		info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		# HP · AP 막대 (레퍼런스: ♥ HP 24/24 ■■■■■ / ⚡ AP 5/5 ■■■■■) — 이름 아래
+		_vitals = Control.new()
+		_vitals.name = "Vitals"
+		_vitals.custom_minimum_size = Vector2(150, 40)
+		_vitals.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_vitals.draw.connect(_draw_vitals)
+		info.add_child(_vitals)
+		info.move_child(_vitals, name_label.get_index() + 1)
 	# 상태 이상 창 = 넓은 판
 	var stw: PanelContainer = find_child("StatusWindow", true, false)
 	if stw != null:
@@ -841,7 +889,9 @@ func _refresh_panel() -> void:
 	if u == null:
 		return
 	name_label.text = "%s · %s  Lv%d" % [u.display_name(), u.data.role, u.data.level]
-	stat_label.text = "HP %d/%d   AP %d/%d (+%d/턴)\n속도 %d   %s %d" % [u.hp, u.data.max_hp, u.ap, u.data.max_ap, u.data.ap_recovery, u.data.speed, _row_text(u), u.index + 1]
+	stat_label.text = "AP +%d/턴 · 속도 %d · %s %d" % [u.data.ap_recovery, u.data.speed, _row_text(u), u.index + 1]   # HP · AP 는 위 막대 (_draw_vitals)
+	if _vitals != null:
+		_vitals.queue_redraw()
 	portrait.texture = UnitArt.portrait(u.data.sprite_id, manifest)
 	portrait.flip_h = (u.team == "enemy") != bool(u.data.palette.get("art_faces_left", false))
 	var is_player := controller.is_player_turn() and not view.busy
