@@ -418,9 +418,9 @@ func _build_defeat(r: Dictionary, allies: Array) -> void:
 		["획득 경험치", "+%d" % xp if xp > 0 else "-"]])
 	# 버튼 (아래 띠 위)
 	var by := 720 - bh + bh * 0.5 - 26
-	var detail := _plate_button("상세 기록", L + "button_normal.png", Vector4(40, 40, 40, 40), 0.5, Rect2(176, by, 280, 52), CREAM)
+	var detail := _plate_button("상세 기록", L + "button_normal.png", Vector4(36, 36, 36, 36), 0.5, Rect2(176, by, 280, 52), CREAM)
 	detail.pressed.connect(_open_detail)
-	var retry := _plate_button("재도전", L + "button_normal.png", Vector4(40, 40, 40, 40), 0.5, Rect2(500, by, 280, 52), CREAM)
+	var retry := _plate_button("재도전", L + "button_normal.png", Vector4(36, 36, 36, 36), 0.5, Rect2(500, by, 280, 52), CREAM)
 	retry.pressed.connect(func():
 		Game.restart_count += 1
 		Game.start_battle())
