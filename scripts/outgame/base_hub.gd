@@ -322,7 +322,7 @@ func _update_hover() -> void:
 	if under.juke_hover != juke:
 		under.juke_hover = juke
 		under.queue_redraw()
-	var go := selected != "" and under.hover_fid != ""
+	var go := selected != "" and under.hover_fid != "" and speed > 0
 	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if (n != "" or _bubble_at(p) != "" or go or juke) else Input.CURSOR_ARROW)
 
 
@@ -447,6 +447,8 @@ func _left_click(p: Vector2, dbl: bool = false) -> void:
 	if not sim.is_unlocked(fid):
 		hud.open_unlock(fid)
 		return
+	if speed == 0:
+		return   # 정지 중 = 이동 지시 안 받음 (예전: 지시는 들어가고 시간이 안 흘러 제자리에서 걸음)
 	var r2 := sim.issue_move(selected, fid, room_x_at(fid, p), dbl)
 	if not r2.ok:
 		hud.show_toast(r2.msg, OutgameHud.BAD)
@@ -636,6 +638,10 @@ func _cli_ui(spec: String) -> void:
 			hud.show_toast(r.msg, OutgameHud.GOOD if r.ok else OutgameHud.BAD)
 			if p.size() > 4:
 				sim.skip(int(p[4]))
+		"speed":   # speed:0|1|4|16 — 기지 시계 속도 (0 = 정지)
+			set_speed(int(p[1]))
+		"click":   # click:x:y — 그 화면 점을 왼쪽 클릭한 것처럼 (정지 중 이동 지시 무시 확인용)
+			_left_click(Vector2(float(p[1]), float(p[2])))
 		"place":   # place:npc_dan:960 — 대원을 그 규칙 x 에 세우고 시계 정지 (벽 뒤로 가리는지 확인용)
 			(sim.npcs[p[1]] as NpcAgent).pos.x = float(p[2])
 			speed = 0

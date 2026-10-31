@@ -45,7 +45,7 @@ func _ready() -> void:
 	_tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_tip.position = Vector2(390, 244)
+	_tip.position = Vector2(390, 262)   # 바 바로 위 (레퍼런스보다 조금 아래)
 	_tip.size = Vector2(500, 94)
 	add_child(_tip)
 	_pct = Label.new()

@@ -146,7 +146,10 @@ func _process(delta: float) -> void:
 ## 상태 → 애니메이션 (앞에서부터 프레임이 있는 것, 없으면 기본 그림)
 func _update_anim(n: NpcAgent) -> void:
 	var cands: Array = ["idle"]
-	if n.state == NpcAgent.MOVING:
+	var paused: bool = hub.speed == 0 or hub.hud.modal_open() or not hub.sim.pending_battle.is_empty()   # 시계가 멈춤 = 걷던 대원도 멈춰 섬
+	if n.state == NpcAgent.MOVING and paused:
+		cands = ["idle"]
+	elif n.state == NpcAgent.MOVING:
 		cands = ["run", "walk", "idle"] if n.running else ["walk", "idle"]
 	elif _pose == "lie":
 		cands = ["sleep", "idle"]
