@@ -359,7 +359,11 @@ git 이 없는 설치(zip)는 같은 설치 명령을 다시 실행하면 최신
   - 모션: idle = 기본 그림 리깅(숨쉬기 · 머리 · 팔), 공격 `shot`/`shot_pistol`(권총) · `shot_smg`(기관단총 들었을 때) · `slash`(근접), 비공격 스킬 `point_up`(시전), `hit` · `miss` · `tired`(숨쉬기 리깅) · `dead`.
   - **사망 = 쓰러진 그림(dead)** — 몬스터(분류가 인간이 아닌 적)만 불에 타 사라짐.
 
+- **인간 적군 AU군 거한** (`bigman`, 사용자 제공 9장 — 원본 `art_src/bigman/`): 근접(전투단검 · 기관단총 · 권총), 키 205cm, HP 120 · 방어 3 [임시], AI aggressive. 모션은 AU군 병사와 같은 짝 (idle · 지침 리깅, shot · shot_pistol · shot_smg · slash · point_up · hit · miss · dead). 그림마다 그린 배율이 달라 군복(갈색) · 군화/장갑(검정) 면적으로 배율을 맞춤.
+- **누운 포즈(dead)**: 발 기준선을 몸 두께의 30% 위로 (`anim.json` "lying_sink") → 쓰러진 몸이 발밑 그림자 위에 놓임 (예전엔 맨 아래 픽셀에 맞춰 떠 보임). poses 도구도 같은 규칙.
+
 ![AU군 병사 — 배치 · 권총 사격 · 쓰러짐(늑대는 탐)](docs/screenshots/army_m_battle.jpg)
+![AU군 거한 배치 · 베기 · 모두 쓰러짐(그림자 위)](docs/screenshots/bigman_battle.jpg)
 ![AU군 병사 포즈 크기 비교](docs/screenshots/army_m_poses.png)
 ![몬스터 사망 — 불에 타 사라짐 (0.6 · 1.3 · 2.0 · 2.9초)](docs/screenshots/monster_burn_death.jpg)
 

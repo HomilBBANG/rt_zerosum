@@ -47,6 +47,11 @@
 		}
 	],
 	"kits": {
+		"bigman": [
+			"basic_attack",
+			"heavy_attack",
+			"ultimate"
+		],
 		"army_m": [
 			"basic_attack",
 			"heavy_attack",

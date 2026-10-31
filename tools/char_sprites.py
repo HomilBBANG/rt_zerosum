@@ -68,6 +68,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 from gen_sprites import build_zone_mask  # noqa: E402
 
 CHAR_DIR = os.path.join(ROOT, "assets", "characters")
+LYING_SINK = 0.3   # 누운 포즈(dead 등): 발 기준선 = 몸 맨 아래에서 몸 두께의 이 비율만큼 위
 
 
 def line_mask(im, size=7, lo=18.0, hi=55.0):
@@ -1277,6 +1278,8 @@ def cmd_poses(cid, pairs, ref=None, band=None):
         else:
             _bb, gx = _feet(can)
         gy = pad + im2.height
+        if lying and im2.width > im2.height * 1.6:   # 누운 그림 (앞으로 길게 덤비는 자세는 아님): 발 기준선을 몸 두께의 30% 위로 → 몸이 바닥 그림자 위에 놓임 (맨 아래 픽셀에 맞추면 떠 보임)
+            gy -= round(im2.height * LYING_SINK)
         adir = os.path.join(cdir, name)
         os.makedirs(adir, exist_ok=True)
         for f in os.listdir(adir):
@@ -1293,7 +1296,7 @@ def cmd_poses(cid, pairs, ref=None, band=None):
             top = can.crop((0, 0, can.width, round(pad + fig * 0.10))).split()[3].point(lambda v: 255 if v > 40 else 0).getbbox()
             head = (top[0], pad, top[2] - top[0], fig * 0.2) if top else None
             eye_mask(can, head=head).save(stem + "_eye.png")
-        meta = {"pose": True, "loop": True, "fps": 1.0, "ground": [round(gx), gy], "figure_px": fig,
+        meta = {"pose": True, "loop": True, "fps": 1.0, "ground": [round(gx), gy], "figure_px": fig, **({"lying_sink": LYING_SINK} if lying else {}),
                 "hip_y": round(gy - fig * 0.52) if not lying else gy - 40, "source": "%s (배율 %.3f, 기준 %s)" % (os.path.basename(path), km, ref)}
         json.dump(meta, open(os.path.join(adir, "anim.json"), "w", encoding="utf-8"), ensure_ascii=False)
         print(cid, name, "포즈", can.size, "발", meta["ground"], "누움" if lying else "")

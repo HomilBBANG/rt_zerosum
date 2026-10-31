@@ -138,10 +138,11 @@ func _run_cli() -> void:
 				hud.begin_move()
 				break
 			if auto.begins_with("burn"):
-				# --autoplay=burn[:초] — 적 모두 사망 연출(불에 타 사라짐), 초 뒤에 찍음 (기본 1.0)
+				# --autoplay=burn[:초[:all]] — 적 모두(all = 아군도) 사망 연출 (몬스터 = 불에 탐, 인간 = 쓰러짐), 초 뒤에 찍음 (기본 1.0)
+				var all_die := auto.get_slice_count(":") > 2 and auto.get_slice(":", 2) == "all"
 				for id in view.sprites:
 					var bs: UnitSprite2D = view.sprites[id]
-					if bs.unit.team != "ally":
+					if bs.unit.team != "ally" or all_die:
 						bs.unit.alive = false
 						bs.play_death()
 				await get_tree().create_timer(float(auto.get_slice(":", 1)) if auto.get_slice_count(":") > 1 else 1.0).timeout
