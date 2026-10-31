@@ -1,6 +1,6 @@
 extends Control
 ## 전투 결과 화면 v2 (레퍼런스 art_src/ui/result/ref_victory.webp, 조각 assets/ui/result/):
-## 배경 · 가운데 큰 판(머리 탭 "전투 승리 / 패배") · 대원 줄(초상화 · 이름 · Lv · +EXP 막대 · 몸 상태 그림 + 상태 꼬리표 · 설명)
+## 배경 · 가운데 큰 판(머리 탭 "전투 승리 / 패배") · 대원 줄(초상화 · 이름 · Lv · +EXP 막대 · 전투 끝에 남은 부정적 상태 이상 꼬리표 · 체력)
 ## · 획득 전리품 칸 · [상세 기록] [계속] · 왼쪽 MVP(준 피해가 가장 큰 대원 — 전신 그림 + 배지), 오른쪽 최저 성과(가장 적은 대원).
 ## 상세 기록 = 전투 로그 + 다시 전투 · 전투 배치 (예전 결과 화면 버튼).
 
@@ -88,7 +88,7 @@ func _title(c: Control, text: String, win: bool) -> void:
 			c.draw_colored_polygon(p, col)
 
 
-## 대원 줄: 초상화 · 이름 · Lv | +EXP · 막대 · 경험치 | 몸 그림 · 상태 꼬리표 · 설명
+## 대원 줄: 초상화 · 이름 · Lv | +EXP · 막대 · 경험치 | 전투 끝에 남은 부정적 상태 이상 꼬리표 · 체력
 func _rows(panel: Control, allies: Array) -> void:
 	var n := maxi(1, allies.size())
 	var top := 78.0
@@ -128,25 +128,18 @@ func _ally_info(a: Dictionary) -> Dictionary:
 	var max_hp := int(a.get("max_hp", u.max_hp if u != null else 1))
 	var hp := int(a.get("hp", max_hp))
 	var alive: bool = a.get("alive", true)
+	# 전투가 끝났을 때 남아 있던 부정적 상태 이상 전부 (같은 것이 여러 번이면 한 번만) + 쓰러짐
 	var bad: Array = []
+	if not alive:
+		bad.append("쓰러짐")
 	for sid in a.get("statuses", []):
 		var d := StatusCatalog.get_def(str(sid))
-		if not d.get("positive", false):
-			bad.append(str(d.get("name", sid)))
-	var tag := "이상 없음"
-	var desc := "특이 사항이 없습니다."
-	var severity := 0   # 0 = 멀쩡 · 1 = 경상 · 2 = 중상
-	if not alive:
-		severity = 2
-		tag = "중상 · 쓰러짐"
-		desc = "쓰러져 부상을 입었습니다.\n의무실 치료가 필요합니다."
-	elif hp < max_hp or not bad.is_empty():
-		severity = 2 if hp * 2 < max_hp else 1
-		tag = "%s · %s" % ["중상" if severity == 2 else "경상", bad[0] if not bad.is_empty() else "체력 %d/%d" % [hp, max_hp]]
-		desc = ("%s · 체력 %d/%d" % [", ".join(bad), hp, max_hp] if not bad.is_empty() else "체력이 줄었습니다.") + "\n의무실에서 회복됩니다."
+		var nm := str(d.get("name", sid))
+		if not d.get("positive", false) and not bad.has(nm):
+			bad.append(nm)
+	var hp_line := "체력 %d/%d" % [hp, max_hp] if alive else "체력 0/%d" % max_hp
 	var portrait: Texture2D = UnitArt.portrait(u.sprite_id, _manifest) if u != null else null
-	return {"name": name, "lv": lv, "ups": ups, "xp": xp, "need": need, "gain": gain, "tag": tag, "desc": desc, "severity": severity,
-		"hp_ratio": clampf(float(hp) / maxf(1.0, max_hp), 0.0, 1.0), "portrait": portrait}
+	return {"name": name, "lv": lv, "ups": ups, "xp": xp, "need": need, "gain": gain, "bad": bad, "hp_line": hp_line, "portrait": portrait}
 
 
 func _draw_row(row: Control, d: Dictionary) -> void:
@@ -166,8 +159,8 @@ func _draw_row(row: Control, d: Dictionary) -> void:
 		var lw := _bold.get_string_size("Lv.%d" % int(d.lv), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		row.draw_string(_bold, Vector2(ps + 26 + lw, h * 0.42 + fs + 5), "▲UP", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, GOLD)
 	# 구분선
-	for x in [222.0, 452.0]:
-		row.draw_line(Vector2(x, 10), Vector2(x, h - 10), Color(0.35, 0.38, 0.3, 0.8), 1.5)
+	for lx in [222.0, 452.0]:
+		row.draw_line(Vector2(lx, 10), Vector2(lx, h - 10), Color(0.35, 0.38, 0.3, 0.8), 1.5)
 	# 경험치
 	var ex := 236.0
 	if int(d.xp) >= 0:
@@ -182,46 +175,35 @@ func _draw_row(row: Control, d: Dictionary) -> void:
 		row.draw_string(_font, Vector2(ex, h * 0.42 + 32), "%d / %d" % [int(d.xp), int(d.need)], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, DIM)
 	else:
 		row.draw_string(_font, Vector2(ex, h * 0.55), "경험치 없음 (전투 테스트)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, DIM)
-	# 몸 상태 그림 (다친 정도 = 몸통 붉게)
-	_body(row, Vector2(476, h * 0.5), h * 0.78, int(d.severity))
-	# 상태 꼬리표 + 설명
-	var tag_col := RED if int(d.severity) > 0 else Color(0.75, 0.78, 0.72)
-	var tf := 15
-	var tw := _bold.get_string_size(str(d.tag), HORIZONTAL_ALIGNMENT_LEFT, -1, tf).x
-	var tr := Rect2(500, h * 0.14, minf(140.0, tw + 22), 24)
+	# 상태 이상: 전투가 끝났을 때 남은 부정적 상태 이상을 꼬리표로 (없으면 "이상 없음") + 체력
+	var bad: Array = d.bad
+	var x := 468.0
+	var y := 10.0
+	var tf := 13
+	if bad.is_empty():
+		_chip(row, Rect2(x, y, _bold.get_string_size("이상 없음", HORIZONTAL_ALIGNMENT_LEFT, -1, tf).x + 18, 22), "이상 없음", Color(0.75, 0.78, 0.72), CREAM, tf)
+	else:
+		for nm in bad:
+			var w := _bold.get_string_size(str(nm), HORIZONTAL_ALIGNMENT_LEFT, -1, tf).x + 18
+			if x + w > 640.0 and x > 468.0:   # 줄 바꿈
+				x = 468.0
+				y += 26.0
+			if y + 22 > h - 18:   # 줄 높이를 넘으면 "외 N"
+				break
+			_chip(row, Rect2(x, y, w, 22), str(nm), RED, RED, tf)
+			x += w + 5
+	row.draw_string(_font, Vector2(468, h - 9), str(d.hp_line), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, DIM)
+
+
+## 상태 꼬리표 (어두운 바탕 + 색 테두리)
+func _chip(c: Control, r: Rect2, text: String, border: Color, col: Color, fs: int) -> void:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.08, 0.06, 0.05, 0.9)
-	sb.border_color = tag_col
+	sb.border_color = border
 	sb.set_border_width_all(2)
 	sb.set_corner_radius_all(4)
-	row.draw_style_box(sb, tr)
-	row.draw_string(_bold, tr.position + Vector2(11, 17), str(d.tag), HORIZONTAL_ALIGNMENT_LEFT, tr.size.x - 14, tf, tag_col if int(d.severity) > 0 else CREAM)
-	var lines: PackedStringArray = str(d.desc).split("\n")
-	for i in lines.size():
-		row.draw_string(_font, Vector2(500, tr.end.y + 16 + i * 14), lines[i], HORIZONTAL_ALIGNMENT_LEFT, 136, 11, CREAM)
-
-
-## 사람 모양 (머리 · 몸통 · 팔 · 다리 선). severity 1 = 몸통 붉게, 2 = 몸통 · 다리 붉게
-func _body(c: Control, center: Vector2, h: float, severity: int) -> void:
-	var s := h / 60.0
-	var line := Color(0.75, 0.78, 0.72)
-	var red := Color(0.85, 0.15, 0.15)
-	var head := center + Vector2(0, -24) * s
-	var torso := PackedVector2Array([center + Vector2(-7, -16) * s, center + Vector2(7, -16) * s, center + Vector2(6, 6) * s, center + Vector2(-6, 6) * s])
-	var leg_l := PackedVector2Array([center + Vector2(-6, 6) * s, center + Vector2(-1, 6) * s, center + Vector2(-2, 30) * s, center + Vector2(-6, 30) * s])
-	var leg_r := PackedVector2Array([center + Vector2(1, 6) * s, center + Vector2(6, 6) * s, center + Vector2(6, 30) * s, center + Vector2(2, 30) * s])
-	var arm_l := PackedVector2Array([center + Vector2(-11, -15) * s, center + Vector2(-7, -15) * s, center + Vector2(-8, 6) * s, center + Vector2(-12, 6) * s])
-	var arm_r := PackedVector2Array([center + Vector2(7, -15) * s, center + Vector2(11, -15) * s, center + Vector2(12, 6) * s, center + Vector2(8, 6) * s])
-	if severity >= 1:
-		c.draw_colored_polygon(torso, red)
-	if severity >= 2:
-		c.draw_colored_polygon(leg_l, red)
-		c.draw_colored_polygon(leg_r, red)
-	for poly in [torso, leg_l, leg_r, arm_l, arm_r]:
-		var cl: PackedVector2Array = poly.duplicate()
-		cl.append(poly[0])
-		c.draw_polyline(cl, line, 1.5, true)
-	c.draw_arc(head, 5.5 * s, 0, TAU, 20, line, 1.5, true)
+	c.draw_style_box(sb, r)
+	c.draw_string(_bold, r.position + Vector2(9, 16), text, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 12, fs, col)
 
 
 ## 획득 전리품: 왼쪽 글자 + 칸(판 · 이름 · ×개수)
@@ -293,7 +275,8 @@ func _side_art(id: String, pose: String, area: Rect2) -> void:
 	var tex := CharacterSprite2D._tex(path)
 	if tex == null:
 		return
-	var k := minf(area.size.y / tex.get_height(), area.size.x / tex.get_width())
+	# 키에 맞춰 같은 배율: 그림 전체 높이(768px 중 몸 759px) = 키, 175cm → 610px (좁은 칸이라도 줄이지 않음 — 옆으로 조금 넘쳐도 됨)
+	var k := (610.0 * u.height_cm / 175.0) / float(tex.get_height())
 	var t := TextureRect.new()
 	t.texture = tex
 	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
