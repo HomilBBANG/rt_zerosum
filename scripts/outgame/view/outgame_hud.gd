@@ -543,7 +543,7 @@ func _build_hint() -> void:
 	sb.content_margin_bottom = 4
 	bar.add_theme_stylebox_override("panel", sb)
 	bar.mouse_filter = MOUSE_FILTER_IGNORE
-	var items := ["대원 클릭: 선택 (한 번 더 = 해제)", "우클릭: 대화 · 정보", "방 클릭: 이동", "더블클릭: 뛰기", "도착 후 우클릭: 행동", "Tab: 다음 대원", "Esc: 해제", "F1: 도움말"]
+	var items := ["대원 클릭: 선택 (한 번 더 = 해제)", "우클릭: 대화 · 정보", "방 클릭: 이동", "더블클릭: 뛰기", "Space: 정지 · 재생", "1 · 2 · 3: 속도", "Tab: 다음 대원", "Esc: 해제", "F10: 설정"]
 	var t := _label("   |   ".join(items), 11, Color(0.82, 0.84, 0.8))
 	bar.add_child(t)
 	bar.clip_contents = true

@@ -236,7 +236,12 @@ func queue_action(npc_id: String, label: String, call: Callable) -> void:
 	under.queue_redraw()
 
 
+var _last_speed := 1   # Space 로 다시 재생할 때 속도
+
+
 func set_speed(v: int) -> void:
+	if v > 0:
+		_last_speed = v
 	speed = v
 	if v > 0 and not queued.is_empty():
 		var q := queued
@@ -387,8 +392,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F10:   # 설정 (음량 · 창 크기 · 전체 화면)
 				SettingsPanel.open(hud)
 				get_viewport().set_input_as_handled()
-			KEY_SPACE:
-				speed = 1 if speed == 0 else 0
+			KEY_SPACE:   # 정지 ↔ 재생 (재생 = 정지 전 속도)
+				set_speed(_last_speed if speed == 0 else 0)
+				get_viewport().set_input_as_handled()
+			KEY_1, KEY_KP_1:
+				set_speed(1)
+			KEY_2, KEY_KP_2:
+				set_speed(4)
+			KEY_3, KEY_KP_3:
+				set_speed(16)
 			KEY_EQUAL, KEY_KP_ADD:
 				zoom_step(1)
 			KEY_MINUS, KEY_KP_SUBTRACT:
