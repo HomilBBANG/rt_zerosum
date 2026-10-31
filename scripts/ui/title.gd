@@ -47,9 +47,7 @@ func _ready() -> void:
 	var has_data := Game.outgame_data != null
 	var cont := _art_button("btn_continue.png", 0, "이어하기")
 	cont.disabled = not (has_data and Game.has_save())
-	cont.pressed.connect(func():
-		if Game.load_campaign():
-			Game.go_base())
+	cont.pressed.connect(_on_continue)
 	var start := _art_button("btn_new.png", 1, "새 게임")
 	start.disabled = not has_data
 	start.pressed.connect(_on_new)
@@ -62,8 +60,10 @@ func _ready() -> void:
 		err.position = Vector2(84, BAR_RECT.position.y - 30)
 		add_child(err)
 	if Game.cli.get("scene", "title") == "title":
-		if str(Game.cli.get("title_ui", "")) == "settings":
-			_open_settings()
+		match str(Game.cli.get("title_ui", "")):
+			"settings": _open_settings()
+			"slots_load": _slot_window("load")
+			"slots_new": _slot_window("new")
 		Game.maybe_cli_capture()
 
 
@@ -106,36 +106,112 @@ func _open_settings() -> void:
 	SettingsPanel.open(self, true)
 
 
-func _on_new() -> void:
-	if not Game.has_save():
-		_start_new()
+## 이어하기: 저장 칸이 하나면 바로 그 칸, 여럿이면 저장 칸 창(불러오기)
+func _on_continue() -> void:
+	var n := 0
+	for k in range(1, Game.SAVE_SLOTS + 1):
+		if Game.has_slot(k):
+			n += 1
+	if n <= 1:
+		if Game.load_campaign():
+			Game.go_base()
 		return
+	_slot_window("load")
+
+
+## 새 게임: 저장 칸 창에서 시작할 칸 고르기 (차 있는 칸 = 덮어쓰기 확인)
+func _on_new() -> void:
+	_slot_window("new")
+
+
+## 저장 칸 창 (칸 3개: 게임 날짜 · 잔액 · 실제 저장 시각). mode = "load"(불러오기) | "new"(여기에 새로 시작)
+func _slot_window(mode: String) -> void:
+	if _confirm != null and is_instance_valid(_confirm):
+		_confirm.queue_free()
 	_confirm = PanelContainer.new()
 	UiPanel.apply(_confirm, Vector4(26, 20, 26, 22))
-	_confirm.position = Vector2(370, 290)
+	add_child(_confirm)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	_confirm.add_child(v)
+	var t := _label("불러오기 — 저장 칸" if mode == "load" else "새 게임 — 시작할 저장 칸", 20, Color(1, 0.92, 0.75))
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(t)
+	var latest := Game.latest_slot()
+	for k in range(1, Game.SAVE_SLOTS + 1):
+		var info := Game.slot_info(k)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		v.add_child(row)
+		var desc := "칸 %d — 비어 있음" % k
+		if info.exists:
+			desc = "칸 %d — %s%s\n저장: %s%s" % [k, info.label if str(info.label) != "" else "(예전 저장)", "  ·  $%d" % int(info.cash) if int(info.cash) >= 0 else "",
+				str(info.saved_at), "   (최근)" if k == latest else ""]
+		var l := _label(desc, 15, Color(0.92, 0.92, 0.88) if info.exists else Color(0.6, 0.62, 0.6))
+		l.custom_minimum_size = Vector2(380, 44)
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(l)
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(150, 42)
+		b.add_theme_font_override("font", _font)
+		b.add_theme_font_size_override("font_size", 16)
+		var slot := k
+		if mode == "load":
+			b.text = "불러오기"
+			b.disabled = not info.exists
+			UiButton.apply(b, "accept")
+			b.pressed.connect(func():
+				if Game.load_campaign(slot):
+					Game.go_base())
+		else:
+			b.text = "덮어쓰고 시작" if info.exists else "여기에 시작"
+			UiButton.apply(b, "decline" if info.exists else "accept")
+			b.pressed.connect(func():
+				if info.exists:
+					_confirm_overwrite(slot)
+				else:
+					_start_new(slot))
+		row.add_child(b)
+	var close := Button.new()
+	close.text = "닫기"
+	close.custom_minimum_size = Vector2(0, 40)
+	UiButton.apply(close, "choice", "choice_on")
+	close.pressed.connect(func(): _confirm.queue_free())
+	v.add_child(close)
+	_confirm.reset_size()
+	_confirm.position = Vector2(640, 330) - _confirm.get_combined_minimum_size() * 0.5
+
+
+func _confirm_overwrite(slot: int) -> void:
+	_confirm.queue_free()
+	_confirm = PanelContainer.new()
+	UiPanel.apply(_confirm, Vector4(26, 20, 26, 22))
 	add_child(_confirm)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	_confirm.add_child(v)
-	v.add_child(_label("저장된 기지가 있습니다. 새로 시작하면 덮어씁니다.", 18, Color(1, 0.95, 0.8)))
+	v.add_child(_label("칸 %d 에 저장된 기지가 있습니다. 새로 시작하면 덮어씁니다." % slot, 18, Color(1, 0.95, 0.8)))
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 10)
 	v.add_child(h)
 	var yes := Button.new()
-	yes.text = "새로 시작"
+	yes.text = "덮어쓰고 시작"
 	yes.custom_minimum_size = Vector2(200, 44)
 	UiButton.apply(yes, "accept")
-	yes.pressed.connect(_start_new)
+	yes.pressed.connect(func(): _start_new(slot))
 	h.add_child(yes)
 	var no := Button.new()
 	no.text = "취소"
 	no.custom_minimum_size = Vector2(200, 44)
 	UiButton.apply(no, "decline")
-	no.pressed.connect(func(): _confirm.queue_free())
+	no.pressed.connect(func(): _slot_window("new"))
 	h.add_child(no)
+	_confirm.reset_size()
+	_confirm.position = Vector2(640, 330) - _confirm.get_combined_minimum_size() * 0.5
 
 
-func _start_new() -> void:
+func _start_new(slot: int = 1) -> void:
+	Game.save_slot = slot
 	if Game.start_base_session(true):
 		Game.go_base()
 

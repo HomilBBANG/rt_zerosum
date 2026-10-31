@@ -696,6 +696,7 @@ func _cli_ui(spec: String) -> void:
 			if p.size() > 4:
 				sim.skip(int(p[4]))
 		"settings": SettingsPanel.open(hud)
+		"save_mark": hud._on_saved(Game.save_slot)   # 자동 저장 표시 확인용
 		"speed":   # speed:0|1|4|16 — 기지 시계 속도 (0 = 정지)
 			set_speed(int(p[1]))
 		"click":   # click:x:y — 그 화면 점을 왼쪽 클릭한 것처럼 (정지 중 이동 지시 무시 확인용)

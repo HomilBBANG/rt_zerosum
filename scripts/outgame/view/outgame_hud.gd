@@ -43,6 +43,7 @@ var _toast_t := 0.0
 func setup(p_hub: Node, p_sim: BaseSim) -> void:
 	hub = p_hub
 	sim = p_sim
+	Game.saved.connect(_on_saved)
 	font = load("res://assets/fonts/Pretendard-Medium.ttf")
 	bold = load("res://assets/fonts/Pretendard-Bold.ttf")
 	var f := FileAccess.open("res://assets/sprites/manifest.json", FileAccess.READ)
@@ -2711,3 +2712,39 @@ func open_sortie() -> void:
 
 func _exit_tree() -> void:
 	Bgm.changed_hook.erase(_refresh_music)
+	if Game.saved.is_connected(_on_saved):
+		Game.saved.disconnect(_on_saved)
+
+
+## 자동 저장 표시: 저장할 때마다 오른쪽 아래(확대 패널 위)에 저장 아이콘 + "저장됨 (칸 N)" 이 잠깐 떴다 사라짐
+var _save_mark: Control
+
+
+func _on_saved(slot: int) -> void:
+	if _save_mark == null:
+		_save_mark = PanelContainer.new()
+		UiPanel.apply(_save_mark, Vector4(10, 6, 14, 6), 0.92)
+		_save_mark.mouse_filter = MOUSE_FILTER_IGNORE
+		var h := _hbox(6)
+		_save_mark.add_child(h)
+		var ic := TextureRect.new()
+		ic.texture = load(V2 + "icon_save.png")
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.custom_minimum_size = Vector2(24, 24)
+		ic.mouse_filter = MOUSE_FILTER_IGNORE
+		h.add_child(ic)
+		var l := _label("", 13, Color(0.9, 0.92, 0.86))
+		l.name = "Text"
+		h.add_child(l)
+		add_child(_save_mark)
+	(_save_mark.find_child("Text", true, false) as Label).text = "저장됨 (칸 %d)" % slot
+	var ms := _save_mark.get_combined_minimum_size()
+	_save_mark.size = ms
+	_save_mark.position = Vector2(1280 - 10 - ms.x, 720 - 84 - ms.y)
+	_save_mark.modulate.a = 1.0
+	_save_mark.visible = true
+	var tw := _save_mark.create_tween()
+	tw.tween_interval(1.4)
+	tw.tween_property(_save_mark, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(func(): _save_mark.visible = false)

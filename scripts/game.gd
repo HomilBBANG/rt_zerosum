@@ -446,17 +446,71 @@ func ally_view(u: UnitData) -> UnitData:
 
 
 # ---------------------------------------------------------------- 아웃게임 (기지)
+## 저장 칸 3개 (user://save_1.json ~ save_3.json). 지금 칸 = save_slot (새 게임 · 불러오기에서 정함, 자동 저장도 이 칸에)
+## 예전 저장(user://outgame_save.json)은 처음 한 번 1번 칸으로 옮김.
+const SAVE_SLOTS := 3
+var save_slot := 1
+signal saved(slot: int)   # 저장할 때마다 (기지 HUD 의 자동 저장 표시)
+
+
+func slot_path(i: int) -> String:
+	return "user://save_%d.json" % i
+
+
+func _migrate_old_save() -> void:
+	if FileAccess.file_exists(SAVE_PATH) and not FileAccess.file_exists(slot_path(1)):
+		DirAccess.rename_absolute(ProjectSettings.globalize_path(SAVE_PATH), ProjectSettings.globalize_path(slot_path(1)))
+
+
+func has_slot(i: int) -> bool:
+	_migrate_old_save()
+	return FileAccess.file_exists(slot_path(i))
+
+
+## 저장이 하나라도 있나 (타이틀 '이어하기')
 func has_save() -> bool:
-	return FileAccess.file_exists(SAVE_PATH)
+	for i in range(1, SAVE_SLOTS + 1):
+		if has_slot(i):
+			return true
+	return false
 
 
-## 기지 세션 준비: new_game = true 면 새로 시작, 아니면 저장 불러오기 (없으면 새로)
+## 가장 최근에 저장한 칸 (없으면 0)
+func latest_slot() -> int:
+	var best := 0
+	var best_t := -1
+	for i in range(1, SAVE_SLOTS + 1):
+		if has_slot(i):
+			var t := FileAccess.get_modified_time(slot_path(i))
+			if t > best_t:
+				best_t = t
+				best = i
+	return best
+
+
+## 칸 정보 {exists, label(게임 날짜), cash, saved_at(실제 저장 시각)} — 타이틀 저장 칸 창
+func slot_info(i: int) -> Dictionary:
+	if not has_slot(i):
+		return {"exists": false}
+	var out := {"exists": true, "label": "", "cash": -1, "saved_at": Time.get_datetime_string_from_unix_time(FileAccess.get_modified_time(slot_path(i)) + _tz_bias(), true)}
+	var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(slot_path(i)))
+	if j is Dictionary and j.get("meta") is Dictionary:
+		out.label = str(j.meta.get("label", ""))
+		out.cash = int(j.meta.get("cash", -1))
+	return out
+
+
+func _tz_bias() -> int:
+	return int(Time.get_time_zone_from_system().get("bias", 0)) * 60
+
+
+## 기지 세션 준비: new_game = true 면 새로 시작, 아니면 지금 칸(save_slot) 불러오기 (없으면 새로)
 func start_base_session(new_game: bool = true) -> bool:
 	if outgame_data == null:
 		return false
 	autosave = not cli.has("editor_base") and not cli.has("shot")
-	if not new_game and has_save():
-		var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	if not new_game and has_slot(save_slot):
+		var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(slot_path(save_slot)))
 		if j is Dictionary:
 			base = BaseSim.from_dict(outgame_data, data, j)
 			campaign = true
@@ -472,20 +526,25 @@ func start_base_session(new_game: bool = true) -> bool:
 func save_campaign() -> bool:
 	if base == null or not autosave:
 		return base != null
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f := FileAccess.open(slot_path(save_slot), FileAccess.WRITE)
 	if f == null:
 		return false
 	var d := base.to_dict()
 	d["formation"] = formation
 	d["stage_id"] = stage_id
+	d["meta"] = {"label": base.clock.label(), "cash": base.ledger.cash}   # 저장 칸 창에 보일 요약
 	f.store_string(JSON.stringify(d))
+	f.close()
+	saved.emit(save_slot)
 	return true
 
 
-func load_campaign() -> bool:
+## 칸 i 를 불러와 그 칸으로 이어하기 (i = 0 이면 가장 최근 칸)
+func load_campaign(i: int = 0) -> bool:
+	save_slot = i if i > 0 else maxi(1, latest_slot())
 	if not start_base_session(false):
 		return false
-	var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	var j: Variant = JSON.parse_string(FileAccess.get_file_as_string(slot_path(save_slot)))
 	if j is Dictionary:
 		if j.get("formation") is Array and not (j.formation as Array).is_empty():
 			formation = []
@@ -497,8 +556,8 @@ func load_campaign() -> bool:
 
 
 func delete_save() -> void:
-	if has_save():
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	if has_slot(save_slot):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(slot_path(save_slot)))
 
 
 func go_title() -> void:
