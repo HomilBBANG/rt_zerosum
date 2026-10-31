@@ -33,6 +33,7 @@ var sim: BaseSim
 var v3d: BaseView3D
 var vp: SubViewport
 var under: BaseOverlay
+var walls: BaseOverlay
 var over: BaseOverlay
 var screen_root: Node2D
 var npc_views: Dictionary = {}     # npc id → NpcView
@@ -84,6 +85,13 @@ func _ready() -> void:
 	screen_root.add_child(under)
 	for id in sim.data.npc_order:
 		_add_npc_view(id)
+	walls = BaseOverlay.new()   # 방 사이 검은 벽 + 이름표 · 강조 — 대원 위 (대원이 벽 뒤로 지나감), 말풍선 아래
+	walls.mode = "walls"
+	walls.sim = sim
+	walls.v3d = v3d
+	walls.hub = self
+	walls.z_index = 300
+	screen_root.add_child(walls)
 	over = BaseOverlay.new()
 	over.mode = "over"
 	over.sim = sim
@@ -160,7 +168,7 @@ func jukebox_rect() -> Rect2:
 	var r := Rect2(project(a.position), Vector2.ZERO)
 	for i in 8:
 		r = r.expand(project(a.get_endpoint(i)))
-	return r
+	return r.grow(6.0)   # 축소해도 누르기 쉽게 화면 6px 여유
 
 
 func project(p: Vector3) -> Vector2:
@@ -614,6 +622,9 @@ func _cli_ui(spec: String) -> void:
 			hud.show_toast(r.msg, OutgameHud.GOOD if r.ok else OutgameHud.BAD)
 			if p.size() > 4:
 				sim.skip(int(p[4]))
+		"place":   # place:npc_dan:960 — 대원을 그 규칙 x 에 세우고 시계 정지 (벽 뒤로 가리는지 확인용)
+			(sim.npcs[p[1]] as NpcAgent).pos.x = float(p[2])
+			speed = 0
 		"act":   # act:npc_dan:sleep — 지금 방에서 행동
 			var r2 := sim.issue_activity(p[1], p[2])
 			hud.show_toast(r2.msg, OutgameHud.GOOD if r2.ok else OutgameHud.BAD)

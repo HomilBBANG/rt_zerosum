@@ -97,13 +97,25 @@ func hit_rect() -> Rect2:
 	return Rect2(position + Vector2(-w * 0.5, -screen_h - 6), Vector2(w, screen_h + 10))
 
 
-## 그 점이 이 대원의 몸 위인가: 그림이 있으면 지금 프레임의 불투명 픽셀 (몸 어디든, 빈 곳은 안 잡힘), 없으면 사각형
+## 그 점이 이 대원의 몸 위인가: 그림이 있으면 지금 프레임의 불투명 픽셀 (몸 어디든, 빈 곳은 안 잡힘), 없으면 사각형.
+## 축소하면 대원이 작아져 팔다리 몇 px 만 남으므로: 몸통 기둥(머리~발, 키의 0.3배 폭, 최소 14px)도 잡고, 픽셀 여유도 작을수록 넓게
 func hits(p: Vector2) -> bool:
 	if chr == null or chr.body == null or chr.body.texture == null:
 		return hit_rect().has_point(p)
+	if _core_rect().has_point(p):
+		return true
 	if not chr.drawn_rect().grow(4.0).has_point(p):   # 그려진 그림 전체 (예전 사각형은 상반신을 놓침)
 		return false
-	return chr.hits(p, 3.0)
+	return chr.hits(p, clampf(300.0 / maxf(1.0, screen_h), 3.0, 8.0))
+
+
+## 몸통 기둥 (누우면 몸 전체 사각형)
+func _core_rect() -> Rect2:
+	var r := hit_rect()
+	if _pose == "lie":
+		return r
+	var w := maxf(14.0, screen_h * 0.3)
+	return Rect2(r.get_center().x - w * 0.5, r.position.y, w, r.size.y)
 
 
 ## 그 점이 머리 위 '!' 요청 마커 위인가

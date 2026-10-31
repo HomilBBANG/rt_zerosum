@@ -57,11 +57,21 @@ func _fit_window() -> void:
 			var wh := str(cli.win).split("x")
 			win.size = Vector2i(int(wh[0]), int(wh[1]))
 		return
+	# 창 제목줄 · 테두리까지 화면(작업 표시줄 제외)에 들어가게: 실제 장식 크기를 재서 그만큼 빼고, 장식 포함 사각형을 가운데로.
+	# (예전엔 제목줄을 60px 로 어림하고 안쪽만 가운데 맞춤 → 화면 배율이 큰 모니터에서 아래가 작업 표시줄 뒤로 잘림)
 	var usable := DisplayServer.screen_get_usable_rect(win.current_screen)
-	var s := minf(1.0, minf(float(usable.size.x) / RENDER_SIZE.x, float(usable.size.y - 60) / RENDER_SIZE.y))
+	win.size = Vector2i(640, 360)
+	await get_tree().process_frame
+	var deco := win.get_size_with_decorations() - win.size
+	var off := win.position - win.get_position_with_decorations()   # 장식 왼쪽 위 → 안쪽 왼쪽 위
+	if deco.y <= 0:   # 장식 크기를 못 재면 넉넉히 어림 (제목줄 + 테두리)
+		deco = Vector2i(16, 80)
+		off = Vector2i(8, 72)
+	var room := usable.size - deco - Vector2i(8, 8)
+	var s := minf(1.0, minf(float(room.x) / RENDER_SIZE.x, float(room.y) / RENDER_SIZE.y))
 	var size := Vector2i(int(RENDER_SIZE.x * s), int(RENDER_SIZE.y * s))
 	win.size = size
-	win.position = usable.position + (usable.size - size) / 2
+	win.position = usable.position + (usable.size - (size + deco)) / 2 + off
 
 
 func _unhandled_key_input(event: InputEvent) -> void:

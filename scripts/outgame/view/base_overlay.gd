@@ -2,6 +2,7 @@ class_name BaseOverlay
 extends Node2D
 ## 3D 기지 위에 화면 좌표로 그리는 2D 덮개 (3D 카메라로 투영).
 ## mode "under": 방 이름표, 잠긴 방 자물쇠·가격, 마우스 강조, 층 이름표 — 대원보다 아래.
+## mode "walls": 방과 방 사이 검은 벽(3D 칸막이 앞면과 같은 자리) + 방 이름표 · 마우스 강조 · 주크박스 표시 — 대원보다 위 (대원이 벽 뒤로 지나감).
 ## mode "over": 대원끼리 대화 말풍선 — 대원보다 위. 말풍선 화면 사각형은 클릭 판정용으로 bubble_rects 에 남긴다.
 
 const OUTLINE := Color(0.06, 0.05, 0.08)
@@ -53,15 +54,34 @@ func _draw() -> void:
 	if mode == "over":
 		_draw_bubbles()
 		return
+	if mode == "walls":
+		for fid in sim.data.facility_order:
+			if sim.is_unlocked(fid):
+				_draw_walls(fid)
+		for fid in sim.data.facility_order:
+			if sim.is_unlocked(fid):
+				_draw_room_top(fid)
+		if hub.under.juke_hover:
+			var jr: Rect2 = hub.jukebox_rect()
+			draw_rect(jr, Color(1, 0.85, 0.3, 0.9), false, 2.0)
+			_text(Vector2(jr.get_center().x, jr.position.y - 6), "클릭: 음악", 14, Color(1, 0.85, 0.3), _font)
+		return
 	_draw_floor_frames()
 	for fid in sim.data.facility_order:
 		_draw_room(fid)
 	_draw_floor_labels()
 	_draw_move_mark()
-	if juke_hover:
-		var jr: Rect2 = hub.jukebox_rect()
-		draw_rect(jr, Color(1, 0.85, 0.3, 0.9), false, 2.0)
-		_text(Vector2(jr.get_center().x, jr.position.y - 6), "클릭: 음악", 14, Color(1, 0.85, 0.3), _font)
+
+
+## 방 좌우 칸막이 앞면 = 검은 띠 (3D 칸막이와 같은 자리 · 같은 색). 대원 위에 그려 벽 뒤로 지나가게 (연출만 — 이동은 그대로)
+const WALL_COL := Color(0.02, 0.02, 0.03)
+func _draw_walls(fid: String) -> void:
+	var b := v3d.room_box(fid)
+	var z := BaseView3D.FRONT_Z
+	for xs in [[b.x0, b.x0 + BaseView3D.WALL], [b.x1 - BaseView3D.WALL, b.x1]]:
+		var a := proj(Vector3(xs[0], b.y1, z))
+		var c := proj(Vector3(xs[1], b.y0, z))
+		draw_rect(Rect2(a, c - a).abs(), WALL_COL)
 
 
 func _draw_room(fid: String) -> void:
@@ -78,6 +98,14 @@ func _draw_room(fid: String) -> void:
 			draw_polyline(_closed(q), Color(1, 0.85, 0.3), 3.0)
 			_text(c + Vector2(0, 54 * k), "클릭: 해금", int(15 * k), Color(1, 0.85, 0.3), _font)
 		return
+
+
+## 열린 방의 이름표 · 마우스 강조 · 작업 표시 (벽 위에 — "walls" 모드)
+func _draw_room_top(fid: String) -> void:
+	var f: Dictionary = sim.data.facilities[fid]
+	var b := v3d.room_box(fid)
+	var q := front_quad(fid)
+	var hover_fid: String = hub.under.hover_fid
 	# 이름표 = 방 왼쪽 위 모서리에 딱 맞춤 (방이 좁으면 글자를 줄이고 잘라 방 밖으로 안 나가게)
 	var plate_at := _quad_rect(q).position
 	var label: String = f.name
