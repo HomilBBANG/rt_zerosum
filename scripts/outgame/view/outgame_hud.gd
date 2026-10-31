@@ -151,6 +151,14 @@ var _top_right: Control
 
 ## 상단: 왼쪽 = 날짜 바(day_bar 그림) 한 장이 날짜 · 속도 버튼 · 돈(지폐 그림) · 정보 줄 전체를 감쌈, 오른쪽 = 아이콘 버튼 (UI 패키지에서 자른 assets/ui/outgame/icons)
 func _build_top() -> void:
+	# 상단 HUD 맨 뒤 띠 (사용자 제공 어두운 띠, 원본 art_src/ui/top_band.webp) — 화면 폭 전체, 두 패널 뒤
+	var band := Control.new()
+	band.position = Vector2.ZERO
+	band.size = Vector2(1280, 6 + 189.0 * TOP_K + 8)
+	band.mouse_filter = MOUSE_FILTER_IGNORE
+	_nine_bg_lrtb(band, load(V2 + "band_top.png"), 8, 8, 8, 8)
+	add_child(band)
+	move_child(band, 0)   # HUD 의 제일 뒤
 	# 왼쪽 위: UI 패키지 v2 두 줄 패널 (윗줄 = 달력 · 날짜 · 속도 버튼, 아랫줄 = 지폐 · 잔액 | 미지급 | 결산 D-day)
 	var left := PanelContainer.new()
 	var em := StyleBoxEmpty.new()

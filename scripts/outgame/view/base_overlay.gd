@@ -78,11 +78,11 @@ func _draw_room(fid: String) -> void:
 			draw_polyline(_closed(q), Color(1, 0.85, 0.3), 3.0)
 			_text(c + Vector2(0, 54 * k), "클릭: 해금", int(15 * k), Color(1, 0.85, 0.3), _font)
 		return
-	# 이름표 (테두리 안쪽 왼쪽 위 — 방이 좁으면 글자를 줄이고 잘라 방 밖으로 안 나가게)
-	var plate_at := q[3] + Vector2(7, 11)
+	# 이름표 = 방 왼쪽 위 모서리에 딱 맞춤 (방이 좁으면 글자를 줄이고 잘라 방 밖으로 안 나가게)
+	var plate_at := _quad_rect(q).position
 	var label: String = f.name
 	var size := 14
-	var room_w: float = _quad_rect(q).size.x - 14.0
+	var room_w: float = _quad_rect(q).size.x
 	var tw := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	while tw + 36 > room_w and size > 10:
 		size -= 1
